@@ -38,7 +38,10 @@ const AuthPage = () => {
                 {/* <h1 className="text-3xl font-semibold text-foreground mb-2">
                   Welcome to Breneo
                 </h1> */}
-                <a href="/" className="flex items-center space-x-2">
+                <a
+                  href="/"
+                  className="flex items-center justify-content: center; space-x-2"
+                >
                   <img
                     src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
                     alt="Breneo Logo"
