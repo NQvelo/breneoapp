@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "homepage": "https://NQvelo.github.io/breneoapp",
+  "homepage": "https://dashboard.breneo.app",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
