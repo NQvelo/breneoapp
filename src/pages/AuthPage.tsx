@@ -17,7 +17,7 @@ const AuthPage = () => {
   return (
     <div className="min-h-screen bg-breneo-lightgray flex flex-col">
       {/* Simple header */}
-      <header className="bg-white py-3 px-4 md:py-4 md:px-6 shadow-sm">
+      {/* <header className="bg-white py-3 px-4 md:py-4 md:px-6 shadow-sm">
         <div className="container mx-auto">
           <a href="/" className="flex items-center space-x-2">
             <img
@@ -27,7 +27,7 @@ const AuthPage = () => {
             />
           </a>
         </div>
-      </header>
+      </header> */}
 
       {/* Main content */}
       <main className="flex-grow flex items-center justify-center py-6 px-3 md:py-12 md:px-4">
@@ -35,11 +35,18 @@ const AuthPage = () => {
           {!selectedRole ? (
             <div className="space-y-6">
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-semibold text-foreground mb-2">
+                {/* <h1 className="text-3xl font-semibold text-foreground mb-2">
                   Welcome to Breneo
-                </h1>
+                </h1> */}
+                <a href="/" className="flex items-center space-x-2">
+                  <img
+                    src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
+                    alt="Breneo Logo"
+                    className="h-8 md:h-10"
+                  />
+                </a>
                 <p className="text-muted-foreground">
-                  Choose your account type to get started
+                  Welcome to Breneo, Choose your account type to get started
                 </p>
               </div>
 

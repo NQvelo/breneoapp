@@ -80,10 +80,9 @@ export default {
       },
       height: {
         input: "58px", // custom height for inputs
+        button: "52px", // custom height for buttons
       },
-      minHeight: {
-        input: "58px", // optional, if you need min-height
-      },
+
       keyframes: {
         "accordion-down": {
           from: {
