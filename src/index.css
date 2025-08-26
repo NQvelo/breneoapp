@@ -1,6 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Removed Tailwind directives because Tailwind is not configured in the build process */
+/* @tailwind base; */
+/* @tailwind components; */
+/* @tailwind utilities; */
 
 @layer base {
   :root {
