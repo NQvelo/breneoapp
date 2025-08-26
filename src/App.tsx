@@ -22,96 +22,89 @@ import LoginPage from "./pages/LoginPage";
 
 const queryClient = new QueryClient();
 
-// const App = () => (
-//   <QueryClientProvider client={queryClient}>
-//     <AuthProvider>
-//       <TooltipProvider>
-//         <Toaster />
-//         <Sonner />
-//         <BrowserRouter>
-//           <Routes>
-//             <Route path="/" element={<LoginPage />} />
-//             <Route path="/auth/login" element={<LoginPage />} />
-//             <Route path="/auth/signup" element={<AuthPage />} />
-//             <Route
-//               path="/auth"
-//               element={<Navigate to="/auth/login" replace />}
-//             />
-//             <Route path="/email-confirmed" element={<EmailConfirmed />} />
-//             <Route
-//               path="/dashboard"
-//               element={
-//                 <ProtectedRoute>
-//                   <Dashboard />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/interests"
-//               element={
-//                 <ProtectedRoute>
-//                   <InterestsPage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/skill-test"
-//               element={
-//                 <ProtectedRoute>
-//                   <SkillTestPage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/skill-path"
-//               element={
-//                 <ProtectedRoute>
-//                   <SkillPathPage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/jobs"
-//               element={
-//                 <ProtectedRoute>
-//                   <JobsPage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/courses"
-//               element={
-//                 <ProtectedRoute>
-//                   <CoursesPage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/profile"
-//               element={
-//                 <ProtectedRoute>
-//                   <ProfilePage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route
-//               path="/academy/:academyName"
-//               element={
-//                 <ProtectedRoute>
-//                   <AcademyPage />
-//                 </ProtectedRoute>
-//               }
-//             />
-//             <Route path="*" element={<NotFound />} />
-//           </Routes>
-//         </BrowserRouter>
-//       </TooltipProvider>
-//     </AuthProvider>
-//   </QueryClientProvider>
-// );
-// src/App.tsx
-function App() {
-  return <h1>Hello from App</h1>;
-}
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        {/* remove <BrowserRouter> */}
+        <Routes>
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/signup" element={<AuthPage />} />
+          <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/email-confirmed" element={<EmailConfirmed />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/interests"
+            element={
+              <ProtectedRoute>
+                <InterestsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/skill-test"
+            element={
+              <ProtectedRoute>
+                <SkillTestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/skill-path"
+            element={
+              <ProtectedRoute>
+                <SkillPathPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/jobs"
+            element={
+              <ProtectedRoute>
+                <JobsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/courses"
+            element={
+              <ProtectedRoute>
+                <CoursesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/academy/:academyName"
+            element={
+              <ProtectedRoute>
+                <AcademyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        {/* remove </BrowserRouter> */}
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default App;
