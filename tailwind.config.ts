@@ -78,6 +78,12 @@ export default {
         md: "calc(16px - 2px)", // 14px
         sm: "calc(16px - 4px)",
       },
+      height: {
+        input: "58px", // custom height for inputs
+      },
+      minHeight: {
+        input: "58px", // optional, if you need min-height
+      },
       keyframes: {
         "accordion-down": {
           from: {
