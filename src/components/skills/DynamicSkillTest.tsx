@@ -21,6 +21,7 @@ export function DynamicSkillTest() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<string>("");
   const [questionNumber, setQuestionNumber] = useState<number>(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [questionOptions, setQuestionOptions] = useState<any[]>([]);
   const [selectedOption, setSelectedOption] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
