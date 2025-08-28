@@ -166,7 +166,7 @@ export function DynamicSkillTest() {
   // Start screen
   if (!hasStarted) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
+      <div className="assessment-container max-w-2xl mx-auto">
         <Card className="p-8 text-center">
           <h2 className="text-2xl font-bold text-breneo-navy mb-4">
             AI-Powered Dynamic Skill Assessment
@@ -317,7 +317,7 @@ export function DynamicSkillTest() {
   const progress = (questionNumber / 5) * 100;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto p-6">
       <div className="mb-8">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-lg font-medium">Dynamic Skill Assessment</h2>
