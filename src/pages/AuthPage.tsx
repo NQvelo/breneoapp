@@ -3,66 +3,47 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { Card, CardContent } from "@/components/ui/card";
 import { GraduationCap, Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
 const AuthPage = () => {
   const [selectedRole, setSelectedRole] = useState<
     "student" | "academy" | null
   >(null);
   const navigate = useNavigate();
+
   const handleRoleSelection = (role: "student" | "academy") => {
     setSelectedRole(role);
   };
+
   const handleBack = () => {
     setSelectedRole(null);
   };
+
   return (
     <div className="min-h-screen bg-breneo-lightgray flex flex-col">
-      {/* Simple header */}
-      {/* <header className="bg-white py-3 px-4 md:py-4 md:px-6 shadow-sm">
-        <div className="container mx-auto">
-          <a href="/" className="flex items-center space-x-2">
-            <img
-              src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
-              alt="Breneo Logo"
-              className="h-8 md:h-10"
-            />
-          </a>
-        </div>
-      </header> */}
-
       {/* Main content */}
       <main className="flex-grow flex items-center justify-center py-6 px-3 md:py-12 md:px-4">
         <div className="w-full max-w-md">
           {!selectedRole ? (
             <div className="space-y-6">
-              <div className="text-center mb-8 space-x-3">
-                {/* <h1 className="text-3xl font-semibold text-foreground mb-2">
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-semibold text-foreground mb-2">
                   Welcome to Breneo
-                </h1> */}
-                <a
-                  href="/"
-                  className="flex items-center justify-center space-x-2"
-                >
-                  <img
-                    src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
-                    alt="Breneo Logo"
-                    className="h-8 md:h-10"
-                  />
-                </a>
+                </h1>
                 <p className="text-muted-foreground">
-                  Welcome to Breneo, Choose your account type to get started
+                  Choose your account type to get started
                 </p>
               </div>
 
               <div className="space-y-4">
                 <Card
-                  className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/20"
+                  className="cursor-pointer border-2 border-white hover:border-[#60ccff] rounded-2xl"
                   onClick={() => handleRoleSelection("student")}
                 >
                   <CardContent className="p-6">
                     <div className="flex items-start space-x-4">
                       <div className="flex-shrink-0">
                         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <GraduationCap className="h-6 w-6 text-breneo-blue" />
+                          <GraduationCap className="h-6 w-6 text-primary" />
                         </div>
                       </div>
                       <div className="flex-1">
@@ -74,22 +55,19 @@ const AuthPage = () => {
                           career with our comprehensive learning platform
                         </p>
                       </div>
-                      {/* <div className="flex-shrink-0">
-                        <div className="w-6 h-6 border-2 border-border rounded-full"></div>
-                      </div> */}
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card
-                  className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/20"
+                  className="cursor-pointer border-2 border-white hover:border-[#60ccff] rounded-2xl"
                   onClick={() => handleRoleSelection("academy")}
                 >
                   <CardContent className="p-6">
                     <div className="flex items-start space-x-4">
                       <div className="flex-shrink-0">
                         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <Building2 className="h-6 w-6 text-breneo-blue" />
+                          <Building2 className="h-6 w-6 text-secondary" />
                         </div>
                       </div>
                       <div className="flex-1">
@@ -101,12 +79,23 @@ const AuthPage = () => {
                           build your educational platform
                         </p>
                       </div>
-                      {/* <div className="flex-shrink-0">
-                        <div className="w-6 h-6 border-2 border-border rounded-full"></div>
-                      </div> */}
                     </div>
                   </CardContent>
                 </Card>
+              </div>
+
+              <div className="text-center mt-6">
+                <button
+                  onClick={() => navigate("/auth/login")}
+                  className="text-sm transition-colors"
+                >
+                  <span className="text-gray-500">
+                    Already have an account?{" "}
+                  </span>
+                  <span className="text-blue-500 hover:text-blue-600">
+                    Sign in
+                  </span>
+                </button>
               </div>
             </div>
           ) : (
@@ -140,4 +129,5 @@ const AuthPage = () => {
     </div>
   );
 };
+
 export default AuthPage;

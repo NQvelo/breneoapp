@@ -13,12 +13,15 @@ import SkillTestPage from "./pages/SkillTestPage";
 import SkillPathPage from "./pages/SkillPathPage";
 import JobsPage from "./pages/JobsPage";
 import CoursesPage from "./pages/CoursesPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AcademyDashboard from "./pages/AcademyDashboard";
 import AcademyPage from "./pages/AcademyPage";
 import NotFound from "./pages/NotFound";
 import EmailConfirmed from "./pages/EmailConfirmed";
 import LoginPage from "./pages/LoginPage";
+
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const queryClient = new QueryClient();
 
@@ -28,12 +31,13 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/* remove <BrowserRouter> */}
+        {/* <BrowserRouter> */}
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/signup" element={<AuthPage />} />
           <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/email-confirmed" element={<EmailConfirmed />} />
           <Route
             path="/dashboard"
@@ -84,6 +88,14 @@ const App = () => (
             }
           />
           <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/profile"
             element={
               <ProtectedRoute>
@@ -101,7 +113,7 @@ const App = () => (
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
-        {/* remove </BrowserRouter> */}
+        {/* </BrowserRouter> */}
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
