@@ -28,6 +28,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-breneo-lightgray flex flex-col">
+<<<<<<< HEAD
       {/* <header className="bg-white py-3 px-4 md:py-4 md:px-6 shadow-sm">
         <div className="container mx-auto">
           <a href="/" className="flex items-center space-x-2">
@@ -36,6 +37,8 @@ const LoginPage: React.FC = () => {
         </div>
       </header> */}
 
+=======
+>>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       <main className="flex-grow flex items-center justify-center py-6 px-3 md:py-12 md:px-4">
         <div className="w-full max-w-md">
           <AuthForm onRequestSignUp={() => navigate("/auth/signup")} />
