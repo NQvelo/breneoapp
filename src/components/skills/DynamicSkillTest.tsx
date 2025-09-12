@@ -1,12 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Loader2 } from "lucide-react";
 
 interface Question {
+  id?: number;
   text: string;
+  skill?: string;
   option1: string;
   option2: string;
   option3: string;
@@ -16,181 +14,207 @@ interface Question {
 interface Result {
   total_score?: number;
   total_questions?: number;
-  score?: number;
-  score_per_skill?: Record<string, number>;
+  final_role?: string;
+  results?: Record<
+    string,
+    {
+      percentage: string;
+      recommendation: string;
+    }
+  >;
 }
 
 export function DynamicSkillTest() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [finished, setFinished] = useState(false);
-  const [result, setResult] = useState<Result | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
+    "career"
+  );
+  const [careerQuestions, setCareerQuestions] = useState<any[]>([]);
+  const [careerIndex, setCareerIndex] = useState(0);
+  const [careerAnswers, setCareerAnswers] = useState<any[]>([]);
+  const [roleMapping, setRoleMapping] = useState<string | null>(null);
 
-  
-  const startAssessment = () => {
-    setIsLoading(true);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
+  const [numQuestions] = useState(10);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [result, setResult] = useState<Result | null>(null);
+
+  // ==== Load career questions ====
+  useEffect(() => {
+    if (phase === "career") {
+      axios
+        .get("http://127.0.0.1:8000/api/career-questions-random/?limit=5")
+        .then((res) => setCareerQuestions(res.data))
+        .catch((err) => console.error(err));
+    }
+  }, [phase]);
+
+  const submitCareerAnswer = (option: any) => {
+    const question = careerQuestions[careerIndex];
+    setCareerAnswers((prev) => [
+      ...prev,
+      { questionId: question.id, answer: option.text },
+    ]);
+
+    if (!roleMapping) setRoleMapping(option.RoleMapping);
+
+    if (careerIndex + 1 < careerQuestions.length) {
+      setCareerIndex(careerIndex + 1);
+    } else {
+      setPhase("assessment");
+      startAssessment(option.RoleMapping);
+    }
+  };
+
+  const startAssessment = (role: string) => {
     axios
-      .post("https://breneo.onrender.com/api/start-assessment/", {
-        num_questions:10
+      .post("http://127.0.0.1:8000/api/start-assessment/", {
+        num_questions: numQuestions,
+        RoleMapping: role,
       })
       .then((res) => {
         setSessionId(res.data.session_id);
-        setQuestions(res.data.questions);
-        setCurrentIndex(0);
         setCurrentQuestion(res.data.questions[0]);
-        setFinished(false);
-        setResult(null);
+        setCurrentIndex(0);
       })
-      .catch((err) => console.error("Start error:", err))
-      .finally(() => setIsLoading(false));
+      .catch((err) => console.error(err));
   };
-
 
   const submitAnswer = (answer: string) => {
     if (!sessionId || !currentQuestion) return;
-    setIsLoading(true);
 
     axios
-      .post("https://breneo.onrender.com/api/submit-answer/", {
+      .post("http://127.0.0.1:8000/api/submit-answer/", {
         session_id: sessionId,
         question_text: currentQuestion.text,
-        answer: answer,
+        answer,
       })
-      .then(() => {
-        if (currentIndex + 1 < questions.length) {
-          setCurrentIndex(currentIndex + 1);
-          setCurrentQuestion(questions[currentIndex + 1]);
-        } else {
+      .then((res) => {
+        if (!res.data.next_question || currentIndex + 1 >= numQuestions) {
           finishAssessment();
+        } else {
+          setCurrentQuestion(res.data.next_question);
+          setCurrentIndex((prev) => prev + 1);
         }
       })
-      .catch((err) => console.error("Submit error:", err))
-      .finally(() => setIsLoading(false));
+      .catch((err) => console.error(err));
   };
 
- 
   const finishAssessment = () => {
     axios
-      .post("https://breneo.onrender.com/api/finish-assessment/", {
+      .post("http://127.0.0.1:8000/api/finish-assessment/", {
         session_id: sessionId,
       })
       .then((res) => {
         setResult(res.data);
-        setFinished(true);
+        setPhase("finished");
         setCurrentQuestion(null);
       })
-      .catch((err) => console.error("Finish error:", err));
+      .catch((err) => console.error(err));
   };
 
- 
-  const progress =
-    questions.length > 0 ? ((currentIndex + 1) / questions.length) * 100 : 0;
-
-  
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      {!sessionId && !finished && (
-        <Card className="p-8 text-center">
-          <h2 className="text-2xl font-bold text-breneo-navy mb-4">
-            AI-Powered Dynamic Skill Assessment
-          </h2>
-          <p className="text-gray-600 mb-6">
-            This personalized test adapts based on your answers, using AI to
-            generate relevant questions that help identify your strengths and
-            career potential.
-          </p>
-          <Button
-            onClick={startAssessment}
-            disabled={isLoading}
-            className="bg-breneo-blue hover:bg-breneo-blue/90"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Starting Test...
-              </>
-            ) : (
-              "Start Assessment"
-            )}
-          </Button>
-        </Card>
+    <div className="p-6 max-w-2xl mx-auto">
+      {/* ===== Phase Titles ===== */}
+      {phase === "career" && (
+        <h1 className="text-2xl font-bold mb-6">🎯 Interest Assessment</h1>
+      )}
+      {phase === "assessment" && (
+        <h1 className="text-2xl font-bold mb-6">⚡ Skill Assessment</h1>
+      )}
+      {phase === "finished" && (
+        <h1 className="text-2xl font-bold mb-6 text-green-600">
+          🏆 Final Results
+        </h1>
       )}
 
-      {currentQuestion && !finished && (
+      {/* Career Phase */}
+      {phase === "career" && careerQuestions.length > 0 && (
         <div>
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-medium">Dynamic Skill Assessment</h2>
-              <span className="text-sm text-gray-500">
-                Question {currentIndex + 1} of {questions.length}
-              </span>
-            </div>
-            <Progress value={progress} className="h-2" />
+          <div>
+            Question {careerIndex + 1} of {careerQuestions.length}
           </div>
-
-          <Card className="p-6">
-            <h3 className="text-xl font-medium mb-6">
-              {currentQuestion.text}
-            </h3>
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map((i) => {
-                const option =
-                  currentQuestion[`option${i}` as keyof Question] as string;
-                return (
-                  <Button
-                    key={i}
-                    onClick={() => submitAnswer(option)}
-                    disabled={isLoading}
-                    variant="outline"
-                    className="block w-full text-left"
-                  >
-                    {option}
-                  </Button>
-                );
-              })}
-            </div>
-          </Card>
+          <h2 className="mt-2 font-semibold">
+            {careerQuestions[careerIndex].text}
+          </h2>
+          {careerQuestions[careerIndex].options.map((opt: any) => (
+            <button
+              key={opt.id}
+              onClick={() => submitCareerAnswer(opt)}
+              className="block w-full my-2 px-4 py-2 border rounded hover:bg-gray-200"
+            >
+              {opt.text}
+            </button>
+          ))}
         </div>
       )}
 
-      {finished && result && (
-        <Card className="p-8 bg-green-50">
-          <h2 className="text-xl font-bold text-green-600">
-            ✅ ტესტი დასრულდა!
-          </h2>
-          <p className="mt-2">
-            საერთო შედეგი:{" "}
-            <strong>
-              {result.total_score !== undefined
-                ? `${result.total_score} / ${result.total_questions}`
-                : result.score || "მონაცემი არ არის"}
-            </strong>
+      {/* Assessment Phase */}
+      {phase === "assessment" && currentQuestion && (
+        <div>
+          <div>
+            Question {currentIndex + 1} of {numQuestions}
+          </div>
+          <p className="text-gray-600 mb-2">
+            <strong>Skill:</strong> {currentQuestion.skill}
+          </p>
+          <h2 className="mt-2 font-semibold">{currentQuestion.text}</h2>
+          {[1, 2, 3, 4].map((i) => (
+            <button
+              key={i}
+              className="block w-full my-2 px-4 py-2 border rounded hover:bg-gray-200"
+              onClick={() => submitAnswer(currentQuestion[`option${i}`])}
+            >
+              {currentQuestion[`option${i}`]}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Result Phase */}
+      {phase === "finished" && result && (
+        <div className="mt-6 p-4 border rounded bg-gray-100">
+          <p className="mt-2 font-medium">
+            საერთო შედეგი: {result.total_score} / {result.total_questions}
           </p>
 
-          <p className="mt-4">📊 ქულები უნარების მიხედვით:</p>
-          {result.score_per_skill &&
-          Object.keys(result.score_per_skill).length > 0 ? (
-            <ul className="list-disc pl-6">
-              {Object.entries(result.score_per_skill).map(([skill, score]) => (
-                <li key={skill}>
-                  {skill}: {score}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-500">მონაცემი არ არის</p>
+          <p className="mt-2 font-medium">
+            <strong>Final Role:</strong> {result.final_role || "N/A"}
+          </p>
+
+          {result.results && Object.keys(result.results).length > 0 && (
+            <div className="mt-4">
+              <p className="font-medium">📊 ქულები უნარების მიხედვით:</p>
+              <ul className="ml-4 list-disc">
+                {Object.entries(result.results)
+                  .filter(
+                    ([, data]) => parseFloat((data as any).percentage) > 0
+                  )
+                  .map(([skill, data]) => (
+                    <li key={skill}>
+                      {skill} – {(data as any).percentage} (threshold: 70%) →{" "}
+                      <strong>{(data as any).recommendation}</strong>
+                    </li>
+                  ))}
+              </ul>
+            </div>
           )}
 
-          <Button
-            onClick={startAssessment}
-            className="mt-6 bg-breneo-blue hover:bg-breneo-blue/90"
+          <button
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            onClick={() => {
+              setPhase("career");
+              setCareerIndex(0);
+              setCareerAnswers([]);
+              setRoleMapping(null);
+              setResult(null);
+              setSessionId(null);
+              setCurrentQuestion(null);
+            }}
           >
             🔄 თავიდან დაწყება
-          </Button>
-        </Card>
+          </button>
+        </div>
       )}
     </div>
   );
