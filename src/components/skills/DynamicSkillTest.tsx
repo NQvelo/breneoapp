@@ -28,8 +28,10 @@ export function DynamicSkillTest() {
   const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
     "career"
   );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [careerQuestions, setCareerQuestions] = useState<any[]>([]);
   const [careerIndex, setCareerIndex] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [careerAnswers, setCareerAnswers] = useState<any[]>([]);
   const [roleMapping, setRoleMapping] = useState<string | null>(null);
 
@@ -49,6 +51,7 @@ export function DynamicSkillTest() {
     }
   }, [phase]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const submitCareerAnswer = (option: any) => {
     const question = careerQuestions[careerIndex];
     setCareerAnswers((prev) => [
@@ -188,6 +191,7 @@ export function DynamicSkillTest() {
               <ul className="ml-4 list-disc">
                 {Object.entries(result.results)
                   .filter(
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     ([, data]) => parseFloat((data as any).percentage) > 0
                   )
                   .map(([skill, data]) => (

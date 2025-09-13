@@ -157,6 +157,7 @@ const JobsPage = () => {
       
       return matchesType && matchesLocation && matchesRemote && matchesSkills;
     })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .sort((a: any, b: any) => b.match - a.match); // Sort by match percentage from highest to lowest
 
   const handleTypeToggle = (type: string) => {
@@ -295,6 +296,7 @@ const JobsPage = () => {
                     </p>
                   </div>
                 )}
+               
                 {filteredJobs.map((job: any) => (
                   <Card key={job.id} className="overflow-hidden rounded-[24px]">
                     <CardContent className="p-0">

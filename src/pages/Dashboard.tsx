@@ -1,17 +1,3 @@
-<<<<<<< HEAD
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/contexts/AuthContext';
-import { Bell } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { calculateSkillScores } from '@/utils/skillTestUtils';
-import AcademyDashboard from './AcademyDashboard';
-=======
 import React from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -30,7 +16,6 @@ import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateSkillScores } from "@/utils/skillTestUtils";
 import AcademyDashboard from "./AcademyDashboard";
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 
 interface Job {
   id: string;
@@ -46,17 +31,6 @@ interface Job {
 }
 
 const fetchJobs = async () => {
-<<<<<<< HEAD
-  const baseUrl = 'https://remotive.com/api/remote-jobs';
-  const params = new URLSearchParams();
-  params.append('limit', '20'); // Get more jobs to have better matching options
-  
-  const response = await fetch(`${baseUrl}?${params}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch jobs');
-  }
-  
-=======
   const baseUrl = "https://remotive.com/api/remote-jobs";
   const params = new URLSearchParams();
   params.append("limit", "20"); // Get more jobs to have better matching options
@@ -66,29 +40,12 @@ const fetchJobs = async () => {
     throw new Error("Failed to fetch jobs");
   }
 
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
   const data = await response.json();
   return data.jobs || [];
 };
 
 const Dashboard = () => {
   const { user } = useAuth();
-<<<<<<< HEAD
-  
-  // Check user role to determine which dashboard to show
-  const { data: userRole, isLoading: roleLoading } = useQuery({
-    queryKey: ['user-role', user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      
-      return data?.role || 'user';
-=======
 
   // Check user role to determine which dashboard to show
   const { data: userRole, isLoading: roleLoading } = useQuery({
@@ -103,44 +60,28 @@ const Dashboard = () => {
         .single();
 
       return data?.role || "user";
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     },
     enabled: !!user,
   });
 
   // Mock user data - using real user data where available
   const userData = {
-<<<<<<< HEAD
-    name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User',
-    skillTestTaken: false
-=======
     name:
       user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User",
     skillTestTaken: false,
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
   };
 
   // Fetch user's skill scores - always call this hook
   const { data: userSkillScores = {}, isLoading: skillsLoading } = useQuery({
-<<<<<<< HEAD
-    queryKey: ['user-skills', user?.id],
-=======
     queryKey: ["user-skills", user?.id],
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     queryFn: async () => {
       if (!user) return {};
 
       try {
         const { data: answers, error } = await supabase
-<<<<<<< HEAD
-          .from('usertestanswers')
-          .select('*')
-          .eq('userid', user.id);
-=======
           .from("usertestanswers")
           .select("*")
           .eq("userid", user.id);
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 
         if (error || !answers || answers.length === 0) {
           return {};
@@ -148,29 +89,15 @@ const Dashboard = () => {
 
         return calculateSkillScores(answers);
       } catch (error) {
-<<<<<<< HEAD
-        console.error('Error fetching user skills:', error);
-        return {};
-      }
-    },
-    enabled: !!user && userRole !== 'academy',
-=======
         console.error("Error fetching user skills:", error);
         return {};
       }
     },
     enabled: !!user && userRole !== "academy",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Fetch real jobs - always call this hook
-<<<<<<< HEAD
-  const { data: jobs = [], isLoading: jobsLoading, error: jobsError } = useQuery({
-    queryKey: ['dashboard-jobs'],
-    queryFn: fetchJobs,
-    enabled: userRole !== 'academy',
-=======
   const {
     data: jobs = [],
     isLoading: jobsLoading,
@@ -179,7 +106,6 @@ const Dashboard = () => {
     queryKey: ["dashboard-jobs"],
     queryFn: fetchJobs,
     enabled: userRole !== "academy",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -198,11 +124,7 @@ const Dashboard = () => {
   }
 
   // Render academy dashboard for academy users
-<<<<<<< HEAD
-  if (userRole === 'academy') {
-=======
   if (userRole === "academy") {
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     return <AcademyDashboard />;
   }
 
@@ -214,43 +136,24 @@ const Dashboard = () => {
 
     const jobText = `${jobTitle} ${jobDescription}`.toLowerCase();
     let matchingSkills = 0;
-<<<<<<< HEAD
-    let totalUserSkills = Object.keys(userSkillScores).length;
-
-    Object.entries(userSkillScores).forEach(([skill, score]) => {
-      if (jobText.includes(skill.toLowerCase())) {
-        matchingSkills += (score as number);
-=======
     const totalUserSkills = Object.keys(userSkillScores).length;
 
     Object.entries(userSkillScores).forEach(([skill, score]) => {
       if (jobText.includes(skill.toLowerCase())) {
         matchingSkills += score as number;
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       }
     });
 
     if (totalUserSkills === 0) return 0;
-<<<<<<< HEAD
-    
-=======
-
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     const matchPercentage = Math.round((matchingSkills / totalUserSkills) * 10);
     return Math.min(Math.max(matchPercentage, 0), 95); // Cap between 0-95%
   };
 
   // Transform jobs and calculate matches
-<<<<<<< HEAD
-  const transformedJobs = jobs.map((job: any) => {
-    const matchPercentage = calculateJobMatch(job.title, job.description || '');
-    
-=======
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformedJobs = jobs.map((job: any) => {
     const matchPercentage = calculateJobMatch(job.title, job.description || "");
 
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     return {
       id: job.id,
       title: job.title,
@@ -261,22 +164,12 @@ const Dashboard = () => {
 
   // Get top 3 matched jobs
   const recommendedJobs = transformedJobs
-<<<<<<< HEAD
-=======
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     .sort((a: any, b: any) => b.match - a.match)
     .slice(0, 3);
 
   // Mock course recommendations
   const recommendedCourses = [
-<<<<<<< HEAD
-    { id: 1, title: 'UI/UX Fundamentals', provider: 'DesignAcademy', duration: '4 weeks' },
-    { id: 2, title: 'Digital Marketing Essentials', provider: 'LearnOnline', duration: '6 weeks' },
-  ];
-
-
-=======
     {
       id: 1,
       title: "UI/UX Fundamentals",
@@ -291,18 +184,13 @@ const Dashboard = () => {
     },
   ];
 
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
   return (
     <DashboardLayout>
       <div>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 md:mb-6 space-y-3 sm:space-y-0">
-<<<<<<< HEAD
-          <h1 className="text-xl md:text-2xl font-bold text-breneo-navy">Welcome, {userData.name}</h1>
-=======
           <h1 className="text-xl md:text-2xl font-bold text-breneo-navy">
             Welcome, {userData.name}
           </h1>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
           <div className="hidden md:flex items-center space-x-2">
             <Button variant="ghost" size="sm" className="p-2">
               <Bell className="h-5 w-5 text-gray-600" />
@@ -315,15 +203,6 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
                 <div>
-<<<<<<< HEAD
-                  <h3 className="text-lg md:text-xl font-semibold text-breneo-navy mb-2">Start Your Journey with Breneo</h3>
-                  <p className="text-sm md:text-base text-gray-600">Take your skill test to get personalized job and course recommendations tailored just for you.</p>
-                </div>
-                <Button asChild className="bg-breneo-blue hover:bg-breneo-blue/90 rounded-[24px] w-full md:w-auto">
-                  <Link to="/skill-test">
-                    Take Skill Test
-                  </Link>
-=======
                   <h3 className="text-lg md:text-xl font-semibold text-breneo-navy mb-2">
                     Start Your Journey with Breneo
                   </h3>
@@ -337,7 +216,6 @@ const Dashboard = () => {
                   className="bg-breneo-blue hover:bg-breneo-blue/90 rounded-[24px] w-full md:w-auto"
                 >
                   <Link to="/skill-test">Take Skill Test</Link>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                 </Button>
               </div>
             </CardContent>
@@ -347,17 +225,12 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
           <Card className="rounded-[24px]">
             <CardHeader className="pb-3 md:pb-6">
-<<<<<<< HEAD
-              <CardTitle className="text-lg md:text-xl">Top Job Matches</CardTitle>
-              <CardDescription className="text-sm md:text-base">Your best matching jobs based on skills</CardDescription>
-=======
               <CardTitle className="text-lg md:text-xl">
                 Top Job Matches
               </CardTitle>
               <CardDescription className="text-sm md:text-base">
                 Your best matching jobs based on skills
               </CardDescription>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
             </CardHeader>
             <CardContent className="pt-0">
               {jobsLoading || skillsLoading ? (
@@ -371,10 +244,6 @@ const Dashboard = () => {
                 </div>
               ) : jobsError ? (
                 <div className="text-center py-4 md:py-6">
-<<<<<<< HEAD
-                  <p className="text-red-500 mb-4 text-sm md:text-base">Failed to load job recommendations</p>
-                  <Button variant="outline" onClick={() => window.location.reload()} className="rounded-[24px] text-sm md:text-base">
-=======
                   <p className="text-red-500 mb-4 text-sm md:text-base">
                     Failed to load job recommendations
                   </p>
@@ -383,20 +252,11 @@ const Dashboard = () => {
                     onClick={() => window.location.reload()}
                     className="rounded-[24px] text-sm md:text-base"
                   >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                     Retry
                   </Button>
                 </div>
               ) : recommendedJobs.length > 0 ? (
                 <div className="space-y-3 md:space-y-4">
-<<<<<<< HEAD
-                  {recommendedJobs.map(job => (
-                    <div key={job.id} className="border rounded-[24px] p-3 md:p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-sm md:text-base truncate">{job.title}</h3>
-                          <p className="text-xs md:text-sm text-gray-500 truncate">{job.company}</p>
-=======
                   {recommendedJobs.map((job) => (
                     <div
                       key={job.id}
@@ -410,7 +270,6 @@ const Dashboard = () => {
                           <p className="text-xs md:text-sm text-gray-500 truncate">
                             {job.company}
                           </p>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                         </div>
                         <div className="bg-breneo-blue/10 text-breneo-blue px-2 py-1 rounded-[24px] text-xs md:text-sm font-medium ml-2 flex-shrink-0">
                           {job.match}% Match
@@ -419,25 +278,17 @@ const Dashboard = () => {
                     </div>
                   ))}
                   <div className="text-center mt-4">
-<<<<<<< HEAD
-                    <Button variant="outline" asChild className="rounded-[24px] w-full sm:w-auto text-sm md:text-base">
-=======
                     <Button
                       variant="outline"
                       asChild
                       className="rounded-[24px] w-full sm:w-auto text-sm md:text-base"
                     >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       <Link to="/jobs">View All Job Offers</Link>
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4 md:py-6">
-<<<<<<< HEAD
-                  <p className="text-gray-500 mb-4 text-sm md:text-base">Take your skill test to see job recommendations</p>
-                  <Button asChild className="bg-breneo-blue hover:bg-breneo-blue/90 rounded-[24px] w-full sm:w-auto text-sm md:text-base">
-=======
                   <p className="text-gray-500 mb-4 text-sm md:text-base">
                     Take your skill test to see job recommendations
                   </p>
@@ -445,7 +296,6 @@ const Dashboard = () => {
                     asChild
                     className="bg-breneo-blue hover:bg-breneo-blue/90 rounded-[24px] w-full sm:w-auto text-sm md:text-base"
                   >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                     <Link to="/skill-test">Take Skill Test</Link>
                   </Button>
                 </div>
@@ -455,34 +305,16 @@ const Dashboard = () => {
 
           <Card className="rounded-[24px]">
             <CardHeader className="pb-3 md:pb-6">
-<<<<<<< HEAD
-              <CardTitle className="text-lg md:text-xl">Recommended Courses</CardTitle>
-              <CardDescription className="text-sm md:text-base">Improve your skills with these learning paths</CardDescription>
-=======
               <CardTitle className="text-lg md:text-xl">
                 Recommended Courses
               </CardTitle>
               <CardDescription className="text-sm md:text-base">
                 Improve your skills with these learning paths
               </CardDescription>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
             </CardHeader>
             <CardContent className="pt-0">
               {recommendedCourses.length > 0 ? (
                 <div className="space-y-3 md:space-y-4">
-<<<<<<< HEAD
-                  {recommendedCourses.map(course => (
-                    <div key={course.id} className="border rounded-[24px] p-3 md:p-4">
-                      <div className="mb-2">
-                        <h3 className="font-medium text-sm md:text-base">{course.title}</h3>
-                        <p className="text-xs md:text-sm text-gray-500">{course.provider} · {course.duration}</p>
-                      </div>
-                      <Button variant="outline" size="sm" className="mt-2 rounded-[24px] text-xs md:text-sm">View Course</Button>
-                    </div>
-                  ))}
-                  <div className="text-center mt-4">
-                    <Button variant="outline" asChild className="rounded-[24px] w-full sm:w-auto text-sm md:text-base">
-=======
                   {recommendedCourses.map((course) => (
                     <div
                       key={course.id}
@@ -511,17 +343,12 @@ const Dashboard = () => {
                       asChild
                       className="rounded-[24px] w-full sm:w-auto text-sm md:text-base"
                     >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       <Link to="/courses">View All Courses</Link>
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-4 md:py-6">
-<<<<<<< HEAD
-                  <p className="text-gray-500 mb-4 text-sm md:text-base">Take your skill test to get course recommendations</p>
-                  <Button asChild className="bg-breneo-blue hover:bg-breneo-blue/90 rounded-[24px] w-full sm:w-auto text-sm md:text-base">
-=======
                   <p className="text-gray-500 mb-4 text-sm md:text-base">
                     Take your skill test to get course recommendations
                   </p>
@@ -529,7 +356,6 @@ const Dashboard = () => {
                     asChild
                     className="bg-breneo-blue hover:bg-breneo-blue/90 rounded-[24px] w-full sm:w-auto text-sm md:text-base"
                   >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                     <Link to="/skill-test">Take Skill Test</Link>
                   </Button>
                 </div>
@@ -541,38 +367,14 @@ const Dashboard = () => {
         <Card className="rounded-[24px]">
           <CardHeader className="pb-3 md:pb-6">
             <CardTitle className="text-lg md:text-xl">Your Progress</CardTitle>
-<<<<<<< HEAD
-            <CardDescription className="text-sm md:text-base">Track your journey with Breneo</CardDescription>
-=======
             <CardDescription className="text-sm md:text-base">
               Track your journey with Breneo
             </CardDescription>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-4 md:space-y-6">
               <div>
                 <div className="flex justify-between items-center mb-2">
-<<<<<<< HEAD
-                  <span className="text-sm md:text-base font-medium">Profile Completion</span>
-                  <span className="text-sm md:text-base text-gray-500">60%</span>
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm md:text-base font-medium">Skill Assessment</span>
-                  <span className="text-sm md:text-base text-gray-500">
-                    {userData.skillTestTaken ? 'Completed' : 'Not Started'}
-                  </span>
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm md:text-base font-medium">Courses Progress</span>
-                  <span className="text-sm md:text-base text-gray-500">0/5</span>
-=======
                   <span className="text-sm md:text-base font-medium">
                     Profile Completion
                   </span>
@@ -601,18 +403,12 @@ const Dashboard = () => {
                   <span className="text-sm md:text-base text-gray-500">
                     0/5
                   </span>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                 </div>
               </div>
             </div>
 
             <div className="mt-4 md:mt-6 text-center">
               <p className="text-xs md:text-sm text-gray-500 mb-3">
-<<<<<<< HEAD
-                Complete your profile and skill assessment for better recommendations
-              </p>
-              <Button variant="outline" className="text-breneo-blue rounded-[24px] text-sm md:text-base w-full sm:w-auto">Update Profile</Button>
-=======
                 Complete your profile and skill assessment for better
                 recommendations
               </p>
@@ -622,7 +418,6 @@ const Dashboard = () => {
               >
                 Update Profile
               </Button>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
             </div>
           </CardContent>
         </Card>
