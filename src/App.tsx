@@ -13,10 +13,7 @@ import SkillTestPage from "./pages/SkillTestPage";
 import SkillPathPage from "./pages/SkillPathPage";
 import JobsPage from "./pages/JobsPage";
 import CoursesPage from "./pages/CoursesPage";
-<<<<<<< HEAD
-=======
 import NotificationsPage from "./pages/NotificationsPage";
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 import ProfilePage from "./pages/ProfilePage";
 import AcademyDashboard from "./pages/AcademyDashboard";
 import AcademyPage from "./pages/AcademyPage";
@@ -24,11 +21,8 @@ import NotFound from "./pages/NotFound";
 import EmailConfirmed from "./pages/EmailConfirmed";
 import LoginPage from "./pages/LoginPage";
 
-<<<<<<< HEAD
-=======
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -37,20 +31,13 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-<<<<<<< HEAD
-        {/* remove <BrowserRouter> */}
-=======
         {/* <BrowserRouter> */}
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/signup" element={<AuthPage />} />
           <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
-<<<<<<< HEAD
-=======
           <Route path="/reset-password" element={<ResetPasswordPage />} />
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
           <Route path="/email-confirmed" element={<EmailConfirmed />} />
           <Route
             path="/dashboard"
@@ -101,8 +88,6 @@ const App = () => (
             }
           />
           <Route
-<<<<<<< HEAD
-=======
             path="/notifications"
             element={
               <ProtectedRoute>
@@ -111,7 +96,6 @@ const App = () => (
             }
           />
           <Route
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
             path="/profile"
             element={
               <ProtectedRoute>
@@ -129,11 +113,7 @@ const App = () => (
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
-<<<<<<< HEAD
-        {/* remove </BrowserRouter> */}
-=======
         {/* </BrowserRouter> */}
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

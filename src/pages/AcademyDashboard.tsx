@@ -1,19 +1,3 @@
-<<<<<<< HEAD
-import React, { useState, useEffect } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, GraduationCap, BookOpen, Clock, Users } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-=======
 import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -56,7 +40,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 
 interface Course {
   id: string;
@@ -82,30 +65,13 @@ interface AcademyProfile {
   website_url: string;
   contact_email: string;
   is_verified: boolean;
-<<<<<<< HEAD
-=======
   logo_url: string | null;
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 }
 
 const AcademyDashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
-<<<<<<< HEAD
-  const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isAddingCourse, setIsAddingCourse] = useState(false);
-  const [courseForm, setCourseForm] = useState({
-    title: '',
-    description: '',
-    category: '',
-    level: '',
-    duration: '',
-    required_skills: '',
-    topics: '',
-    image: ''
-=======
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null
   );
@@ -120,7 +86,6 @@ const AcademyDashboard = () => {
     required_skills: "",
     topics: "",
     image: "",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
   });
 
   useEffect(() => {
@@ -138,15 +103,9 @@ const AcademyDashboard = () => {
   const fetchAcademyData = async () => {
     try {
       const { data, error } = await supabase
-<<<<<<< HEAD
-        .from('academy_profiles')
-        .select('*')
-        .eq('user_id', user?.id)
-=======
         .from("academy_profiles")
         .select("*")
         .eq("user_id", user?.id)
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
         .single();
 
       if (error) throw error;
@@ -155,11 +114,7 @@ const AcademyDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to load academy profile",
-<<<<<<< HEAD
-        variant: "destructive"
-=======
         variant: "destructive",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       });
     }
   };
@@ -167,19 +122,11 @@ const AcademyDashboard = () => {
   const fetchCourses = async () => {
     try {
       const { data, error } = await supabase
-<<<<<<< HEAD
-        .from('courses')
-        .select('*')
-        .eq('academy_id', academyProfile?.id)
-        .eq('is_academy_course', true)
-        .order('created_at', { ascending: false });
-=======
         .from("courses")
         .select("*")
         .eq("academy_id", academyProfile?.id)
         .eq("is_academy_course", true)
         .order("created_at", { ascending: false });
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 
       if (error) throw error;
       setCourses(data || []);
@@ -187,11 +134,7 @@ const AcademyDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to load courses",
-<<<<<<< HEAD
-        variant: "destructive"
-=======
         variant: "destructive",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       });
     } finally {
       setLoading(false);
@@ -200,11 +143,6 @@ const AcademyDashboard = () => {
 
   const handleAddCourse = async () => {
     if (!academyProfile) return;
-<<<<<<< HEAD
-    
-=======
-
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
     setIsAddingCourse(true);
     try {
       const courseData = {
@@ -214,20 +152,6 @@ const AcademyDashboard = () => {
         level: courseForm.level,
         duration: courseForm.duration,
         provider: academyProfile.academy_name,
-<<<<<<< HEAD
-        required_skills: courseForm.required_skills.split(',').map(s => s.trim()).filter(s => s),
-        topics: courseForm.topics.split(',').map(s => s.trim()).filter(s => s),
-        image: courseForm.image || '/lovable-uploads/6bee4aa6-3a7f-4806-98bd-dc73a1955812.png',
-        academy_id: academyProfile.id,
-        is_academy_course: true,
-        enrolled: false,
-        popular: false
-      };
-
-      const { error } = await supabase
-        .from('courses')
-        .insert(courseData);
-=======
         required_skills: courseForm.required_skills
           .split(",")
           .map((s) => s.trim())
@@ -246,26 +170,11 @@ const AcademyDashboard = () => {
       };
 
       const { error } = await supabase.from("courses").insert(courseData);
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 
       if (error) throw error;
 
       toast({
         title: "Success",
-<<<<<<< HEAD
-        description: "Course added successfully"
-      });
-
-      setCourseForm({
-        title: '',
-        description: '',
-        category: '',
-        level: '',
-        duration: '',
-        required_skills: '',
-        topics: '',
-        image: ''
-=======
         description: "Course added successfully",
       });
 
@@ -278,7 +187,6 @@ const AcademyDashboard = () => {
         required_skills: "",
         topics: "",
         image: "",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       });
 
       fetchCourses();
@@ -286,11 +194,7 @@ const AcademyDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to add course",
-<<<<<<< HEAD
-        variant: "destructive"
-=======
         variant: "destructive",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       });
     } finally {
       setIsAddingCourse(false);
@@ -300,25 +204,15 @@ const AcademyDashboard = () => {
   const handleDeleteCourse = async (courseId: string) => {
     try {
       const { error } = await supabase
-<<<<<<< HEAD
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-=======
         .from("courses")
         .delete()
         .eq("id", courseId);
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
 
       if (error) throw error;
 
       toast({
         title: "Success",
-<<<<<<< HEAD
-        description: "Course deleted successfully"
-=======
         description: "Course deleted successfully",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       });
 
       fetchCourses();
@@ -326,11 +220,7 @@ const AcademyDashboard = () => {
       toast({
         title: "Error",
         description: "Failed to delete course",
-<<<<<<< HEAD
-        variant: "destructive"
-=======
         variant: "destructive",
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
       });
     }
   };
@@ -350,17 +240,12 @@ const AcademyDashboard = () => {
       <DashboardLayout>
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
-<<<<<<< HEAD
-            <h2 className="text-2xl font-bold mb-4">Academy Profile Not Found</h2>
-            <p className="text-muted-foreground">Please contact support to set up your academy profile.</p>
-=======
             <h2 className="text-2xl font-bold mb-4">
               Academy Profile Not Found
             </h2>
             <p className="text-muted-foreground">
               Please contact support to set up your academy profile.
             </p>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
           </div>
         </div>
       </DashboardLayout>
@@ -374,21 +259,6 @@ const AcademyDashboard = () => {
         <div className="bg-white rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-<<<<<<< HEAD
-              <div className="w-16 h-16 bg-breneo-blue rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">{academyProfile.academy_name}</h1>
-                <p className="text-muted-foreground">{academyProfile.description}</p>
-                <div className="flex items-center mt-2 space-x-4">
-                  {academyProfile.is_verified && (
-                    <Badge variant="outline" className="text-green-600 border-green-600">
-                      ✓ Verified
-                    </Badge>
-                  )}
-                  <span className="text-sm text-muted-foreground">{courses.length} Courses</span>
-=======
               {academyProfile.logo_url ? (
                 <img
                   src={academyProfile.logo_url}
@@ -419,7 +289,6 @@ const AcademyDashboard = () => {
                   <span className="text-sm text-muted-foreground">
                     {courses.length} Courses
                   </span>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                 </div>
               </div>
             </div>
@@ -452,13 +321,9 @@ const AcademyDashboard = () => {
                     <Input
                       id="title"
                       value={courseForm.title}
-<<<<<<< HEAD
-                      onChange={(e) => setCourseForm({...courseForm, title: e.target.value})}
-=======
                       onChange={(e) =>
                         setCourseForm({ ...courseForm, title: e.target.value })
                       }
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       className="col-span-3"
                     />
                   </div>
@@ -469,16 +334,12 @@ const AcademyDashboard = () => {
                     <Textarea
                       id="description"
                       value={courseForm.description}
-<<<<<<< HEAD
-                      onChange={(e) => setCourseForm({...courseForm, description: e.target.value})}
-=======
                       onChange={(e) =>
                         setCourseForm({
                           ...courseForm,
                           description: e.target.value,
                         })
                       }
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       className="col-span-3"
                     />
                   </div>
@@ -486,15 +347,11 @@ const AcademyDashboard = () => {
                     <Label htmlFor="category" className="text-right">
                       Category
                     </Label>
-<<<<<<< HEAD
-                    <Select onValueChange={(value) => setCourseForm({...courseForm, category: value})}>
-=======
                     <Select
                       onValueChange={(value) =>
                         setCourseForm({ ...courseForm, category: value })
                       }
                     >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -503,17 +360,12 @@ const AcademyDashboard = () => {
                         <SelectItem value="design">Design</SelectItem>
                         <SelectItem value="marketing">Marketing</SelectItem>
                         <SelectItem value="business">Business</SelectItem>
-<<<<<<< HEAD
-                        <SelectItem value="data-science">Data Science</SelectItem>
-                        <SelectItem value="cybersecurity">Cybersecurity</SelectItem>
-=======
                         <SelectItem value="data-science">
                           Data Science
                         </SelectItem>
                         <SelectItem value="cybersecurity">
                           Cybersecurity
                         </SelectItem>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       </SelectContent>
                     </Select>
                   </div>
@@ -521,27 +373,19 @@ const AcademyDashboard = () => {
                     <Label htmlFor="level" className="text-right">
                       Level
                     </Label>
-<<<<<<< HEAD
-                    <Select onValueChange={(value) => setCourseForm({...courseForm, level: value})}>
-=======
                     <Select
                       onValueChange={(value) =>
                         setCourseForm({ ...courseForm, level: value })
                       }
                     >
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select level" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="beginner">Beginner</SelectItem>
-<<<<<<< HEAD
-                        <SelectItem value="intermediate">Intermediate</SelectItem>
-=======
                         <SelectItem value="intermediate">
                           Intermediate
                         </SelectItem>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                         <SelectItem value="advanced">Advanced</SelectItem>
                       </SelectContent>
                     </Select>
@@ -554,16 +398,12 @@ const AcademyDashboard = () => {
                       id="duration"
                       placeholder="e.g., 8 weeks"
                       value={courseForm.duration}
-<<<<<<< HEAD
-                      onChange={(e) => setCourseForm({...courseForm, duration: e.target.value})}
-=======
                       onChange={(e) =>
                         setCourseForm({
                           ...courseForm,
                           duration: e.target.value,
                         })
                       }
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       className="col-span-3"
                     />
                   </div>
@@ -575,16 +415,12 @@ const AcademyDashboard = () => {
                       id="skills"
                       placeholder="Comma separated skills"
                       value={courseForm.required_skills}
-<<<<<<< HEAD
-                      onChange={(e) => setCourseForm({...courseForm, required_skills: e.target.value})}
-=======
                       onChange={(e) =>
                         setCourseForm({
                           ...courseForm,
                           required_skills: e.target.value,
                         })
                       }
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       className="col-span-3"
                     />
                   </div>
@@ -596,13 +432,9 @@ const AcademyDashboard = () => {
                       id="topics"
                       placeholder="Comma separated topics"
                       value={courseForm.topics}
-<<<<<<< HEAD
-                      onChange={(e) => setCourseForm({...courseForm, topics: e.target.value})}
-=======
                       onChange={(e) =>
                         setCourseForm({ ...courseForm, topics: e.target.value })
                       }
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       className="col-span-3"
                     />
                   </div>
@@ -614,26 +446,14 @@ const AcademyDashboard = () => {
                       id="image"
                       placeholder="Optional image URL"
                       value={courseForm.image}
-<<<<<<< HEAD
-                      onChange={(e) => setCourseForm({...courseForm, image: e.target.value})}
-=======
                       onChange={(e) =>
                         setCourseForm({ ...courseForm, image: e.target.value })
                       }
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                       className="col-span-3"
                     />
                   </div>
                 </div>
                 <DialogFooter>
-<<<<<<< HEAD
-                  <Button 
-                    onClick={handleAddCourse}
-                    disabled={isAddingCourse || !courseForm.title || !courseForm.description}
-                    className="bg-breneo-blue hover:bg-breneo-blue/90"
-                  >
-                    {isAddingCourse ? 'Adding...' : 'Add Course'}
-=======
                   <Button
                     onClick={handleAddCourse}
                     disabled={
@@ -644,7 +464,6 @@ const AcademyDashboard = () => {
                     className="bg-breneo-blue hover:bg-breneo-blue/90"
                   >
                     {isAddingCourse ? "Adding..." : "Add Course"}
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -657,52 +476,6 @@ const AcademyDashboard = () => {
               <div className="text-center py-8">
                 <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No courses yet</h3>
-<<<<<<< HEAD
-                <p className="text-muted-foreground">Add your first course to get started</p>
-              </div>
-            ) : (
-              courses.map((course) => (
-                <Card key={course.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-semibold">{course.title}</h3>
-                          <Badge variant="secondary">{course.level}</Badge>
-                          <Badge variant="outline">{course.category}</Badge>
-                        </div>
-                        <p className="text-muted-foreground mb-3">{course.description}</p>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                          <div className="flex items-center">
-                            <Clock className="w-4 h-4 mr-1" />
-                            {course.duration}
-                          </div>
-                          <div className="flex items-center">
-                            <BookOpen className="w-4 h-4 mr-1" />
-                            {course.topics.length} topics
-                          </div>
-                        </div>
-                        {course.required_skills.length > 0 && (
-                          <div className="mt-3">
-                            <span className="text-sm font-medium">Required Skills: </span>
-                            <span className="text-sm text-muted-foreground">
-                              {course.required_skills.join(', ')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <Button variant="outline" size="sm">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleDeleteCourse(course.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-=======
                 <p className="text-muted-foreground">
                   Add your first course to get started
                 </p>
@@ -774,7 +547,6 @@ const AcademyDashboard = () => {
                         >
                           <Trash2 className="w-4 h-4 mr-2 lg:mr-0" />
                           <span className="lg:hidden">Delete</span>
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
                         </Button>
                       </div>
                     </div>
@@ -789,8 +561,4 @@ const AcademyDashboard = () => {
   );
 };
 
-<<<<<<< HEAD
 export default AcademyDashboard;
-=======
-export default AcademyDashboard;
->>>>>>> b2de839eb07d4851272ea692cd669a25bbaff333
