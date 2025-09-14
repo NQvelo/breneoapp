@@ -45,7 +45,7 @@ export function DynamicSkillTest() {
   useEffect(() => {
     if (phase === "career") {
       axios
-        .get("http://127.0.0.1:8000/api/career-questions-random/?limit=5")
+        .get("https://breneo.onrender.com/api/career-questions-random/?limit=5")
         .then((res) => setCareerQuestions(res.data))
         .catch((err) => console.error(err));
     }
@@ -71,7 +71,7 @@ export function DynamicSkillTest() {
 
   const startAssessment = (role: string) => {
     axios
-      .post("http://127.0.0.1:8000/api/start-assessment/", {
+      .post("https://breneo.onrender.com/api/start-assessment/", {
         num_questions: numQuestions,
         RoleMapping: role,
       })
@@ -87,7 +87,7 @@ export function DynamicSkillTest() {
     if (!sessionId || !currentQuestion) return;
 
     axios
-      .post("http://127.0.0.1:8000/api/submit-answer/", {
+      .post("https://breneo.onrender.com/api/submit-answer/", {
         session_id: sessionId,
         question_text: currentQuestion.text,
         answer,
@@ -105,7 +105,7 @@ export function DynamicSkillTest() {
 
   const finishAssessment = () => {
     axios
-      .post("http://127.0.0.1:8000/api/finish-assessment/", {
+      .post("https://breneo.onrender.com/api/finish-assessment/", {
         session_id: sessionId,
       })
       .then((res) => {
