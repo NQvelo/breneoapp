@@ -11,10 +11,17 @@ interface Question {
   option4: string;
 }
 
+interface CareerOption {
+  id: number;
+  text: string;
+  RoleMapping: string;
+}
+
 interface Result {
   total_score?: number;
   total_questions?: number;
   final_role?: string;
+  score_per_skill?: Record<string, string>;
   results?: Record<
     string,
     {
@@ -28,18 +35,20 @@ export function DynamicSkillTest() {
   const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
     "career"
   );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [careerQuestions, setCareerQuestions] = useState<any[]>([]);
   const [careerIndex, setCareerIndex] = useState(0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [careerAnswers, setCareerAnswers] = useState<any[]>([]);
   const [roleMapping, setRoleMapping] = useState<string | null>(null);
 
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
-  const [numQuestions] = useState(10);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [result, setResult] = useState<Result | null>(null);
+  const [techSession, setTechSession] = useState<any>(null);
+  const [softSession, setSoftSession] = useState<any>(null);
+  const [currentTechQ, setCurrentTechQ] = useState<Question | null>(null);
+  const [currentSoftQ, setCurrentSoftQ] = useState<Question | null>(null);
+  const [techDone, setTechDone] = useState(false);
+  const [softDone, setSoftDone] = useState(false);
+  const [results, setResults] = useState<Result | null>(null);
+
+  const numQuestions = 5;
 
   // ==== Load career questions ====
   useEffect(() => {
@@ -51,8 +60,7 @@ export function DynamicSkillTest() {
     }
   }, [phase]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const submitCareerAnswer = (option: any) => {
+  const submitCareerAnswer = (option: CareerOption) => {
     const question = careerQuestions[careerIndex];
     setCareerAnswers((prev) => [
       ...prev,
@@ -65,161 +73,201 @@ export function DynamicSkillTest() {
       setCareerIndex(careerIndex + 1);
     } else {
       setPhase("assessment");
-      startAssessment(option.RoleMapping);
+      startAssessments();
     }
   };
 
-  const startAssessment = (role: string) => {
-    axios
-      .post("https://breneo.onrender.com/api/start-assessment/", {
-        num_questions: numQuestions,
-        RoleMapping: role,
-      })
-      .then((res) => {
-        setSessionId(res.data.session_id);
-        setCurrentQuestion(res.data.questions[0]);
-        setCurrentIndex(0);
-      })
-      .catch((err) => console.error(err));
+  const startAssessments = async () => {
+    try {
+      const techRes = await axios.post(
+        "https://breneo.onrender.com/api/start-assessment/",
+        { num_questions: numQuestions, RoleMapping: roleMapping }
+      );
+      const softRes = await axios.post(
+        "https://breneo.onrender.com/api/soft/start/",
+        { num_questions: numQuestions }
+      );
+      setTechSession(techRes.data);
+      setSoftSession(softRes.data);
+      setCurrentTechQ(techRes.data.questions[0]);
+      setCurrentSoftQ(softRes.data.first_question);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const submitAnswer = (answer: string) => {
-    if (!sessionId || !currentQuestion) return;
-
-    axios
-      .post("https://breneo.onrender.com/api/submit-answer/", {
-        session_id: sessionId,
-        question_text: currentQuestion.text,
-        answer,
-      })
-      .then((res) => {
-        if (!res.data.next_question || currentIndex + 1 >= numQuestions) {
-          finishAssessment();
-        } else {
-          setCurrentQuestion(res.data.next_question);
-          setCurrentIndex((prev) => prev + 1);
+  const submitTechAnswer = async (answer: string) => {
+    if (!techSession || !currentTechQ) return;
+    try {
+      const res = await axios.post(
+        "https://breneo.onrender.com/api/submit-answer/",
+        {
+          session_id: techSession.session_id,
+          question_text: currentTechQ.text,
+          answer,
         }
-      })
-      .catch((err) => console.error(err));
+      );
+      if (res.data.next_question) setCurrentTechQ(res.data.next_question);
+      else {
+        setTechDone(true);
+        setCurrentTechQ(null);
+        finishTechAssessment();
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const finishAssessment = () => {
-    axios
-      .post("https://breneo.onrender.com/api/finish-assessment/", {
-        session_id: sessionId,
-      })
-      .then((res) => {
-        setResult(res.data);
-        setPhase("finished");
-        setCurrentQuestion(null);
-      })
-      .catch((err) => console.error(err));
+  const submitSoftAnswer = async (answer: string) => {
+    if (!softSession || !currentSoftQ) return;
+    try {
+      const res = await axios.post(
+        "https://breneo.onrender.com/api/soft/submit/",
+        {
+          session_id: softSession.session_id,
+          question_text: currentSoftQ.questiontext,
+          answer,
+        }
+      );
+      if (res.data.next_question) setCurrentSoftQ(res.data.next_question);
+      else {
+        setSoftDone(true);
+        setCurrentSoftQ(null);
+        finishSoftAssessment();
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  return (
-    <div className="p-6 max-w-2xl mx-auto">
-      {/* ===== Phase Titles ===== */}
-      {phase === "career" && (
-        <h1 className="text-2xl font-bold mb-6">🎯 Interest Assessment</h1>
-      )}
-      {phase === "assessment" && (
-        <h1 className="text-2xl font-bold mb-6">⚡ Skill Assessment</h1>
-      )}
-      {phase === "finished" && (
-        <h1 className="text-2xl font-bold mb-6 text-green-600">
-          🏆 Final Results
-        </h1>
-      )}
+  const finishTechAssessment = async () => {
+    const res = await axios.post(
+      "https://breneo.onrender.com/api/finish-assessment/",
+      { session_id: techSession.session_id }
+    );
+    setResults((prev) => ({ ...prev, tech: res.data }));
+  };
 
-      {/* Career Phase */}
-      {phase === "career" && careerQuestions.length > 0 && (
-        <div>
-          <div>
-            Question {careerIndex + 1} of {careerQuestions.length}
-          </div>
-          <h2 className="mt-2 font-semibold">
-            {careerQuestions[careerIndex].text}
-          </h2>
-          {careerQuestions[careerIndex].options.map((opt: any) => (
+  const finishSoftAssessment = async () => {
+    const res = await axios.post(
+      "https://breneo.onrender.com/api/soft/finish/",
+      { session_id: softSession.session_id }
+    );
+    setResults((prev) => ({ ...prev, soft: res.data }));
+  };
+
+  const renderSkillResults = (skills: Record<string, string>) =>
+    Object.entries(skills)
+      .filter(([_, pct]) => parseFloat(pct.replace("%", "")) > 0)
+      .map(([skill, pct]) => {
+        const percentage = parseFloat(pct.replace("%", ""));
+        const status = percentage >= 70 ? "✅ Strong" : "❌ Weak";
+        return (
+          <li key={skill} className="mb-1">
+            {skill} – {pct} (threshold: 70%) → {status}
+          </li>
+        );
+      });
+
+  // ==== RENDER ====
+  if (phase === "career" && careerQuestions.length > 0) {
+    const q = careerQuestions[careerIndex];
+    return (
+      <div className="p-8 max-w-xl mx-auto bg-white shadow-md rounded-md">
+        <h1 className="text-2xl font-bold mb-4">🧭 Interest / Career Test</h1>
+        <div className="text-gray-700 mb-2">
+          Question {careerIndex + 1} of {careerQuestions.length}
+        </div>
+        <h2 className="mt-2 mb-4 text-lg font-semibold">{q.text}</h2>
+        <div className="space-y-2">
+          {q.options.map((opt: CareerOption) => (
             <button
               key={opt.id}
+              className="block w-full px-4 py-2 border rounded hover:bg-gray-100 text-left"
               onClick={() => submitCareerAnswer(opt)}
-              className="block w-full my-2 px-4 py-2 border rounded hover:bg-gray-200"
             >
               {opt.text}
             </button>
           ))}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Assessment Phase */}
-      {phase === "assessment" && currentQuestion && (
-        <div>
-          <div>
-            Question {currentIndex + 1} of {numQuestions}
-          </div>
-          <p className="text-gray-600 mb-2">
-            <strong>Skill:</strong> {currentQuestion.skill}
-          </p>
-          <h2 className="mt-2 font-semibold">{currentQuestion.text}</h2>
+  if (!techSession || !softSession)
+    return <div className="p-8 text-center">Loading assessments...</div>;
+
+  if (currentTechQ) {
+    return (
+      <div className="p-8 max-w-xl mx-auto bg-white shadow-md rounded-md">
+        <h2 className="text-xl font-bold mb-2">⚡ Tech Question</h2>
+        <p className="text-gray-600 mb-4">{currentTechQ.text}</p>
+        <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <button
               key={i}
-              className="block w-full my-2 px-4 py-2 border rounded hover:bg-gray-200"
-              onClick={() => submitAnswer(currentQuestion[`option${i}`])}
+              className="block w-full px-4 py-2 border rounded hover:bg-gray-100 text-left"
+              onClick={() => submitTechAnswer(currentTechQ[`option${i}`])}
             >
-              {currentQuestion[`option${i}`]}
+              {currentTechQ[`option${i}`]}
             </button>
           ))}
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {/* Result Phase */}
-      {phase === "finished" && result && (
-        <div className="mt-6 p-4 border rounded bg-gray-100">
-          <p className="mt-2 font-medium">
-            საერთო შედეგი: {result.total_score} / {result.total_questions}
-          </p>
-
-          <p className="mt-2 font-medium">
-            <strong>Final Role:</strong> {result.final_role || "N/A"}
-          </p>
-
-          {result.results && Object.keys(result.results).length > 0 && (
-            <div className="mt-4">
-              <p className="font-medium">📊 ქულები უნარების მიხედვით:</p>
-              <ul className="ml-4 list-disc">
-                {Object.entries(result.results)
-                  .filter(
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    ([, data]) => parseFloat((data as any).percentage) > 0
-                  )
-                  .map(([skill, data]) => (
-                    <li key={skill}>
-                      {skill} – {(data as any).percentage} (threshold: 70%) →{" "}
-                      <strong>{(data as any).recommendation}</strong>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
-
-          <button
-            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            onClick={() => {
-              setPhase("career");
-              setCareerIndex(0);
-              setCareerAnswers([]);
-              setRoleMapping(null);
-              setResult(null);
-              setSessionId(null);
-              setCurrentQuestion(null);
-            }}
-          >
-            🔄 თავიდან დაწყება
-          </button>
+  if (currentSoftQ) {
+    return (
+      <div className="p-8 max-w-xl mx-auto bg-white shadow-md rounded-md">
+        <h2 className="text-xl font-bold mb-2">🌟 Soft Skills Question</h2>
+        <p className="text-gray-600 mb-4">{currentSoftQ.questiontext}</p>
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <button
+              key={i}
+              className="block w-full px-4 py-2 border rounded hover:bg-gray-100 text-left"
+              onClick={() => submitSoftAnswer(currentSoftQ[`option${i}`])}
+            >
+              {currentSoftQ[`option${i}`]}
+            </button>
+          ))}
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  if (techDone && softDone && results) {
+    const totalScore =
+      (results.tech?.total_score || 0) + (results.soft?.total_score || 0);
+    const totalQuestions =
+      (results.tech?.total_questions || 0) +
+      (results.soft?.total_questions || 0);
+    const finalRole =
+      results.soft?.final_role || results.tech?.final_role || "N/A";
+
+    return (
+      <div className="p-8 max-w-xl mx-auto bg-white shadow-md rounded-md">
+        <h1 className="text-2xl font-bold mb-4 text-green-600">
+          🏆 ტესტი დასრულდა!
+        </h1>
+        <p className="mb-2">
+          საერთო შედეგი: {totalScore} / {totalQuestions}
+        </p>
+        <p className="mb-4 font-semibold">Final Role: {finalRole}</p>
+
+        <h3 className="font-semibold mb-2">📊 ქულები უნარების მიხედვით:</h3>
+        <ul className="list-disc list-inside mb-2">
+          {results.tech?.score_per_skill &&
+            renderSkillResults(results.tech.score_per_skill)}
+        </ul>
+        <ul className="list-disc list-inside">
+          {results.soft?.score_per_skill &&
+            renderSkillResults(results.soft.score_per_skill)}
+        </ul>
+      </div>
+    );
+  }
+
+  return <div className="p-8 text-center">Loading...</div>;
 }

@@ -129,7 +129,7 @@ const NotificationsPage = () => {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl mx-auto">
-        <div className="mb-8">
+        {/* <div className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Bell className="h-8 w-8 text-primary" />
             Notifications
@@ -140,7 +140,7 @@ const NotificationsPage = () => {
           <p className="text-muted-foreground mt-2">
             Stay updated with the latest platform notifications
           </p>
-        </div>
+        </div> */}
 
         <Card>
           <CardHeader>

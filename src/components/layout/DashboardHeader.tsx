@@ -1,91 +1,73 @@
-import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, Bell, User, LogOut } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardHeaderProps {
-  sidebarCollapsed?: boolean;
+  sidebarCollapsed: boolean;
+  isVisible: boolean; // Prop for visibility
 }
 
-export function DashboardHeader({ sidebarCollapsed = false }: DashboardHeaderProps) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, signOut } = useAuth();
-  
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case '/dashboard':
-        return 'Dashboard';
-      case '/jobs':
-        return 'Job Offers';
-      case '/courses':
-        return 'Courses';
-      case '/profile':
-        return 'Settings';
-      default:
-        return 'Dashboard';
-    }
-  };
+// Helper function to get the page title from the pathname
+const getPageTitle = (pathname: string, username?: string) => {
+  if (pathname.startsWith("/dashboard")) {
+    return (
+      <>
+        Welcome, <span className="font-bold">{username || "User"}</span>!
+      </>
+    );
+  }
+  if (pathname.startsWith("/jobs")) return "Job Offers";
+  if (pathname.startsWith("/courses")) return "Courses";
+  if (pathname.startsWith("/settings")) return "Settings";
+  if (pathname.startsWith("/profile")) return "Profile";
+  if (pathname.startsWith("/notifications")) return "Notifications";
+  if (pathname.startsWith("/skill-test")) return "Skill Test";
+  return "Dashboard";
+};
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
+export function DashboardHeader({
+  sidebarCollapsed,
+  isVisible,
+}: DashboardHeaderProps) {
+  const location = useLocation();
+  const { user } = useAuth();
+  const username = user?.email?.split("@")[0];
+  const pageTitle = getPageTitle(location.pathname, username);
 
   return (
-    <header className={`hidden md:block fixed top-0 right-0 h-16 bg-white border-b border-gray-200 z-30 transition-all duration-300 ${sidebarCollapsed ? 'left-20' : 'left-64'}`}>
-      <div className="h-full px-6 flex items-center justify-between">
-        {/* Left side - Page title */}
-        <div className="flex items-center">
-          <h1 className="text-xl font-semibold text-gray-900">
-            {getPageTitle()}
-          </h1>
+    <header
+      className={cn(
+        "fixed top-0 right-0 z-30 bg-gradient-to-b from-[#F8F9FA] to-transparent",
+        "transition-opacity duration-300 ease-in-out",
+        sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
+        "left-0",
+        isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+      )}
+    >
+      <div className="flex items-center justify-between px-6 pt-6 pb-4">
+        <div className="hidden md:flex items-center">
+          <h1 className="text-2xl font-semibold text-gray-800">{pageTitle}</h1>
         </div>
 
-        {/* Right side - Actions */}
-        <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-            <Bell size={20} />
-          </button>
+        {/* This div is a placeholder to balance the flex layout on mobile */}
+        <div className="md:hidden"></div>
 
-          {/* Profile dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center space-x-3 px-2 py-2 hover:bg-gray-50 rounded-lg transition-colors">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="" />
-                <AvatarFallback className="bg-orange-500 text-white text-sm">
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-900">
-                  {user?.email?.split('@')[0] || 'User'}
-                </span>
-                <ChevronDown size={16} className="text-gray-400" />
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2">
-              <DropdownMenuItem onClick={() => navigate('/profile')} className="py-3 px-3">
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleLogout} className="py-3 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 focus:text-red-700 focus:bg-red-50">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* Right side icons - hidden on mobile */}
+        <div className="hidden md:flex items-center">
+          <Link to="/notifications">
+            <Button
+              variant="ghost" // Start with ghost variant for base styling
+              size="icon"
+              className="relative h-10 w-10 rounded-xl border border-gray-200 bg-white shadow-sm // Restored these styles
+                         text-gray-500 hover:text-gray-800 hover:bg-gray-50 active:bg-gray-100" // Adjusted hover/active
+            >
+              <Bell className="h-5 w-5" />
+              <span className="sr-only">Notifications</span>
+            </Button>
+          </Link>
         </div>
       </div>
     </header>

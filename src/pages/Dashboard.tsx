@@ -187,7 +187,7 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div>
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 md:mb-6 space-y-3 sm:space-y-0">
+        {/* <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 md:mb-6 space-y-3 sm:space-y-0">
           <h1 className="text-xl md:text-2xl font-bold text-breneo-navy">
             Welcome, {userData.name}
           </h1>
@@ -196,7 +196,7 @@ const Dashboard = () => {
               <Bell className="h-5 w-5 text-gray-600" />
             </Button>
           </div>
-        </div>
+        </div> */}
 
         {!userData.skillTestTaken && (
           <Card className="mb-4 md:mb-6 bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 border-breneo-blue/20 rounded-[24px]">
