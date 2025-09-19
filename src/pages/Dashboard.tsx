@@ -363,64 +363,6 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
-
-        <Card className="rounded-[24px]">
-          <CardHeader className="pb-3 md:pb-6">
-            <CardTitle className="text-lg md:text-xl">Your Progress</CardTitle>
-            <CardDescription className="text-sm md:text-base">
-              Track your journey with Breneo
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="space-y-4 md:space-y-6">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm md:text-base font-medium">
-                    Profile Completion
-                  </span>
-                  <span className="text-sm md:text-base text-gray-500">
-                    60%
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm md:text-base font-medium">
-                    Skill Assessment
-                  </span>
-                  <span className="text-sm md:text-base text-gray-500">
-                    {userData.skillTestTaken ? "Completed" : "Not Started"}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm md:text-base font-medium">
-                    Courses Progress
-                  </span>
-                  <span className="text-sm md:text-base text-gray-500">
-                    0/5
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 md:mt-6 text-center">
-              <p className="text-xs md:text-sm text-gray-500 mb-3">
-                Complete your profile and skill assessment for better
-                recommendations
-              </p>
-              <Button
-                variant="outline"
-                className="text-breneo-blue rounded-[24px] text-sm md:text-base w-full sm:w-auto"
-              >
-                Update Profile
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );

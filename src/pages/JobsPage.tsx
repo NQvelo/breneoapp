@@ -7,9 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Bookmark, MapPin, AlertCircle, Filter } from "lucide-react";
+import { Bookmark, AlertCircle, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal"; // Make sure the path is correct
 
 // Updated Job interface for the new API
@@ -187,14 +186,7 @@ const JobsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* <h1 className="text-3xl font-bold text-breneo-navy mb-2">
-          Find Your Next Opportunity
-        </h1>
-        <p className="text-muted-foreground mb-6">
-          Search for jobs from all over the world.
-        </p> */}
-
+      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         <div className="flex gap-4 mb-8">
           <Input
             placeholder="Search by job title or keyword..."
@@ -217,7 +209,7 @@ const JobsPage = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
           {isLoading
             ? [...Array(6)].map((_, i) => (
                 <Card key={i}>

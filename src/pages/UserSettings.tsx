@@ -223,11 +223,11 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex items-center space-x-2">
+      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 space-y-6">
+        {/* <div className="flex items-center space-x-2">
           <Settings className="h-6 w-6" />
           <h1 className="text-2xl font-bold">Settings</h1>
-        </div>
+        </div> */}
 
         <div className="space-y-6">
           {/* Profile Photo and Info */}
