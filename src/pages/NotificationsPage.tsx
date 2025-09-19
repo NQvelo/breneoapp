@@ -1,134 +1,182 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Users, User, Clock, CheckCircle } from "lucide-react";
+import {
+  Bell,
+  Users,
+  User,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+// Define the shape of a notification
 interface Notification {
   id: string;
   title: string;
   message: string;
   type: "info" | "success" | "warning" | "error";
-  sender_id: string;
   recipient_id: string | null;
   is_read: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 const NotificationsPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const queryKey = ["user-notifications", user?.id];
 
-  // Fetch notifications for current user
-  const { data: notifications, isLoading } = useQuery({
-    queryKey: ["user-notifications", user?.id],
+  // Fetch all notifications for the current user (personal and broadcast)
+  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+    queryKey,
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .or(`recipient_id.is.null,recipient_id.eq.${user?.id}`)
+        .or(`recipient_id.is.null,recipient_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching notifications:", error);
-        return [];
+        throw new Error("Could not fetch notifications.");
       }
-      return data || [];
+      return data;
     },
     enabled: !!user?.id,
   });
 
-  // Mark notification as read mutation
+  // Mutation to mark a notification as read with optimistic updates
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
+      if (!user?.id) throw new Error("User not authenticated.");
       const { error } = await supabase
         .from("notifications")
-        .update({ is_read: true })
+        .update({ is_read: true, updated_at: new Date().toISOString() })
         .eq("id", notificationId)
-        .eq("recipient_id", user?.id);
+        .eq("recipient_id", user.id);
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["user-notifications", user?.id],
+    onMutate: async (notificationId: string) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previousNotifications =
+        queryClient.getQueryData<Notification[]>(queryKey) || [];
+
+      queryClient.setQueryData<Notification[]>(queryKey, (old) =>
+        (old || []).map((n) =>
+          n.id === notificationId ? { ...n, is_read: true } : n
+        )
+      );
+      return { previousNotifications };
+    },
+    onError: (err, _, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(queryKey, context.previousNotifications);
+      }
+      toast({
+        title: "Error",
+        description: "Could not mark notification as read.",
+        variant: "destructive",
       });
     },
-    onError: (error) => {
-      console.error("Error marking notification as read:", error);
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
     },
   });
 
-  // Set up realtime subscription for new notifications
+  // Set up a real-time subscription to listen for new notifications
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel("user-notifications-channel")
+    const handleNewNotification = (payload: any) => {
+      queryClient.invalidateQueries({ queryKey });
+      if (payload.new) {
+        toast({
+          title: payload.new.title,
+          description: payload.new.message,
+        });
+      }
+    };
+
+    const personalChannel = supabase
+      .channel("personal-user-notifications")
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "notifications",
-          filter: `recipient_id.is.null,recipient_id.eq.${user.id}`,
+          filter: `recipient_id=eq.${user.id}`,
         },
-        (payload) => {
-          console.log("New notification received:", payload);
-          queryClient.invalidateQueries({
-            queryKey: ["user-notifications", user.id],
-          });
+        handleNewNotification
+      )
+      .subscribe();
 
-          // Show toast for new notifications
-          if (payload.new) {
-            toast({
-              title: payload.new.title,
-              description: payload.new.message,
-            });
-          }
-        }
+    const broadcastChannel = supabase
+      .channel("broadcast-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: "recipient_id=is.null",
+        },
+        handleNewNotification
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(personalChannel);
+      supabase.removeChannel(broadcastChannel);
     };
-  }, [queryClient, user?.id, toast]);
+  }, [queryClient, user?.id, toast, queryKey]);
 
-  const handleMarkAsRead = (notificationId: string) => {
-    markAsReadMutation.mutate(notificationId);
-  };
-
-  const getTypeColor = (type: string) => {
+  // Helper function to get an icon based on notification type
+  const getNotificationIcon = (type: Notification["type"]) => {
     switch (type) {
       case "success":
-        return "bg-green-100 text-green-800";
+        return (
+          <div className="bg-green-100 rounded-full p-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+          </div>
+        );
       case "warning":
-        return "bg-yellow-100 text-yellow-800";
+        return (
+          <div className="bg-yellow-100 rounded-full p-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+          </div>
+        );
       case "error":
-        return "bg-red-100 text-red-800";
+        return (
+          <div className="bg-red-100 rounded-full p-2">
+            <XCircle className="h-5 w-5 text-red-600" />
+          </div>
+        );
       default:
-        return "bg-blue-100 text-blue-800";
+        return (
+          <div className="bg-blue-100 rounded-full p-2">
+            <Bell className="h-5 w-5 text-blue-600" />
+          </div>
+        );
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const unreadCount =
-    notifications?.filter((n) => !n.is_read && n.recipient_id === user?.id)
-      .length || 0;
+  const unreadCount = notifications.filter(
+    (n) => !n.is_read && n.recipient_id === user?.id
+  ).length;
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* <div className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Bell className="h-8 w-8 text-primary" />
@@ -138,82 +186,55 @@ const NotificationsPage = () => {
             )}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Stay updated with the latest platform notifications
+            Stay updated with the latest platform notifications.
           </p>
         </div> */}
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              All Notifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-0">
+            <div className="divide-y divide-gray-200">
               {isLoading ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  Loading notifications...
+                  Loading...
                 </div>
-              ) : notifications?.length === 0 ? (
+              ) : notifications.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No notifications yet</p>
-                  <p className="text-sm">
-                    You'll see new notifications here when they arrive
-                  </p>
+                  <p>You have no new notifications.</p>
                 </div>
               ) : (
-                notifications?.map((notification) => (
+                notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`border rounded-lg p-4 space-y-3 transition-all hover:shadow-md ${
+                    className={`flex items-start gap-4 p-4 transition-colors ${
                       !notification.is_read &&
                       notification.recipient_id === user?.id
-                        ? "bg-blue-50 border-blue-200"
-                        : "bg-white"
+                        ? "bg-blue-50"
+                        : "hover:bg-gray-50"
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <h4 className="font-medium text-lg">
-                        {notification.title}
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getTypeColor(notification.type)}>
-                          {notification.type}
-                        </Badge>
-                        {notification.recipient_id ? (
-                          <div className="flex items-center gap-1">
-                            <User className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              Personal
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              Broadcast
-                            </span>
-                          </div>
-                        )}
+                    {getNotificationIcon(notification.type)}
+                    <div className="flex-1">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-medium text-gray-900">
+                          {notification.title}
+                        </h4>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(
+                            notification.created_at
+                          ).toLocaleDateString()}
+                        </span>
                       </div>
-                    </div>
-
-                    <p className="text-muted-foreground">
-                      {notification.message}
-                    </p>
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        {formatDate(notification.created_at)}
-                      </div>
-
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {notification.message}
+                      </p>
                       {!notification.is_read &&
                         notification.recipient_id === user?.id && (
                           <button
-                            onClick={() => handleMarkAsRead(notification.id)}
-                            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                            onClick={() =>
+                              markAsReadMutation.mutate(notification.id)
+                            }
+                            className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mt-2 disabled:opacity-50"
                             disabled={markAsReadMutation.isPending}
                           >
                             <CheckCircle className="h-4 w-4" />

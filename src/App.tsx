@@ -22,6 +22,8 @@ import EmailConfirmed from "./pages/EmailConfirmed";
 import LoginPage from "./pages/LoginPage";
 
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import { Settings } from "lucide-react";
+import UserSettings from "./pages/UserSettings";
 
 const queryClient = new QueryClient();
 
@@ -104,6 +106,14 @@ const App = () => (
             }
           />
           <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <UserSettings />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/academy/:academyName"
             element={
               <ProtectedRoute>
@@ -111,6 +121,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
         {/* </BrowserRouter> */}
