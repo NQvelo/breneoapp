@@ -227,7 +227,7 @@ const CoursesPage = () => {
                       </Button>
                       <Button
                         size="icon"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => saveCourseMutation.mutate(course)}
                         aria-label={
                           course.is_saved ? "Unsave course" : "Save course"
