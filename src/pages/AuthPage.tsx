@@ -66,7 +66,7 @@ const AuthPage = () => {
                     <div className="flex items-start space-x-4">
                       <div className="flex-shrink-0">
                         <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                          <Building2 className="h-6 w-6 text-secondary" />
+                          <Building2 className="h-6 w-6 text-primary" />
                         </div>
                       </div>
                       <div className="flex-1">
@@ -83,17 +83,16 @@ const AuthPage = () => {
                 </Card>
               </div>
 
-              <div className="text-center mt-6">
+              <div className="text-center pt-4">
+                <span className="text-muted-foreground">
+                  Already have an account?{" "}
+                </span>
                 <button
+                  type="button"
                   onClick={() => navigate("/auth/login")}
-                  className="text-sm transition-colors"
+                  className="text-breneo-blue hover:underline font-medium"
                 >
-                  <span className="text-gray-500">
-                    Already have an account?{" "}
-                  </span>
-                  <span className="text-blue-500 hover:text-blue-600">
-                    Sign in
-                  </span>
+                  Sign in
                 </button>
               </div>
             </div>

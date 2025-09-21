@@ -127,7 +127,7 @@ const ProfilePage = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
+              {/* <Button
                 variant="outline"
                 size={isMobile ? "icon" : "default"}
                 aria-label="Settings"
@@ -137,7 +137,7 @@ const ProfilePage = () => {
                   <Settings className={isMobile ? "h-4 w-4" : "h-4 w-4 mr-2"} />
                   {!isMobile && "Settings"}
                 </Link>
-              </Button>
+              </Button> */}
               <Button
                 variant="outline"
                 onClick={handleLogout}

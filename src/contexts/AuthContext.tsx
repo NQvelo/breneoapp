@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isAcademy: boolean;
   signUp: (
     email: string,
     password: string,
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAcademy, setIsAcademy] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -66,6 +68,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Check for academy status once user is loaded
+  useEffect(() => {
+    if (loading) return; // Wait for auth to finish loading
+    if (!user) {
+      setIsAcademy(false);
+      return;
+    }
+
+    const checkAcademyStatus = async () => {
+      const { data, error } = await supabase
+        .from("academy_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error checking academy status in AuthContext:", error);
+      }
+      setIsAcademy(!!data);
+    };
+
+    checkAcademyStatus();
+  }, [user, loading]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
@@ -210,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             description: academyData.description,
             website_url: academyData.websiteUrl,
             contact_email: academyData.contactEmail,
+            role: "academy",
           },
         },
       });
@@ -283,6 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     loading,
+    isAcademy,
     signUp,
     signUpAcademy,
     signIn,

@@ -232,7 +232,7 @@ export function AuthForm({
                   }
                   className="text-breneo-blue hover:underline font-medium"
                 >
-                  Sign up
+                  Register
                 </button>
               </div>
             </form>
@@ -399,12 +399,12 @@ export function AuthForm({
                   {academyStep === "name" ? (
                     <div className="space-y-6">
                       <div className="text-center mb-8">
-                        <h2 className="text-2xl font-semibold text-foreground mb-2">
+                        {/* <h2 className="text-2xl font-semibold text-foreground mb-2">
                           Create Your Academy
-                        </h2>
-                        <p className="text-muted-foreground">
+                        </h2> */}
+                        {/* <p className="text-muted-foreground">
                           Set up your academy account to manage your courses
-                        </p>
+                        </p> */}
                       </div>
 
                       <div className="bg-card rounded-lg border p-6">
@@ -483,9 +483,9 @@ export function AuthForm({
                   ) : (
                     <form onSubmit={handleAcademySignUp} className="space-y-6">
                       <div className="text-center mb-6">
-                        <h2 className="text-2xl font-semibold text-foreground mb-2">
+                        {/* <h2 className="text-2xl font-semibold text-foreground mb-2">
                           Complete Your Academy Setup
-                        </h2>
+                        </h2> */}
                         <p className="text-muted-foreground">
                           Academy:{" "}
                           <span className="font-medium text-foreground">

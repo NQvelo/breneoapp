@@ -43,7 +43,7 @@ const fetchJobs = async (searchTerm: string, filters: JobFilters) => {
     query: `${searchTerm} in ${filters.country}`,
     num_pages: "1",
     employment_types: filters.jobTypes.join(","),
-    remote_jobs_only: String(filters.isRemote),
+    work_from_home: String(filters.isRemote),
   });
 
   const response = await fetch(
@@ -56,6 +56,10 @@ const fetchJobs = async (searchTerm: string, filters: JobFilters) => {
       },
     }
   );
+
+  if (response.status === 429) {
+    throw new Error("You have exceeded your API request limit.");
+  }
 
   if (!response.ok) {
     throw new Error("Failed to fetch jobs from the API.");
@@ -143,6 +147,10 @@ const JobsPage = () => {
   } = useQuery({
     queryKey: ["jobs", searchTerm, activeFilters],
     queryFn: () => fetchJobs(searchTerm, activeFilters),
+    // Add these options to prevent excessive refetching
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   const saveJobMutation = useMutation({

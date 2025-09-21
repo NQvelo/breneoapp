@@ -28,6 +28,8 @@ interface Course {
   topics: string[];
   required_skills: string[];
   is_saved: boolean;
+  academy_id: string | null;
+  academy_profiles: { slug: string } | null;
 }
 
 const CoursesPage = () => {
@@ -59,7 +61,7 @@ const CoursesPage = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("courses")
-        .select("*")
+        .select("*, academy_profiles(slug)")
         .order("created_at", { ascending: false });
       if (error) {
         console.error("Error fetching courses:", error);
@@ -194,56 +196,69 @@ const CoursesPage = () => {
           {coursesLoading ? (
             <p>Loading courses...</p>
           ) : (
-            filteredCourses.map((course) => (
-              <Card key={course.id} className="overflow-hidden group">
-                <div className="h-40 overflow-hidden">
-                  <img
-                    src={course.image}
-                    alt={course.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <CardContent className="p-5">
-                  <h3 className="font-medium text-lg mb-2">{course.title}</h3>
-                  <div className="flex items-center gap-2 mb-3 text-sm text-gray-500">
-                    <span>{course.provider}</span>
-                    <span>•</span>
-                    <span>{course.level}</span>
-                    <span>•</span>
-                    <span>{course.duration}</span>
+            filteredCourses.map((course) => {
+              const academySlug = (course.academy_profiles as any)?.slug;
+              return (
+                <Card key={course.id} className="overflow-hidden group">
+                  <div className="h-40 overflow-hidden">
+                    <img
+                      src={course.image}
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <p className="text-gray-700 text-sm mb-4">
-                    {course.description}
-                  </p>
+                  <CardContent className="p-5">
+                    <h3 className="font-medium text-lg mb-2">{course.title}</h3>
+                    <div className="flex items-center gap-2 mb-3 text-sm text-gray-500">
+                      {academySlug ? (
+                        <Link
+                          to={`/academy/${academySlug}`}
+                          className="hover:underline text-blue-600 font-medium"
+                        >
+                          {course.provider}
+                        </Link>
+                      ) : (
+                        <span>{course.provider}</span>
+                      )}
 
-                  <div className="flex justify-between items-center">
-                    <Badge>{course.match}% Match</Badge>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant={course.enrolled ? "outline" : "default"}
-                      >
-                        {course.enrolled ? "Continue" : "Enroll"}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => saveCourseMutation.mutate(course)}
-                        aria-label={
-                          course.is_saved ? "Unsave course" : "Save course"
-                        }
-                      >
-                        <Bookmark
-                          className={`h-4 w-4 ${
-                            course.is_saved ? "fill-primary text-primary" : ""
-                          }`}
-                        />
-                      </Button>
+                      <span>•</span>
+                      <span>{course.level}</span>
+                      <span>•</span>
+                      <span>{course.duration}</span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                    <p className="text-gray-700 text-sm mb-4">
+                      {course.description}
+                    </p>
+
+                    <div className="flex justify-between items-center">
+                      <Badge>{course.match}% Match</Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant={course.enrolled ? "outline" : "default"}
+                        >
+                          {course.enrolled ? "Continue" : "Enroll"}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => saveCourseMutation.mutate(course)}
+                          aria-label={
+                            course.is_saved ? "Unsave course" : "Save course"
+                          }
+                        >
+                          <Bookmark
+                            className={`h-4 w-4 ${
+                              course.is_saved ? "fill-primary text-primary" : ""
+                            }`}
+                          />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       </div>

@@ -21,7 +21,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading, isAcademy } = useAuth();
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>("");
 
   useEffect(() => {
@@ -47,30 +47,51 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
     fetchProfilePhoto();
   }, [user]);
-  const navItems = [
-    {
-      icon: LayoutDashboard,
-      label: "Dashboard",
-      href: "/dashboard",
-    },
-    {
-      icon: Briefcase,
-      label: "Job Offers",
-      href: "/jobs",
-    },
-    {
-      icon: BookOpen,
-      label: "Courses",
-      href: "/courses",
-    },
-  ];
 
+  // If the main auth is still loading, don't render the sidebar yet.
+  if (loading) {
+    return null;
+  }
+
+  // Conditionally define the navigation items based on the user's role
+  const navItems = isAcademy
+    ? [
+        // Nav items for ACADEMY users
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          href: "/dashboard",
+        },
+      ]
+    : [
+        // Nav items for DEFAULT users
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          href: "/dashboard",
+        },
+        {
+          icon: Briefcase,
+          label: "Job Offers",
+          href: "/jobs",
+        },
+        {
+          icon: BookOpen,
+          label: "Courses",
+          href: "/courses",
+        },
+      ];
+
+  // Set the correct profile page path based on the user's role
+  const profilePath = isAcademy ? "/academy/profile" : "/profile";
+
+  // Mobile navigation is built from the conditionally set navItems
   const mobileNavItems = [
     ...navItems,
     {
       icon: User,
       label: "Profile",
-      href: "/profile",
+      href: profilePath,
     },
   ];
 
@@ -291,7 +312,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
             <div className="border-t border-gray-200 mt-4 pt-4">
               <Link
-                to="/profile"
+                to={profilePath}
                 className={cn(
                   "flex items-center space-x-4 px-4 py-2 rounded-xl transition-all duration-200 group",
                   "hover:bg-gray-50"

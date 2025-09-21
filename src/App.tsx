@@ -24,6 +24,7 @@ import LoginPage from "./pages/LoginPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { Settings } from "lucide-react";
 import UserSettings from "./pages/UserSettings";
+import AcademyProfilePage from "./pages/AcademyProfilePage";
 
 const queryClient = new QueryClient();
 
@@ -114,14 +115,21 @@ const App = () => (
             }
           />
           <Route
-            path="/academy/:academyName"
+            path="/academy/:academySlug"
             element={
               <ProtectedRoute>
                 <AcademyPage />
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/academy/profile"
+            element={
+              <ProtectedRoute>
+                <AcademyProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
         {/* </BrowserRouter> */}
