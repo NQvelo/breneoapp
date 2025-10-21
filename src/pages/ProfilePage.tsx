@@ -1,28 +1,20 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LogOut, Settings } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext"; //
 import { useMobile } from "@/hooks/use-mobile";
-import { useNavigate } from "react-router-dom";
+// Removed useNavigate, as logout() from context handles navigation
 
 const ProfilePage = () => {
-  const { signOut } = useAuth();
+  // ✅ Get user, loading state, and logout function from AuthContext
+  const { user, loading, logout } = useAuth(); //
   const isMobile = useMobile();
-  const navigate = useNavigate(); // For redirect
-  const [userData, setUserData] = useState(null);
 
-  useEffect(() => {
-    // Retrieve user data from localStorage after login
-    const storedUserData = localStorage.getItem("userData");
-    if (storedUserData) {
-      setUserData(JSON.parse(storedUserData));
-    }
-  }, []);
-
-  if (!userData) {
+  // ✅ Show loading text based on the context's loading state
+  if (loading) {
     return (
       <DashboardLayout>
         <div className="flex justify-center items-center h-64">
@@ -32,17 +24,23 @@ const ProfilePage = () => {
     );
   }
 
+  // ✅ Show error or prompt to login if user isn't loaded
+  if (!user) {
+    return (
+      <DashboardLayout>
+        <div className="flex justify-center items-center h-64">
+          <p>Could not load user data. Please try logging in again.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const handleLogout = () => {
-    // 1️⃣ Clear localStorage
-    localStorage.removeItem("userData");
-
-    // 2️⃣ Call your auth context logout (if it handles token removal, etc.)
-    signOut();
-
-    // 3️⃣ Redirect to login page
-    navigate("/login");
+    // ✅ Call the logout function directly from the context
+    logout(); //
   };
 
+  // ✅ Use the 'user' object from the context directly
   const {
     first_name,
     last_name,
@@ -50,7 +48,7 @@ const ProfilePage = () => {
     phone_number,
     profile_image,
     user_type,
-  } = userData;
+  } = user;
 
   return (
     <DashboardLayout>
@@ -88,7 +86,7 @@ const ProfilePage = () => {
               <Button
                 variant="destructive"
                 size={isMobile ? "sm" : "default"}
-                onClick={handleLogout} // ✅ Updated
+                onClick={handleLogout} // ✅ Corrected
                 className="flex items-center gap-2"
               >
                 <LogOut size={16} />

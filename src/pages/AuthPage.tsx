@@ -1,14 +1,15 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
-import { toast } from "sonner";
 
-const AuthPage = () => {
+const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(
@@ -29,44 +30,30 @@ const AuthPage = () => {
     const phoneNumber = `${selectedCountry?.dial_code}${phone}`;
 
     try {
-      const response = await fetch(
-        "https://breneo.onrender.com/api/register/",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            phone_number: phoneNumber,
-            password: password,
-          }),
-        }
-      );
+      await axios.post("https://breneo.onrender.com/api/register/", {
+        first_name: firstName,
+        last_name: lastName,
+        email: email,
+        phone_number: phoneNumber,
+        password: password,
+      });
 
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await response.json();
-        if (response.ok) {
-          toast.success("Registration successful! Verify your email.");
+      // Save email & password temporarily for auto-login
+      sessionStorage.setItem("tempEmail", email);
+      sessionStorage.setItem("tempPassword", password);
 
-          // Save email & password temporarily for auto-login
-          sessionStorage.setItem("tempEmail", email);
-          sessionStorage.setItem("tempPassword", password);
-
-          navigate("/email-verification");
-        } else {
-          const errorMessages = Object.values(data).flat();
-          toast.error(errorMessages.join(" ") || "Registration failed.");
-        }
-      } else {
-        const errorText = await response.text();
-        console.error("Server returned non-JSON response:", errorText);
-        toast.error("Server error. Try again later.");
+      navigate("/email-verification");
+      toast.success("Registration successful! Verify your email.");
+    } catch (err: any) {
+      let errorMessage = "Registration failed. Please try again.";
+      if (axios.isAxiosError(err) && err.response) {
+        errorMessage =
+          err.response.data.detail ||
+          err.response.data.message ||
+          err.response.data.error ||
+          errorMessage;
       }
-    } catch (error) {
-      console.error("Registration error:", error);
-      toast.error("Unexpected error occurred. Try again.");
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -1,21 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+// import axios from "axios"; // No longer needed here
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
-import { toast } from "sonner";
+// import { toast } from "sonner"; // No longer needed, context handles it
+import { useAuth } from "@/contexts/AuthContext"; // ✅ IMPORT USEAUTH
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  // ✅ Get login function and loading state from context
+  const { login, loading: authLoading } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  // const [isLoading, setIsLoading] = useState(false); // We now use authLoading
 
-  // Set page title and meta
+  // Set page title and meta (This is fine)
   useEffect(() => {
     document.title = "Login | Breneo";
 
@@ -40,52 +43,26 @@ const LoginPage: React.FC = () => {
     canonical.setAttribute("href", `${window.location.origin}/auth/login`);
   }, []);
 
-  // Handle login
+  // ✅ Handle login (NOW MUCH SIMPLER)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    // setIsLoading(true); // Handled by context
 
     try {
-      // 1️⃣ Login
-      const response = await axios.post(
-        "https://breneo.onrender.com/api/login/",
-        { username: emailOrUsername, password }
-      );
-
-      const { token } = response.data;
-      localStorage.setItem("authToken", token);
-
-      // 2️⃣ Check if temporary academy user
-      const tempRes = await axios.get(
-        `https://breneo.onrender.com/api/verify-academy-email/?email=${encodeURIComponent(
-          emailOrUsername
-        )}`
-      );
-      const isTemporary = tempRes.data?.is_temporary === true;
-
-      if (isTemporary) {
-        toast.info("Please verify your email before accessing Breneo.");
-        navigate("/auth/email-verification");
-        return;
-      }
-
-      // 3️⃣ Otherwise, proceed to dashboard
-      toast.success("Logged in successfully!");
-      navigate("/dashboard");
+      // ✅ CALL THE CONTEXT FUNCTION
+      await login(emailOrUsername, password);
+      // All logic (toast, navigation, user fetching) is now in the context.
     } catch (err: any) {
-      let errorMessage = "Login failed. Please try again.";
-      if (axios.isAxiosError(err) && err.response) {
-        errorMessage =
-          err.response.data.detail ||
-          err.response.data.message ||
-          err.response.data.error ||
-          errorMessage;
-      }
-      toast.error(errorMessage);
+      // The context already showed an error toast.
+      // We can just log it here for debugging.
+      console.error("Login page caught error (toast was already shown):", err);
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // Handled by context
     }
   };
+
+  // ✅ Use the loading state from the context
+  const isLoading = authLoading;
 
   return (
     <div className="min-h-screen flex">
@@ -114,7 +91,7 @@ const LoginPage: React.FC = () => {
                 value={emailOrUsername}
                 onChange={(e) => setEmailOrUsername(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isLoading} // ✅ Uses context's loading
               />
             </div>
             <div>
@@ -128,7 +105,7 @@ const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isLoading} // ✅ Uses context's loading
                 />
                 <Button
                   type="button"
@@ -136,7 +113,7 @@ const LoginPage: React.FC = () => {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
+                  disabled={isLoading} // ✅ Uses context's loading
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-gray-500" />
@@ -149,7 +126,7 @@ const LoginPage: React.FC = () => {
             <Button
               type="submit"
               className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-              disabled={isLoading}
+              disabled={isLoading} // ✅ Uses context's loading
             >
               {isLoading ? "Signing In..." : "Sign In"}
             </Button>

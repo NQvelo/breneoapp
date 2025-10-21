@@ -142,14 +142,7 @@ const App = () => (
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/email-verification"
-            element={
-              <ProtectedRoute>
-                <EmailVerification />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/email-verification" element={<EmailVerification />} />
           <Route
             path="/academy/register"
             element={<AcademyRegistrationPage />}
