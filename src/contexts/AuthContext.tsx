@@ -1,330 +1,107 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  [key: string]: any;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
-  isAcademy: boolean;
-  signUp: (
-    email: string,
-    password: string,
-    fullName: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ) => Promise<{ error: any }>;
-  signUpAcademy: (
-    email: string,
-    password: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    academyData: any
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ) => Promise<{ error: any }>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resendConfirmation: (email: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  register: (email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAcademy, setIsAcademy] = useState(false);
-  const { toast } = useToast();
+  const navigate = useNavigate();
 
+  // --- Restore user session if token exists ---
   useEffect(() => {
-    // Set up auth state listener
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event, session);
-      setSession(session);
-      setUser(session?.user ?? null);
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      axios
+        .get("https://breneo.onrender.com/api/user/", {
+          headers: { Authorization: `Token ${token}` },
+        })
+        .then((res) => setUser(res.data))
+        .catch(() => {
+          localStorage.removeItem("authToken");
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
+    } else {
       setLoading(false);
-
-      // Redirect to interests for regular users who just verified their email
-      if (
-        event === "SIGNED_IN" &&
-        session?.user &&
-        !session.user.email_confirmed_at
-      ) {
-        setTimeout(() => {
-          window.location.href = "/interests";
-        }, 1000);
-      }
-    });
-
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
   }, []);
 
-  // Check for academy status once user is loaded
-  useEffect(() => {
-    if (loading) return; // Wait for auth to finish loading
-    if (!user) {
-      setIsAcademy(false);
-      return;
-    }
-
-    const checkAcademyStatus = async () => {
-      const { data, error } = await supabase
-        .from("academy_profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error checking academy status in AuthContext:", error);
-      }
-      setIsAcademy(!!data);
-    };
-
-    checkAcademyStatus();
-  }, [user, loading]);
-
-  const signUp = async (email: string, password: string, fullName: string) => {
+  // --- Login function ---
+  const login = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/email-confirmed`;
-
-      const { error } = await supabase.auth.signUp({
-        email,
+      const res = await axios.post("https://breneo.onrender.com/api/login/", {
+        username: email,
         password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-          },
-        },
       });
 
-      if (error) {
-        const msg = (error.message || "").toLowerCase();
-        if (
-          msg.includes("already") ||
-          msg.includes("registered") ||
-          msg.includes("exists")
-        ) {
-          const { error: resendError } = await supabase.auth.resend({
-            type: "signup",
-            email,
-          });
-          if (resendError) {
-            toast({
-              title: "Sign up failed",
-              description: resendError.message,
-              variant: "destructive",
-            });
-            return { error: resendError };
-          }
-          toast({
-            title: "Email already registered",
-            description: "We resent the verification link to your email.",
-          });
-          return { error: null };
-        }
-        toast({
-          title: "Sign up failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error };
-      }
+      const token = res.data.token;
+      localStorage.setItem("authToken", token);
 
-      toast({
-        title: "Account created!",
-        description: "Please check your email to verify your account.",
+      // Fetch user info
+      const userRes = await axios.get("https://breneo.onrender.com/api/user/", {
+        headers: { Authorization: `Token ${token}` },
       });
 
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: "Sign up failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      return { error };
+      setUser(userRes.data);
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("Login failed:", err);
+      throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  // --- Register function ---
+  const register = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      await axios.post("https://breneo.onrender.com/api/register/", {
         email,
         password,
       });
 
-      if (error) {
-        toast({
-          title: "Sign in failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error };
-      }
-
-      toast({
-        title: "Success!",
-        description: "You've been signed in.",
-      });
-
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: "Sign in failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      return { error };
+      // ✅ Redirect to email verification page
+      navigate("/auth/email-verification");
+    } catch (err) {
+      console.error("Registration failed:", err);
+      throw err;
     }
   };
 
-  const resendConfirmation = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email,
-      });
-      if (error) {
-        toast({
-          title: "Resend failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error };
-      }
-      toast({
-        title: "Verification email resent",
-        description: "Please check your inbox.",
-      });
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: "Resend failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      return { error };
-    }
+  // --- Logout function ---
+  const logout = () => {
+    localStorage.removeItem("authToken");
+    setUser(null);
+    navigate("/auth/login");
   };
 
-  const signUpAcademy = async (
-    email: string,
-    password: string,
-    academyData: any
-  ) => {
-    try {
-      const redirectUrl = `${window.location.origin}/email-confirmed`;
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout, register }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            academy_name: academyData.academyName,
-            description: academyData.description,
-            website_url: academyData.websiteUrl,
-            contact_email: academyData.contactEmail,
-            role: "academy",
-          },
-        },
-      });
-
-      if (error) {
-        const msg = (error.message || "").toLowerCase();
-        if (
-          msg.includes("already") ||
-          msg.includes("registered") ||
-          msg.includes("exists")
-        ) {
-          const { error: resendError } = await supabase.auth.resend({
-            type: "signup",
-            email,
-          });
-          if (resendError) {
-            toast({
-              title: "Academy registration failed",
-              description: resendError.message,
-              variant: "destructive",
-            });
-            return { error: resendError };
-          }
-          toast({
-            title: "Email already registered",
-            description: "We resent the verification link to your email.",
-          });
-          return { error: null };
-        }
-        toast({
-          title: "Academy registration failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error };
-      }
-
-      toast({
-        title: "Academy registered!",
-        description: "Please check your email to verify your account.",
-      });
-
-      return { error: null };
-    } catch (error: any) {
-      toast({
-        title: "Academy registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
-      return { error };
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast({
-        title: "Signed out",
-        description: "You've been successfully signed out.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Sign out failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const value = {
-    user,
-    session,
-    loading,
-    isAcademy,
-    signUp,
-    signUpAcademy,
-    signIn,
-    resendConfirmation,
-    signOut,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
-}
+};

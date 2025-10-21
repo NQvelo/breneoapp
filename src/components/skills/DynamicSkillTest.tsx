@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useAuth } from "../../contexts/AuthContext"; // corrected relative path
 
+// Interfaces
 interface Question {
   id?: number;
   text: string;
@@ -32,9 +34,12 @@ interface Result {
 }
 
 export function DynamicSkillTest() {
+  const { user } = useAuth(); // ✅ get current user
   const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
     "career"
   );
+
+  // State variables
   const [careerQuestions, setCareerQuestions] = useState<any[]>([]);
   const [careerIndex, setCareerIndex] = useState(0);
   const [careerAnswers, setCareerAnswers] = useState<any[]>([]);
@@ -50,16 +55,32 @@ export function DynamicSkillTest() {
 
   const numQuestions = 5;
 
-  // ==== Load career questions ====
+  // Load career questions
   useEffect(() => {
     if (phase === "career") {
       axios
-        .get("https://breneo.onrender.com/api/career-questions-random/?limit=5")
+        .get(
+          `https://breneo.onrender.com/api/career-questions-random/?limit=${numQuestions}`
+        )
         .then((res) => setCareerQuestions(res.data))
         .catch((err) => console.error(err));
     }
   }, [phase]);
 
+  // Save test results
+  const saveTestResults = async (resultsToSave: any) => {
+    if (!user) return;
+    try {
+      await axios.post("https://breneo.onrender.com/api/save-test-results/", {
+        userId: user.id,
+        ...resultsToSave,
+      });
+    } catch (err) {
+      console.error("Error saving test results:", err);
+    }
+  };
+
+  // Career answer submission
   const submitCareerAnswer = (option: CareerOption) => {
     const question = careerQuestions[careerIndex];
     setCareerAnswers((prev) => [
@@ -77,6 +98,7 @@ export function DynamicSkillTest() {
     }
   };
 
+  // Start tech & soft assessments
   const startAssessments = async () => {
     try {
       const techRes = await axios.post(
@@ -87,6 +109,7 @@ export function DynamicSkillTest() {
         "https://breneo.onrender.com/api/soft/start/",
         { num_questions: numQuestions }
       );
+
       setTechSession(techRes.data);
       setSoftSession(softRes.data);
       setCurrentTechQ(techRes.data.questions[0]);
@@ -96,6 +119,7 @@ export function DynamicSkillTest() {
     }
   };
 
+  // Submit tech answer
   const submitTechAnswer = async (answer: string) => {
     if (!techSession || !currentTechQ) return;
     try {
@@ -107,8 +131,9 @@ export function DynamicSkillTest() {
           answer,
         }
       );
-      if (res.data.next_question) setCurrentTechQ(res.data.next_question);
-      else {
+      if (res.data.next_question) {
+        setCurrentTechQ(res.data.next_question);
+      } else {
         setTechDone(true);
         setCurrentTechQ(null);
         finishTechAssessment();
@@ -118,6 +143,7 @@ export function DynamicSkillTest() {
     }
   };
 
+  // Submit soft answer
   const submitSoftAnswer = async (answer: string) => {
     if (!softSession || !currentSoftQ) return;
     try {
@@ -125,12 +151,13 @@ export function DynamicSkillTest() {
         "https://breneo.onrender.com/api/soft/submit/",
         {
           session_id: softSession.session_id,
-          question_text: currentSoftQ.questiontext,
+          question_text: currentSoftQ.text,
           answer,
         }
       );
-      if (res.data.next_question) setCurrentSoftQ(res.data.next_question);
-      else {
+      if (res.data.next_question) {
+        setCurrentSoftQ(res.data.next_question);
+      } else {
         setSoftDone(true);
         setCurrentSoftQ(null);
         finishSoftAssessment();
@@ -141,6 +168,7 @@ export function DynamicSkillTest() {
   };
 
   const finishTechAssessment = async () => {
+    if (!techSession) return;
     const res = await axios.post(
       "https://breneo.onrender.com/api/finish-assessment/",
       { session_id: techSession.session_id }
@@ -149,6 +177,7 @@ export function DynamicSkillTest() {
   };
 
   const finishSoftAssessment = async () => {
+    if (!softSession) return;
     const res = await axios.post(
       "https://breneo.onrender.com/api/soft/finish/",
       { session_id: softSession.session_id }
@@ -156,6 +185,7 @@ export function DynamicSkillTest() {
     setResults((prev) => ({ ...prev, soft: res.data }));
   };
 
+  // Render skill results helper
   const renderSkillResults = (skills: Record<string, string>) =>
     Object.entries(skills)
       .filter(([_, pct]) => parseFloat(pct.replace("%", "")) > 0)
@@ -164,12 +194,37 @@ export function DynamicSkillTest() {
         const status = percentage >= 70 ? "✅ Strong" : "❌ Weak";
         return (
           <li key={skill} className="mb-1">
-            {skill} – {pct} (threshold: 70%) → {status}
+            {skill} – {pct} → {status}
           </li>
         );
       });
 
-  // ==== RENDER ====
+  // Save final results when both assessments are done
+  useEffect(() => {
+    if (techDone && softDone && results && user) {
+      const totalScore =
+        (results.tech?.total_score || 0) + (results.soft?.total_score || 0);
+      const totalQuestions =
+        (results.tech?.total_questions || 0) +
+        (results.soft?.total_questions || 0);
+      const finalRole =
+        results.soft?.final_role || results.tech?.final_role || "N/A";
+
+      const resultsToSave = {
+        totalScore,
+        totalQuestions,
+        finalRole,
+        techScorePerSkill: results.tech?.score_per_skill,
+        softScorePerSkill: results.soft?.score_per_skill,
+        careerAnswers,
+      };
+
+      saveTestResults(resultsToSave);
+      setPhase("finished");
+    }
+  }, [techDone, softDone, results, user]);
+
+  // ----- RENDER LOGIC -----
   if (phase === "career" && careerQuestions.length > 0) {
     const q = careerQuestions[careerIndex];
     return (
@@ -194,8 +249,9 @@ export function DynamicSkillTest() {
     );
   }
 
-  if (!techSession || !softSession)
+  if (!techSession || !softSession) {
     return <div className="p-8 text-center">Loading assessments...</div>;
+  }
 
   if (currentTechQ) {
     return (
@@ -221,7 +277,7 @@ export function DynamicSkillTest() {
     return (
       <div className="p-8 max-w-xl mx-auto bg-white shadow-md rounded-md">
         <h2 className="text-xl font-bold mb-2">🌟 Soft Skills Question</h2>
-        <p className="text-gray-600 mb-4">{currentSoftQ.questiontext}</p>
+        <p className="text-gray-600 mb-4">{currentSoftQ.text}</p>
         <div className="space-y-2">
           {[1, 2, 3, 4].map((i) => (
             <button
@@ -237,7 +293,7 @@ export function DynamicSkillTest() {
     );
   }
 
-  if (techDone && softDone && results) {
+  if (phase === "finished" && results) {
     const totalScore =
       (results.tech?.total_score || 0) + (results.soft?.total_score || 0);
     const totalQuestions =

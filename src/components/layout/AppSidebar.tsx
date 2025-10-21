@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -11,8 +11,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { supabase } from "@/integrations/supabase/client";
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -21,78 +19,57 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   const location = useLocation();
-  const { user, loading, isAcademy } = useAuth();
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>("");
+  const { loading, isAcademy } = useAuth();
+  const [userData, setUserData] = useState<any>(null);
 
+  // Load user data from localStorage
   useEffect(() => {
-    const fetchProfilePhoto = async () => {
-      if (user) {
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("profile_photo_url")
-          .eq("id", user.id)
-          .maybeSingle();
+    const storedUserData = localStorage.getItem("userData");
+    if (storedUserData) {
+      setUserData(JSON.parse(storedUserData));
+    }
+  }, []);
 
-        if (error) {
-          setProfilePhotoUrl("");
-        } else if (profile && "profile_photo_url" in profile) {
-          setProfilePhotoUrl(
-            (profile as { profile_photo_url?: string }).profile_photo_url || ""
-          );
-        } else {
-          setProfilePhotoUrl("");
-        }
-      }
-    };
+  if (loading) return null;
 
-    fetchProfilePhoto();
-  }, [user]);
+  // Helper: Get user display name
+  const getDisplayName = () => {
+    if (!userData) return "Member";
+    const { first_name, last_name, email } = userData;
 
-  // If the main auth is still loading, don't render the sidebar yet.
-  if (loading) {
-    return null;
-  }
+    if (first_name && last_name) {
+      const capitalize = (str: string) =>
+        str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "";
+      return `${capitalize(first_name)} ${capitalize(last_name)}`;
+    }
+    return email ?? "Member";
+  };
 
-  // Conditionally define the navigation items based on the user's role
+  // Helper: Get avatar initials (always uppercase)
+  const getInitials = () => {
+    if (userData?.first_name && userData?.last_name) {
+      return `${userData.first_name.charAt(0)}${userData.last_name.charAt(
+        0
+      )}`.toUpperCase();
+    }
+    return "U";
+  };
+
+  // Navigation items
   const navItems = isAcademy
-    ? [
-        // Nav items for ACADEMY users
-        {
-          icon: LayoutDashboard,
-          label: "Dashboard",
-          href: "/dashboard",
-        },
-      ]
+    ? [{ icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" }]
     : [
-        // Nav items for DEFAULT users
-        {
-          icon: LayoutDashboard,
-          label: "Dashboard",
-          href: "/dashboard",
-        },
-        {
-          icon: Briefcase,
-          label: "Job Offers",
-          href: "/jobs",
-        },
-        {
-          icon: BookOpen,
-          label: "Courses",
-          href: "/courses",
-        },
+        { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+        { icon: Briefcase, label: "Job Offers", href: "/jobs" },
+        { icon: BookOpen, label: "Courses", href: "/courses" },
       ];
 
-  // Set the correct profile page path based on the user's role
   const profilePath = isAcademy ? "/academy/profile" : "/profile";
 
-  // Mobile navigation is built from the conditionally set navItems
+  // Mobile navigation
   const mobileNavItems = [
     ...navItems,
-    {
-      icon: User,
-      label: "Profile",
-      href: profilePath,
-    },
+    { icon: User, label: "Profile", href: profilePath },
   ];
 
   return (
@@ -102,9 +79,9 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center">
             <img
-              src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
+              src="lovable-uploads/breneo_logo.png"
               alt="Breneo Logo"
-              className="h-7 "
+              className="h-7"
             />
           </Link>
           <div className="flex items-center gap-2">
@@ -166,7 +143,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
         </nav>
       </div>
 
-      {/* Desktop Sidebar - Full Height */}
+      {/* Desktop Sidebar */}
       <div
         className={cn(
           "hidden md:flex fixed top-4 left-4 bottom-4 z-40 bg-white border border-gray-200 transition-all duration-300 flex-col shadow-sm rounded-2xl",
@@ -175,34 +152,25 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       >
         {/* Header */}
         <div className="p-4 flex items-center justify-between border-b border-gray-100">
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center">
-              {!collapsed && (
-                <Link to="/dashboard" className="flex items-center space-x-2">
-                  <img
-                    src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
-                    alt="Breneo Logo"
-                    className="h-8"
-                  />
-                </Link>
-              )}
-              {collapsed && (
-                <img
-                  src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
-                  alt="Breneo Logo"
-                  className="h-5 w-10"
-                  style={{
-                    objectFit: "cover",
-                    objectPosition: "left",
-                  }}
-                />
-              )}
-            </div>
-          </div>
+          {!collapsed ? (
+            <Link to="/dashboard" className="flex items-center space-x-2">
+              <img
+                src="lovable-uploads/breneo_logo.png"
+                alt="Breneo Logo"
+                className="h-8"
+              />
+            </Link>
+          ) : (
+            <img
+              src="lovable-uploads/breneo_logo.png"
+              alt="Breneo Logo"
+              className="h-5 w-10 object-cover object-left"
+            />
+          )}
         </div>
 
+        {/* Main Nav */}
         <div className="flex flex-col flex-1">
-          {/* Main Navigation */}
           <div className="flex-1 overflow-y-auto pt-8">
             <nav className="space-y-2 px-4">
               {navItems.map((item, index) => {
@@ -244,9 +212,11 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
               })}
             </nav>
           </div>
+
           {/* Bottom section */}
           <div className="px-4 pb-4">
             <div className="border-t border-gray-200 mb-4"></div>
+
             <Link
               to="/settings"
               className={cn(
@@ -256,28 +226,12 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   : "text-gray-600 hover:bg-gray-50 hover:text-breneo-blue"
               )}
             >
-              <Settings
-                size={22}
-                className={cn(
-                  "transition-colors duration-200 flex-shrink-0",
-                  location.pathname === "/settings"
-                    ? "text-breneo-blue"
-                    : "text-gray-400 group-hover:text-breneo-blue"
-                )}
-              />
+              <Settings size={22} />
               {!collapsed && (
-                <span
-                  className={cn(
-                    "font-medium text-base transition-colors duration-200",
-                    location.pathname === "/settings"
-                      ? "text-breneo-blue"
-                      : "text-gray-600 group-hover:text-breneo-blue"
-                  )}
-                >
-                  Settings
-                </span>
+                <span className="font-medium text-base">Settings</span>
               )}
             </Link>
+
             <Link
               to="/help"
               className={cn(
@@ -287,53 +241,44 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   : "text-gray-600 hover:bg-gray-50 hover:text-breneo-blue"
               )}
             >
-              <HelpCircle
-                size={22}
-                className={cn(
-                  "transition-colors duration-200 flex-shrink-0",
-                  location.pathname === "/help"
-                    ? "text-breneo-blue"
-                    : "text-gray-400 group-hover:text-breneo-blue"
-                )}
-              />
+              <HelpCircle size={22} />
               {!collapsed && (
-                <span
-                  className={cn(
-                    "font-medium text-base transition-colors duration-200",
-                    location.pathname === "/help"
-                      ? "text-breneo-blue"
-                      : "text-gray-600 group-hover:text-breneo-blue"
-                  )}
-                >
-                  Help Center
-                </span>
+                <span className="font-medium text-base">Help Center</span>
               )}
             </Link>
 
+            {/* Profile */}
             <div className="border-t border-gray-200 mt-4 pt-4">
               <Link
                 to={profilePath}
-                className={cn(
-                  "flex items-center space-x-4 px-4 py-2 rounded-xl transition-all duration-200 group",
-                  "hover:bg-gray-50"
-                )}
+                className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all duration-200 group"
               >
-                <Avatar className="h-7 w-7">
-                  <AvatarImage src={profilePhotoUrl} alt="Profile" />
-                  <AvatarFallback>
-                    <User
-                      size={28}
-                      className="text-gray-400 group-hover:text-breneo-blue"
+                {/* Avatar box */}
+                <div
+                  className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-[12px] text-sm font-semibold shrink-0",
+                    userData?.profile_image
+                      ? "overflow-hidden"
+                      : "bg-[#AAF0FF] text-[#099DBC]"
+                  )}
+                >
+                  {userData?.profile_image ? (
+                    <img
+                      src={userData.profile_image}
+                      alt="Profile"
+                      className="w-full h-full object-cover rounded-[12px]"
                     />
-                  </AvatarFallback>
-                </Avatar>
+                  ) : (
+                    getInitials()
+                  )}
+                </div>
+
                 {!collapsed && (
                   <div className="flex-1">
                     <div className="font-semibold text-sm text-gray-700">
-                      {user?.user_metadata?.full_name ??
-                        user?.email ??
-                        "Member"}
+                      {getDisplayName()}
                     </div>
+                    <p className="text-xs text-gray-400">{userData?.email}</p>
                   </div>
                 )}
               </Link>

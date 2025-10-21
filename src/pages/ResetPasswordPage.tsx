@@ -68,7 +68,7 @@ const ResetPasswordPage: React.FC = () => {
         <div className="container mx-auto">
           <a href="/" className="flex items-center space-x-2">
             <img
-              src="/lovable-uploads/a27089ec-2666-4c11-a0e0-0d8ea54e1d39.png"
+              src="lovable-uploads/breneo_logo.png"
               alt="Breneo Logo"
               className="h-8 md:h-10"
             />

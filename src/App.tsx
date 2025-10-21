@@ -13,6 +13,7 @@ import SkillTestPage from "./pages/SkillTestPage";
 import SkillPathPage from "./pages/SkillPathPage";
 import JobsPage from "./pages/JobsPage";
 import CoursesPage from "./pages/CoursesPage";
+import CoursePage from "./pages/CoursePage"; // Import the new course page
 import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AcademyDashboard from "./pages/AcademyDashboard";
@@ -25,6 +26,8 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { Settings } from "lucide-react";
 import UserSettings from "./pages/UserSettings";
 import AcademyProfilePage from "./pages/AcademyProfilePage";
+import EmailVerification from "./pages/EmailVerification";
+import AcademyRegistrationPage from "./pages/AcademyRegistrationPage";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +93,15 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          {/* Add the new route for a single course */}
+          <Route
+            path="/course/:courseId"
+            element={
+              <ProtectedRoute>
+                <CoursePage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/notifications"
             element={
@@ -130,6 +142,19 @@ const App = () => (
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/email-verification"
+            element={
+              <ProtectedRoute>
+                <EmailVerification />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/academy/register"
+            element={<AcademyRegistrationPage />}
+          />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
         {/* </BrowserRouter> */}

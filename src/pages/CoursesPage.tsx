@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,7 @@ const CoursesPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [currentTab, setCurrentTab] = React.useState("all");
+  const navigate = useNavigate(); // Initialize the navigate function
 
   const { data: savedCourses = [] } = useQuery({
     queryKey: ["savedCourses", user?.id],
@@ -202,7 +203,11 @@ const CoursesPage = () => {
                 <Card key={course.id} className="overflow-hidden group">
                   <div className="h-40 overflow-hidden">
                     <img
-                      src={course.image}
+                      src={
+                        course.image
+                          ? course.image
+                          : "lovable-uploads/no_photo.png"
+                      }
                       alt={course.title}
                       className="w-full h-full object-cover"
                     />
@@ -236,6 +241,11 @@ const CoursesPage = () => {
                         <Button
                           size="sm"
                           variant={course.enrolled ? "outline" : "default"}
+                          onClick={() => {
+                            if (!course.enrolled) {
+                              navigate(`/course/${course.id}`);
+                            }
+                          }}
                         >
                           {course.enrolled ? "Continue" : "Enroll"}
                         </Button>
