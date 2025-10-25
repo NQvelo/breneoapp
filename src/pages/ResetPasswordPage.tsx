@@ -1,186 +1,227 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+
+const API_BASE = "https://breneo.onrender.com";
 
 const ResetPasswordPage: React.FC = () => {
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { updatePassword } = useAuth();
+  const [step, setStep] = useState(1);
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    document.title = "Reset Password | Breneo";
-    let descTag = document.querySelector('meta[name="description"]');
-    if (!descTag) {
-      descTag = document.createElement("meta");
-      descTag.setAttribute("name", "description");
-      document.head.appendChild(descTag);
-    }
-    descTag.setAttribute("content", "Reset your Breneo account password.");
-
-    let canonical = document.querySelector(
-      'link[rel="canonical"]'
-    ) as HTMLLinkElement | null;
-    if (!canonical) {
-      canonical = document.createElement("link");
-      canonical.setAttribute("rel", "canonical");
-      document.head.appendChild(canonical);
-    }
-    canonical.setAttribute("href", `${window.location.origin}/reset-password`);
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // =========================
+  // Step 1: Send Code
+  // =========================
+  const sendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (password !== confirmPassword) {
-      return;
+    setIsLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/password-reset/request/`, {
+        email,
+      });
+      toast.success(res.data.message || "Code sent to your email!");
+      setStep(2);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Error sending code");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (password.length < 6) {
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await updatePassword(password);
-
-    if (!error) {
-      navigate("/dashboard");
-    }
-
-    setLoading(false);
   };
 
-  const passwordsMatch = password === confirmPassword;
-  const isValidPassword = password.length >= 6;
-  const canSubmit =
-    passwordsMatch && isValidPassword && password && confirmPassword;
+  // =========================
+  // Step 2: Verify Code
+  // =========================
+  const verifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/password-reset/verify/`, {
+        email,
+        code,
+      });
+      toast.success(res.data.message || "Code verified!");
+      setStep(3);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Invalid code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // =========================
+  // Step 3: Set New Password
+  // =========================
+  const setNewPasswordHandler = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/password-reset/set-new/`, {
+        email,
+        code,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      toast.success(res.data.message || "Password reset successfully!");
+      navigate("/auth/login"); // Redirect to login on success
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Error setting new password");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-breneo-lightgray flex flex-col">
-      <header className="bg-white py-3 px-4 md:py-4 md:px-6 shadow-sm">
-        <div className="container mx-auto">
-          <a href="/" className="flex items-center space-x-2">
-            <img
-              src="lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className="h-8 md:h-10"
-            />
-          </a>
-        </div>
-      </header>
-
-      <main className="flex-grow flex items-center justify-center py-6 px-3 md:py-12 md:px-4">
+    <div className="min-h-screen flex">
+      {/* Left Section (Form) */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-semibold text-foreground mb-2">
-              Reset Password
-            </h1>
-            <p className="text-muted-foreground">
-              Enter your new password below
-            </p>
+          <div className="mb-8">
+            <img
+              src="/lovable-uploads/breneo_logo.png"
+              alt="Breneo Logo"
+              className="h-10"
+            />
           </div>
+          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+            Reset Password
+          </h1>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium text-foreground"
-              >
-                New Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter new password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  disabled={loading}
-                  className="h-12 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  disabled={loading}
+          {/* Step 1: Enter Email */}
+          {step === 1 && (
+            <>
+              <p className="text-gray-600 mb-8">
+                Enter your email to receive a verification code.
+              </p>
+              <form onSubmit={sendCode} className="space-y-6">
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="mt-1 h-12"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                  disabled={isLoading}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              {password && !isValidPassword && (
-                <p className="text-sm text-red-500">
-                  Password must be at least 6 characters
-                </p>
-              )}
-            </div>
+                  {isLoading ? "Sending Code..." : "Send Code"}
+                </Button>
+              </form>
+            </>
+          )}
 
-            <div className="space-y-2">
-              <label
-                htmlFor="confirmPassword"
-                className="text-sm font-medium text-foreground"
-              >
-                Repeat Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Repeat new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-12 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  disabled={loading}
+          {/* Step 2: Enter Code */}
+          {step === 2 && (
+            <>
+              <p className="text-gray-600 mb-8">
+                A code was sent to {email}. Please enter it below.
+              </p>
+              <form onSubmit={verifyCode} className="space-y-6">
+                <div>
+                  <Label htmlFor="code">Verification Code</Label>
+                  <Input
+                    id="code"
+                    type="text"
+                    placeholder="Enter 6-digit code"
+                    className="mt-1 h-12"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                  disabled={isLoading}
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              {confirmPassword && !passwordsMatch && (
-                <p className="text-sm text-red-500">Passwords do not match</p>
-              )}
-            </div>
+                  {isLoading ? "Verifying..." : "Verify Code"}
+                </Button>
+              </form>
+            </>
+          )}
 
-            <Button
-              type="submit"
-              className="w-full h-12 bg-breneo-blue hover:bg-breneo-blue/90 text-white font-medium"
-              disabled={loading || !canSubmit}
+          {/* Step 3: Set New Password */}
+          {step === 3 && (
+            <>
+              <p className="text-gray-600 mb-8">Enter your new password.</p>
+              <form onSubmit={setNewPasswordHandler} className="space-y-6">
+                <div>
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Enter new password"
+                    className="mt-1 h-12"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Confirm new password"
+                    className="mt-1 h-12"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Setting..." : "Set New Password"}
+                </Button>
+              </form>
+            </>
+          )}
+
+          <p className="text-center text-gray-600 mt-8">
+            Remembered your password?{" "}
+            <button
+              type="button"
+              className="text-[#00BFFF] hover:underline"
+              onClick={() => navigate("/auth/login")}
             >
-              {loading ? "Updating Password..." : "Update Password"}
-            </Button>
-          </form>
-        </div>
-      </main>
-
-      <footer className="bg-white py-3 px-4 md:py-4 md:px-6 border-t">
-        <div className="container mx-auto">
-          <p className="text-xs md:text-sm text-gray-500 text-center">
-            © {new Date().getFullYear()} Breneo. All rights reserved.
+              Sign In
+            </button>
           </p>
         </div>
-      </footer>
+      </div>
+
+      {/* Right Section (Image) */}
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
+        <div
+          className="w-full h-full bg-cover bg-center bg-no-repeat rounded-xl"
+          style={{ backgroundImage: "url('/lovable-uploads/future.png')" }}
+        ></div>
+      </div>
     </div>
   );
 };

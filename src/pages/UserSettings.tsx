@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -13,259 +13,206 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { User, Camera, Upload, Settings } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
+import { Camera } from "lucide-react";
+
+// Base API URL
+const API_BASE = "https://breneo.onrender.com";
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Profile form state
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
 
-  // Password form state
+  // --- Password Reset State ---
+  const [passwordStep, setPasswordStep] = useState(1);
+  const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  // ---
 
+  // Populate form with user data from AuthContext
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (user) {
-        setFullName(user.user_metadata?.full_name || "");
-        setEmail(user.email || "");
-
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("profile_photo_url")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (error) {
-          setProfilePhotoUrl("");
-        } else if (profile && "profile_photo_url" in profile) {
-          setProfilePhotoUrl(
-            (profile as { profile_photo_url?: string }).profile_photo_url || ""
-          );
-        } else {
-          setProfilePhotoUrl("");
-        }
-      }
-    };
-
-    fetchProfile();
+    if (user) {
+      setFirstName(user.first_name || "");
+      setLastName(user.last_name || "");
+      setEmail(user.email || "");
+      setPhoneNumber(user.phone_number || "");
+    }
   }, [user]);
 
-  const handlePhotoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file || !user) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast({
-        title: "Error",
-        description: "Please select an image file",
-        variant: "destructive",
-      });
-      return;
+  // Get initials for avatar
+  const getInitials = () => {
+    if (firstName && lastName) {
+      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Error",
-        description: "Image size must be less than 5MB",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUploadingPhoto(true);
-
-    try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/avatar.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        email: user.email,
-        full_name: fullName,
-        profile_photo_url: publicUrl,
-      });
-
-      if (updateError) throw updateError;
-
-      setProfilePhotoUrl(publicUrl);
-      toast({
-        title: "Success",
-        description: "Profile photo updated successfully",
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setUploadingPhoto(false);
-    }
+    return user?.email?.charAt(0).toUpperCase() || "U";
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  const handlePhotoUploadClick = () => {
+    toast.info("Profile photo upload is coming soon!");
+  };
+
+  const handleProfileClick = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+
+    if (!isEditing) {
+      setIsEditing(true);
+      return;
+    }
+
+    setProfileLoading(true);
+    // Get the simple 'token'
+    const token = localStorage.getItem("authToken");
+
+    if (!token) {
+      toast.error("Authentication session expired. Please log in again.");
+      setProfileLoading(false);
+      return;
+    }
+    if (!user || !user.id) {
+      toast.error("User ID not found. Please log in again.");
+      setProfileLoading(false);
+      return;
+    }
 
     try {
-      const { error: authError } = await supabase.auth.updateUser({
-        email: email,
-        data: {
-          full_name: fullName,
+      const updateUrl = `${API_BASE}/api/profile/${user.id}/`;
+      await axios.patch(
+        // Use PATCH
+        updateUrl,
+        {
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
         },
-      });
+        {
+          headers: {
+            // Use 'Bearer' auth
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      if (authError) throw authError;
-
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-        id: user?.id!,
-        email: email,
-        full_name: fullName,
-        profile_photo_url: profilePhotoUrl,
-      });
-
-      if (profileError) throw profileError;
-
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.success("Profile updated successfully!");
+      setIsEditing(false);
+    } catch (err: any) {
+      let errorMessage = "Failed to update profile.";
+      if (axios.isAxiosError(err) && err.response) {
+        errorMessage =
+          err.response.data.detail ||
+          err.response.data.message ||
+          "An error occurred.";
+      }
+      toast.error(errorMessage);
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   };
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
+  // --- START: Password Reset Functions ---
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords do not match",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setPasswordLoading(true);
-
+    if (!user?.email) {
+      toast.error("Email not found. Please log in again.");
+      setPasswordLoading(false);
+      return;
+    }
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
+      const res = await axios.post(`${API_BASE}/password-reset/request/`, {
+        email: user.email,
       });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Password updated successfully",
-        });
-        setNewPassword("");
-        setConfirmPassword("");
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast.success(res.data.message || "Code sent to your email!");
+      setPasswordStep(2);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Error sending code");
     } finally {
       setPasswordLoading(false);
     }
   };
 
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/password-reset/verify/`, {
+        email: user?.email,
+        code: code,
+      });
+      toast.success(res.data.message || "Code verified!");
+      setPasswordStep(3);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Invalid code");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      const res = await axios.post(`${API_BASE}/password-reset/set-new/`, {
+        email: user?.email,
+        code: code,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      toast.success(res.data.message || "Password updated successfully!");
+      // Reset everything
+      setPasswordStep(1);
+      setCode("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Error setting new password");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+  // --- END: New Password Reset Functions ---
+
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 space-y-6">
-        {/* <div className="flex items-center space-x-2">
-          <Settings className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">Settings</h1>
-        </div> */}
-
         <div className="space-y-6">
           {/* Profile Photo and Info */}
-
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative">
                   <Avatar className="h-32 w-32">
                     <AvatarImage
-                      src={profilePhotoUrl}
+                      src={user?.profile_image}
                       alt="Profile photo"
-                      key={profilePhotoUrl}
                     />
                     <AvatarFallback className="bg-breneo-blue/10 text-breneo-blue text-2xl">
-                      {fullName
-                        ? fullName.charAt(0).toUpperCase()
-                        : user?.email?.charAt(0).toUpperCase() || "U"}
+                      {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingPhoto}
+                    onClick={handlePhotoUploadClick}
                     className="absolute bottom-1 right-1 bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-full p-2 shadow-lg transition-colors disabled:opacity-50"
                   >
-                    {uploadingPhoto ? (
-                      <Upload className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
+                    <Camera className="h-4 w-4" />
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                  />
                 </div>
               </div>
             </CardContent>
@@ -281,20 +228,39 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <form onSubmit={handleProfileClick} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
+                    <Label htmlFor="firstName">First Name</Label>
                     <Input
-                      id="username"
+                      id="firstName"
                       type="text"
-                      value={email.split("@")[0]}
-                      disabled
-                      className="bg-gray-50"
-                      placeholder="Username (auto-generated)"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="Enter your first name"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Username is based on your email and cannot be changed
-                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="Enter your last name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Mobile Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="Enter your mobile number"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
@@ -306,22 +272,22 @@ export default function SettingsPage() {
                       className="bg-gray-50"
                       placeholder="Email address"
                     />
+                    {/* ✅ START: FIX */}
                     <p className="text-xs text-muted-foreground">
-                      Email cannot be changed from this page
+                      Email cannot be changed from this page.
                     </p>
+                    {/* ✅ END: FIX */}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-                  <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Updating..." : "Update Profile"}
+                  <Button
+                    type="submit"
+                    disabled={profileLoading}
+                    className="w-full"
+                  >
+                    {isEditing
+                      ? profileLoading
+                        ? "Updating..."
+                        : "Update Info"
+                      : "Edit Your Info"}
                   </Button>
                 </form>
               </CardContent>
@@ -336,37 +302,105 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleUpdatePassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">
-                      Confirm New Password
-                    </Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={passwordLoading}
-                    className="w-full"
-                  >
-                    {passwordLoading ? "Updating..." : "Update Password"}
-                  </Button>
-                </form>
+                {/* Step 1: Send Code */}
+                {passwordStep === 1 && (
+                  <form onSubmit={handleSendCode} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email_pass_reset">Email</Label>
+                      <Input
+                        id="email_pass_reset"
+                        type="email"
+                        value={user?.email || ""}
+                        disabled
+                        className="bg-gray-50"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        A verification code will be sent to this email.
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={passwordLoading}
+                      className="w-full"
+                    >
+                      {passwordLoading ? "Sending..." : "Send Code"}
+                    </Button>
+                  </form>
+                )}
+
+                {/* Step 2: Verify Code */}
+                {passwordStep === 2 && (
+                  <form onSubmit={handleVerifyCode} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="code">Verification Code</Label>
+                      <Input
+                        id="code"
+                        type="text"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        placeholder="Enter 6-digit code"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={passwordLoading}
+                      className="w-full"
+                    >
+                      {passwordLoading ? "Verifying..." : "Verify Code"}
+                    </Button>
+                    <Button
+                      variant="link"
+                      type="button"
+                      onClick={() => setPasswordStep(1)}
+                      className="p-0 h-auto"
+                    >
+                      Back
+                    </Button>
+                  </form>
+                )}
+
+                {/* Step 3: Set New Password */}
+                {passwordStep === 3 && (
+                  <form onSubmit={handleSetNewPassword} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">
+                        Confirm New Password
+                      </Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={passwordLoading}
+                      className="w-full"
+                    >
+                      {passwordLoading ? "Updating..." : "Set New Password"}
+                    </Button>
+                    <Button
+                      variant="link"
+                      type="button"
+                      onClick={() => setPasswordStep(2)}
+                      className="p-0 h-auto"
+                    >
+                      Back
+                    </Button>
+                  </form>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -382,23 +416,17 @@ export default function SettingsPage() {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Account ID:</span>
-                  <span className="text-sm text-gray-600">{user?.id}</span>
+                  <span className="text-sm font-medium">Email:</span>
+                  <span className="text-sm text-gray-600">{user?.email}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Email Verified:</span>
+                  <span className="text-sm font-medium">User Type:</span>
                   <span className="text-sm text-gray-600">
-                    {user?.email_confirmed_at ? "Yes" : "No"}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Account Created:</span>
-                  <span className="text-sm text-gray-600">
-                    {user?.created_at
-                      ? new Date(user.created_at).toLocaleDateString()
-                      : "Unknown"}
+                    {user?.user_type
+                      ? user.user_type.charAt(0).toUpperCase() +
+                        user.user_type.slice(1)
+                      : "N/A"}
                   </span>
                 </div>
               </div>

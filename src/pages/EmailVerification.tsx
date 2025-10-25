@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login } = useAuth();
   const [code, setCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,6 +21,31 @@ const EmailVerification: React.FC = () => {
   useEffect(() => {
     document.title = "Email Verification | Breneo";
   }, []);
+
+  // ✅ Helper function for auto-login using AuthContext
+  const loginAndNavigate = async () => {
+    if (!email || !password) {
+      toast.error("Session expired. Please log in manually.");
+      navigate("/auth/login");
+      return;
+    }
+    try {
+      // Use AuthContext login function instead of direct API call
+      await login(email, password);
+
+      toast.success("Email verified and logged in!");
+      sessionStorage.removeItem("tempEmail");
+      sessionStorage.removeItem("tempPassword");
+
+      // Navigation is handled by AuthContext
+    } catch (loginErr) {
+      console.error("Auto-login failed:", loginErr);
+      toast.error(
+        "Verification successful, but auto-login failed. Please log in manually."
+      );
+      navigate("/auth/login");
+    }
+  };
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,35 +62,50 @@ const EmailVerification: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Verify email
+      // Step 1: Try to verify email
       await axios.post("https://breneo.onrender.com/api/verify-code/", {
         email,
         code,
       });
 
-      // Auto-login
-      const loginResp = await axios.post(
-        "https://breneo.onrender.com/api/login/",
-        { username: email, password }
-      );
-
-      localStorage.setItem("authToken", loginResp.data.token);
-
-      toast.success("Email verified and logged in!");
-      sessionStorage.removeItem("tempEmail");
-      sessionStorage.removeItem("tempPassword");
-
-      navigate("/dashboard");
-    } catch (err: any) {
+      // ✅ If verification succeeds (no error), proceed to login
+      await loginAndNavigate();
+    } catch (err: unknown) {
+      // Step 2: If verification fails, check *why*
       let errorMessage = "Verification failed. Please try again.";
+      let isKnownBackendBug = false;
+
       if (axios.isAxiosError(err) && err.response) {
-        errorMessage =
-          err.response.data.detail ||
-          err.response.data.message ||
-          err.response.data.error ||
-          errorMessage;
+        const errorData = err.response.data;
+        // Find the error detail string from various possible fields
+        const detail =
+          errorData.detail ||
+          errorData.message ||
+          errorData.error ||
+          (Array.isArray(errorData.email) && errorData.email[0]) || // Check for field-specific errors
+          "";
+
+        errorMessage = typeof detail === "string" ? detail : errorMessage;
+
+        // ✅ WORKAROUND: Check for the specific backend bug
+        if (
+          err.response.status === 400 &&
+          errorMessage
+            .toLowerCase()
+            .includes("user with this email already exists")
+        ) {
+          isKnownBackendBug = true;
+        }
       }
-      toast.error(errorMessage);
+
+      // ✅ If it's the known bug, ignore it and try to log in anyway
+      if (isKnownBackendBug) {
+        toast.info("Verification processed, attempting login...");
+        await loginAndNavigate();
+      } else {
+        // Otherwise, it's a real error (e.g., wrong code, or 404)
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +117,7 @@ const EmailVerification: React.FC = () => {
         <div className="w-full max-w-md">
           <div className="mb-8">
             <img
-              src="lovable-uploads/breneo_logo.png"
+              src="/lovable-uploads/breneo_logo.png" // Use root path
               alt="Breneo Logo"
               className="h-10"
             />
@@ -85,7 +127,7 @@ const EmailVerification: React.FC = () => {
             Verify Your Email
           </h1>
           <p className="text-gray-600 mb-8">
-            Enter the 6-digit code sent to your email ({email})
+            Enter the 6-digit code sent to your email ({email || "your-email"})
           </p>
 
           <form onSubmit={handleVerify} className="space-y-6">
@@ -129,7 +171,7 @@ const EmailVerification: React.FC = () => {
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
         <div
           className="w-full h-full bg-cover bg-center bg-no-repeat rounded-xl"
-          style={{ backgroundImage: `url('/lovable-uploads/future.png')` }}
+          style={{ backgroundImage: `url('/lovable-uploads/future.png')` }} // Use root path
         ></div>
       </div>
     </div>

@@ -1,24 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-// import axios from "axios"; // No longer needed here
+import axios from "axios"; // ✅ Required for error type checking
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
-// import { toast } from "sonner"; // No longer needed, context handles it
+import { toast } from "sonner"; // ✅ Required for error toasts
 import { useAuth } from "@/contexts/AuthContext"; // ✅ IMPORT USEAUTH
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  // ✅ Get login function and loading state from context
   const { login, loading: authLoading } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  // const [isLoading, setIsLoading] = useState(false); // We now use authLoading
 
-  // Set page title and meta (This is fine)
+  // Set page title and meta
   useEffect(() => {
     document.title = "Login | Breneo";
 
@@ -43,25 +41,81 @@ const LoginPage: React.FC = () => {
     canonical.setAttribute("href", `${window.location.origin}/auth/login`);
   }, []);
 
-  // ✅ Handle login (NOW MUCH SIMPLER)
+  // ✅ Handle login (NOW WITH MORE ROBUST ERROR HANDLING)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // setIsLoading(true); // Handled by context
 
     try {
-      // ✅ CALL THE CONTEXT FUNCTION
       await login(emailOrUsername, password);
-      // All logic (toast, navigation, user fetching) is now in the context.
-    } catch (err: any) {
-      // The context already showed an error toast.
-      // We can just log it here for debugging.
-      console.error("Login page caught error (toast was already shown):", err);
-    } finally {
-      // setIsLoading(false); // Handled by context
+      // Success logic (navigation, etc.) is handled by the AuthContext
+    } catch (err: unknow) {
+      // ✅ START: Improved error handling
+      let errorMessage = "Login failed. Please try again.";
+      let needsVerification = false;
+
+      if (axios.isAxiosError(err) && err.response && err.response.data) {
+        const errorData = err.response.data;
+        let detail = "";
+
+        // Try to find the error message in common response fields
+        if (typeof errorData.detail === "string") detail = errorData.detail;
+        else if (typeof errorData.message === "string")
+          detail = errorData.message;
+        else if (typeof errorData.error === "string") detail = errorData.error;
+        // Check for Django REST Framework's default non-field errors
+        else if (
+          Array.isArray(errorData.non_field_errors) &&
+          errorData.non_field_errors.length > 0 &&
+          typeof errorData.non_field_errors[0] === "string"
+        ) {
+          detail = errorData.non_field_errors[0];
+        }
+
+        if (detail) {
+          errorMessage = detail;
+          const lowerCaseDetail = detail.toLowerCase();
+
+          // Check for various "not verified" messages (case-insensitive)
+          if (
+            lowerCaseDetail.includes("email not verified") ||
+            lowerCaseDetail.includes("account not active") ||
+            lowerCaseDetail.includes("please verify your email") ||
+            lowerCaseDetail.includes("e-mail address not verified") ||
+            lowerCaseDetail.includes("user is inactive")
+          ) {
+            needsVerification = true;
+          }
+        } else {
+          // If we can't parse the error, log it for debugging
+          console.error("Unknown error format from server:", errorData);
+        }
+      }
+
+      if (needsVerification) {
+        // This is the flow you requested
+        toast.info(
+          "Your account is not verified. Redirecting to verification..."
+        );
+        sessionStorage.setItem("tempEmail", emailOrUsername);
+        sessionStorage.setItem("tempPassword", password);
+        navigate("/auth/email-verification");
+      } else {
+        // This is a standard login fail (e.g., wrong password)
+        toast.error(errorMessage);
+
+        // ✅ NEW: Log the server's response data for debugging
+        console.error(
+          "Login page caught error (see details below):",
+          err instanceof Error ? err.message : String(err)
+        );
+        if (axios.isAxiosError(err) && err.response) {
+          console.error("Server response data:", err.response.data);
+        }
+      }
+      // ✅ END: Improved error handling
     }
   };
 
-  // ✅ Use the loading state from the context
   const isLoading = authLoading;
 
   return (
@@ -91,7 +145,7 @@ const LoginPage: React.FC = () => {
                 value={emailOrUsername}
                 onChange={(e) => setEmailOrUsername(e.target.value)}
                 required
-                disabled={isLoading} // ✅ Uses context's loading
+                disabled={isLoading}
               />
             </div>
             <div>
@@ -105,7 +159,7 @@ const LoginPage: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading} // ✅ Uses context's loading
+                  disabled={isLoading}
                 />
                 <Button
                   type="button"
@@ -113,7 +167,7 @@ const LoginPage: React.FC = () => {
                   size="sm"
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading} // ✅ Uses context's loading
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-gray-500" />
@@ -126,7 +180,7 @@ const LoginPage: React.FC = () => {
             <Button
               type="submit"
               className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-              disabled={isLoading} // ✅ Uses context's loading
+              disabled={isLoading}
             >
               {isLoading ? "Signing In..." : "Sign In"}
             </Button>

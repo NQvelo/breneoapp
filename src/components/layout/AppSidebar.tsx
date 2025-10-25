@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react"; // ⛔ Removed useEffect, useState
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -19,38 +19,39 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   const location = useLocation();
-  const { loading, isAcademy } = useAuth();
-  const [userData, setUserData] = useState<any>(null);
+  // ✅ Get the user object directly from the context
+  const { loading, isAcademy, user } = useAuth();
 
-  // Load user data from localStorage
-  useEffect(() => {
-    const storedUserData = localStorage.getItem("userData");
-    if (storedUserData) {
-      setUserData(JSON.parse(storedUserData));
-    }
-  }, []);
+  // ⛔ Removed old useState and useEffect for localStorage
 
   if (loading) return null;
 
   // Helper: Get user display name
   const getDisplayName = () => {
-    if (!userData) return "Member";
-    const { first_name, last_name, email } = userData;
+    // ✅ Changed userData to user
+    if (!user) return "Member";
+    const { first_name, last_name, email } = user;
 
     if (first_name && last_name) {
       const capitalize = (str: string) =>
         str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "";
       return `${capitalize(first_name)} ${capitalize(last_name)}`;
     }
+    // ✅ Use user.email as a fallback
     return email ?? "Member";
   };
 
   // Helper: Get avatar initials (always uppercase)
   const getInitials = () => {
-    if (userData?.first_name && userData?.last_name) {
-      return `${userData.first_name.charAt(0)}${userData.last_name.charAt(
+    // ✅ Changed userData to user
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name.charAt(0)}${user.last_name.charAt(
         0
       )}`.toUpperCase();
+    }
+    // ✅ Fallback to first letter of email or "U"
+    if (user?.email) {
+      return user.email.charAt(0).toUpperCase();
     }
     return "U";
   };
@@ -79,7 +80,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center">
             <img
-              src="lovable-uploads/breneo_logo.png"
+              src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
               alt="Breneo Logo"
               className="h-7"
             />
@@ -155,14 +156,14 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
           {!collapsed ? (
             <Link to="/dashboard" className="flex items-center space-x-2">
               <img
-                src="lovable-uploads/breneo_logo.png"
+                src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
                 alt="Breneo Logo"
                 className="h-8"
               />
             </Link>
           ) : (
             <img
-              src="lovable-uploads/breneo_logo.png"
+              src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
               alt="Breneo Logo"
               className="h-5 w-10 object-cover object-left"
             />
@@ -257,14 +258,16 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 <div
                   className={cn(
                     "flex items-center justify-center w-8 h-8 rounded-[12px] text-sm font-semibold shrink-0",
-                    userData?.profile_image
+                    // ✅ Changed userData to user
+                    user?.profile_image
                       ? "overflow-hidden"
                       : "bg-[#AAF0FF] text-[#099DBC]"
                   )}
                 >
-                  {userData?.profile_image ? (
+                  {/* ✅ Changed userData to user */}
+                  {user?.profile_image ? (
                     <img
-                      src={userData.profile_image}
+                      src={user.profile_image}
                       alt="Profile"
                       className="w-full h-full object-cover rounded-[12px]"
                     />
@@ -278,7 +281,8 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     <div className="font-semibold text-sm text-gray-700">
                       {getDisplayName()}
                     </div>
-                    <p className="text-xs text-gray-400">{userData?.email}</p>
+                    {/* ✅ Changed userData to user */}
+                    <p className="text-xs text-gray-400">{user?.email}</p>
                   </div>
                 )}
               </Link>
