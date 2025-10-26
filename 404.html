@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 - Page Not Found | Breneo</title>
+    <meta
+      name="description"
+      content="The page you're looking for doesn't exist. Return to Breneo to continue your journey."
+    />
+
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico" />
+
+    <!-- Theme detection script -->
+    <script>
+      // Detect system theme preference
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      const savedTheme = localStorage.getItem("theme");
+      const theme = savedTheme || (prefersDark ? "dark" : "light");
+
+      // Apply theme class immediately to prevent flash
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS for dark mode -->
+    <style>
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --primary: 222.2 47.4% 11.2%;
+      }
+
+      .dark {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --primary: 210 40% 98%;
+      }
+
+      body {
+        background-color: hsl(var(--background));
+        color: hsl(var(--foreground));
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      .text-muted {
+        color: hsl(var(--muted-foreground));
+      }
+
+      .text-primary {
+        color: hsl(var(--primary));
+      }
+
+      .bg-primary {
+        background-color: hsl(var(--primary));
+      }
+
+      .hover\:bg-primary\/90:hover {
+        background-color: hsl(var(--primary) / 0.9);
+      }
+
+      .border-primary {
+        border-color: hsl(var(--primary));
+      }
+
+      .hover\:text-primary:hover {
+        color: hsl(var(--primary));
+      }
+    </style>
+  </head>
+  <body>
+    <div class="min-h-screen flex items-center justify-center px-4">
+      <div class="text-center max-w-md mx-auto">
+        <!-- Logo -->
+        <div class="mb-8">
+          <img
+            src="/lovable-uploads/breneo_logo.png"
+            alt="Breneo Logo"
+            class="h-12 mx-auto"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+          />
+          <div
+            class="h-12 w-32 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center mx-auto hidden"
+          >
+            <span class="text-sm text-gray-500 dark:text-gray-400 font-semibold"
+              >Breneo</span
+            >
+          </div>
+        </div>
+
+        <!-- 404 Content -->
+        <div class="mb-8">
+          <h1 class="text-6xl font-bold text-primary mb-4">404</h1>
+          <h2 class="text-2xl font-semibold mb-2">Page Not Found</h2>
+          <p class="text-muted mb-6">
+            The page you're looking for doesn't exist or has been moved.
+          </p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="space-y-4">
+          <a
+            href="/#/dashboard"
+            class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          >
+            Go to Dashboard
+          </a>
+
+          <div class="text-sm text-muted">
+            <a
+              href="/#/auth/login"
+              class="hover:text-primary transition-colors"
+            >
+              Sign In
+            </a>
+            <span class="mx-2">•</span>
+            <a
+              href="/#/auth/signup"
+              class="hover:text-primary transition-colors"
+            >
+              Sign Up
+            </a>
+          </div>
+        </div>
+
+        <!-- Theme Toggle -->
+        <div class="mt-8">
+          <button
+            id="theme-toggle"
+            class="p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Toggle theme"
+          >
+            <svg
+              id="sun-icon"
+              class="w-5 h-5 text-yellow-500"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
+                clip-rule="evenodd"
+              ></path>
+            </svg>
+            <svg
+              id="moon-icon"
+              class="w-5 h-5 text-gray-400 hidden"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Theme toggle functionality
+      const themeToggle = document.getElementById("theme-toggle");
+      const sunIcon = document.getElementById("sun-icon");
+      const moonIcon = document.getElementById("moon-icon");
+
+      function updateThemeIcon(theme) {
+        if (theme === "dark") {
+          sunIcon.classList.add("hidden");
+          moonIcon.classList.remove("hidden");
+        } else {
+          sunIcon.classList.remove("hidden");
+          moonIcon.classList.add("hidden");
+        }
+      }
+
+      themeToggle.addEventListener("click", () => {
+        const isDark = document.documentElement.classList.contains("dark");
+        const newTheme = isDark ? "light" : "dark";
+
+        if (newTheme === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+
+        localStorage.setItem("theme", newTheme);
+        updateThemeIcon(newTheme);
+      });
+
+      // Initialize theme icon
+      updateThemeIcon(
+        localStorage.getItem("theme") ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light")
+      );
+    </script>
+  </body>
+</html>
