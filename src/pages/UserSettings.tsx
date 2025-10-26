@@ -11,25 +11,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import OptimizedAvatar, {
+  useImagePreloader,
+} from "@/components/ui/OptimizedAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import apiClient, { API_ENDPOINTS, createFormDataRequest } from "@/lib/api";
 import axios from "axios";
 import { Camera } from "lucide-react";
 
-// Base API URL
-const API_BASE = "https://breneo.onrender.com";
-
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { preloadImage } = useImagePreloader();
   const [isEditing, setIsEditing] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Profile form state
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // --- Password Reset State ---
   const [passwordStep, setPasswordStep] = useState(1);
@@ -49,6 +53,22 @@ export default function SettingsPage() {
     }
   }, [user]);
 
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
+  // Clear phone error when editing is disabled
+  useEffect(() => {
+    if (!isEditing) {
+      setPhoneError("");
+    }
+  }, [isEditing]);
+
   // Get initials for avatar
   const getInitials = () => {
     if (firstName && lastName) {
@@ -57,8 +77,126 @@ export default function SettingsPage() {
     return user?.email?.charAt(0).toUpperCase() || "U";
   };
 
+  // Phone number validation
+  const validatePhoneNumber = (phone: string): boolean => {
+    if (!phone) return true; // Empty is allowed (optional field)
+
+    // International phone number regex:
+    // - Optional + at the start
+    // - Only digits (0-9) and spaces, dashes, parentheses, and dots allowed
+    // - Minimum 7 digits (shortest valid international number like Tuvalu: +688)
+    // - Maximum 15 digits (ITU-T E.164 standard limit)
+    const phoneRegex = /^\+?[\d\s\-().]{7,15}$/;
+
+    // Remove all non-digit characters for length check
+    const digitsOnly = phone.replace(/\D/g, "");
+
+    // Check format and length
+    if (!phoneRegex.test(phone)) {
+      setPhoneError(
+        "Phone number can only contain digits, spaces, hyphens, parentheses, and dots, optionally starting with +"
+      );
+      return false;
+    }
+
+    if (digitsOnly.length < 7) {
+      setPhoneError("Phone number must contain at least 7 digits");
+      return false;
+    }
+
+    if (digitsOnly.length > 15) {
+      setPhoneError("Phone number must not exceed 15 digits");
+      return false;
+    }
+
+    setPhoneError("");
+    return true;
+  };
+
   const handlePhotoUploadClick = () => {
-    toast.info("Profile photo upload is coming soon!");
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = handlePhotoUpload;
+    input.click();
+  };
+
+  const handlePhotoUpload = async (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      return;
+    }
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+
+    if (!user || !user.id) {
+      toast.error("User ID not found. Please log in again.");
+      return;
+    }
+
+    try {
+      setPhotoUploading(true);
+
+      // Create FormData for file upload
+      const formData = createFormDataRequest({ profile_image: file });
+
+      // Upload the image using the correct endpoint (no ID in URL)
+      const response = await apiClient.patch(
+        API_ENDPOINTS.AUTH.PROFILE,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      // Update user data in AuthContext
+      if (response.data && user) {
+        const updatedUser = {
+          ...user,
+          profile_image: response.data.profile_image,
+        };
+
+        // Preload the new image for better performance
+        if (response.data.profile_image) {
+          preloadImage(response.data.profile_image).catch(console.error);
+        }
+
+        toast.success("Profile photo updated successfully!");
+
+        // Clear preview and reload the page to refresh user data
+        setImagePreview(null);
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Photo upload failed:", error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage =
+          error.response?.data?.detail ||
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Failed to upload profile photo. Please try again.";
+        toast.error(errorMessage);
+      } else {
+        toast.error("Failed to upload profile photo. Please try again.");
+      }
+    } finally {
+      setPhotoUploading(false);
+    }
   };
 
   const handleProfileClick = async (e: React.FormEvent) => {
@@ -69,15 +207,25 @@ export default function SettingsPage() {
       return;
     }
 
-    setProfileLoading(true);
-    // Get the simple 'token'
-    const token = localStorage.getItem("authToken");
+    // Check if there are any changes
+    const hasChanges =
+      firstName !== (user?.first_name || "") ||
+      lastName !== (user?.last_name || "") ||
+      phoneNumber !== (user?.phone_number || "");
 
-    if (!token) {
-      toast.error("Authentication session expired. Please log in again.");
-      setProfileLoading(false);
+    if (!hasChanges) {
+      // No changes made, just revert to disabled state
+      setIsEditing(false);
       return;
     }
+
+    // Validate phone number before submitting
+    if (!validatePhoneNumber(phoneNumber)) {
+      return;
+    }
+
+    setProfileLoading(true);
+
     if (!user || !user.id) {
       toast.error("User ID not found. Please log in again.");
       setProfileLoading(false);
@@ -85,26 +233,15 @@ export default function SettingsPage() {
     }
 
     try {
-      const updateUrl = `${API_BASE}/api/profile/${user.id}/`;
-      await axios.patch(
-        // Use PATCH
-        updateUrl,
-        {
-          first_name: firstName,
-          last_name: lastName,
-          phone_number: phoneNumber,
-        },
-        {
-          headers: {
-            // Use 'Bearer' auth
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+      });
 
       toast.success("Profile updated successfully!");
       setIsEditing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = "Failed to update profile.";
       if (axios.isAxiosError(err) && err.response) {
         errorMessage =
@@ -128,13 +265,17 @@ export default function SettingsPage() {
       return;
     }
     try {
-      const res = await axios.post(`${API_BASE}/password-reset/request/`, {
+      const res = await apiClient.post(API_ENDPOINTS.AUTH.PASSWORD_RESET, {
         email: user.email,
       });
       toast.success(res.data.message || "Code sent to your email!");
       setPasswordStep(2);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Error sending code");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.error || "Error sending code");
+      } else {
+        toast.error("Error sending code");
+      }
     } finally {
       setPasswordLoading(false);
     }
@@ -144,14 +285,21 @@ export default function SettingsPage() {
     e.preventDefault();
     setPasswordLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/password-reset/verify/`, {
-        email: user?.email,
-        code: code,
-      });
+      const res = await apiClient.post(
+        API_ENDPOINTS.AUTH.PASSWORD_RESET_VERIFY,
+        {
+          email: user?.email,
+          code: code,
+        }
+      );
       toast.success(res.data.message || "Code verified!");
       setPasswordStep(3);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Invalid code");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.error || "Invalid code");
+      } else {
+        toast.error("Invalid code");
+      }
     } finally {
       setPasswordLoading(false);
     }
@@ -169,20 +317,27 @@ export default function SettingsPage() {
     }
     setPasswordLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/password-reset/set-new/`, {
-        email: user?.email,
-        code: code,
-        new_password: newPassword,
-        confirm_password: confirmPassword,
-      });
+      const res = await apiClient.post(
+        API_ENDPOINTS.AUTH.PASSWORD_RESET_CONFIRM,
+        {
+          email: user?.email,
+          code: code,
+          new_password: newPassword,
+          confirm_password: confirmPassword,
+        }
+      );
       toast.success(res.data.message || "Password updated successfully!");
       // Reset everything
       setPasswordStep(1);
       setCode("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Error setting new password");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.error || "Error setting new password");
+      } else {
+        toast.error("Error setting new password");
+      }
     } finally {
       setPasswordLoading(false);
     }
@@ -191,27 +346,31 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 space-y-6">
+      <div className="max-w-none mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16 space-y-6">
         <div className="space-y-6">
           {/* Profile Photo and Info */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col items-center space-y-4">
                 <div className="relative">
-                  <Avatar className="h-32 w-32">
-                    <AvatarImage
-                      src={user?.profile_image}
-                      alt="Profile photo"
-                    />
-                    <AvatarFallback className="bg-breneo-blue/10 text-breneo-blue text-2xl">
-                      {getInitials()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <OptimizedAvatar
+                    src={imagePreview || user?.profile_image}
+                    alt="Profile photo"
+                    fallback={getInitials()}
+                    size="xl"
+                    loading="eager"
+                    className="h-32 w-32"
+                  />
                   <button
                     onClick={handlePhotoUploadClick}
+                    disabled={photoUploading}
                     className="absolute bottom-1 right-1 bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-full p-2 shadow-lg transition-colors disabled:opacity-50"
                   >
-                    <Camera className="h-4 w-4" />
+                    {photoUploading ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -257,10 +416,23 @@ export default function SettingsPage() {
                       id="phoneNumber"
                       type="tel"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value);
+                        if (isEditing) {
+                          validatePhoneNumber(e.target.value);
+                        }
+                      }}
                       disabled={!isEditing}
-                      placeholder="Enter your mobile number"
+                      placeholder="+1 234 567 8900"
+                      className={phoneError ? "border-red-500" : ""}
                     />
+                    {phoneError && (
+                      <p className="text-sm text-red-500">{phoneError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      International format: minimum 7 digits, maximum 15 digits.
+                      (e.g., +1 234 567 8900)
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
@@ -269,7 +441,7 @@ export default function SettingsPage() {
                       type="email"
                       value={email}
                       disabled
-                      className="bg-gray-50"
+                      className="bg-muted/50 text-muted-foreground"
                       placeholder="Email address"
                     />
                     {/* ✅ START: FIX */}
@@ -312,7 +484,7 @@ export default function SettingsPage() {
                         type="email"
                         value={user?.email || ""}
                         disabled
-                        className="bg-gray-50"
+                        className="bg-muted/50 text-muted-foreground"
                       />
                       <p className="text-xs text-muted-foreground">
                         A verification code will be sent to this email.
@@ -417,12 +589,14 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">Email:</span>
-                  <span className="text-sm text-gray-600">{user?.email}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {user?.email}
+                  </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-sm font-medium">User Type:</span>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-muted-foreground">
                     {user?.user_type
                       ? user.user_type.charAt(0).toUpperCase() +
                         user.user_type.slice(1)

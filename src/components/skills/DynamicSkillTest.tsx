@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext"; // corrected relative path
+import apiClient from "@/lib/api";
 
 // Interfaces
 interface Question {
@@ -58,10 +59,8 @@ export function DynamicSkillTest() {
   // Load career questions
   useEffect(() => {
     if (phase === "career") {
-      axios
-        .get(
-          `https://breneo.onrender.com/api/career-questions-random/?limit=${numQuestions}`
-        )
+      apiClient
+        .get(`/api/career-questions-random/?limit=${numQuestions}`)
         .then((res) => setCareerQuestions(res.data))
         .catch((err) => console.error(err));
     }
@@ -71,7 +70,7 @@ export function DynamicSkillTest() {
   const saveTestResults = async (resultsToSave: any) => {
     if (!user) return;
     try {
-      await axios.post("https://breneo.onrender.com/api/save-test-results/", {
+      await apiClient.post("/api/save-test-results/", {
         userId: user.id,
         ...resultsToSave,
       });
@@ -101,14 +100,13 @@ export function DynamicSkillTest() {
   // Start tech & soft assessments
   const startAssessments = async () => {
     try {
-      const techRes = await axios.post(
-        "https://breneo.onrender.com/api/start-assessment/",
-        { num_questions: numQuestions, RoleMapping: roleMapping }
-      );
-      const softRes = await axios.post(
-        "https://breneo.onrender.com/api/soft/start/",
-        { num_questions: numQuestions }
-      );
+      const techRes = await apiClient.post("/api/start-assessment/", {
+        num_questions: numQuestions,
+        RoleMapping: roleMapping,
+      });
+      const softRes = await apiClient.post("/api/soft/start/", {
+        num_questions: numQuestions,
+      });
 
       setTechSession(techRes.data);
       setSoftSession(softRes.data);
@@ -123,14 +121,11 @@ export function DynamicSkillTest() {
   const submitTechAnswer = async (answer: string) => {
     if (!techSession || !currentTechQ) return;
     try {
-      const res = await axios.post(
-        "https://breneo.onrender.com/api/submit-answer/",
-        {
-          session_id: techSession.session_id,
-          question_text: currentTechQ.text,
-          answer,
-        }
-      );
+      const res = await apiClient.post("/api/submit-answer/", {
+        session_id: techSession.session_id,
+        question_text: currentTechQ.text,
+        answer,
+      });
       if (res.data.next_question) {
         setCurrentTechQ(res.data.next_question);
       } else {
@@ -147,14 +142,11 @@ export function DynamicSkillTest() {
   const submitSoftAnswer = async (answer: string) => {
     if (!softSession || !currentSoftQ) return;
     try {
-      const res = await axios.post(
-        "https://breneo.onrender.com/api/soft/submit/",
-        {
-          session_id: softSession.session_id,
-          question_text: currentSoftQ.text,
-          answer,
-        }
-      );
+      const res = await apiClient.post("/api/soft/submit/", {
+        session_id: softSession.session_id,
+        question_text: currentSoftQ.text,
+        answer,
+      });
       if (res.data.next_question) {
         setCurrentSoftQ(res.data.next_question);
       } else {
@@ -169,19 +161,17 @@ export function DynamicSkillTest() {
 
   const finishTechAssessment = async () => {
     if (!techSession) return;
-    const res = await axios.post(
-      "https://breneo.onrender.com/api/finish-assessment/",
-      { session_id: techSession.session_id }
-    );
+    const res = await apiClient.post("/api/finish-assessment/", {
+      session_id: techSession.session_id,
+    });
     setResults((prev) => ({ ...prev, tech: res.data }));
   };
 
   const finishSoftAssessment = async () => {
     if (!softSession) return;
-    const res = await axios.post(
-      "https://breneo.onrender.com/api/soft/finish/",
-      { session_id: softSession.session_id }
-    );
+    const res = await apiClient.post("/api/soft/finish/", {
+      session_id: softSession.session_id,
+    });
     setResults((prev) => ({ ...prev, soft: res.data }));
   };
 

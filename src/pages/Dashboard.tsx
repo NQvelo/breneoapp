@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateSkillScores } from "@/utils/skillTestUtils";
+import { numericIdToUuid } from "@/lib/utils";
 import AcademyDashboard from "./AcademyDashboard";
 
 interface Job {
@@ -56,7 +57,7 @@ const Dashboard = () => {
       const { data } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("user_id", numericIdToUuid(user.id))
         .single();
 
       return data?.role || "user";
@@ -67,7 +68,9 @@ const Dashboard = () => {
   // Mock user data - using real user data where available
   const userData = {
     name:
-      user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User",
+      (user as any)?.user_metadata?.full_name ||
+      user?.email?.split("@")[0] ||
+      "User",
     skillTestTaken: false,
   };
 
@@ -81,7 +84,7 @@ const Dashboard = () => {
         const { data: answers, error } = await supabase
           .from("usertestanswers")
           .select("*")
-          .eq("userid", user.id);
+          .eq("userid", numericIdToUuid(user.id));
 
         if (error || !answers || answers.length === 0) {
           return {};

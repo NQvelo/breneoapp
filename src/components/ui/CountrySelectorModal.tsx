@@ -67,8 +67,12 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
 
   const filteredCountries = useMemo(() => {
     if (!searchTerm) return countries;
-    return countries.filter((country) =>
-      country.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const searchLower = searchTerm.toLowerCase();
+    return countries.filter(
+      (country) =>
+        country.name.toLowerCase().includes(searchLower) ||
+        country.dial_code.includes(searchTerm) ||
+        country.code.toLowerCase().includes(searchLower)
     );
   }, [searchTerm]);
 
@@ -90,7 +94,7 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search countries..."
+                placeholder="Search countries or dial codes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 pr-10"
@@ -136,7 +140,7 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search countries..."
+              placeholder="Search countries or dial codes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-10"

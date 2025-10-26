@@ -1,11 +1,23 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import axios from "axios";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import { useNavigate } from "react-router-dom";
+import apiClient, { API_ENDPOINTS, TokenManager } from "@/lib/api";
+import { useImagePreloader } from "@/components/ui/OptimizedAvatar";
 
 interface User {
   id: number | string; // Allow both number and string IDs
   username?: string; // Make optional since profile might not have username
   email: string;
+  first_name?: string;
+  last_name?: string;
+  phone_number?: string;
+  profile_image?: string | null;
+  user_type?: string;
   [key: string]: unknown;
 }
 
@@ -64,15 +76,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { preloadImage } = useImagePreloader();
+  const preloadImageRef = useRef(preloadImage);
+
+  // Keep ref updated with latest function
+  useEffect(() => {
+    preloadImageRef.current = preloadImage;
+  }, [preloadImage]);
 
   // --- Restore user session if token exists ---
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
+    const token = TokenManager.getAccessToken();
     if (token) {
-      axios
-        .get("https://breneo.onrender.com/api/profile/", {
-          headers: { Authorization: `Bearer ${token}` }, // Fixed: Use 'Bearer' for JWT tokens
-        })
+      apiClient
+        .get(API_ENDPOINTS.AUTH.PROFILE)
         .then((res) => {
           // ✅ START: FIX - Use the helper function
           const userData = extractUserFromData(res.data);
@@ -92,39 +109,53 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // ✅ END: FIX
         })
         .catch(() => {
-          localStorage.removeItem("authToken");
+          TokenManager.clearTokens();
           setUser(null);
         })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
+
+  // Preload image when user data changes
+  useEffect(() => {
+    if (user?.profile_image) {
+      preloadImageRef.current(user.profile_image).catch(console.error);
+    }
+  }, [user?.profile_image]); // Only depend on the image URL
 
   // --- Login function ---
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const res = await axios.post("https://breneo.onrender.com/api/login/", {
+      const res = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, {
         username: email,
         password,
       });
 
       const token = res.data.access || res.data.token; // Handle both JWT 'access' and 'token' fields
+      const refreshToken = res.data.refresh; // Get refresh token
+
       if (!token) {
         throw new Error(
           "Login succeeded but did not return the required token (access or token field)."
         );
       }
-      localStorage.setItem("authToken", token);
+
+      // Store both access and refresh tokens
+      if (refreshToken) {
+        TokenManager.setTokens(token, refreshToken);
+      } else {
+        // Fallback: store only access token if refresh token is not available
+        localStorage.setItem("authToken", token);
+      }
+
+      // Wait a moment to ensure token is stored before making profile request
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Fetch user info from /api/profile/ to get the 'id'
-      const userRes = await axios.get(
-        "https://breneo.onrender.com/api/profile/",
-        {
-          headers: { Authorization: `Bearer ${token}` }, // Fixed: Use 'Bearer' for JWT tokens
-        }
-      );
+      const userRes = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
       // ✅ START: FIX - Use the helper function
       const userData = extractUserFromData(userRes.data);
@@ -145,6 +176,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setUser(userData);
+
+      // Preload profile image for better performance
+      if (userData?.profile_image) {
+        preloadImageRef.current(userData.profile_image).catch(console.error);
+      }
       // ✅ END: FIX
 
       navigate("/dashboard");
@@ -159,7 +195,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // --- Register function ---
   const register = async (email: string, password: string) => {
     try {
-      await axios.post("https://breneo.onrender.com/api/register/", {
+      await apiClient.post(API_ENDPOINTS.AUTH.REGISTER, {
         email,
         password,
       });
@@ -173,7 +209,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // --- Logout function ---
   const logout = () => {
-    localStorage.removeItem("authToken");
+    TokenManager.clearTokens();
     setUser(null);
     navigate("/auth/login");
   };

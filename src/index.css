@@ -46,28 +46,63 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-primary: 222.2 47.4% 11.2%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 222.2 84% 4.9%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    /* Darker base backgrounds for depth */
+    --background: 218 28% 8%; /* Very dark blue-gray background */
+    --foreground: 210 50% 92%; /* Light text with slight warmth */
+
+    /* Lighter card surfaces for contrast */
+    --card: 220 26% 13%; /* Slightly lighter dark background for cards */
+    --card-foreground: 210 50% 92%;
+
+    /* Popovers match card tone */
+    --popover: 220 26% 13%;
+    --popover-foreground: 210 50% 92%;
+
+    /* Primary for interactive elements */
+    --primary: 210 100% 65%; /* Softer, warmer primary */
+    --primary-foreground: 218 28% 8%;
+
+    /* Secondary elements with smooth gradient */
+    --secondary: 218 20% 16%; /* Middle-ground for depth */
+    --secondary-foreground: 210 50% 92%;
+
+    /* Muted areas that blend nicely */
+    --muted: 220 18% 18%; /* Subtle background variation */
+    --muted-foreground: 215 25% 70%; /* Readable but not harsh */
+
+    /* Accent for hover states */
+    --accent: 218 25% 15%; /* Slightly lighter than background */
+    --accent-foreground: 210 50% 92%;
+
+    /* Destructive actions */
+    --destructive: 0 65% 50%; /* Softer red for dark mode */
+    --destructive-foreground: 210 50% 92%;
+
+    /* Borders with subtle contrast */
+    --border: 218 20% 20%; /* Noticeable but not stark */
+    --input: 218 20% 20%;
+    --ring: 210 100% 65%; /* Match primary for focus */
+
+    /* Sidebar with its own gradient */
+    --sidebar-background: 218 28% 10%; /* Slightly brighter than main bg */
+    --sidebar-foreground: 210 50% 90%;
+    --sidebar-primary: 210 100% 65%;
+    --sidebar-primary-foreground: 218 28% 8%;
+    --sidebar-accent: 218 22% 14%; /* Subtle variation */
+    --sidebar-accent-foreground: 210 50% 90%;
+    --sidebar-border: 218 20% 18%; /* Softer border */
+    --sidebar-ring: 210 100% 65%;
   }
 }
 
@@ -78,5 +113,85 @@
   body {
     @apply bg-background text-foreground;
     font-family: "Mark GEO", sans-serif; /* Apply the font here */
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+@layer utilities {
+  /* Dark mode support for custom background colors with improved contrast */
+  .dark .bg-breneo-lightgray {
+    background-color: hsl(var(--muted));
+  }
+
+  .dark .bg-white {
+    background-color: hsl(var(--card));
+  }
+
+  .dark .border-gray-200 {
+    border-color: hsl(var(--border));
+  }
+
+  .dark .border-gray-100 {
+    border-color: hsl(var(--secondary));
+  }
+
+  .dark .text-gray-600 {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark .text-gray-400 {
+    color: hsl(var(--muted-foreground) / 0.7);
+  }
+
+  .dark .hover\:bg-gray-50:hover {
+    background-color: hsl(var(--accent));
+  }
+
+  /* Enhanced shadows for depth in dark mode */
+  .dark .shadow-sm {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.6), 0 1px 2px -1px rgb(0 0 0 / 0.6);
+  }
+
+  .dark .shadow-md {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  }
+
+  .dark .shadow-lg {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.6),
+      0 4px 6px -4px rgb(0 0 0 / 0.6);
+  }
+
+  /* Improved text contrast in dark mode */
+  .dark .text-gray-700 {
+    color: hsl(var(--foreground) / 0.85);
+  }
+
+  .dark .text-gray-900 {
+    color: hsl(var(--foreground));
+  }
+
+  /* Smooth gradient backgrounds for depth */
+  .dark .bg-gradient-subtle {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--background)),
+      hsl(var(--secondary))
+    );
+  }
+
+  /* Gentle card elevation */
+  .dark .card-elevated {
+    background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--accent)));
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* Soft transitions for interactive elements */
+  .dark .transition-smooth {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Switch logo to dark mode version */
+  .dark img[src*="breneo_logo.png"] {
+    content: url("/lovable-uploads/breneo_logo_dark.png");
   }
 }

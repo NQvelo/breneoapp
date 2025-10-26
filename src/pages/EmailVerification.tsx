@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import apiClient, { API_ENDPOINTS } from "@/lib/api";
+import axios from "axios";
 
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +31,11 @@ const EmailVerification: React.FC = () => {
       return;
     }
     try {
+      console.log("Attempting auto-login with:", {
+        email,
+        passwordLength: password.length,
+      });
+
       // Use AuthContext login function instead of direct API call
       await login(email, password);
 
@@ -40,6 +46,18 @@ const EmailVerification: React.FC = () => {
       // Navigation is handled by AuthContext
     } catch (loginErr) {
       console.error("Auto-login failed:", loginErr);
+
+      // More detailed error logging
+      if (axios.isAxiosError(loginErr)) {
+        console.error("Login error details:", {
+          status: loginErr.response?.status,
+          statusText: loginErr.response?.statusText,
+          data: loginErr.response?.data,
+          url: loginErr.config?.url,
+          method: loginErr.config?.method,
+        });
+      }
+
       toast.error(
         "Verification successful, but auto-login failed. Please log in manually."
       );
@@ -63,7 +81,7 @@ const EmailVerification: React.FC = () => {
     setIsLoading(true);
     try {
       // Step 1: Try to verify email
-      await axios.post("https://breneo.onrender.com/api/verify-code/", {
+      await apiClient.post(API_ENDPOINTS.AUTH.VERIFY_CODE, {
         email,
         code,
       });

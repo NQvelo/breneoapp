@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -86,6 +87,9 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
             />
           </Link>
           <div className="flex items-center gap-2">
+            <div className="p-2">
+              <ThemeToggle />
+            </div>
             <Link
               to="/notifications"
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -247,6 +251,22 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 <span className="font-medium text-base">Help Center</span>
               )}
             </Link>
+
+            {/* Theme Toggle */}
+            <div className={cn(
+              "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200",
+              "text-gray-600"
+            )}>
+              <div className={cn(
+                "flex items-center justify-center w-[22px] h-[22px]",
+                "flex-shrink-0"
+              )}>
+                <ThemeToggle />
+              </div>
+              {!collapsed && (
+                <span className="font-medium text-base">Theme</span>
+              )}
+            </div>
 
             {/* Profile */}
             <div className="border-t border-gray-200 mt-4 pt-4">

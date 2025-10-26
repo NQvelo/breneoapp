@@ -1,17 +1,20 @@
-
-import React, { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { calculateSkillScores } from '@/utils/skillTestUtils';
+import React, { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { calculateSkillScores } from "@/utils/skillTestUtils";
+import { numericIdToUuid } from "@/lib/utils";
 
 interface SkillBasedJobFilterProps {
   onSkillsChange: (skills: string[]) => void;
   selectedSkills: string[];
 }
 
-export function SkillBasedJobFilter({ onSkillsChange, selectedSkills }: SkillBasedJobFilterProps) {
+export function SkillBasedJobFilter({
+  onSkillsChange,
+  selectedSkills,
+}: SkillBasedJobFilterProps) {
   const { user } = useAuth();
   const [topSkills, setTopSkills] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,9 +29,9 @@ export function SkillBasedJobFilter({ onSkillsChange, selectedSkills }: SkillBas
       try {
         // Fetch user's test answers
         const { data: answers, error } = await supabase
-          .from('usertestanswers')
-          .select('*')
-          .eq('userid', user.id);
+          .from("usertestanswers")
+          .select("*")
+          .eq("userid", numericIdToUuid(user.id));
 
         if (error || !answers || answers.length === 0) {
           setLoading(false);
@@ -38,13 +41,13 @@ export function SkillBasedJobFilter({ onSkillsChange, selectedSkills }: SkillBas
         // Calculate skill scores and get top skills
         const skillScores = calculateSkillScores(answers);
         const skills = Object.entries(skillScores)
-          .sort(([,a], [,b]) => (b as number) - (a as number))
+          .sort(([, a], [, b]) => (b as number) - (a as number))
           .slice(0, 5)
           .map(([skill]) => skill);
 
         setTopSkills(skills);
       } catch (error) {
-        console.error('Error fetching user skills:', error);
+        console.error("Error fetching user skills:", error);
       } finally {
         setLoading(false);
       }
@@ -55,7 +58,7 @@ export function SkillBasedJobFilter({ onSkillsChange, selectedSkills }: SkillBas
 
   const toggleSkill = (skill: string) => {
     if (selectedSkills.includes(skill)) {
-      onSkillsChange(selectedSkills.filter(s => s !== skill));
+      onSkillsChange(selectedSkills.filter((s) => s !== skill));
     } else {
       onSkillsChange([...selectedSkills, skill]);
     }
@@ -96,15 +99,15 @@ export function SkillBasedJobFilter({ onSkillsChange, selectedSkills }: SkillBas
           </Button>
         </div>
       </div>
-      
+
       <div className="flex flex-wrap gap-2">
         {topSkills.map((skill) => (
           <Badge
             key={skill}
             variant={selectedSkills.includes(skill) ? "default" : "outline"}
             className={`cursor-pointer transition-colors ${
-              selectedSkills.includes(skill) 
-                ? "bg-breneo-blue hover:bg-breneo-blue/90" 
+              selectedSkills.includes(skill)
+                ? "bg-breneo-blue hover:bg-breneo-blue/90"
                 : "hover:bg-gray-100"
             }`}
             onClick={() => toggleSkill(skill)}

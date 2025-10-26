@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronsUpDown } from "lucide-react";
 import { CountrySelectorModal } from "./CountrySelectorModal";
-import { Country } from "@/data/countries";
+import { Country, countries } from "@/data/countries";
 
 interface CountrySelectorProps {
   value?: Country;
@@ -19,6 +19,10 @@ export const CountrySelector: React.FC<CountrySelectorProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Default to Georgia if no value is provided
+  const defaultCountry = countries.find((country) => country.code === "GE");
+  const selectedCountry = value || defaultCountry;
+
   return (
     <>
       <Button
@@ -28,10 +32,10 @@ export const CountrySelector: React.FC<CountrySelectorProps> = ({
         className={`justify-between ${className}`}
         onClick={() => setIsOpen(true)}
       >
-        {value ? (
+        {selectedCountry ? (
           <div className="flex items-center gap-2">
-            <span className="text-lg">{value.flag}</span>
-            <span>{value.dial_code}</span>
+            <span className="text-lg">{selectedCountry.flag}</span>
+            <span>{selectedCountry.dial_code}</span>
           </div>
         ) : (
           placeholder
@@ -43,7 +47,7 @@ export const CountrySelector: React.FC<CountrySelectorProps> = ({
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         onSelect={onChange}
-        selectedCountry={value}
+        selectedCountry={selectedCountry}
       />
     </>
   );

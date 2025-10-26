@@ -1,11 +1,11 @@
-
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { calculateSkillScores } from '@/utils/skillTestUtils';
+import React, { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { calculateSkillScores } from "@/utils/skillTestUtils";
+import { numericIdToUuid } from "@/lib/utils";
 
 interface SkillResult {
   skill: string;
@@ -18,7 +18,10 @@ interface TestResultsProps {
   compact?: boolean;
 }
 
-export function TestResults({ showTitle = true, compact = false }: TestResultsProps) {
+export function TestResults({
+  showTitle = true,
+  compact = false,
+}: TestResultsProps) {
   const { user } = useAuth();
   const [skillResults, setSkillResults] = useState<SkillResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,12 +34,12 @@ export function TestResults({ showTitle = true, compact = false }: TestResultsPr
       try {
         // Fetch user's test answers
         const { data: answers, error } = await supabase
-          .from('usertestanswers')
-          .select('*')
-          .eq('userid', user.id);
+          .from("usertestanswers")
+          .select("*")
+          .eq("userid", numericIdToUuid(user.id));
 
         if (error) {
-          console.error('Error fetching test answers:', error);
+          console.error("Error fetching test answers:", error);
           return;
         }
 
@@ -54,13 +57,13 @@ export function TestResults({ showTitle = true, compact = false }: TestResultsPr
           .map(([skill, score]) => ({
             skill,
             score: score as number,
-            percentage: Math.round(((score as number) / answers.length) * 100)
+            percentage: Math.round(((score as number) / answers.length) * 100),
           }))
           .sort((a, b) => b.score - a.score);
 
         setSkillResults(results);
       } catch (error) {
-        console.error('Error calculating skill results:', error);
+        console.error("Error calculating skill results:", error);
       } finally {
         setLoading(false);
       }
@@ -84,7 +87,8 @@ export function TestResults({ showTitle = true, compact = false }: TestResultsPr
       <Card>
         <CardContent className="p-6">
           <div className="text-center text-gray-500">
-            No test results available. Take the skill assessment to see your results here.
+            No test results available. Take the skill assessment to see your
+            results here.
           </div>
         </CardContent>
       </Card>
@@ -107,8 +111,8 @@ export function TestResults({ showTitle = true, compact = false }: TestResultsPr
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2 mb-4">
             {topSkills.map((result, index) => (
-              <Badge 
-                key={result.skill} 
+              <Badge
+                key={result.skill}
                 variant={index === 0 ? "default" : "secondary"}
                 className={index === 0 ? "bg-breneo-blue" : ""}
               >
@@ -123,7 +127,9 @@ export function TestResults({ showTitle = true, compact = false }: TestResultsPr
                 <div key={result.skill} className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{result.skill}</span>
-                    <span className="text-gray-600">{result.score}/{totalQuestions}</span>
+                    <span className="text-gray-600">
+                      {result.score}/{totalQuestions}
+                    </span>
                   </div>
                   <Progress value={result.percentage} className="h-2" />
                 </div>

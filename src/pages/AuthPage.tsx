@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
+import apiClient, { API_ENDPOINTS } from "@/lib/api";
+import axios from "axios";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(
-    countries.find((c) => c.code === "GB")
+    countries.find((c) => c.code === "GE")
   );
 
   const [firstName, setFirstName] = useState("");
@@ -30,7 +32,7 @@ const AuthPage: React.FC = () => {
     const phoneNumber = `${selectedCountry?.dial_code}${phone}`;
 
     try {
-      await axios.post("https://breneo.onrender.com/api/register/", {
+      await apiClient.post(API_ENDPOINTS.AUTH.REGISTER, {
         first_name: firstName,
         last_name: lastName,
         email: email,
@@ -44,7 +46,7 @@ const AuthPage: React.FC = () => {
 
       navigate("/email-verification");
       toast.success("Registration successful! Verify your email.");
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = "Registration failed. Please try again.";
       if (axios.isAxiosError(err) && err.response) {
         errorMessage =
@@ -61,20 +63,23 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex">
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md">
-          <div className="mb-8">
+          <div className="mb-8 flex items-center justify-between">
             <img
               src="lovable-uploads/breneo_logo.png"
               alt="Breneo Logo"
               className="h-10"
             />
+            <ThemeToggle />
           </div>
 
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+          <h1 className="text-3xl font-semibold text-foreground mb-2">
             Create Account
           </h1>
-          <p className="text-gray-600 mb-8">Sign up for your Breneo account</p>
+          <p className="text-muted-foreground mb-8">
+            Sign up for your Breneo account
+          </p>
 
           <form onSubmit={handleRegister} className="space-y-6">
             <div className="mt-1 flex gap-3">
@@ -173,11 +178,11 @@ const AuthPage: React.FC = () => {
             </Button>
           </form>
 
-          <p className="text-center text-gray-600 mt-8">
+          <p className="text-center text-muted-foreground mt-8">
             Already have an account?{" "}
             <button
               type="button"
-              className="text-[#00BFFF] hover:underline"
+              className="text-primary hover:underline"
               onClick={() => navigate("/auth/login")}
             >
               Sign In

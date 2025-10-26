@@ -146,6 +146,7 @@ const CoursesPage = () => {
       toast({
         title: variables.is_saved ? "Course Unsaved" : "Course Saved",
         description: `"${variables.title}" has been updated.`,
+        duration: 1750, // Auto-dismiss after 1.75 seconds
       });
     },
     onError: (error) => {
@@ -153,6 +154,7 @@ const CoursesPage = () => {
         title: "Error",
         description: (error as Error).message,
         variant: "destructive",
+        duration: 2000, // Auto-dismiss after 2 seconds
       });
     },
   });

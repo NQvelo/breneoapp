@@ -109,6 +109,9 @@ const JobsPage = () => {
   }, []);
 
   const handleDetectLocation = () => {
+    // Check if location toast has already been shown in this session
+    const locationToastShown = sessionStorage.getItem("locationToastShown");
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -124,23 +127,39 @@ const JobsPage = () => {
               country: data.countryName,
             }));
             setTempFilters((prev) => ({ ...prev, country: data.countryName }));
-            toast({
-              title: "Location Detected",
-              description: `Showing jobs in ${data.countryName}.`,
-            });
+
+            // Only show toast if not shown in this session
+            if (!locationToastShown) {
+              toast({
+                title: "Location Detected",
+                description: `Showing jobs in ${data.countryName}.`,
+                duration: 2000,
+              });
+              sessionStorage.setItem("locationToastShown", "true");
+            }
           }
         } catch (error) {
-          toast({
-            title: "Could not determine your location.",
-            variant: "destructive",
-          });
+          // Only show error toast if not shown in this session
+          if (!locationToastShown) {
+            toast({
+              title: "Could not determine your location.",
+              variant: "destructive",
+              duration: 2000,
+            });
+            sessionStorage.setItem("locationToastShown", "true");
+          }
         }
       },
       () => {
-        toast({
-          title: "Location permission denied.",
-          description: "Defaulting to United States.",
-        });
+        // Only show permission denied toast if not shown in this session
+        if (!locationToastShown) {
+          toast({
+            title: "Location permission denied.",
+            description: "Defaulting to United States.",
+            duration: 2000,
+          });
+          sessionStorage.setItem("locationToastShown", "true");
+        }
       }
     );
   };

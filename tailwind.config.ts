@@ -36,6 +36,12 @@ export default {
           success: "#20C997",
           warning: "#FFC107",
           danger: "#DC3545",
+          // Dark mode adjusted colors
+          "blue-dark": "#5AC9F8", // Brighter blue for dark backgrounds
+          "accent-dark": "#8B84FF", // Softer purple for dark mode
+          "success-dark": "#2DD9A8", // Brighter green for dark mode
+          "warning-dark": "#FFD666", // Softer yellow for dark mode
+          "danger-dark": "#F87171", // Softer red for dark mode
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",

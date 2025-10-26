@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios"; // ✅ Required for error type checking
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ImageIcon } from "lucide-react";
 import { toast } from "sonner"; // ✅ Required for error toasts
 import { useAuth } from "@/contexts/AuthContext"; // ✅ IMPORT USEAUTH
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,38 @@ const LoginPage: React.FC = () => {
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Image loading states
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Image preloading function
+  const preloadImage = useCallback((src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+      img.src = src;
+    });
+  }, []);
+
+  // Preload images on component mount
+  useEffect(() => {
+    const preloadImages = async () => {
+      try {
+        await Promise.all([
+          preloadImage("/lovable-uploads/breneo_logo.png"),
+          preloadImage("/lovable-uploads/future.png"),
+        ]);
+      } catch (error) {
+        console.warn("Some images failed to preload:", error);
+        setImageError(true);
+      }
+    };
+
+    preloadImages();
+  }, [preloadImage]);
 
   // Set page title and meta
   useEffect(() => {
@@ -48,7 +81,7 @@ const LoginPage: React.FC = () => {
     try {
       await login(emailOrUsername, password);
       // Success logic (navigation, etc.) is handled by the AuthContext
-    } catch (err: unknow) {
+    } catch (err: unknown) {
       // ✅ START: Improved error handling
       let errorMessage = "Login failed. Please try again.";
       let needsVerification = false;
@@ -121,17 +154,39 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left Section (Form) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md">
-          <div className="mb-8">
-            <img
-              src="/lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className="h-10"
-            />
+          <div className="mb-8 flex items-center justify-between">
+            <div className="flex items-center">
+              {!logoLoaded && !imageError && (
+                <div className="h-10 w-32 bg-gray-200 animate-pulse rounded flex items-center justify-center">
+                  <ImageIcon className="h-5 w-5 text-gray-400" />
+                </div>
+              )}
+              <img
+                src="/lovable-uploads/breneo_logo.png"
+                alt="Breneo Logo"
+                className={`h-10 transition-opacity duration-300 ${
+                  logoLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={() => setLogoLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                  setLogoLoaded(true);
+                }}
+              />
+              {imageError && (
+                <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
+                  <span className="text-sm text-gray-500">Breneo</span>
+                </div>
+              )}
+            </div>
+            <ThemeToggle />
           </div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">Sign In</h1>
-          <p className="text-gray-600 mb-8">
+          <h1 className="text-3xl font-semibold text-foreground mb-2">
+            Sign In
+          </h1>
+          <p className="text-muted-foreground mb-8">
             Welcome back to your Breneo account
           </p>
           <form onSubmit={handleLogin} className="space-y-6">
@@ -185,11 +240,11 @@ const LoginPage: React.FC = () => {
               {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
-          <p className="text-center text-gray-600 mt-8">
+          <p className="text-center text-muted-foreground mt-8">
             Don't have an account?{" "}
             <button
               type="button"
-              className="text-[#00BFFF] hover:underline"
+              className="text-primary hover:underline"
               onClick={() => navigate("/auth/signup")}
             >
               Sign Up
@@ -200,10 +255,48 @@ const LoginPage: React.FC = () => {
 
       {/* Right Section (Image) */}
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-        <div
-          className="w-full h-full bg-cover bg-center bg-no-repeat rounded-xl"
-          style={{ backgroundImage: "url('/lovable-uploads/future.png')" }}
-        ></div>
+        <div className="relative w-full h-full rounded-xl overflow-hidden">
+          {/* Loading skeleton */}
+          {!backgroundLoaded && !imageError && (
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
+              <ImageIcon className="h-16 w-16 text-gray-400" />
+            </div>
+          )}
+
+          {/* Background image */}
+          <div
+            className={`w-full h-full bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${
+              backgroundLoaded ? "opacity-100" : "opacity-0"
+            }`}
+            style={{
+              backgroundImage: backgroundLoaded
+                ? "url('/lovable-uploads/future.png')"
+                : "none",
+            }}
+          />
+
+          {/* Hidden image for loading detection */}
+          <img
+            src="/lovable-uploads/future.png"
+            alt=""
+            className="hidden"
+            onLoad={() => setBackgroundLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setBackgroundLoaded(true);
+            }}
+          />
+
+          {/* Error fallback */}
+          {imageError && (
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+              <div className="text-center text-blue-600">
+                <ImageIcon className="h-16 w-16 mx-auto mb-2" />
+                <p className="text-sm">Future Technology</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

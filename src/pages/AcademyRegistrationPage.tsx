@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, ImageIcon } from "lucide-react";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const AcademyRegistrationPage = () => {
   const navigate = useNavigate();
@@ -26,8 +27,40 @@ const AcademyRegistrationPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(
-    countries.find((c) => c.code === "GB")
+    countries.find((c) => c.code === "GE")
   );
+
+  // Image loading states
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Image preloading function
+  const preloadImage = useCallback((src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+      img.src = src;
+    });
+  }, []);
+
+  // Preload images on component mount
+  useEffect(() => {
+    const preloadImages = async () => {
+      try {
+        await Promise.all([
+          preloadImage("lovable-uploads/breneo_logo.png"),
+          preloadImage("/lovable-uploads/academy.png"),
+        ]);
+      } catch (error) {
+        console.warn("Some images failed to preload:", error);
+        setImageError(true);
+      }
+    };
+
+    preloadImages();
+  }, [preloadImage]);
 
   // Handler to move to the next step
   const handleNextStep = () => {
@@ -95,15 +128,35 @@ const AcademyRegistrationPage = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left Section (Form) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <div className="mb-4">
-            <img
-              src="lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className="h-10"
-            />
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center">
+              {!logoLoaded && !imageError && (
+                <div className="h-10 w-32 bg-gray-200 animate-pulse rounded flex items-center justify-center">
+                  <ImageIcon className="h-5 w-5 text-gray-400" />
+                </div>
+              )}
+              <img
+                src="lovable-uploads/breneo_logo.png"
+                alt="Breneo Logo"
+                className={`h-10 transition-opacity duration-300 ${
+                  logoLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={() => setLogoLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                  setLogoLoaded(true);
+                }}
+              />
+              {imageError && (
+                <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
+                  <span className="text-sm text-gray-500">Breneo</span>
+                </div>
+              )}
+            </div>
+            <ThemeToggle />
           </div>
 
           {/* Progress Bar */}
@@ -114,10 +167,10 @@ const AcademyRegistrationPage = () => {
             ></div>
           </div>
 
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+          <h1 className="text-3xl font-semibold text-foreground mb-2">
             Register Academy
           </h1>
-          <p className="text-gray-600 mb-8">
+          <p className="text-muted-foreground mb-8">
             {step === 1
               ? "Start by creating your account credentials."
               : "Tell us more about your academy."}
@@ -268,11 +321,11 @@ const AcademyRegistrationPage = () => {
             </div>
           </form>
 
-          <p className="text-center text-gray-600 mt-8">
+          <p className="text-center text-muted-foreground mt-8">
             Already have an account?{" "}
             <button
               type="button"
-              className="text-[#00BFFF] hover:underline"
+              className="text-primary hover:underline"
               onClick={() => navigate("/auth/login")}
             >
               Sign In
@@ -282,13 +335,49 @@ const AcademyRegistrationPage = () => {
       </div>
 
       {/* Right Section (Image) */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5 ">
-        <div
-          className="w-full h-full bg-cover bg-center bg-no-repeat rounded-xl"
-          style={{
-            backgroundImage: `url('/lovable-uploads/academy.png')`,
-          }}
-        ></div>
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
+        <div className="relative w-full h-full rounded-xl overflow-hidden">
+          {/* Loading skeleton */}
+          {!backgroundLoaded && !imageError && (
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
+              <ImageIcon className="h-16 w-16 text-gray-400" />
+            </div>
+          )}
+
+          {/* Background image */}
+          <div
+            className={`w-full h-full bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${
+              backgroundLoaded ? "opacity-100" : "opacity-0"
+            }`}
+            style={{
+              backgroundImage: backgroundLoaded
+                ? "url('/lovable-uploads/academy.png')"
+                : "none",
+            }}
+          />
+
+          {/* Hidden image for loading detection */}
+          <img
+            src="/lovable-uploads/academy.png"
+            alt=""
+            className="hidden"
+            onLoad={() => setBackgroundLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setBackgroundLoaded(true);
+            }}
+          />
+
+          {/* Error fallback */}
+          {imageError && (
+            <div className="absolute inset-0 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+              <div className="text-center text-green-600">
+                <ImageIcon className="h-16 w-16 mx-auto mb-2" />
+                <p className="text-sm">Academy Education</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
