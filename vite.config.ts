@@ -18,4 +18,17 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Preserve .htaccess and other dot files
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name && assetInfo.name.startsWith(".")) {
+            return assetInfo.name;
+          }
+          return "assets/[name]-[hash][extname]";
+        },
+      },
+    },
+  },
 }));
