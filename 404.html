@@ -99,24 +99,17 @@
     </div>
 
     <script>
-      // GitHub Pages SPA redirect script for clean URLs
-      // This script redirects all 404 requests to index.html while preserving the path
+      // Simple GitHub Pages SPA redirect
+      // This script redirects all 404 requests to the main app
 
-      // Get the current pathname and search params
+      // Get the current pathname
       const currentPath = window.location.pathname;
-      const currentSearch = window.location.search;
-      const currentHash = window.location.hash;
 
-      // Store the original URL in sessionStorage for React Router to use
+      // If we're not on the root path, redirect to root
       if (currentPath !== "/") {
-        sessionStorage.setItem(
-          "redirectPath",
-          currentPath + currentSearch + currentHash
-        );
+        // Simple redirect to root - let React Router handle the rest
+        window.location.replace("/");
       }
-
-      // Redirect to the main app
-      window.location.replace("/");
 
       // Fallback: if redirect doesn't work after 2 seconds, go to home
       setTimeout(() => {
