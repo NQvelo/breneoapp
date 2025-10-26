@@ -2,15 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
-import {
-  LogOut,
-  Edit,
-  Camera,
-  Phone,
-  Mail,
-  Plus,
-  Settings,
-} from "lucide-react";
+import { LogOut, Edit, Phone, Mail, Plus, Settings } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
@@ -60,25 +52,14 @@ const ProfilePage = () => {
           {/* Profile Header Card */}
           <Card>
             <CardContent className="flex flex-col items-center pb-6 pt-6">
-              <div className="relative">
-                <OptimizedAvatar
-                  src={profile_image}
-                  alt="Profile photo"
-                  fallback={
-                    first_name ? first_name.charAt(0).toUpperCase() : "U"
-                  }
-                  size="xl"
-                  loading="lazy"
-                  className="h-32 w-32"
-                />
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="absolute bottom-0 right-0 h-10 w-10 rounded-full"
-                >
-                  <Camera size={16} />
-                </Button>
-              </div>
+              <OptimizedAvatar
+                src={profile_image}
+                alt="Profile photo"
+                fallback={first_name ? first_name.charAt(0).toUpperCase() : "U"}
+                size="xl"
+                loading="lazy"
+                className="h-32 w-32"
+              />
               <h1 className="text-2xl font-bold mt-4 text-center">
                 {first_name} {last_name}
               </h1>

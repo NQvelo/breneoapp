@@ -8,6 +8,8 @@ import {
   HelpCircle,
   User,
   Bell,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,9 +26,15 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   // ✅ Get the user object directly from the context
   const { loading, user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
 
   // Determine if user is an academy
   const isAcademy = user?.user_type === "academy";
+
+  // Handle mounted state to avoid hydration mismatch
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ⛔ Removed old useState and useEffect for localStorage
 
@@ -82,7 +90,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   return (
     <>
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-card border-b border-gray-200 dark:border-border px-4 py-3">
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center">
             <img
@@ -96,7 +104,11 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
-              <ThemeToggle />
+              {mounted && theme === "dark" ? (
+                <Moon size={20} />
+              ) : (
+                <Sun size={20} />
+              )}
             </button>
             <Link
               to="/notifications"
@@ -115,7 +127,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-card border-t border-gray-200 dark:border-border">
         <nav className="flex justify-around items-center py-2">
           {mobileNavItems.map((item, index) => {
             const isActive = location.pathname === item.href;
@@ -159,12 +171,12 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       {/* Desktop Sidebar */}
       <div
         className={cn(
-          "hidden md:flex fixed top-4 left-4 bottom-4 z-40 bg-[#FFFFFF] dark:bg-[#191E2A] border border-gray-200 transition-all duration-300 flex-col rounded-2xl",
+          "hidden md:flex fixed top-4 left-4 bottom-4 z-40 bg-[#FFFFFF] dark:bg-card border border-gray-200 dark:border-border transition-all duration-300 flex-col rounded-2xl",
           collapsed ? "w-20" : "w-64"
         )}
       >
         {/* Header */}
-        <div className="p-4 flex items-center justify-between border-b border-gray-100">
+        <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-border">
           {!collapsed ? (
             <Link to="/dashboard" className="flex items-center space-x-2">
               <img
@@ -228,7 +240,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
           {/* Bottom section */}
           <div className="px-4 pb-4">
-            <div className="border-t border-gray-200 mb-4"></div>
+            <div className="border-t border-gray-200 dark:border-border mb-4"></div>
 
             <Link
               to="/settings"
@@ -284,7 +296,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
             </button>
 
             {/* Profile */}
-            <div className="border-t border-gray-200 mt-4 pt-4">
+            <div className="border-t border-gray-200 dark:border-border mt-4 pt-4">
               <Link
                 to={profilePath}
                 className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all duration-200 group"

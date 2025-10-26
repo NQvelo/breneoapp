@@ -152,150 +152,182 @@ const LoginPage: React.FC = () => {
   const isLoading = authLoading;
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Section (Form) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center justify-between">
-            <div className="flex items-center">
-              {!logoLoaded && !imageError && (
-                <div className="h-10 w-32 bg-gray-200 animate-pulse rounded flex items-center justify-center">
-                  <ImageIcon className="h-5 w-5 text-gray-400" />
-                </div>
-              )}
-              <img
-                src="/lovable-uploads/breneo_logo.png"
-                alt="Breneo Logo"
-                className={`h-10 transition-opacity duration-300 ${
-                  logoLoaded ? "opacity-100" : "opacity-0"
-                }`}
-                onLoad={() => setLogoLoaded(true)}
-                onError={() => {
-                  setImageError(true);
-                  setLogoLoaded(true);
-                }}
-              />
-              {imageError && (
-                <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-                  <span className="text-sm text-gray-500">Breneo</span>
-                </div>
-              )}
+    <div className="min-h-screen flex flex-col">
+      {/* Mobile Header */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
+        <div className="flex items-center">
+          {!logoLoaded && !imageError && (
+            <div className="h-7 w-20 bg-gray-200 animate-pulse rounded flex items-center justify-center">
+              <ImageIcon className="h-3 w-3 text-gray-400" />
             </div>
-            <ThemeToggle />
-          </div>
-          <h1 className="text-3xl font-semibold text-foreground mb-2">
-            Sign In
-          </h1>
-          <p className="text-muted-foreground mb-8">
-            Welcome back to your Breneo account
-          </p>
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <Label htmlFor="emailOrUsername">Email or Username</Label>
-              <Input
-                id="emailOrUsername"
-                type="text"
-                placeholder="Enter your email or username"
-                className="mt-1 h-12"
-                value={emailOrUsername}
-                onChange={(e) => setEmailOrUsername(e.target.value)}
-                required
-                disabled={isLoading}
-              />
+          )}
+          <img
+            src="/lovable-uploads/breneo_logo.png"
+            alt="Breneo Logo"
+            className={`h-7 transition-opacity duration-300 ${
+              logoLoaded ? "opacity-100" : "opacity-0"
+            }`}
+            onLoad={() => setLogoLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setLogoLoaded(true);
+            }}
+          />
+          {imageError && (
+            <div className="h-7 w-20 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
+              <span className="text-xs text-gray-500">Breneo</span>
             </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <div className="relative mt-1">
+          )}
+        </div>
+        <ThemeToggle />
+      </div>
+
+      {/* Content Section */}
+      <div className="flex flex-1">
+        {/* Left Section (Form) */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
+          <div className="w-full max-w-md">
+            <div className="mb-8 hidden lg:flex items-center justify-between">
+              <div className="flex items-center">
+                {!logoLoaded && !imageError && (
+                  <div className="h-10 w-32 bg-gray-200 animate-pulse rounded flex items-center justify-center">
+                    <ImageIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                )}
+                <img
+                  src="/lovable-uploads/breneo_logo.png"
+                  alt="Breneo Logo"
+                  className={`h-10 transition-opacity duration-300 ${
+                    logoLoaded ? "opacity-100" : "opacity-0"
+                  }`}
+                  onLoad={() => setLogoLoaded(true)}
+                  onError={() => {
+                    setImageError(true);
+                    setLogoLoaded(true);
+                  }}
+                />
+                {imageError && (
+                  <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
+                    <span className="text-sm text-gray-500">Breneo</span>
+                  </div>
+                )}
+              </div>
+              <ThemeToggle />
+            </div>
+            <h1 className="text-3xl font-semibold text-foreground mb-2">
+              Sign In
+            </h1>
+            <p className="text-muted-foreground mb-8">
+              Welcome back to your Breneo account
+            </p>
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div>
+                <Label htmlFor="emailOrUsername">Email or Username</Label>
                 <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  className="pr-10 h-12"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="emailOrUsername"
+                  type="text"
+                  placeholder="Enter your email or username"
+                  className="mt-1 h-12"
+                  value={emailOrUsername}
+                  onChange={(e) => setEmailOrUsername(e.target.value)}
                   required
                   disabled={isLoading}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-500" />
-                  )}
-                </Button>
               </div>
-            </div>
-            <Button
-              type="submit"
-              className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-              disabled={isLoading}
-            >
-              {isLoading ? "Signing In..." : "Sign In"}
-            </Button>
-          </form>
-          <p className="text-center text-muted-foreground mt-8">
-            Don't have an account?{" "}
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => navigate("/auth/signup")}
-            >
-              Sign Up
-            </button>
-          </p>
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    className="pr-10 h-12"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing In..." : "Sign In"}
+              </Button>
+            </form>
+            <p className="text-center text-muted-foreground mt-8">
+              Don't have an account?{" "}
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => navigate("/auth/signup")}
+              >
+                Sign Up
+              </button>
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Right Section (Image) */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-        <div className="relative w-full h-full rounded-xl overflow-hidden">
-          {/* Loading skeleton */}
-          {!backgroundLoaded && !imageError && (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
-              <ImageIcon className="h-16 w-16 text-gray-400" />
-            </div>
-          )}
-
-          {/* Background image */}
-          <div
-            className={`w-full h-full bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${
-              backgroundLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            style={{
-              backgroundImage: backgroundLoaded
-                ? "url('/lovable-uploads/future.png')"
-                : "none",
-            }}
-          />
-
-          {/* Hidden image for loading detection */}
-          <img
-            src="/lovable-uploads/future.png"
-            alt=""
-            className="hidden"
-            onLoad={() => setBackgroundLoaded(true)}
-            onError={() => {
-              setImageError(true);
-              setBackgroundLoaded(true);
-            }}
-          />
-
-          {/* Error fallback */}
-          {imageError && (
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-              <div className="text-center text-blue-600">
-                <ImageIcon className="h-16 w-16 mx-auto mb-2" />
-                <p className="text-sm">Future Technology</p>
+        {/* Right Section (Image) */}
+        <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
+          <div className="relative w-full h-full rounded-xl overflow-hidden">
+            {/* Loading skeleton */}
+            {!backgroundLoaded && !imageError && (
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
+                <ImageIcon className="h-16 w-16 text-gray-400" />
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Background image */}
+            <div
+              className={`w-full h-full bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${
+                backgroundLoaded ? "opacity-100" : "opacity-0"
+              }`}
+              style={{
+                backgroundImage: backgroundLoaded
+                  ? "url('/lovable-uploads/future.png')"
+                  : "none",
+              }}
+            />
+
+            {/* Hidden image for loading detection */}
+            <img
+              src="/lovable-uploads/future.png"
+              alt=""
+              className="hidden"
+              onLoad={() => setBackgroundLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setBackgroundLoaded(true);
+              }}
+            />
+
+            {/* Error fallback */}
+            {imageError && (
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                <div className="text-center text-blue-600">
+                  <ImageIcon className="h-16 w-16 mx-auto mb-2" />
+                  <p className="text-sm">Future Technology</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

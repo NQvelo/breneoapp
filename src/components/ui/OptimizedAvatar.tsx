@@ -150,10 +150,13 @@ export const useImagePreloader = () => {
     });
   }, []);
 
-  const preloadImages = useCallback(async (srcs: string[]): Promise<void> => {
-    const promises = srcs.map((src) => preloadImage(src));
-    await Promise.allSettled(promises);
-  }, [preloadImage]);
+  const preloadImages = useCallback(
+    async (srcs: string[]): Promise<void> => {
+      const promises = srcs.map((src) => preloadImage(src));
+      await Promise.allSettled(promises);
+    },
+    [preloadImage]
+  );
 
   return { preloadImage, preloadImages };
 };

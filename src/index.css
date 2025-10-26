@@ -57,51 +57,51 @@
   }
 
   .dark {
-    /* Darker base backgrounds for depth */
-    --background: 218 28% 8%; /* Very dark blue-gray background */
-    --foreground: 210 50% 92%; /* Light text with slight warmth */
+    /* Main background color - #181818 */
+    --background: 0 0% 9.4%;
+    --foreground: 0 0% 90%;
 
-    /* Lighter card surfaces for contrast */
-    --card: 220 26% 13%; /* Slightly lighter dark background for cards */
-    --card-foreground: 210 50% 92%;
+    /* Component background color - #242424 */
+    --card: 0 0% 14.1%;
+    --card-foreground: 0 0% 90%;
 
     /* Popovers match card tone */
-    --popover: 220 26% 13%;
-    --popover-foreground: 210 50% 92%;
+    --popover: 0 0% 14.1%;
+    --popover-foreground: 0 0% 90%;
 
     /* Primary for interactive elements */
-    --primary: 210 100% 65%; /* Softer, warmer primary */
-    --primary-foreground: 218 28% 8%;
+    --primary: 210 100% 65%;
+    --primary-foreground: 0 0% 9.4%;
 
-    /* Secondary elements with smooth gradient */
-    --secondary: 218 20% 16%; /* Middle-ground for depth */
-    --secondary-foreground: 210 50% 92%;
+    /* Secondary elements */
+    --secondary: 0 0% 14.1%;
+    --secondary-foreground: 0 0% 90%;
 
-    /* Muted areas that blend nicely */
-    --muted: 220 18% 18%; /* Subtle background variation */
-    --muted-foreground: 215 25% 70%; /* Readable but not harsh */
+    /* Muted areas */
+    --muted: 0 0% 14.1%;
+    --muted-foreground: 0 0% 70%;
 
     /* Accent for hover states */
-    --accent: 218 25% 15%; /* Slightly lighter than background */
-    --accent-foreground: 210 50% 92%;
+    --accent: 0 0% 14.1%;
+    --accent-foreground: 0 0% 90%;
 
     /* Destructive actions */
-    --destructive: 0 65% 50%; /* Softer red for dark mode */
-    --destructive-foreground: 210 50% 92%;
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 90%;
 
     /* Borders with subtle contrast */
-    --border: 218 20% 20%; /* Noticeable but not stark */
-    --input: 218 20% 20%;
-    --ring: 210 100% 65%; /* Match primary for focus */
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 210 100% 65%;
 
-    /* Sidebar with its own gradient */
-    --sidebar-background: 218 28% 10%; /* Slightly brighter than main bg */
-    --sidebar-foreground: 210 50% 90%;
+    /* Sidebar */
+    --sidebar-background: 0 0% 14.1%;
+    --sidebar-foreground: 0 0% 90%;
     --sidebar-primary: 210 100% 65%;
-    --sidebar-primary-foreground: 218 28% 8%;
-    --sidebar-accent: 218 22% 14%; /* Subtle variation */
-    --sidebar-accent-foreground: 210 50% 90%;
-    --sidebar-border: 218 20% 18%; /* Softer border */
+    --sidebar-primary-foreground: 0 0% 9.4%;
+    --sidebar-accent: 0 0% 14.1%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 0 0% 18%;
     --sidebar-ring: 210 100% 65%;
   }
 }
@@ -120,7 +120,7 @@
 @layer utilities {
   /* Dark mode support for custom background colors with improved contrast */
   .dark .bg-breneo-lightgray {
-    background-color: hsl(var(--muted));
+    background-color: hsl(var(--background));
   }
 
   .dark .bg-white {

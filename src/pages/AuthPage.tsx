@@ -62,140 +62,153 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center justify-between">
-            <img
-              src="lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className="h-10"
-            />
-            <ThemeToggle />
-          </div>
-
-          <h1 className="text-3xl font-semibold text-foreground mb-2">
-            Create Account
-          </h1>
-          <p className="text-muted-foreground mb-8">
-            Sign up for your Breneo account
-          </p>
-
-          <form onSubmit={handleRegister} className="space-y-6">
-            <div className="mt-1 flex gap-3">
-              <div className="flex-1">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  placeholder="John"
-                  className="mt-1 h-12"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="flex-1">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Doe"
-                  className="mt-1 h-12"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                className="mt-1 h-12"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="phone">Phone Number</Label>
-              <div className="phone-input-container mt-1 flex items-center rounded-md border border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-                <CountrySelector
-                  value={selectedCountry}
-                  onChange={setSelectedCountry}
-                  className="w-auto h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
-                />
-                <div className="h-6 w-px bg-slate-200" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="Phone number"
-                  className="flex-1 h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <div className="relative mt-1">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
-                  className="pr-10 h-12"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-500" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-              disabled={isLoading}
-            >
-              {isLoading ? "Signing Up..." : "Sign Up"}
-            </Button>
-          </form>
-
-          <p className="text-center text-muted-foreground mt-8">
-            Already have an account?{" "}
-            <button
-              type="button"
-              className="text-primary hover:underline"
-              onClick={() => navigate("/auth/login")}
-            >
-              Sign In
-            </button>
-          </p>
-        </div>
+    <div className="min-h-screen flex flex-col">
+      {/* Mobile Header */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
+        <img
+          src="/lovable-uploads/breneo_logo.png"
+          alt="Breneo Logo"
+          className="h-7"
+        />
+        <ThemeToggle />
       </div>
 
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-        <div
-          className="w-full h-full bg-cover bg-center bg-no-repeat rounded-xl"
-          style={{ backgroundImage: `url('/lovable-uploads/way.png')` }}
-        ></div>
+      {/* Content Section */}
+      <div className="flex flex-1">
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
+          <div className="w-full max-w-md">
+            <div className="mb-8 hidden lg:flex items-center justify-between">
+              <img
+                src="/lovable-uploads/breneo_logo.png"
+                alt="Breneo Logo"
+                className="h-10"
+              />
+              <ThemeToggle />
+            </div>
+
+            <h1 className="text-3xl font-semibold text-foreground mb-2">
+              Create Account
+            </h1>
+            <p className="text-muted-foreground mb-8">
+              Sign up for your Breneo account
+            </p>
+
+            <form onSubmit={handleRegister} className="space-y-6">
+              <div className="mt-1 flex gap-3">
+                <div className="flex-1">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    className="mt-1 h-12"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    className="mt-1 h-12"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  className="mt-1 h-12"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="phone">Phone Number</Label>
+                <div className="phone-input-container mt-1 flex items-center rounded-md border border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                  <CountrySelector
+                    value={selectedCountry}
+                    onChange={setSelectedCountry}
+                    className="w-auto h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
+                  />
+                  <div className="h-6 w-px bg-slate-200" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="Phone number"
+                    className="flex-1 h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Create a password"
+                    className="pr-10 h-12"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                disabled={isLoading}
+              >
+                {isLoading ? "Signing Up..." : "Sign Up"}
+              </Button>
+            </form>
+
+            <p className="text-center text-muted-foreground mt-8">
+              Already have an account?{" "}
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => navigate("/auth/login")}
+              >
+                Sign In
+              </button>
+            </p>
+          </div>
+        </div>
+
+        <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
+          <div
+            className="w-full h-full bg-cover bg-center bg-no-repeat rounded-xl"
+            style={{ backgroundImage: `url('/lovable-uploads/way.png')` }}
+          ></div>
+        </div>
       </div>
     </div>
   );

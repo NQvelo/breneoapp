@@ -41,7 +41,7 @@ export function DashboardHeader({
     <header
       className={cn(
         "fixed top-0 right-0 z-30",
-        "bg-gradient-to-b from-[#F8F9FA] dark:from-[#262B36] to-transparent",
+        "bg-gradient-to-b from-breneo-lightgray dark:from-background to-transparent",
         "transition-opacity duration-300 ease-in-out",
         sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
         "left-0",
