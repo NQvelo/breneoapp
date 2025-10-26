@@ -12,8 +12,18 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="text-center max-w-md mx-auto">
+    <div
+      className="min-h-screen flex items-center justify-center px-4 relative"
+      style={{
+        backgroundImage:
+          "url('/lovable-uploads/full-shot-student-library.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      {/* White content container */}
+      <div className="bg-white rounded-lg shadow-lg p-8 text-center max-w-md mx-auto">
         {/* Logo */}
         <div className="mb-8">
           <img

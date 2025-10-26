@@ -1,8 +1,16 @@
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import {
+  LogOut,
+  Edit,
+  Camera,
+  Phone,
+  Mail,
+  Plus,
+  Settings,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
@@ -46,51 +54,13 @@ const ProfilePage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            {/* Mobile Layout - Stacked */}
-            <div className="flex flex-col md:hidden space-y-4">
-              {/* Avatar and Info */}
-              <div className="flex items-center space-x-4">
-                <OptimizedAvatar
-                  src={profile_image}
-                  alt="Profile photo"
-                  fallback={
-                    first_name ? first_name.charAt(0).toUpperCase() : "U"
-                  }
-                  size="lg"
-                  loading="lazy"
-                  className="h-16 w-16 flex-shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-lg font-bold truncate">
-                    {first_name} {last_name}
-                  </h1>
-                  <p className="text-sm text-gray-500 truncate">{email}</p>
-                  <p className="text-sm text-gray-500 truncate">
-                    {phone_number}
-                  </p>
-                </div>
-              </div>
-
-              {/* Buttons - Inline, Max 20% Width on Mobile */}
-              <div className="flex items-center gap-2 self-end">
-                <Button
-                  variant="destructive"
-                  onClick={handleLogout}
-                  size="sm"
-                  className="flex items-center justify-center gap-1.5 text-xs px-3 h-8"
-                >
-                  <LogOut size={14} />
-                  <span>Logout</span>
-                </Button>
-              </div>
-            </div>
-
-            {/* Desktop Layout - Horizontal */}
-            <div className="hidden md:flex justify-between items-center gap-6">
-              <div className="flex items-center space-x-4 min-w-0 flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+        {/* Left Column - Profile Summary */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Profile Header Card */}
+          <Card>
+            <CardContent className="flex flex-col items-center pb-6 pt-6">
+              <div className="relative">
                 <OptimizedAvatar
                   src={profile_image}
                   alt="Profile photo"
@@ -99,72 +69,147 @@ const ProfilePage = () => {
                   }
                   size="xl"
                   loading="lazy"
-                  className="h-20 w-20 flex-shrink-0"
+                  className="h-32 w-32"
                 />
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-2xl font-bold truncate">
-                    {first_name} {last_name}
-                  </h1>
-                  <p className="text-base text-gray-500 truncate">{email}</p>
-                  <p className="text-base text-gray-500 truncate">
-                    {phone_number}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 flex-shrink-0">
                 <Button
-                  variant="destructive"
-                  onClick={handleLogout}
-                  className="flex items-center justify-center gap-2 text-sm px-4 h-10"
+                  variant="default"
+                  size="icon"
+                  className="absolute bottom-0 right-0 h-10 w-10 rounded-full"
                 >
-                  <LogOut size={16} />
-                  Logout
+                  <Camera size={16} />
                 </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <h1 className="text-2xl font-bold mt-4 text-center">
+                {first_name} {last_name}
+              </h1>
+              <div className="mt-4 flex items-center gap-2 w-full">
+                <Button
+                  variant="outline"
+                  className="flex-[4] flex items-center justify-center gap-2"
+                >
+                  <Settings size={16} />
+                  Settings
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleLogout}
+                  className="flex-[1] flex items-center justify-center border-red-500 text-red-500 hover:bg-red-50"
+                >
+                  <LogOut size={16} />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-4 sm:p-6">
-            <h2 className="text-lg font-semibold mb-4">Account Details</h2>
-            <div className="space-y-3 sm:space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 py-2 border-b border-gray-100 last:border-0">
-                <strong className="text-sm text-gray-600 sm:w-24 sm:flex-shrink-0">
-                  First Name:
-                </strong>
-                <span className="text-sm sm:text-base text-gray-900 break-words">
-                  {first_name}
+          {/* Contact Information Card */}
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-bold">Contact Information</h3>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 rounded-full p-2">
+                  <Phone size={18} className="text-purple-600" />
+                </div>
+                <span className="text-sm">
+                  {phone_number || "Not provided"}
                 </span>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 py-2 border-b border-gray-100 last:border-0">
-                <strong className="text-sm text-gray-600 sm:w-24 sm:flex-shrink-0">
-                  Last Name:
-                </strong>
-                <span className="text-sm sm:text-base text-gray-900 break-words">
-                  {last_name}
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="bg-purple-100 rounded-full p-2">
+                  <Mail size={18} className="text-purple-600" />
+                </div>
+                <span className="text-sm">{email}</span>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 py-2 border-b border-gray-100 last:border-0">
-                <strong className="text-sm text-gray-600 sm:w-24 sm:flex-shrink-0">
-                  Email:
-                </strong>
-                <span className="text-sm sm:text-base text-gray-900 break-all">
-                  {email}
-                </span>
+            </CardContent>
+          </Card>
+
+          {/* Social Networks Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-bold">Social Networks</h3>
+              <Button variant="link" className="text-purple-600 p-0 h-auto">
+                Add
+              </Button>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Right Column - Details */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* About Me Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-bold">About Me</h3>
+              <Button variant="link" className="text-purple-600 p-0 h-auto">
+                Edit
+              </Button>
+            </CardHeader>
+          </Card>
+
+          {/* Work Experience Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-bold">Work Experience</h3>
+              <Button
+                variant="link"
+                className="text-purple-600 p-0 h-auto flex items-center gap-1"
+              >
+                <Plus size={16} />
+                Add
+              </Button>
+            </CardHeader>
+          </Card>
+
+          {/* Education Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-bold">Education</h3>
+              <Button
+                variant="link"
+                className="text-purple-600 p-0 h-auto flex items-center gap-1"
+              >
+                <Plus size={16} />
+                Add
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                <p className="text-base">Management and IT</p>
+                <p className="text-sm text-gray-600">Master</p>
+                <p className="text-sm text-gray-500">University</p>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 py-2 border-b border-gray-100 last:border-0">
-                <strong className="text-sm text-gray-600 sm:w-24 sm:flex-shrink-0">
-                  Phone:
-                </strong>
-                <span className="text-sm sm:text-base text-gray-900 break-words">
-                  {phone_number}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Professional Skills Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-bold">Professional Skills</h3>
+              <Button
+                variant="link"
+                className="text-purple-600 p-0 h-auto flex items-center gap-1"
+              >
+                <Plus size={16} />
+                Add
+              </Button>
+            </CardHeader>
+          </Card>
+
+          {/* Personal Skills Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <h3 className="text-lg font-bold">Personal Skills</h3>
+              <Button
+                variant="link"
+                className="text-purple-600 p-0 h-auto flex items-center gap-1"
+              >
+                <Plus size={16} />
+                Add
+              </Button>
+            </CardHeader>
+          </Card>
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -139,7 +139,7 @@ const AcademyRegistrationPage = () => {
                 </div>
               )}
               <img
-                src="lovable-uploads/breneo_logo.png"
+                src="/lovable-uploads/breneo_logo.png"
                 alt="Breneo Logo"
                 className={`h-10 transition-opacity duration-300 ${
                   logoLoaded ? "opacity-100" : "opacity-0"
@@ -150,11 +150,6 @@ const AcademyRegistrationPage = () => {
                   setLogoLoaded(true);
                 }}
               />
-              {imageError && (
-                <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-                  <span className="text-sm text-gray-500">Breneo</span>
-                </div>
-              )}
             </div>
             <ThemeToggle />
           </div>
@@ -370,11 +365,12 @@ const AcademyRegistrationPage = () => {
 
           {/* Error fallback */}
           {imageError && (
-            <div className="absolute inset-0 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-              <div className="text-center text-green-600">
-                <ImageIcon className="h-16 w-16 mx-auto mb-2" />
-                <p className="text-sm">Academy Education</p>
-              </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img
+                src="/lovable-uploads/academy.png"
+                alt="Academy"
+                className="w-full h-full object-cover"
+              />
             </div>
           )}
         </div>
