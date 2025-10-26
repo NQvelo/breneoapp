@@ -3,46 +3,118 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Breneo - AI-Powered Learning & Job Matching Platform</title>
-    <meta
-      name="description"
-      content="Breneo helps users assess their skills, explore job offers, and follow personalized learning paths with AI technology."
-    />
-    <meta name="author" content="Breneo" />
+    <title>Breneo - Loading...</title>
 
-    <meta
-      property="og:title"
-      content="Breneo - AI-Powered Learning & Job Matching Platform"
-    />
-    <meta
-      property="og:description"
-      content="Breneo helps users assess their skills, explore job offers, and follow personalized learning paths with AI technology."
-    />
-    <meta property="og:type" content="website" />
-    <meta
-      property="og:image"
-      content="https://lovable.dev/opengraph-image-p98pqg.png"
-    />
+    <!-- Favicon -->
+    <link rel="icon" href="/favicon.ico" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@lovable_dev" />
-    <meta
-      name="twitter:image"
-      content="https://lovable.dev/opengraph-image-p98pqg.png"
-    />
+    <!-- Theme detection script -->
+    <script>
+      // Detect system theme preference
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      const savedTheme = localStorage.getItem("theme");
+      const theme = savedTheme || (prefersDark ? "dark" : "light");
 
-    <!-- Added favicon -->
-    <link
-      rel="icon"
-      href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png"
-      type="image/png"
-    />
+      // Apply theme class immediately to prevent flash
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark");
+      }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS for dark mode -->
+    <style>
+      :root {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --primary: 222.2 47.4% 11.2%;
+      }
+
+      .dark {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --primary: 210 40% 98%;
+      }
+
+      body {
+        background-color: hsl(var(--background));
+        color: hsl(var(--foreground));
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      .text-muted {
+        color: hsl(var(--muted-foreground));
+      }
+
+      .text-primary {
+        color: hsl(var(--primary));
+      }
+    </style>
   </head>
-
   <body>
-    <div id="root"></div>
-    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <script type="module" src="/src/main.tsx"></script>
+    <div class="min-h-screen flex items-center justify-center px-4">
+      <div class="text-center max-w-md mx-auto">
+        <!-- Logo -->
+        <div class="mb-8">
+          <img
+            src="/lovable-uploads/breneo_logo.png"
+            alt="Breneo Logo"
+            class="h-12 mx-auto"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+          />
+          <div
+            class="h-12 w-32 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center mx-auto hidden"
+          >
+            <span class="text-sm text-gray-500 dark:text-gray-400 font-semibold"
+              >Breneo</span
+            >
+          </div>
+        </div>
+
+        <!-- Loading Content -->
+        <div class="mb-8">
+          <div
+            class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"
+          ></div>
+          <h2 class="text-xl font-semibold mb-2">Loading...</h2>
+          <p class="text-muted">Redirecting to your page.</p>
+        </div>
+
+        <!-- Manual redirect button -->
+        <div class="space-y-4">
+          <a
+            href="/"
+            class="inline-block bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+          >
+            Go to Breneo
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Simple GitHub Pages SPA redirect
+      // This script redirects all 404 requests to the main app
+
+      // Get the current pathname
+      const currentPath = window.location.pathname;
+
+      // If we're not on the root path, redirect to root
+      if (currentPath !== "/") {
+        // Simple redirect to root - let React Router handle the rest
+        window.location.replace("/");
+      }
+
+      // Fallback: if redirect doesn't work after 2 seconds, go to home
+      setTimeout(() => {
+        window.location.replace("/");
+      }, 2000);
+    </script>
   </body>
 </html>

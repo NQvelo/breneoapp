@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTheme } from "next-themes";
 
 interface AppSidebarProps {
@@ -208,7 +207,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                       "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
                       isActive
                         ? "bg-breneo-blue/10 text-breneo-blue"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-breneo-blue"
+                        : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
                     )}
                   >
                     <item.icon
@@ -242,58 +241,80 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
           <div className="px-4 pb-4">
             <div className="border-t border-gray-200 dark:border-border mb-4"></div>
 
-            <Link
-              to="/settings"
-              className={cn(
-                "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
-                location.pathname === "/settings"
-                  ? "bg-breneo-blue/10 text-breneo-blue"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-breneo-blue"
-              )}
-            >
-              <Settings size={22} />
-              {!collapsed && (
-                <span className="font-medium text-base">Settings</span>
-              )}
-            </Link>
-
-            <Link
-              to="/help"
-              className={cn(
-                "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
-                location.pathname === "/help"
-                  ? "bg-breneo-blue/10 text-breneo-blue"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-breneo-blue"
-              )}
-            >
-              <HelpCircle size={22} />
-              {!collapsed && (
-                <span className="font-medium text-base">Help Center</span>
-              )}
-            </Link>
-
-            {/* Theme Toggle */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className={cn(
-                "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group w-full text-left",
-                "text-gray-600 hover:bg-gray-50 hover:text-breneo-blue"
-              )}
-            >
-              <div
+            {/* Settings, Help Center, Theme Toggle grouped together */}
+            <div className="space-y-2 mb-4">
+              <Link
+                to="/settings"
                 className={cn(
-                  "flex items-center justify-center w-[22px] h-[22px]",
-                  "flex-shrink-0"
+                  "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
+                  location.pathname === "/settings"
+                    ? "bg-breneo-blue/10 text-breneo-blue"
+                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
                 )}
               >
-                <ThemeToggle />
-              </div>
-              {!collapsed && (
-                <span className="font-medium text-base">
-                  {theme === "dark" ? "Dark Mode" : "Light Mode"}
-                </span>
-              )}
-            </button>
+                <Settings
+                  size={22}
+                  className={cn(
+                    "flex-shrink-0 transition-colors duration-200",
+                    location.pathname === "/settings"
+                      ? "text-breneo-blue"
+                      : "text-gray-400 group-hover:text-breneo-blue"
+                  )}
+                />
+                {!collapsed && (
+                  <span className="font-medium text-base">Settings</span>
+                )}
+              </Link>
+
+              <Link
+                to="/help"
+                className={cn(
+                  "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
+                  location.pathname === "/help"
+                    ? "bg-breneo-blue/10 text-breneo-blue"
+                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
+                )}
+              >
+                <HelpCircle
+                  size={22}
+                  className={cn(
+                    "flex-shrink-0 transition-colors duration-200",
+                    location.pathname === "/help"
+                      ? "text-breneo-blue"
+                      : "text-gray-400 group-hover:text-breneo-blue"
+                  )}
+                />
+                {!collapsed && (
+                  <span className="font-medium text-base">Help Center</span>
+                )}
+              </Link>
+
+              {/* Theme Toggle */}
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className={cn(
+                  "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group w-full text-left",
+                  "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
+                )}
+              >
+                {theme === "dark" ? (
+                  <Moon
+                    size={22}
+                    className="text-gray-400 group-hover:text-breneo-blue transition-colors duration-200 flex-shrink-0"
+                  />
+                ) : (
+                  <Sun
+                    size={22}
+                    className="text-gray-400 group-hover:text-breneo-blue transition-colors duration-200 flex-shrink-0"
+                  />
+                )}
+                {!collapsed && (
+                  <span className="font-medium text-base transition-colors duration-200">
+                    {theme === "dark" ? "Dark Mode" : "Light Mode"}
+                  </span>
+                )}
+              </button>
+            </div>
 
             {/* Profile */}
             <div className="border-t border-gray-200 dark:border-border mt-4 pt-4">
