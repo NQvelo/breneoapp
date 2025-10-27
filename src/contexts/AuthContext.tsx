@@ -108,21 +108,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(userData);
           // ✅ END: FIX
         })
-        .catch((error) => {
-          // Only clear tokens if it's actually an authentication error
-          const status = error.response?.status;
-          if (status === 401 || status === 403) {
-            // Invalid or expired token
-            console.log("Authentication error, clearing tokens");
-            TokenManager.clearTokens();
-            setUser(null);
-          } else {
-            // Network error or other non-auth error - keep user logged in
-            console.log(
-              "Non-auth error during profile fetch, keeping user logged in:",
-              error.message
-            );
-          }
+        .catch(() => {
+          TokenManager.clearTokens();
+          setUser(null);
         })
         .finally(() => setLoading(false));
     } else {
