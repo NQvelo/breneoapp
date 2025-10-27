@@ -1,11 +1,48 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { ImageIcon } from "lucide-react";
 
 const LandingPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+
+  // Image loading states
+  const [headerLogoLoaded, setHeaderLogoLoaded] = useState(false);
+  const [heroLogoLoaded, setHeroLogoLoaded] = useState(false);
+  const [footerLogoLoaded, setFooterLogoLoaded] = useState(false);
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Image preloading function
+  const preloadImage = useCallback((src: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+      img.src = src;
+    });
+  }, []);
+
+  // Preload images on component mount
+  useEffect(() => {
+    const preloadImages = async () => {
+      try {
+        await Promise.all([
+          preloadImage("lovable-uploads/breneo_logo.png"),
+          preloadImage(
+            "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80"
+          ),
+        ]);
+      } catch (error) {
+        console.warn("Some images failed to preload:", error);
+        setImageError(true);
+      }
+    };
+
+    preloadImages();
+  }, [preloadImage]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -30,11 +67,30 @@ const LandingPage = () => {
       <header className="bg-white py-4 px-3 md:px-6 shadow-sm">
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
+            {!headerLogoLoaded && !imageError && (
+              <div className="h-10 w-32 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+                <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
+              </div>
+            )}
             <img
               src="lovable-uploads/breneo_logo.png"
               alt="Breneo Logo"
-              className="h-10"
+              className={`h-10 transition-opacity duration-300 ${
+                headerLogoLoaded ? "opacity-100" : "opacity-0"
+              }`}
+              onLoad={() => setHeaderLogoLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setHeaderLogoLoaded(true);
+              }}
             />
+            {imageError && !headerLogoLoaded && (
+              <div className="h-10 w-32 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Breneo
+                </span>
+              </div>
+            )}
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <a
@@ -118,11 +174,30 @@ const LandingPage = () => {
               </div>
             </div>
             <div className="hidden md:block">
+              {!heroImageLoaded && !imageError && (
+                <div className="rounded-lg shadow-lg bg-gray-200 dark:bg-[#242424] animate-pulse w-full h-auto flex items-center justify-center min-h-[400px]">
+                  <ImageIcon className="h-16 w-16 text-gray-400 dark:text-gray-600" />
+                </div>
+              )}
               <img
                 src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80"
                 alt="People collaborating"
-                className="rounded-lg shadow-lg w-full h-auto"
+                className={`rounded-lg shadow-lg w-full h-auto transition-opacity duration-300 ${
+                  heroImageLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={() => setHeroImageLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                  setHeroImageLoaded(true);
+                }}
               />
+              {imageError && !heroImageLoaded && (
+                <div className="rounded-lg shadow-lg bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 w-full h-auto flex items-center justify-center min-h-[400px]">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Image not available
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -400,11 +475,30 @@ const LandingPage = () => {
         <div className="container mx-auto px-3 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
+              {!footerLogoLoaded && !imageError && (
+                <div className="h-10 w-32 bg-gray-700 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center mb-4">
+                  <ImageIcon className="h-5 w-5 text-gray-500 dark:text-gray-600" />
+                </div>
+              )}
               <img
                 src="lovable-uploads/breneo_logo.png"
                 alt="Breneo Logo"
-                className="h-10 mb-4"
+                className={`h-10 mb-4 transition-opacity duration-300 ${
+                  footerLogoLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={() => setFooterLogoLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                  setFooterLogoLoaded(true);
+                }}
               />
+              {imageError && !footerLogoLoaded && (
+                <div className="h-10 w-32 bg-gray-700 dark:bg-[#242424] border border-gray-600 dark:border-gray-700 rounded flex items-center justify-center mb-4">
+                  <span className="text-sm text-gray-300 dark:text-gray-400">
+                    Breneo
+                  </span>
+                </div>
+              )}
               <p className="text-gray-300 text-sm">
                 Empowering careers through AI-powered skill assessment and
                 personalized learning.

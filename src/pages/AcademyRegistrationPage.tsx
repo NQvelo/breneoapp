@@ -131,8 +131,8 @@ const AcademyRegistrationPage = () => {
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
           {!logoLoaded && !imageError && (
-            <div className="h-7 w-20 bg-gray-200 animate-pulse rounded flex items-center justify-center">
-              <ImageIcon className="h-3 w-3 text-gray-400" />
+            <div className="h-7 w-20 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+              <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
             </div>
           )}
           <img
@@ -165,8 +165,8 @@ const AcademyRegistrationPage = () => {
             <div className="mb-4 hidden lg:flex items-center justify-between">
               <div className="flex items-center">
                 {!logoLoaded && !imageError && (
-                  <div className="h-10 w-32 bg-gray-200 animate-pulse rounded flex items-center justify-center">
-                    <ImageIcon className="h-5 w-5 text-gray-400" />
+                  <div className="h-10 w-32 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+                    <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
                   </div>
                 )}
                 <img
@@ -370,8 +370,8 @@ const AcademyRegistrationPage = () => {
           <div className="relative w-full h-full rounded-xl overflow-hidden">
             {/* Loading skeleton */}
             {!backgroundLoaded && !imageError && (
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
-                <ImageIcon className="h-16 w-16 text-gray-400" />
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-[#242424] dark:to-[#2a2a2a] animate-pulse flex items-center justify-center">
+                <ImageIcon className="h-16 w-16 text-gray-400 dark:text-gray-600" />
               </div>
             )}
 

@@ -29,6 +29,8 @@ import UserSettings from "./pages/UserSettings";
 import AcademyProfilePage from "./pages/AcademyProfilePage";
 import EmailVerification from "./pages/EmailVerification";
 import AcademyRegistrationPage from "./pages/AcademyRegistrationPage";
+import TermsOfUse from "./pages/TermsOfUse";
+import HelpCenter from "./pages/HelpCenter";
 
 const queryClient = new QueryClient();
 
@@ -127,6 +129,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UserSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/terms-of-use"
+              element={
+                <ProtectedRoute>
+                  <TermsOfUse />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/help"
+              element={
+                <ProtectedRoute>
+                  <HelpCenter />
                 </ProtectedRoute>
               }
             />
