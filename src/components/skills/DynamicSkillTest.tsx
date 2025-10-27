@@ -122,14 +122,56 @@ export function DynamicSkillTest({
 
   // Save test results
   const saveTestResults = async (resultsToSave: any) => {
-    if (!user) return;
+    if (!user) {
+      console.warn("No user found, cannot save test results");
+      return;
+    }
     try {
-      await apiClient.post("/api/save-test-results/", {
-        userId: user.id,
-        ...resultsToSave,
-      });
-    } catch (err) {
-      console.error("Error saving test results:", err);
+      console.log("💾 Saving test results for user:", user.id);
+      console.log("💾 Raw test results data:", resultsToSave);
+
+      // Clean and prepare payload - ensure all fields are defined and serializable
+      // Combine tech and soft skills into skills_json as required by backend
+      const skillsJson = {
+        tech: resultsToSave.tech_score_per_skill || {},
+        soft: resultsToSave.soft_score_per_skill || {},
+      };
+
+      const payload = {
+        user: user.id,
+        total_score: resultsToSave.total_score ?? 0,
+        total_questions: resultsToSave.total_questions ?? 0,
+        final_role: resultsToSave.final_role || "N/A",
+        skills_json: skillsJson, // Required field by Django backend
+        career_answers: resultsToSave.career_answers || [],
+      };
+
+      console.log(
+        "📦 Final payload being sent:",
+        JSON.stringify(payload, null, 2)
+      );
+
+      // Send data with user ID to Django backend
+      const response = await apiClient.post("/api/skilltest/save/", payload);
+
+      console.log("✅ Test results saved successfully:", response.data);
+    } catch (err: any) {
+      console.error("❌ Error saving test results:");
+      console.error("Full error object:", err);
+
+      // Log axios error details
+      if (err.response) {
+        console.error("❌ Response status:", err.response.status);
+        console.error(
+          "❌ Response data:",
+          JSON.stringify(err.response.data, null, 2)
+        );
+        console.error("❌ Response headers:", err.response.headers);
+      } else if (err.request) {
+        console.error("❌ No response received:", err.request);
+      } else {
+        console.error("❌ Error setting up request:", err.message);
+      }
     }
   };
 
@@ -367,15 +409,17 @@ export function DynamicSkillTest({
       const finalRole =
         results.soft?.final_role || results.tech?.final_role || "N/A";
 
+      // Prepare data in snake_case for Django backend
       const resultsToSave = {
-        totalScore,
-        totalQuestions,
-        finalRole,
-        techScorePerSkill: results.tech?.score_per_skill,
-        softScorePerSkill: results.soft?.score_per_skill,
-        careerAnswers,
+        total_score: totalScore,
+        total_questions: totalQuestions,
+        final_role: finalRole,
+        tech_score_per_skill: results.tech?.score_per_skill,
+        soft_score_per_skill: results.soft?.score_per_skill,
+        career_answers: careerAnswers,
       };
 
+      console.log("📊 Final results to save:", resultsToSave);
       saveTestResults(resultsToSave);
       setPhase("finished");
     }
@@ -386,7 +430,7 @@ export function DynamicSkillTest({
   if (phase === "career" && careerQuestions.length > 0) {
     const q = careerQuestions[careerIndex];
     return (
-      <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
         {/* <h1 className="text-2xl font-bold mb-4">🧭 Interest / Career Test</h1> */}
         {/* <div className="text-gray-700 mb-2">
           Question {careerIndex + 1} of {careerQuestions.length}
@@ -460,7 +504,7 @@ export function DynamicSkillTest({
       softSession: softSession,
     });
     return (
-      <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border text-center dark:text-foreground">
+      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border text-center dark:text-foreground">
         Loading assessments...
       </div>
     );
@@ -478,7 +522,7 @@ export function DynamicSkillTest({
 
   if (currentTechQ) {
     return (
-      <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
         {/* <h2 className="text-xl font-bold mb-2">⚡ Tech Question</h2> */}
         <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
           {currentTechQ.text}
@@ -587,7 +631,7 @@ export function DynamicSkillTest({
 
     if (!hasOptions) {
       return (
-        <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+        <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
           <h2 className="text-xl font-bold mb-2 dark:text-foreground">
             ⚠️ Error Loading Question
           </h2>
@@ -602,7 +646,7 @@ export function DynamicSkillTest({
     }
 
     return (
-      <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
         {/* <h2 className="text-xl font-bold mb-2">🌟 Soft Skills Question</h2> */}
         <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
           {questionText}
@@ -679,7 +723,7 @@ export function DynamicSkillTest({
       results.soft?.final_role || results.tech?.final_role || "N/A";
 
     return (
-      <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
         <h1 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
           🏆 ტესტი დასრულდა!
         </h1>
@@ -706,7 +750,7 @@ export function DynamicSkillTest({
   }
 
   return (
-    <div className="p-8 max-w-xl mx-auto bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border text-center dark:text-foreground">
+    <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border text-center dark:text-foreground">
       Loading...
     </div>
   );

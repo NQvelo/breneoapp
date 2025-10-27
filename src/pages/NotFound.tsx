@@ -1,8 +1,11 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 const NotFound = () => {
   const location = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => {
     console.error(
@@ -11,7 +14,7 @@ const NotFound = () => {
     );
   }, [location.pathname]);
 
-  return (
+  const NotFoundContent = () => (
     <div
       className="min-h-screen flex items-center justify-center px-4 relative"
       style={{
@@ -23,7 +26,7 @@ const NotFound = () => {
       }}
     >
       {/* White content container */}
-      <div className="bg-white rounded-lg shadow-lg p-8 text-center max-w-md mx-auto">
+      <div className="bg-white dark:bg-card rounded-lg shadow-lg p-8 text-center max-w-md mx-auto">
         {/* Logo */}
         <div className="mb-8">
           <img
@@ -47,7 +50,9 @@ const NotFound = () => {
         {/* 404 Content */}
         <div className="mb-8">
           <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
-          <h2 className="text-2xl font-semibold mb-2">Page Not Found</h2>
+          <h2 className="text-2xl font-semibold mb-2 dark:text-foreground">
+            Page Not Found
+          </h2>
           <p className="text-muted-foreground mb-6">
             The page you're looking for doesn't exist or has been moved.
           </p>
@@ -62,25 +67,39 @@ const NotFound = () => {
             Go to Dashboard
           </Link>
 
-          <div className="text-sm text-muted-foreground">
-            <Link
-              to="/auth/login"
-              className="hover:text-primary transition-colors"
-            >
-              Sign In
-            </Link>
-            <span className="mx-2">•</span>
-            <Link
-              to="/auth/signup"
-              className="hover:text-primary transition-colors"
-            >
-              Sign Up
-            </Link>
-          </div>
+          {!user && (
+            <div className="text-sm text-muted-foreground">
+              <Link
+                to="/auth/login"
+                className="hover:text-primary transition-colors"
+              >
+                Sign In
+              </Link>
+              <span className="mx-2">•</span>
+              <Link
+                to="/auth/signup"
+                className="hover:text-primary transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
+
+  // If user is logged in, show within dashboard layout
+  if (user) {
+    return (
+      <DashboardLayout>
+        <NotFoundContent />
+      </DashboardLayout>
+    );
+  }
+
+  // If not logged in, show full-page 404
+  return <NotFoundContent />;
 };
 
 export default NotFound;

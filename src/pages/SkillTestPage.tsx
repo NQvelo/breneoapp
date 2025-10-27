@@ -140,8 +140,8 @@ const ProgressBar = ({
 // Start Screen Component
 const StartScreen = ({ onStart }: { onStart: () => void }) => {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-xl mx-auto">
-      <div className="w-full p-8 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-xl mx-auto mb-12">
+      <div className="w-full p-8 mb-12 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border">
         {/* Header Section - Centered */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center mb-4">
@@ -234,7 +234,7 @@ const SkillTestPage = () => {
   if (!testStarted) {
     return (
       <DashboardLayout>
-        <div className="p-6">
+        <div className="p">
           <StartScreen onStart={() => setTestStarted(true)} />
         </div>
       </DashboardLayout>

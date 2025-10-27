@@ -179,9 +179,16 @@ apiClient.interceptors.response.use(
         console.error("Token refresh failed:", refreshError);
       }
 
-      // If refresh fails, clear tokens and redirect to login
-      TokenManager.clearTokens();
-      if (!window.location.pathname.includes("/auth/")) {
+      // If refresh fails, only clear tokens and redirect if:
+      // 1. User is on a protected route (not on auth pages)
+      // 2. The request was an authentication check (profile endpoint)
+      const isProtectedRoute = !window.location.pathname.includes("/auth/");
+      const isAuthCheck = originalRequest.url?.includes("/api/profile/");
+
+      if (isProtectedRoute && isAuthCheck) {
+        // Only redirect on app mounts when checking authentication
+        // Don't redirect on subsequent API calls to avoid unwanted logouts
+        TokenManager.clearTokens();
         window.location.href = "/auth/login";
       }
     }
