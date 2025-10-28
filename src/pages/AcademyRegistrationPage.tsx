@@ -106,8 +106,12 @@ const AcademyRegistrationPage = () => {
       if (contentType && contentType.indexOf("application/json") !== -1) {
         const data = await response.json();
         if (response.ok) {
-          toast.success("Registration successful! Please login.");
-          navigate("/auth/login");
+          toast.success("Registration successful! Please verify your email.");
+          // Store email for verification page
+          sessionStorage.setItem("tempAcademyEmail", email);
+          navigate("/email-verification", {
+            state: { email, isAcademy: true },
+          });
         } else {
           const errorMessages = Object.values(data).flat();
           toast.error(errorMessages.join(" ") || "Registration failed.");
@@ -147,11 +151,6 @@ const AcademyRegistrationPage = () => {
               setLogoLoaded(true);
             }}
           />
-          {imageError && (
-            <div className="h-7 w-20 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-              <span className="text-xs text-gray-500">Breneo</span>
-            </div>
-          )}
         </div>
         <ThemeToggle />
       </div>
@@ -181,11 +180,6 @@ const AcademyRegistrationPage = () => {
                     setLogoLoaded(true);
                   }}
                 />
-                {imageError && (
-                  <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-                    <span className="text-sm text-gray-500">Breneo</span>
-                  </div>
-                )}
               </div>
               <ThemeToggle />
             </div>
@@ -296,7 +290,7 @@ const AcademyRegistrationPage = () => {
                     <textarea
                       id="description"
                       placeholder="Describe your academy"
-                      className="mt-1 w-full h-24 px-3 py-2 border border-input rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      className="mt-1 w-full h-24 px-3 py-2 text-base border border-input bg-background text-foreground placeholder:text-muted-foreground rounded-md resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required

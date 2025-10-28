@@ -24,8 +24,12 @@ const EmailVerification: React.FC = () => {
   const [imageError, setImageError] = useState(false);
 
   // Get email from state
-  const email = location.state?.email || sessionStorage.getItem("tempEmail");
+  const email =
+    location.state?.email ||
+    sessionStorage.getItem("tempEmail") ||
+    sessionStorage.getItem("tempAcademyEmail");
   const password = sessionStorage.getItem("tempPassword");
+  const isAcademy = location.state?.isAcademy || false;
 
   // Image preloading function
   const preloadImage = useCallback((src: string): Promise<void> => {
@@ -126,8 +130,8 @@ const EmailVerification: React.FC = () => {
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("Email or password missing. Please register again.");
+    if (!email) {
+      toast.error("Email missing. Please register again.");
       navigate("/auth/signup");
       return;
     }
@@ -140,14 +144,33 @@ const EmailVerification: React.FC = () => {
 
     setIsLoading(true);
     try {
+      // Choose the correct API endpoint based on whether it's academy verification
+      const verifyEndpoint = isAcademy
+        ? API_ENDPOINTS.AUTH.VERIFY_ACADEMY_EMAIL
+        : API_ENDPOINTS.AUTH.VERIFY_CODE;
+
       // Step 1: Try to verify email
-      await apiClient.post(API_ENDPOINTS.AUTH.VERIFY_CODE, {
+      await apiClient.post(verifyEndpoint, {
         email,
         code: codeString,
       });
 
-      // ✅ If verification succeeds (no error), proceed to login
-      await loginAndNavigate();
+      // ✅ If verification succeeds
+      if (isAcademy) {
+        // For academy, just redirect to login page
+        toast.success("Email verified successfully!");
+        sessionStorage.removeItem("tempAcademyEmail");
+        navigate("/auth/login");
+      } else {
+        // For regular users, proceed to auto-login if password is available
+        if (password) {
+          await loginAndNavigate();
+        } else {
+          toast.success("Email verified successfully!");
+          sessionStorage.removeItem("tempEmail");
+          navigate("/auth/login");
+        }
+      }
     } catch (err: unknown) {
       // Step 2: If verification fails, check *why*
       let errorMessage = "Verification failed. Please try again.";
@@ -176,8 +199,8 @@ const EmailVerification: React.FC = () => {
         }
       }
 
-      // ✅ If it's the known bug, ignore it and try to log in anyway
-      if (isKnownBackendBug) {
+      // ✅ If it's the known bug, ignore it and try to log in anyway (only for regular users)
+      if (isKnownBackendBug && !isAcademy && password) {
         toast.info("Verification processed, attempting login...");
         await loginAndNavigate();
       } else {
@@ -260,8 +283,8 @@ const EmailVerification: React.FC = () => {
               Verify Your Email
             </h1>
             <p className="text-muted-foreground mb-8">
-              Enter the 6-digit code sent to your email ({email || "your-email"}
-              )
+              Enter the 6-digit code sent to your email{" "}
+              {isAcademy && "(academy registration)"} ({email || "your-email"})
             </p>
 
             <form onSubmit={handleVerify} className="space-y-6">

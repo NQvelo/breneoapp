@@ -262,6 +262,15 @@ const LoginPage: React.FC = () => {
                     )}
                   </Button>
                 </div>
+                <div className="flex justify-end mt-2">
+                  <button
+                    type="button"
+                    className="text-sm text-primary hover:underline"
+                    onClick={() => navigate("/auth/reset-password")}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
               </div>
               <Button
                 type="submit"

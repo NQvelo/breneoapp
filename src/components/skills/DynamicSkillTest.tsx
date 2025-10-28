@@ -3,7 +3,11 @@ import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext"; // corrected relative path
 import apiClient from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Award, CheckCircle2, AlertCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 // Interfaces
 export interface Question {
@@ -80,6 +84,8 @@ export function DynamicSkillTest({
   const [techDone, setTechDone] = useState(false);
   const [softDone, setSoftDone] = useState(false);
   const [results, setResults] = useState<Result | null>(null);
+  const [isCalculatingResults, setIsCalculatingResults] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [selectedTechAnswer, setSelectedTechAnswer] = useState<string | null>(
     null
   );
@@ -88,6 +94,25 @@ export function DynamicSkillTest({
   );
 
   const numQuestions = 5;
+
+  // Loading messages to display during calculation
+  const loadingMessages = [
+    "📊 ვითვლით თქვენს შედეგებს...",
+    "🧮 ვიწყებთ ანალიზს...",
+    "💡 ვადგენთ უნარებს...",
+    "🎯 ვპოულობთ საუკეთესო მატჩს...",
+    "✨ თითქმის მზადაა...",
+  ];
+
+  // Cycle through loading messages
+  useEffect(() => {
+    if (isCalculatingResults) {
+      const interval = setInterval(() => {
+        setLoadingMessageIndex((prev) => (prev + 1) % 5);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [isCalculatingResults]);
 
   // Notify parent of phase changes
   useEffect(() => {
@@ -130,6 +155,53 @@ export function DynamicSkillTest({
       console.log("💾 Saving test results for user:", user.id);
       console.log("💾 Raw test results data:", resultsToSave);
 
+      // Validate and convert to numbers
+      const totalScore = Number(resultsToSave.total_score);
+      const totalQuestions = Number(resultsToSave.total_questions);
+
+      console.log("🔍 Validation check:");
+      console.log(
+        "  - Total Score (raw):",
+        resultsToSave.total_score,
+        "Type:",
+        typeof resultsToSave.total_score
+      );
+      console.log(
+        "  - Total Questions (raw):",
+        resultsToSave.total_questions,
+        "Type:",
+        typeof resultsToSave.total_questions
+      );
+      console.log(
+        "  - Total Score (converted):",
+        totalScore,
+        "isNaN:",
+        isNaN(totalScore)
+      );
+      console.log(
+        "  - Total Questions (converted):",
+        totalQuestions,
+        "isNaN:",
+        isNaN(totalQuestions)
+      );
+
+      // Validate values are numbers
+      if (isNaN(totalScore) || isNaN(totalQuestions)) {
+        console.error("❌ Invalid score values detected!");
+        console.error(
+          "  - total_score:",
+          resultsToSave.total_score,
+          "→",
+          totalScore
+        );
+        console.error(
+          "  - total_questions:",
+          resultsToSave.total_questions,
+          "→",
+          totalQuestions
+        );
+      }
+
       // Clean and prepare payload - ensure all fields are defined and serializable
       // Combine tech and soft skills into skills_json as required by backend
       const skillsJson = {
@@ -139,8 +211,8 @@ export function DynamicSkillTest({
 
       const payload = {
         user: user.id,
-        total_score: resultsToSave.total_score ?? 0,
-        total_questions: resultsToSave.total_questions ?? 0,
+        total_score: totalScore, // Use converted number
+        total_questions: totalQuestions, // Use converted number
         final_role: resultsToSave.final_role || "N/A",
         skills_json: skillsJson, // Required field by Django backend
         career_answers: resultsToSave.career_answers || [],
@@ -150,11 +222,20 @@ export function DynamicSkillTest({
         "📦 Final payload being sent:",
         JSON.stringify(payload, null, 2)
       );
+      console.log("📦 Payload types:", {
+        user: typeof payload.user,
+        total_score: typeof payload.total_score,
+        total_questions: typeof payload.total_questions,
+        final_role: typeof payload.final_role,
+      });
 
       // Send data with user ID to Django backend
       const response = await apiClient.post("/api/skilltest/save/", payload);
 
-      console.log("✅ Test results saved successfully:", response.data);
+      console.log("✅ Test results saved successfully!");
+      console.log("✅ Response:", response.data);
+      console.log("✅ Saved total_score:", payload.total_score);
+      console.log("✅ Saved total_questions:", payload.total_questions);
     } catch (err: any) {
       console.error("❌ Error saving test results:");
       console.error("Full error object:", err);
@@ -370,58 +451,200 @@ export function DynamicSkillTest({
 
   const finishTechAssessment = async () => {
     if (!techSession) return;
-    const res = await apiClient.post("/api/finish-assessment/", {
-      session_id: techSession.session_id,
-    });
-    setResults((prev) => ({ ...prev, tech: res.data }));
+    try {
+      console.log(
+        "🔍 Finishing tech assessment with session:",
+        techSession.session_id
+      );
+      const res = await apiClient.post("/api/finish-assessment/", {
+        session_id: techSession.session_id,
+      });
+      console.log("✅ Tech assessment finish response:", res.data);
+      console.log("✅ Tech response keys:", Object.keys(res.data));
+      console.log("✅ Tech total_score:", res.data.total_score);
+      console.log("✅ Tech total_questions:", res.data.total_questions);
+      setResults((prev) => ({ ...prev, tech: res.data }));
+    } catch (err) {
+      console.error("❌ Error finishing tech assessment:", err);
+    }
   };
 
   const finishSoftAssessment = async () => {
     if (!softSession) return;
-    const res = await apiClient.post("/api/soft/finish/", {
-      session_id: softSession.session_id,
-    });
-    setResults((prev) => ({ ...prev, soft: res.data }));
+    try {
+      console.log(
+        "🔍 Finishing soft assessment with session:",
+        softSession.session_id
+      );
+      const res = await apiClient.post("/api/soft/finish/", {
+        session_id: softSession.session_id,
+      });
+      console.log("✅ Soft assessment finish response:", res.data);
+      console.log("✅ Soft response keys:", Object.keys(res.data));
+      console.log("✅ Soft total_score:", res.data.total_score);
+      console.log("✅ Soft total_questions:", res.data.total_questions);
+      setResults((prev) => ({ ...prev, soft: res.data }));
+    } catch (err) {
+      console.error("❌ Error finishing soft assessment:", err);
+    }
   };
 
-  // Render skill results helper
+  // Render skill results helper with visual progress bars
   const renderSkillResults = (skills: Record<string, string>) =>
     Object.entries(skills)
       .filter(([_, pct]) => parseFloat(pct.replace("%", "")) > 0)
       .map(([skill, pct]) => {
         const percentage = parseFloat(pct.replace("%", ""));
-        const status = percentage >= 70 ? "✅ Strong" : "❌ Weak";
+        const isStrong = percentage >= 70;
         return (
-          <li key={skill} className="mb-1">
-            {skill} – {pct} → {status}
-          </li>
+          <div
+            key={skill}
+            className="mb-3 p-3 bg-gray-50 dark:bg-muted rounded-lg"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium dark:text-foreground">
+                {skill}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-gray-700 dark:text-foreground">
+                  {pct}
+                </span>
+                {isStrong ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                )}
+              </div>
+            </div>
+            <Progress
+              value={percentage}
+              className={`h-2 ${
+                isStrong
+                  ? "bg-green-100 dark:bg-green-900/30"
+                  : "bg-orange-100 dark:bg-orange-900/30"
+              }`}
+            />
+            <div className="text-xs mt-1 text-gray-600 dark:text-gray-400">
+              {isStrong ? "Strong" : "Needs Improvement"}
+            </div>
+          </div>
         );
       });
 
   // Save final results when both assessments are done
   useEffect(() => {
     if (techDone && softDone && results && user) {
-      const totalScore =
-        (results.tech?.total_score || 0) + (results.soft?.total_score || 0);
-      const totalQuestions =
-        (results.tech?.total_questions || 0) +
-        (results.soft?.total_questions || 0);
+      // Start loading state
+      setIsCalculatingResults(true);
+      setLoadingMessageIndex(0);
+
+      // Debug logging
+      console.log("🔍 Full results object:", results);
+      console.log("🔍 Tech results:", results.tech);
+      console.log("🔍 Soft results:", results.soft);
+
+      // Extract scores - try from API response first, fallback to calculating from score_per_skill
+      let techScore = results.tech?.total_score;
+      let softScore = results.soft?.total_score;
+      let techQuestions = results.tech?.total_questions;
+      let softQuestions = results.soft?.total_questions;
+
+      // If backend doesn't provide scores, calculate from skill percentages
+      if (!techScore && results.tech?.score_per_skill) {
+        console.log("⚡ Calculating tech score from skill percentages");
+        const skillScores = Object.values(results.tech.score_per_skill).map(
+          (pct: string) => parseFloat(pct.replace("%", ""))
+        );
+        const avgScore =
+          skillScores.reduce((sum, val) => sum + val, 0) / skillScores.length;
+        techScore = Math.round((avgScore * numQuestions) / 100);
+        techQuestions = numQuestions;
+        console.log(
+          "⚡ Calculated tech score:",
+          techScore,
+          "from avg percentage:",
+          avgScore
+        );
+      }
+
+      if (!softScore && results.soft?.score_per_skill) {
+        console.log("🌟 Calculating soft score from skill percentages");
+        const skillScores = Object.values(results.soft.score_per_skill).map(
+          (pct: string) => parseFloat(pct.replace("%", ""))
+        );
+        const avgScore =
+          skillScores.reduce((sum, val) => sum + val, 0) / skillScores.length;
+        softScore = Math.round((avgScore * numQuestions) / 100);
+        softQuestions = numQuestions;
+        console.log(
+          "🌟 Calculated soft score:",
+          softScore,
+          "from avg percentage:",
+          avgScore
+        );
+      }
+
+      // Use defaults if still undefined
+      techScore = techScore || 0;
+      softScore = softScore || 0;
+      techQuestions = techQuestions || 0;
+      softQuestions = softQuestions || 0;
+
+      console.log("📊 Final score extraction:");
+      console.log("  - Tech Score:", techScore, "Questions:", techQuestions);
+      console.log("  - Soft Score:", softScore, "Questions:", softQuestions);
+
+      const totalScore = techScore + softScore;
+      const totalQuestions = techQuestions + softQuestions;
+
+      console.log("📊 Calculated totals:");
+      console.log("  - Total Score:", totalScore);
+      console.log("  - Total Questions:", totalQuestions);
+
+      // Validate the values are actual numbers
+      if (isNaN(totalScore) || isNaN(totalQuestions) || totalQuestions === 0) {
+        console.error("❌ Invalid calculated values:", {
+          totalScore,
+          totalQuestions,
+        });
+        console.error("❌ Trying to save with numQuestions:", numQuestions * 2);
+        // Fallback to using known question count
+        const fallbackQuestions = numQuestions * 2; // career + tech + soft (we have 2 main assessments)
+        const fallbackScore = totalScore || 0;
+        console.log("❌ Using fallback values:", {
+          fallbackScore,
+          fallbackQuestions,
+        });
+      }
+
       const finalRole =
         results.soft?.final_role || results.tech?.final_role || "N/A";
 
       // Prepare data in snake_case for Django backend
       const resultsToSave = {
-        total_score: totalScore,
-        total_questions: totalQuestions,
+        total_score: totalScore || 0,
+        total_questions: totalQuestions || numQuestions * 2,
         final_role: finalRole,
-        tech_score_per_skill: results.tech?.score_per_skill,
-        soft_score_per_skill: results.soft?.score_per_skill,
+        tech_score_per_skill: results.tech?.score_per_skill || {},
+        soft_score_per_skill: results.soft?.score_per_skill || {},
         career_answers: careerAnswers,
       };
 
       console.log("📊 Final results to save:", resultsToSave);
-      saveTestResults(resultsToSave);
-      setPhase("finished");
+      console.log("📊 Type check:", {
+        total_score_type: typeof resultsToSave.total_score,
+        total_questions_type: typeof resultsToSave.total_questions,
+        total_score_value: resultsToSave.total_score,
+        total_questions_value: resultsToSave.total_questions,
+      });
+
+      // Wait 5 seconds before saving and showing results
+      setTimeout(() => {
+        console.log("✅ 5 seconds passed, saving results now");
+        saveTestResults(resultsToSave);
+        setIsCalculatingResults(false);
+        setPhase("finished");
+      }, 5000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [techDone, softDone, results, user]);
@@ -713,6 +936,39 @@ export function DynamicSkillTest({
     );
   }
 
+  // Show loading screen while calculating results
+  if (isCalculatingResults) {
+    return (
+      <div className="max-w-4xl mx-auto mb-8">
+        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <div className="relative mb-8">
+              <div className="h-32 w-32 rounded-full border-4 border-[#00afea]/20 animate-pulse"></div>
+              <div className="absolute top-0 left-0 h-32 w-32 rounded-full border-4 border-transparent border-t-[#00afea] animate-spin"></div>
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <Award className="h-12 w-12 text-[#00afea]" />
+              </div>
+            </div>
+            <h2 className="text-3xl font-bold text-[#00afea] mb-4 text-center">
+              {loadingMessages[loadingMessageIndex]}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-center max-w-md">
+              ვამუშავებთ თქვენს პასუხებს და ვახერხებთ საუკეთესო რეკომენდაციას
+            </p>
+            <div className="mt-8 w-full max-w-md">
+              <Progress
+                value={
+                  ((loadingMessageIndex + 1) / loadingMessages.length) * 100
+                }
+                className="h-2"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (phase === "finished" && results) {
     const totalScore =
       (results.tech?.total_score || 0) + (results.soft?.total_score || 0);
@@ -722,29 +978,82 @@ export function DynamicSkillTest({
     const finalRole =
       results.soft?.final_role || results.tech?.final_role || "N/A";
 
-    return (
-      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
-        <h1 className="text-2xl font-bold mb-4 text-green-600 dark:text-green-400">
-          🏆 ტესტი დასრულდა!
-        </h1>
-        <p className="mb-2 dark:text-foreground">
-          საერთო შედეგი: {totalScore} / {totalQuestions}
-        </p>
-        <p className="mb-4 font-semibold dark:text-foreground">
-          Final Role: {finalRole}
-        </p>
+    const hasTechResults =
+      results.tech?.score_per_skill &&
+      Object.keys(results.tech.score_per_skill).length > 0;
+    const hasSoftResults =
+      results.soft?.score_per_skill &&
+      Object.keys(results.soft.score_per_skill).length > 0;
 
-        <h3 className="font-semibold mb-2 dark:text-foreground">
-          📊 ქულები უნარების მიხედვით:
-        </h3>
-        <ul className="list-disc list-inside mb-2">
-          {results.tech?.score_per_skill &&
-            renderSkillResults(results.tech.score_per_skill)}
-        </ul>
-        <ul className="list-disc list-inside">
-          {results.soft?.score_per_skill &&
-            renderSkillResults(results.soft.score_per_skill)}
-        </ul>
+    return (
+      <div className="p-8 max-w-4xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+        {/* Celebration Header */}
+        <div className="text-center pb-6 mb-6 border-b border-gray-200 dark:border-border">
+          <div className="flex justify-center mb-4">
+            <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+              <Award className="h-12 w-12 text-green-600 dark:text-green-400" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+            ტესტი დასრულდა! 🎉
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            გილოცავთ! თქვენ დაასრულეთ უნარების ტესტი
+          </p>
+        </div>
+
+        {/* Final Role Section */}
+        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-border">
+          <h2 className="text-xl font-semibold text-blue-700 dark:text-blue-300 mb-4 flex items-center gap-2">
+            <Award className="h-5 w-5" />
+            რეკომენდაცია
+          </h2>
+          <div className="text-center bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
+            <Badge
+              variant="default"
+              className="text-lg px-6 py-3 bg-blue-600 hover:bg-blue-700"
+            >
+              {finalRole}
+            </Badge>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
+              ამ როლისთვის რეკომენდირებული როლი
+            </p>
+          </div>
+        </div>
+
+        {/* Skills Breakdown */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Technical Skills */}
+          {hasTechResults && (
+            <div className="bg-gray-50 dark:bg-muted/50 p-6 rounded-lg border border-gray-200 dark:border-border">
+              <h3 className="text-lg font-semibold mb-4 dark:text-foreground flex items-center gap-2">
+                ⚡ ტექნიკური უნარები
+              </h3>
+              {results.tech?.score_per_skill &&
+                renderSkillResults(results.tech.score_per_skill)}
+            </div>
+          )}
+
+          {/* Soft Skills */}
+          {hasSoftResults && (
+            <div className="bg-gray-50 dark:bg-muted/50 p-6 rounded-lg border border-gray-200 dark:border-border">
+              <h3 className="text-lg font-semibold mb-4 dark:text-foreground flex items-center gap-2">
+                🌟 რბილი უნარები
+              </h3>
+              {results.soft?.score_per_skill &&
+                renderSkillResults(results.soft.score_per_skill)}
+            </div>
+          )}
+        </div>
+
+        {/* Empty State */}
+        {!hasTechResults && !hasSoftResults && (
+          <div className="py-8 text-center">
+            <p className="text-gray-500 dark:text-gray-400">
+              ქულები დაზუსტების პროცესშია
+            </p>
+          </div>
+        )}
       </div>
     );
   }

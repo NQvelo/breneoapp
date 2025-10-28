@@ -210,6 +210,7 @@ export const API_ENDPOINTS = {
     REGISTER: "/api/register/",
     PROFILE: "/api/profile/",
     VERIFY_CODE: "/api/verify-code/",
+    VERIFY_ACADEMY_EMAIL: "/api/verify-academy-email/",
     PASSWORD_RESET: "/password-reset/request/",
     PASSWORD_RESET_VERIFY: "/password-reset/verify/",
     PASSWORD_RESET_CONFIRM: "/password-reset/set-new/",

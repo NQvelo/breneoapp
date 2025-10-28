@@ -49,7 +49,10 @@ const App = () => (
               path="/auth"
               element={<Navigate to="/auth/login" replace />}
             />
-            <Route path="auth/reset-password" element={<ResetPasswordPage />} />
+            <Route
+              path="/auth/reset-password"
+              element={<ResetPasswordPage />}
+            />
             <Route path="/email-confirmed" element={<EmailConfirmed />} />
             <Route
               path="/dashboard"
