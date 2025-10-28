@@ -49,11 +49,19 @@ const Dashboard = () => {
   const { user } = useAuth();
 
   // Check user role to determine which dashboard to show
+  // First try to use user_type from the user object (set during login)
+  // If not available, query the database
   const { data: userRole, isLoading: roleLoading } = useQuery({
     queryKey: ["user-role", user?.id],
     queryFn: async () => {
       if (!user) return null;
 
+      // If user_type is already available from login, use it
+      if (user.user_type) {
+        return user.user_type;
+      }
+
+      // Otherwise, query the database
       const { data } = await supabase
         .from("user_roles")
         .select("role")
@@ -63,6 +71,7 @@ const Dashboard = () => {
       return data?.role || "user";
     },
     enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Mock user data - using real user data where available

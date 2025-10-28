@@ -30,100 +30,19 @@ export const OptimizedAvatar: React.FC<OptimizedAvatarProps> = ({
   size = "md",
   loading = "lazy",
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  // Check if image is already cached
-  const isImageCached = src ? imageCache.has(src) : false;
-
-  useEffect(() => {
-    if (!src) {
-      setImageLoaded(false);
-      setImageError(false);
-      setIsLoading(false);
-      return;
-    }
-
-    // If image is cached, mark as loaded immediately
-    if (isImageCached) {
-      setImageLoaded(true);
-      setImageError(false);
-      setIsLoading(false);
-      return;
-    }
-
-    // Reset states for new image
-    setImageLoaded(false);
-    setImageError(false);
-    setIsLoading(true);
-
-    // Preload the image
-    const img = new Image();
-
-    img.onload = () => {
-      // Cache the successful load
-      imageCache.set(src, true);
-      setImageLoaded(true);
-      setImageError(false);
-      setIsLoading(false);
-    };
-
-    img.onerror = () => {
-      setImageLoaded(false);
-      setImageError(true);
-      setIsLoading(false);
-    };
-
-    // Set loading priority based on prop
-    img.loading = loading;
-
-    // Add crossOrigin for better caching
-    img.crossOrigin = "anonymous";
-
-    // Start loading
-    img.src = src;
-
-    return () => {
-      // Cleanup
-      img.onload = null;
-      img.onerror = null;
-    };
-  }, [src, isImageCached, loading]);
-
-  // Show skeleton while loading
-  if (isLoading && !isImageCached) {
-    return (
-      <div
-        className={cn(
-          "relative flex shrink-0 overflow-hidden rounded-full",
-          sizeClasses[size],
-          className
-        )}
-      >
-        <Skeleton className="h-full w-full rounded-full" />
-      </div>
-    );
-  }
-
+  // Simplified: just use the AvatarImage component directly
+  // The browser and Avatar component will handle loading naturally
   return (
-    <Avatar className={cn(sizeClasses[size], className)}>
-      {src && !imageError && (
+    <Avatar className={cn(sizeClasses[size], className, "rounded-3xl")}>
+      {src && (
         <AvatarImage
-          ref={imgRef}
           src={src}
           alt={alt}
-          className={cn(
-            "aspect-square h-full w-full transition-opacity duration-200",
-            imageLoaded ? "opacity-100" : "opacity-0"
-          )}
+          className="aspect-square h-full w-full rounded-3xl"
           loading={loading}
-          onLoad={() => setImageLoaded(true)}
-          onError={() => setImageError(true)}
         />
       )}
-      <AvatarFallback className="bg-breneo-blue/10 text-breneo-blue text-sm font-medium">
+      <AvatarFallback className="bg-[#AAF0FF] text-[#099DBC] text-2xl font-semibold rounded-3xl">
         {fallback}
       </AvatarFallback>
     </Avatar>
@@ -145,7 +64,13 @@ export const useImagePreloader = () => {
         resolve();
       };
       img.onerror = reject;
-      img.crossOrigin = "anonymous";
+      // Only add crossOrigin for external URLs
+      if (
+        !src.includes("supabase.co") &&
+        !src.includes(window.location.origin)
+      ) {
+        img.crossOrigin = "anonymous";
+      }
       img.src = src;
     });
   }, []);

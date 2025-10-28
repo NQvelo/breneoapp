@@ -11,6 +11,8 @@ import {
   Settings,
   Award,
   Camera,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,11 +82,23 @@ const ProfilePage = () => {
   const [aboutMe, setAboutMe] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageTimestamp, setImageTimestamp] = useState(Date.now());
+
+  // Initialize profile image from user context on mount
+  useEffect(() => {
+    if (user?.profile_image) {
+      setProfileImage(user.profile_image);
+    }
+  }, [user?.profile_image]);
 
   // About Me modal state
   const [isAboutMeModalOpen, setIsAboutMeModalOpen] = useState(false);
   const [aboutMeText, setAboutMeText] = useState("");
   const [updatingAboutMe, setUpdatingAboutMe] = useState(false);
+
+  // Profile image options modal state
+  const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
+
   const { toast } = useToast();
 
   // Fetch skill test results
@@ -325,6 +339,9 @@ const ProfilePage = () => {
 
     setUploadingImage(true);
 
+    // Clear current image to show fallback
+    setProfileImage(null);
+
     try {
       const formData = new FormData();
       formData.append("profile_image", file);
@@ -348,20 +365,99 @@ const ProfilePage = () => {
         uploadResponse.data?.user?.profile_image ||
         null;
 
+      // Update the image with the new URL
       setProfileImage(newProfileImage);
 
-      // Refresh profile data
-      const response = await apiClient.get("/api/profile/", {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
+      // Update timestamp to force image reload
+      setImageTimestamp(Date.now());
+
+      toast({
+        title: "Success",
+        description: "Profile image has been updated successfully.",
       });
-      setProfileData(response.data);
+
+      // Reload page to refresh user context with new profile image
+      // This ensures the image persists and is available everywhere
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
 
       console.log("✅ Profile image uploaded successfully");
     } catch (error) {
       console.error("❌ Error uploading profile image:", error);
       alert("Failed to upload profile image. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Handler to open profile image options modal
+  const handleImageModalClick = () => {
+    setIsProfileImageModalOpen(true);
+  };
+
+  // Handler to trigger file input click from modal
+  const handleUploadFromModal = () => {
+    document.getElementById("profile-image-input")?.click();
+    setIsProfileImageModalOpen(false);
+  };
+
+  // Handler to remove profile image
+  const handleRemoveImage = async () => {
+    if (!user) return;
+
+    if (!confirm("Are you sure you want to remove your profile image?")) {
+      setIsProfileImageModalOpen(false);
+      return;
+    }
+
+    setUploadingImage(true);
+    setIsProfileImageModalOpen(false);
+
+    try {
+      const token = localStorage.getItem("authToken");
+
+      const response = await apiClient.patch(
+        "/api/profile/",
+        { profile_image: null },
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+
+      console.log("✅ Image removal response:", response.data);
+
+      setProfileImage(null);
+      setImageTimestamp(Date.now());
+
+      // Refresh profile data
+      const profileResponse = await apiClient.get("/api/profile/", {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+      setProfileData(profileResponse.data);
+
+      toast({
+        title: "Success",
+        description: "Profile image has been removed.",
+      });
+
+      // Reload page to refresh user context
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+
+      console.log("✅ Profile image removed successfully");
+    } catch (error) {
+      console.error("❌ Error removing profile image:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove profile image. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUploadingImage(false);
     }
@@ -426,8 +522,9 @@ const ProfilePage = () => {
   // ✅ Use the 'user' object from the context directly
   const { first_name, last_name, email, phone_number } = user;
 
-  // Use profile image from API if available, otherwise fallback to user context
-  const displayProfileImage = profileImage || user.profile_image;
+  // Use profile image from user context (same as UserSettings)
+  // profileImage state is updated after upload to show the new image
+  const displayProfileImage = profileImage || user?.profile_image;
 
   // Combine all skills from tech and soft - only show top 5 with > 0%
   const getAllSkills = () => {
@@ -477,34 +574,39 @@ const ProfilePage = () => {
           {/* Profile Header Card */}
           <Card>
             <CardContent className="flex flex-col items-center pb-6 pt-6">
-              <div className="relative group">
+              <div
+                className="relative group cursor-pointer"
+                onClick={handleImageModalClick}
+              >
                 <OptimizedAvatar
-                  src={displayProfileImage}
+                  key={`avatar-${imageTimestamp}`}
+                  src={displayProfileImage || undefined}
                   alt="Profile photo"
                   fallback={
                     first_name ? first_name.charAt(0).toUpperCase() : "U"
                   }
                   size="xl"
-                  loading="lazy"
+                  loading="eager"
                   className="h-32 w-32"
                 />
                 {uploadingImage ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl z-10">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                   </div>
                 ) : (
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
                     <Camera className="h-8 w-8 text-white" />
-                  </label>
+                  </div>
                 )}
               </div>
+              <input
+                id="profile-image-input"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                disabled={uploadingImage}
+              />
               <h1 className="text-2xl font-bold mt-4 text-center">
                 {first_name} {last_name}
               </h1>
@@ -805,6 +907,87 @@ const ProfilePage = () => {
               </Button>
               <Button onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
                 {updatingAboutMe ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Profile Image Options Modal */}
+      {isMobile ? (
+        <Drawer
+          open={isProfileImageModalOpen}
+          onOpenChange={setIsProfileImageModalOpen}
+        >
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Profile Photo</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-4">
+              <div className="space-y-2">
+                <Button
+                  onClick={handleUploadFromModal}
+                  className="w-full justify-start gap-3"
+                  variant="ghost"
+                  disabled={uploadingImage}
+                >
+                  <Upload className="h-5 w-5" />
+                  {displayProfileImage ? "Update Photo" : "Upload Photo"}
+                </Button>
+                {displayProfileImage && (
+                  <Button
+                    onClick={handleRemoveImage}
+                    className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+                    variant="ghost"
+                    disabled={uploadingImage}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    Remove Photo
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog
+          open={isProfileImageModalOpen}
+          onOpenChange={setIsProfileImageModalOpen}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Profile Photo</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="space-y-2">
+                <Button
+                  onClick={handleUploadFromModal}
+                  className="w-full justify-start gap-3"
+                  variant="ghost"
+                  disabled={uploadingImage}
+                >
+                  <Upload className="h-5 w-5" />
+                  {displayProfileImage ? "Update Photo" : "Upload Photo"}
+                </Button>
+                {displayProfileImage && (
+                  <Button
+                    onClick={handleRemoveImage}
+                    className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+                    variant="ghost"
+                    disabled={uploadingImage}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    Remove Photo
+                  </Button>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsProfileImageModalOpen(false)}
+              >
+                Cancel
               </Button>
             </DialogFooter>
           </DialogContent>

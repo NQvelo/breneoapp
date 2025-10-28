@@ -341,15 +341,25 @@ const AcademyDashboard = () => {
   const fetchAcademyData = useCallback(async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
-        .from("academy_profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+      // Create academy profile from Django user data
+      // The backend provides academy info in the user profile or user metadata
+      const academyName =
+        (user as any)?.academy_name || user.email?.split("@")[0] || "Academy";
 
-      if (error) throw error;
-      setAcademyProfile(data);
+      const academyProfile: AcademyProfile = {
+        id: String(user.id),
+        academy_name: academyName,
+        description: (user as any)?.academy_description || "",
+        website_url: (user as any)?.website_url || "",
+        contact_email: user.email || "",
+        is_verified: (user as any)?.is_verified || false,
+        logo_url: (user as any)?.logo_url || user.profile_image || null,
+      };
+
+      setAcademyProfile(academyProfile);
+      console.log("✅ Academy profile loaded from Django API:", academyProfile);
     } catch (error: any) {
+      console.error("Failed to load academy profile:", error);
       toast({
         title: "Error",
         description: "Failed to load academy profile",
@@ -360,6 +370,7 @@ const AcademyDashboard = () => {
 
   const fetchCourses = useCallback(async () => {
     if (!academyProfile) return;
+
     try {
       const { data, error } = await supabase
         .from("courses")
@@ -418,6 +429,7 @@ const AcademyDashboard = () => {
 
   const handleAddCourse = async () => {
     if (!academyProfile) return;
+
     setIsSubmitting(true);
     try {
       let imageUrl =
@@ -482,6 +494,7 @@ const AcademyDashboard = () => {
 
   const handleUpdateCourse = async () => {
     if (!editingCourse) return;
+
     setIsSubmitting(true);
     try {
       let imageUrl = editingCourse.image;

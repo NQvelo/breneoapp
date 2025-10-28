@@ -411,6 +411,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.log("Using email as ID fallback:", userData.email);
       }
 
+      // user_type should already be set from the profile/login response
+      // If not available, default to "user"
+      if (!userData.user_type) {
+        userData.user_type = "user";
+        console.log("user_type not found in profile, defaulting to 'user'");
+      } else {
+        console.log("✅ User type from profile:", userData.user_type);
+      }
+
       setUser(userData);
 
       // Preload profile image for better performance
