@@ -37,6 +37,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 const extractUserFromData = (data: unknown): User | null => {
   if (data && typeof data === "object") {
     const dataObj = data as Record<string, unknown>;
+
     // 1. Check for a 'user' key
     if (dataObj.user && typeof dataObj.user === "object") {
       return dataObj.user as User;
@@ -45,9 +46,40 @@ const extractUserFromData = (data: unknown): User | null => {
     if (dataObj.profile && typeof dataObj.profile === "object") {
       return dataObj.profile as User;
     }
-    // 3. Assume the whole object is the user (if it has user-like keys)
-    if (dataObj.email || dataObj.username || dataObj.id) {
-      return dataObj as User;
+    // 3. Check if the root object itself contains user data (for login responses with inline user data)
+    // This handles cases where login returns: { access, refresh, email, name, user_type, ... }
+    if (
+      dataObj.email ||
+      dataObj.username ||
+      dataObj.id ||
+      dataObj.user_type ||
+      dataObj.name
+    ) {
+      // Create a clean user object by excluding non-user fields like tokens
+      const userFields: User = {} as User;
+
+      if (dataObj.id) {
+        userFields.id =
+          typeof dataObj.id === "string" || typeof dataObj.id === "number"
+            ? dataObj.id
+            : String(dataObj.id);
+      }
+      if (dataObj.email) userFields.email = dataObj.email as string;
+      if (dataObj.username) userFields.username = dataObj.username as string;
+      if (dataObj.first_name)
+        userFields.first_name = dataObj.first_name as string;
+      if (dataObj.last_name) userFields.last_name = dataObj.last_name as string;
+      // Handle 'name' field - if first_name/last_name aren't present, use name for first_name
+      if (dataObj.name && !dataObj.first_name) {
+        userFields.first_name = dataObj.name as string;
+      }
+      if (dataObj.phone_number)
+        userFields.phone_number = dataObj.phone_number as string;
+      if (dataObj.profile_image !== undefined)
+        userFields.profile_image = dataObj.profile_image as string | null;
+      if (dataObj.user_type) userFields.user_type = dataObj.user_type as string;
+
+      return userFields;
     }
   }
   return null; // Return null if no user-like data is found
@@ -86,36 +118,223 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // --- Restore user session if token exists ---
   useEffect(() => {
-    const token = TokenManager.getAccessToken();
-    if (token) {
-      apiClient
-        .get(API_ENDPOINTS.AUTH.PROFILE)
-        .then((res) => {
-          // ✅ START: FIX - Use the helper function
-          const userData = extractUserFromData(res.data);
-          console.log("Restored user data:", userData);
+    const restoreSession = async () => {
+      const token = TokenManager.getAccessToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
-          // Extract the proper user ID from the JWT token
+      console.log("🔄 Starting session restoration with token");
+
+      try {
+        const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+
+        console.log(
+          "🔍 Profile response raw data:",
+          JSON.stringify(res.data, null, 2)
+        );
+        let userData = extractUserFromData(res.data);
+        console.log("Restored user data:", userData);
+
+        // If extraction failed, try to create a minimal user from JWT token
+        if (!userData) {
+          console.warn(
+            "⚠️ Could not extract user data from profile, creating from token"
+          );
+
+          // Decode JWT to get user info
+          try {
+            const parts = token.split(".");
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              console.log(
+                "🔑 JWT Token payload:",
+                JSON.stringify(payload, null, 2)
+              );
+
+              const userIdFromToken =
+                payload.user_id || payload.sub || payload.id || "";
+
+              userData = {
+                id: userIdFromToken || String(payload.username) || "",
+                email: payload.email || payload.username || "",
+                username: payload.username || payload.email || "",
+                first_name: payload.first_name || payload.name || "",
+                user_type: payload.user_type || "user",
+                profile_image: payload.profile_image || null,
+              };
+              console.log("✅ Created user from token payload:", userData);
+            } else {
+              throw new Error("Invalid JWT token format");
+            }
+          } catch (tokenError) {
+            console.error("Failed to decode JWT token:", tokenError);
+            TokenManager.clearTokens();
+            setUser(null);
+            return;
+          }
+
+          // If we still don't have user data, something is seriously wrong
+          if (!userData || !userData.id) {
+            console.error("❌ Cannot create user data from token");
+            TokenManager.clearTokens();
+            setUser(null);
+            return;
+          }
+        } else {
+          // If we successfully extracted from profile, use JWT token for ID
           const userIdFromToken = extractUserIdFromToken(token);
           if (userIdFromToken) {
             userData.id = userIdFromToken; // Use the numeric ID from JWT token
             console.log("Using user ID from JWT token:", userIdFromToken);
-          } else if (userData && !userData.id && userData.email) {
+          } else if (!userData.id && userData.email) {
             userData.id = userData.email; // Fallback to email if JWT decoding fails
             console.log("Using email as ID fallback:", userData.email);
           }
+        }
 
-          setUser(userData);
-          // ✅ END: FIX
-        })
-        .catch(() => {
+        // If user_type is not set in the restored data, try to fetch it from Supabase
+        // This is important for academy users whose JWT might not include user_type
+        if (!userData.user_type) {
+          console.log(
+            "No user_type found, attempting to fetch from Supabase..."
+          );
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+
+            // Query the user_roles table to get the user's role
+            const { data: rolesData, error: rolesError } = await supabase
+              .from("user_roles")
+              .select("role")
+              .eq("user_id", String(userData.id))
+              .single();
+
+            if (!rolesError && rolesData) {
+              userData.user_type = rolesData.role;
+              console.log(
+                "✅ Fetched user_type from database:",
+                rolesData.role
+              );
+            } else {
+              console.warn(
+                "Could not fetch user_type from database:",
+                rolesError
+              );
+            }
+          } catch (supabaseError) {
+            console.warn(
+              "Failed to import Supabase client or fetch user_type:",
+              supabaseError
+            );
+          }
+        }
+
+        setUser(userData);
+        console.log(
+          "✅ Session restored successfully for user:",
+          userData.email,
+          "type:",
+          userData.user_type
+        );
+      } catch (error) {
+        console.error("❌ Failed to restore session:", error);
+        console.error("Error details:", {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data,
+        });
+
+        // Only clear tokens and logout if it's an authentication error
+        if (error.response?.status === 401) {
+          console.error("Authentication failed (401), clearing tokens");
           TokenManager.clearTokens();
           setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+        } else {
+          // For other errors (network, server error, etc.), try to restore from JWT token
+          console.warn(
+            "Non-auth error during session restore, attempting JWT fallback"
+          );
+          console.log(
+            "🔑 Using token from catch block:",
+            token ? "exists" : "missing"
+          );
+          console.log(
+            "Token preview:",
+            token ? token.substring(0, 50) + "..." : "no token"
+          );
+          try {
+            const parts = token.split(".");
+            console.log("Token split into parts:", parts.length);
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              const userIdFromToken =
+                payload.user_id || payload.sub || payload.id || "";
+
+              const userData = {
+                id: userIdFromToken || String(payload.username) || "",
+                email: payload.email || payload.username || "",
+                username: payload.username || payload.email || "",
+                first_name: payload.first_name || payload.name || "",
+                user_type: payload.user_type || "user",
+                profile_image: payload.profile_image || null,
+              };
+
+              // Try to fetch user_type from Supabase if not in JWT
+              if (!userData.user_type || userData.user_type === "user") {
+                try {
+                  const { supabase } = await import(
+                    "@/integrations/supabase/client"
+                  );
+                  const { data: rolesData } = await supabase
+                    .from("user_roles")
+                    .select("role")
+                    .eq("user_id", String(userData.id))
+                    .single();
+
+                  if (rolesData) {
+                    userData.user_type = rolesData.role;
+                    console.log(
+                      "✅ Fetched user_type from database (fallback):",
+                      rolesData.role
+                    );
+                  }
+                } catch (supabaseError) {
+                  console.warn(
+                    "Could not fetch user_type in error fallback:",
+                    supabaseError
+                  );
+                }
+              }
+
+              if (userData.id) {
+                console.log(
+                  "✅ Restored user from JWT fallback:",
+                  userData.email
+                );
+                setUser(userData);
+              } else {
+                console.error("Cannot restore user from JWT token");
+                setUser(null);
+              }
+            } else {
+              console.error("Invalid JWT token format");
+              setUser(null);
+            }
+          } catch (tokenError) {
+            console.error(
+              "Failed to decode JWT token in error handler:",
+              tokenError
+            );
+            setUser(null);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []); // Empty dependency array - only run once on mount
 
   // Preload image when user data changes
@@ -154,12 +373,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Wait a moment to ensure token is stored before making profile request
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Fetch user info from /api/profile/ to get the 'id'
-      const userRes = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+      let userData: User | null = null;
 
-      // ✅ START: FIX - Use the helper function
-      const userData = extractUserFromData(userRes.data);
-      console.log("Logged in user data (from /api/profile/):", userData);
+      // ✅ START: FIX - Check if login response already contains user data
+      // This is common for academy logins and some custom auth flows
+      const loginResponseData = extractUserFromData(res.data);
+
+      if (loginResponseData && loginResponseData.email) {
+        console.log("User data found in login response:", loginResponseData);
+        userData = loginResponseData;
+      } else {
+        // Only fetch from profile endpoint if user data is not in login response
+        console.log(
+          "No user data in login response, fetching from profile endpoint..."
+        );
+        try {
+          const userRes = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+          userData = extractUserFromData(userRes.data);
+          console.log("Logged in user data (from /api/profile/):", userData);
+        } catch (profileError) {
+          console.error("Failed to fetch profile:", profileError);
+          // Don't throw yet - try to use data from login response if available
+        }
+      }
 
       if (!userData) {
         throw new Error("Failed to fetch user profile.");

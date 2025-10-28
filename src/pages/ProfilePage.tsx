@@ -2,7 +2,16 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, Edit, Phone, Mail, Plus, Settings, Award } from "lucide-react";
+import {
+  LogOut,
+  Edit,
+  Phone,
+  Mail,
+  Plus,
+  Settings,
+  Award,
+  Camera,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
@@ -10,6 +19,24 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "@/lib/api";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 interface SkillTestResult {
   final_role?: string;
@@ -17,6 +44,22 @@ interface SkillTestResult {
     tech?: Record<string, string>;
     soft?: Record<string, string>;
   };
+}
+
+interface ProfileData {
+  about_me?: string | null;
+  profile_image?: string | null;
+  profile?: {
+    about_me?: string | null;
+    profile_image?: string | null;
+    [key: string]: unknown;
+  };
+  user?: {
+    about_me?: string | null;
+    profile_image?: string | null;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
 }
 
 const ProfilePage = () => {
@@ -30,6 +73,19 @@ const ProfilePage = () => {
     null
   );
   const [loadingResults, setLoadingResults] = useState(false);
+
+  // State for profile data from API
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [aboutMe, setAboutMe] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // About Me modal state
+  const [isAboutMeModalOpen, setIsAboutMeModalOpen] = useState(false);
+  const [aboutMeText, setAboutMeText] = useState("");
+  const [updatingAboutMe, setUpdatingAboutMe] = useState(false);
+  const { toast } = useToast();
 
   // Fetch skill test results
   useEffect(() => {
@@ -77,6 +133,151 @@ const ProfilePage = () => {
     }
   }, [skillResults]);
 
+  // Fetch profile data from API endpoint
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!user) return;
+
+      setLoadingProfile(true);
+
+      // Check if we have an access token
+      const token = localStorage.getItem("authToken");
+      console.log("🔑 Access token exists:", !!token);
+      if (token) {
+        console.log("🔑 Token preview:", token.substring(0, 50) + "...");
+      }
+
+      try {
+        // Prepare request headers with Bearer token
+        const requestHeaders = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
+
+        console.log("🌐 Making authenticated request to /api/profile/");
+        console.log("🌐 Request URL: https://breneo.onrender.com/api/profile/");
+        console.log("🌐 Request Method: GET");
+        console.log("🌐 Request Headers:", requestHeaders);
+        console.log("🌐 Bearer Token being sent:", token ? "✅ YES" : "❌ NO");
+        console.log("🌐 Token length:", token?.length || 0);
+
+        // Make the API call with explicit Authorization header
+        const response = await apiClient.get("/api/profile/", {
+          headers: requestHeaders,
+        });
+
+        // Log the raw response
+        console.log("✅ API Request successful!");
+        console.log("📊 Raw API Response:", response);
+        console.log("📊 API Response Status:", response.status);
+        console.log("📊 API Response Headers:", response.headers);
+        console.log("📊 API Response Data:", response.data);
+
+        // Check if data exists
+        if (!response.data) {
+          console.warn("⚠️ No data in response");
+          setProfileData(null);
+          setAboutMe(null);
+          setProfileImage(null);
+          return;
+        }
+
+        // Log the full profile data structure
+        console.log(
+          "📊 Full Profile Data Structure:",
+          JSON.stringify(response.data, null, 2)
+        );
+
+        // Set all profile data
+        setProfileData(response.data);
+
+        // Log all available keys in the response
+        console.log(
+          "📊 All available keys in response.data:",
+          Object.keys(response.data || {})
+        );
+
+        // Log nested structures if they exist
+        if (response.data?.profile) {
+          console.log(
+            "📊 Profile object keys:",
+            Object.keys(response.data.profile)
+          );
+          console.log("📊 Profile object:", response.data.profile);
+        }
+        if (response.data?.user) {
+          console.log("📊 User object keys:", Object.keys(response.data.user));
+          console.log("📊 User object:", response.data.user);
+        }
+
+        // Extract about_me if it exists in the response
+        const aboutMeValue =
+          response.data?.about_me ||
+          response.data?.profile?.about_me ||
+          response.data?.user?.about_me ||
+          null;
+        setAboutMe(aboutMeValue);
+        console.log("✅ Extracted about_me value:", aboutMeValue);
+
+        // Initialize aboutMeText with the fetched value
+        setAboutMeText(aboutMeValue || "");
+
+        // Extract profile_image if it exists in the response
+        const profileImageValue =
+          response.data?.profile_image ||
+          response.data?.profile?.profile_image ||
+          response.data?.user?.profile_image ||
+          null;
+        setProfileImage(profileImageValue);
+        console.log("✅ Extracted profile_image value:", profileImageValue);
+
+        // Log all other profile fields that might be useful
+        console.log("📊 Available profile fields:");
+        Object.entries(response.data || {}).forEach(([key, value]) => {
+          if (key !== "profile" && key !== "user") {
+            console.log(`  - ${key}:`, value);
+          }
+        });
+
+        // Summary log of what the API returns
+        console.log("═══════════════════════════════════════════");
+        console.log("📋 SUMMARY: API Response from /api/profile/");
+        console.log("═══════════════════════════════════════════");
+        console.log("🔒 Authentication: Bearer Token ✅");
+        console.log("✅ Response Status:", response.status);
+        console.log("✅ Response Headers:", response.headers);
+        console.log("✅ Full Response Data:", response.data);
+        console.log("✅ All Top-Level Keys:", Object.keys(response.data || {}));
+        console.log("✅ About Me:", aboutMeValue);
+        console.log("✅ Profile Image:", profileImageValue);
+        console.log("✅ User ID from context:", user.id);
+        console.log("═══════════════════════════════════════════");
+        console.log(
+          "✅ SUCCESS: Protected endpoint accessed with Bearer token!"
+        );
+        console.log("✅ Full user profile data retrieved from /api/profile/");
+        console.log("═══════════════════════════════════════════");
+      } catch (error) {
+        console.error("❌ Error fetching profile data:", error);
+        if (error && typeof error === "object" && "response" in error) {
+          const axiosError = error as {
+            response?: { data?: unknown; status?: number };
+            message?: string;
+          };
+          console.error("❌ Error response:", axiosError.response?.data);
+          console.error("❌ Error status:", axiosError.response?.status);
+          console.error("❌ Error message:", axiosError.message);
+        }
+        setProfileData(null);
+        setAboutMe(null);
+        setProfileImage(null);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [user]);
+
   // ✅ Show loading text based on the context's loading state
   if (loading) {
     return (
@@ -104,8 +305,129 @@ const ProfilePage = () => {
     logout();
   };
 
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image size should be less than 5MB");
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("profile_image", file);
+
+      const token = localStorage.getItem("authToken");
+
+      // Upload the image
+      const uploadResponse = await apiClient.patch("/api/profile/", formData, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      console.log("✅ Image upload response:", uploadResponse.data);
+
+      // Update local state
+      const newProfileImage =
+        uploadResponse.data?.profile_image ||
+        uploadResponse.data?.profile?.profile_image ||
+        uploadResponse.data?.user?.profile_image ||
+        null;
+
+      setProfileImage(newProfileImage);
+
+      // Refresh profile data
+      const response = await apiClient.get("/api/profile/", {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+      setProfileData(response.data);
+
+      console.log("✅ Profile image uploaded successfully");
+    } catch (error) {
+      console.error("❌ Error uploading profile image:", error);
+      alert("Failed to upload profile image. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Handler to open About Me edit modal
+  const handleOpenAboutMeModal = () => {
+    setAboutMeText(aboutMe || "");
+    setIsAboutMeModalOpen(true);
+  };
+
+  // Handler to save About Me
+  const handleSaveAboutMe = async () => {
+    if (!user) return;
+
+    setUpdatingAboutMe(true);
+
+    try {
+      const token = localStorage.getItem("authToken");
+
+      const response = await apiClient.patch(
+        "/api/profile/",
+        { about_me: aboutMeText },
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+
+      console.log("✅ About Me updated:", response.data);
+
+      // Update local state
+      setAboutMe(aboutMeText);
+
+      // Refresh full profile data
+      const profileResponse = await apiClient.get("/api/profile/", {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+      setProfileData(profileResponse.data);
+
+      setIsAboutMeModalOpen(false);
+
+      toast({
+        title: "Success",
+        description: "About Me has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("❌ Error updating about me:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update About Me. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingAboutMe(false);
+    }
+  };
+
   // ✅ Use the 'user' object from the context directly
-  const { first_name, last_name, email, phone_number, profile_image } = user;
+  const { first_name, last_name, email, phone_number } = user;
+
+  // Use profile image from API if available, otherwise fallback to user context
+  const displayProfileImage = profileImage || user.profile_image;
 
   // Combine all skills from tech and soft - only show top 5 with > 0%
   const getAllSkills = () => {
@@ -155,14 +477,34 @@ const ProfilePage = () => {
           {/* Profile Header Card */}
           <Card>
             <CardContent className="flex flex-col items-center pb-6 pt-6">
-              <OptimizedAvatar
-                src={profile_image}
-                alt="Profile photo"
-                fallback={first_name ? first_name.charAt(0).toUpperCase() : "U"}
-                size="xl"
-                loading="lazy"
-                className="h-32 w-32"
-              />
+              <div className="relative group">
+                <OptimizedAvatar
+                  src={displayProfileImage}
+                  alt="Profile photo"
+                  fallback={
+                    first_name ? first_name.charAt(0).toUpperCase() : "U"
+                  }
+                  size="xl"
+                  loading="lazy"
+                  className="h-32 w-32"
+                />
+                {uploadingImage ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  </div>
+                ) : (
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
+                    <Camera className="h-8 w-8 text-white" />
+                  </label>
+                )}
+              </div>
               <h1 className="text-2xl font-bold mt-4 text-center">
                 {first_name} {last_name}
               </h1>
@@ -225,11 +567,45 @@ const ProfilePage = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <h3 className="text-lg font-bold">About Me</h3>
-              <Button variant="link" className="text-breneo-blue p-0 h-auto">
+              <Button
+                variant="link"
+                className="text-breneo-blue p-0 h-auto"
+                onClick={handleOpenAboutMeModal}
+              >
+                <Edit size={16} className="mr-2" />
                 Edit
               </Button>
             </CardHeader>
+            <CardContent>
+              {loadingProfile ? (
+                <div className="text-center py-4 text-gray-500">Loading...</div>
+              ) : aboutMe ? (
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {aboutMe}
+                </p>
+              ) : (
+                <p className="text-gray-500 italic">
+                  No information available. Add some details about yourself!
+                </p>
+              )}
+            </CardContent>
           </Card>
+
+          {/* Debug: All Profile Data Card */}
+          {profileData && (
+            <Card className="border-orange-200 dark:border-orange-800">
+              <CardHeader>
+                <h3 className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                  Debug: All Profile Data
+                </h3>
+              </CardHeader>
+              <CardContent>
+                <pre className="text-xs bg-gray-50 dark:bg-gray-900 p-4 rounded overflow-auto max-h-96">
+                  {JSON.stringify(profileData, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Work Experience Card */}
           {/* <Card>
@@ -363,6 +739,77 @@ const ProfilePage = () => {
           </Card>
         </div>
       </div>
+
+      {/* About Me Edit Modal */}
+      {isMobile ? (
+        <Drawer open={isAboutMeModalOpen} onOpenChange={setIsAboutMeModalOpen}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Edit About Me</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="about-me">Tell us about yourself</Label>
+                  <Textarea
+                    id="about-me"
+                    placeholder="Share something about yourself..."
+                    value={aboutMeText}
+                    onChange={(e) => setAboutMeText(e.target.value)}
+                    className="mt-2 min-h-[200px]"
+                    disabled={updatingAboutMe}
+                  />
+                </div>
+              </div>
+            </div>
+            <DrawerFooter>
+              <Button onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
+                {updatingAboutMe ? "Saving..." : "Save Changes"}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" disabled={updatingAboutMe}>
+                  Cancel
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={isAboutMeModalOpen} onOpenChange={setIsAboutMeModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit About Me</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="about-me">Tell us about yourself</Label>
+                  <Textarea
+                    id="about-me"
+                    placeholder="Share something about yourself..."
+                    value={aboutMeText}
+                    onChange={(e) => setAboutMeText(e.target.value)}
+                    className="mt-2 min-h-[200px]"
+                    disabled={updatingAboutMe}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsAboutMeModalOpen(false)}
+                disabled={updatingAboutMe}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
+                {updatingAboutMe ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 };

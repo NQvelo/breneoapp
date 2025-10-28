@@ -27,6 +27,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { Settings } from "lucide-react";
 import UserSettings from "./pages/UserSettings";
 import AcademyProfilePage from "./pages/AcademyProfilePage";
+import AcademySettings from "./pages/AcademySettings";
 import EmailVerification from "./pages/EmailVerification";
 import AcademyRegistrationPage from "./pages/AcademyRegistrationPage";
 import TermsOfUse from "./pages/TermsOfUse";
@@ -164,6 +165,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <AcademyProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/academy/settings"
+              element={
+                <ProtectedRoute>
+                  <AcademySettings />
                 </ProtectedRoute>
               }
             />

@@ -79,6 +79,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       ];
 
   const profilePath = isAcademy ? "/academy/profile" : "/profile";
+  const settingsPath = isAcademy ? "/academy/settings" : "/settings";
 
   // Mobile navigation
   const mobileNavItems = [
@@ -116,7 +117,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
               <Bell size={20} />
             </Link>
             <Link
-              to="/settings"
+              to={settingsPath}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <Settings size={20} />
@@ -244,10 +245,10 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
             {/* Settings, Help Center, Theme Toggle grouped together */}
             <div className="space-y-2 mb-4">
               <Link
-                to="/settings"
+                to={settingsPath}
                 className={cn(
                   "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
-                  location.pathname === "/settings"
+                  location.pathname === settingsPath
                     ? "bg-breneo-blue/10 text-breneo-blue"
                     : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
                 )}
@@ -256,7 +257,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   size={22}
                   className={cn(
                     "flex-shrink-0 transition-colors duration-200",
-                    location.pathname === "/settings"
+                    location.pathname === settingsPath
                       ? "text-breneo-blue"
                       : "text-gray-400 group-hover:text-breneo-blue"
                   )}
