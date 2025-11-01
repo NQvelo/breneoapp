@@ -129,7 +129,12 @@ const NotFound = () => {
           <div className="space-y-4">
             {!loading && user ? (
               <Link
-                to="/dashboard"
+                to={
+                  user.user_type === "academy" ||
+                  localStorage.getItem("userRole") === "academy"
+                    ? "/academy/dashboard"
+                    : "/dashboard"
+                }
                 className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
               >
                 Go to Dashboard

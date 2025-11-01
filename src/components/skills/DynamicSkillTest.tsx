@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useAuth } from "../../contexts/AuthContext"; // corrected relative path
-import apiClient from "@/lib/api";
+import apiClient from "@/api/auth/apiClient";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Award, CheckCircle2, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";

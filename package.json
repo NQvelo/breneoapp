@@ -10,7 +10,8 @@
     "copy404": "node -e \"require('fs').copyFileSync('dist/index.html', 'dist/404.html')\"",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "security-test": "npx tsx scripts/security-test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

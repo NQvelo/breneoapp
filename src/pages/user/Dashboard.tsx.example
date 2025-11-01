@@ -1,0 +1,65 @@
+/**
+ * User Dashboard Page
+ * 
+ * Main dashboard for regular users
+ * Displays personalized content, job recommendations, and skill insights
+ * 
+ * Location: src/pages/user/Dashboard.tsx
+ */
+
+import React from 'react';
+import { UserLayout } from '@/layouts/user/UserLayout';
+import { useAuth } from '@/contexts/AuthContext';
+
+/**
+ * UserDashboard Component
+ * 
+ * Features:
+ * - Welcome message with user's name
+ * - Job recommendations based on skills
+ * - Course recommendations
+ * - Skill test progress
+ * - Quick actions
+ */
+const UserDashboard: React.FC = () => {
+  const { user } = useAuth();
+
+  return (
+    <UserLayout>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-6">
+          Welcome, {user?.first_name || user?.email}!
+        </h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Job Recommendations Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Job Recommendations</h2>
+            <p className="text-gray-600">
+              Find jobs that match your skills
+            </p>
+          </div>
+
+          {/* Course Recommendations Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Course Recommendations</h2>
+            <p className="text-gray-600">
+              Enhance your skills with recommended courses
+            </p>
+          </div>
+
+          {/* Skill Progress Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold mb-4">Skill Progress</h2>
+            <p className="text-gray-600">
+              Track your skill development
+            </p>
+          </div>
+        </div>
+      </div>
+    </UserLayout>
+  );
+};
+
+export default UserDashboard;
+

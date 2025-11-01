@@ -59,10 +59,10 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { v4 as uuidv4 } from "uuid";
 import { useMobile } from "@/hooks/use-mobile";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -372,16 +372,10 @@ const AcademyDashboard = () => {
     if (!academyProfile) return;
 
     try {
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("academy_id", academyProfile.id)
-        .eq("is_academy_course", true)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setCourses(data || []);
+      const response = await apiClient.get(API_ENDPOINTS.ACADEMY.COURSES);
+      setCourses(response.data || []);
     } catch (error: any) {
+      console.error("Error fetching courses:", error);
       toast({
         title: "Error",
         description: "Failed to load courses",
@@ -432,59 +426,68 @@ const AcademyDashboard = () => {
 
     setIsSubmitting(true);
     try {
-      let imageUrl =
-        "/lovable-uploads/6bee4aa6-3a7f-4806-98bd-dc73a1955812.png";
+      const formData = new FormData();
+
+      // Add course data to FormData
+      formData.append("title", courseForm.title);
+      formData.append("description", courseForm.description);
+      formData.append("category", courseForm.category);
+      formData.append("level", courseForm.level);
+      formData.append("duration", courseForm.duration);
+      formData.append("provider", academyProfile.academy_name);
+      formData.append(
+        "required_skills",
+        JSON.stringify(
+          courseForm.required_skills
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s)
+        )
+      );
+      formData.append(
+        "topics",
+        JSON.stringify(
+          courseForm.topics
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s)
+        )
+      );
+      formData.append("enrolled", "false");
+      formData.append("popular", "false");
+
+      // Add image if provided
       if (courseImage) {
-        const fileExt = courseImage.name.split(".").pop();
-        const fileName = `${uuidv4()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("course-images")
-          .upload(fileName, courseImage);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from("course-images")
-          .getPublicUrl(fileName);
-        imageUrl = publicUrlData.publicUrl;
+        formData.append("image", courseImage);
       }
 
-      const courseData = {
-        title: courseForm.title,
-        description: courseForm.description,
-        category: courseForm.category,
-        level: courseForm.level,
-        duration: courseForm.duration,
-        provider: academyProfile.academy_name,
-        required_skills: courseForm.required_skills
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s),
-        topics: courseForm.topics
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s),
-        image: imageUrl,
-        academy_id: academyProfile.id,
-        is_academy_course: true,
-        enrolled: false,
-        popular: false,
-      };
+      const response = await apiClient.post(
+        API_ENDPOINTS.ACADEMY.COURSES,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-      const { error } = await supabase.from("courses").insert(courseData);
-      if (error) throw error;
+      if (response.data) {
+        toast({
+          title: "Success",
+          description: "Course added successfully",
+        });
 
-      toast({
-        title: "Success",
-        description: "Course added successfully",
-      });
-
-      fetchCourses();
-      handleModalOpenChange(false);
+        fetchCourses();
+        handleModalOpenChange(false);
+      }
     } catch (error: any) {
+      console.error("Error adding course:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to add course",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to add course",
         variant: "destructive",
       });
     } finally {
@@ -497,62 +500,65 @@ const AcademyDashboard = () => {
 
     setIsSubmitting(true);
     try {
-      let imageUrl = editingCourse.image;
+      const formData = new FormData();
+
+      // Add course data to FormData
+      formData.append("title", courseForm.title);
+      formData.append("description", courseForm.description);
+      formData.append("category", courseForm.category);
+      formData.append("level", courseForm.level);
+      formData.append("duration", courseForm.duration);
+      formData.append(
+        "required_skills",
+        JSON.stringify(
+          courseForm.required_skills
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s)
+        )
+      );
+      formData.append(
+        "topics",
+        JSON.stringify(
+          courseForm.topics
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s)
+        )
+      );
+
+      // Add image if provided (new image uploaded)
       if (courseImage) {
-        const fileExt = courseImage.name.split(".").pop();
-        const fileName = `${uuidv4()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from("course-images")
-          .upload(fileName, courseImage);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from("course-images")
-          .getPublicUrl(fileName);
-        imageUrl = publicUrlData.publicUrl;
-
-        const oldImageName = editingCourse.image.split("/").pop();
-        if (oldImageName) {
-          await supabase.storage.from("course-images").remove([oldImageName]);
-        }
+        formData.append("image", courseImage);
       }
 
-      const updatedCourseData = {
-        title: courseForm.title,
-        description: courseForm.description,
-        category: courseForm.category,
-        level: courseForm.level,
-        duration: courseForm.duration,
-        required_skills: courseForm.required_skills
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s),
-        topics: courseForm.topics
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s),
-        image: imageUrl,
-      };
+      const response = await apiClient.patch(
+        `${API_ENDPOINTS.ACADEMY.COURSES}${editingCourse.id}/`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
 
-      const { error } = await supabase
-        .from("courses")
-        .update(updatedCourseData)
-        .eq("id", editingCourse.id);
+      if (response.data) {
+        toast({
+          title: "Success",
+          description: "Course updated successfully",
+        });
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Course updated successfully",
-      });
-
-      fetchCourses();
-      handleModalOpenChange(false);
+        fetchCourses();
+        handleModalOpenChange(false);
+      }
     } catch (error: any) {
+      console.error("Error updating course:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update course",
+        description:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to update course",
         variant: "destructive",
       });
     } finally {
@@ -562,12 +568,7 @@ const AcademyDashboard = () => {
 
   const handleDeleteCourse = async (courseId: string) => {
     try {
-      const { error } = await supabase
-        .from("courses")
-        .delete()
-        .eq("id", courseId);
-
-      if (error) throw error;
+      await apiClient.delete(`${API_ENDPOINTS.ACADEMY.COURSES}${courseId}/`);
 
       toast({
         title: "Success",
@@ -577,9 +578,10 @@ const AcademyDashboard = () => {
       fetchCourses();
       handleModalOpenChange(false);
     } catch (error: any) {
+      console.error("Error deleting course:", error);
       toast({
         title: "Error",
-        description: "Failed to delete course",
+        description: error.response?.data?.message || "Failed to delete course",
         variant: "destructive",
       });
     }

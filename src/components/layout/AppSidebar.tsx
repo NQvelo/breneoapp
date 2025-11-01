@@ -28,7 +28,11 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   const [mounted, setMounted] = React.useState(false);
 
   // Determine if user is an academy
-  const isAcademy = user?.user_type === "academy";
+  // Check both user object and localStorage (in case user object isn't fully loaded)
+  const isAcademy =
+    user?.user_type === "academy" ||
+    (typeof window !== "undefined" &&
+      localStorage.getItem("userRole") === "academy");
 
   // Handle mounted state to avoid hydration mismatch
   React.useEffect(() => {
@@ -69,9 +73,15 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
     return "U";
   };
 
-  // Navigation items
+  // Navigation items - completely separated by role
   const navItems = isAcademy
-    ? [{ icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" }]
+    ? [
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          href: "/academy/dashboard",
+        },
+      ]
     : [
         { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
         { icon: Briefcase, label: "Job Offers", href: "/jobs" },
@@ -80,6 +90,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
   const profilePath = isAcademy ? "/academy/profile" : "/profile";
   const settingsPath = isAcademy ? "/academy/settings" : "/settings";
+  const dashboardPath = isAcademy ? "/academy/dashboard" : "/dashboard";
 
   // Mobile navigation
   const mobileNavItems = [
@@ -92,7 +103,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-card border-b border-gray-200 dark:border-border px-4 py-3">
         <div className="flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center">
+          <Link to={dashboardPath} className="flex items-center">
             <img
               src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
               alt="Breneo Logo"
@@ -178,7 +189,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
         {/* Header */}
         <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-border">
           {!collapsed ? (
-            <Link to="/dashboard" className="flex items-center space-x-2">
+            <Link to={dashboardPath} className="flex items-center space-x-2">
               <img
                 src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
                 alt="Breneo Logo"

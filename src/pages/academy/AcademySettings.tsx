@@ -16,24 +16,38 @@ import OptimizedAvatar, {
 } from "@/components/ui/OptimizedAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import apiClient, { API_ENDPOINTS, createFormDataRequest } from "@/lib/api";
-import axios from "axios";
+import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import axios, { AxiosError } from "axios";
 import { Camera } from "lucide-react";
 
-export default function SettingsPage() {
-  const { user } = useAuth();
+interface AcademyProfile {
+  id: string;
+  academy_name: string;
+  description: string;
+  website_url: string;
+  contact_email: string;
+  logo_url: string | null;
+}
+
+export default function AcademySettingsPage() {
+  const { user, loading: authLoading } = useAuth();
   const { preloadImage } = useImagePreloader();
   const [isEditing, setIsEditing] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
 
   // Profile form state
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [academyName, setAcademyName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
+    null
+  );
 
   // --- Password Reset State ---
   const [passwordStep, setPasswordStep] = useState(1);
@@ -43,15 +57,113 @@ export default function SettingsPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   // ---
 
-  // Populate form with user data from AuthContext
+  // Fetch academy profile data
   useEffect(() => {
-    if (user) {
-      setFirstName(user.first_name || "");
-      setLastName(user.last_name || "");
-      setEmail(user.email || "");
-      setPhoneNumber(user.phone_number || "");
-    }
-  }, [user]);
+    const fetchAcademyData = async () => {
+      // Wait for auth to complete
+      if (authLoading) {
+        return;
+      }
+
+      if (!user) {
+        setLoadingData(false);
+        return;
+      }
+
+      // ✅ Check if token exists before making API calls
+      const hasToken =
+        typeof window !== "undefined" && !!localStorage.getItem("authToken");
+      if (!hasToken) {
+        console.error("❌ No token available, cannot fetch academy profile");
+        setLoadingData(false);
+        toast.error(
+          "Authentication Error: Please log in again to access academy settings."
+        );
+        return;
+      }
+
+      try {
+        // Get phone number from user context
+        setPhoneNumber(user.phone_number || "");
+
+        // ✅ Fetch academy profile from API (same as AcademyProfilePage)
+        try {
+          const academyResponse = await apiClient.get(
+            API_ENDPOINTS.ACADEMY.PROFILE
+          );
+
+          if (academyResponse.data) {
+            const data = academyResponse.data;
+            console.log("✅ Academy profile data:", data);
+            setAcademyProfile(data);
+            setAcademyName(data.academy_name || "");
+            setWebsiteUrl(data.website_url || "");
+            setContactEmail(data.contact_email || "");
+          }
+        } catch (error: unknown) {
+          // Handle specific error cases without triggering logout
+          const academyError = error as AxiosError;
+          const status = academyError.response?.status;
+          const errorData = academyError.response?.data as
+            | {
+                detail?: string;
+                message?: string;
+              }
+            | undefined;
+
+          // 404 means academy profile doesn't exist yet - this is okay
+          if (status === 404) {
+            console.log(
+              "✅ Academy profile not found (404) - user may need to create one"
+            );
+            // Don't show error - user can create profile from settings
+            setAcademyProfile(null);
+          }
+          // 401 might mean profile doesn't exist or permissions issue
+          else if (status === 401) {
+            const errorDetail = errorData?.detail || errorData?.message || "";
+            const errorMessage = String(errorDetail).toLowerCase();
+            const isProfileNotFound =
+              errorMessage.includes("not found") ||
+              errorMessage.includes("does not exist") ||
+              errorMessage.includes("user not found");
+
+            if (isProfileNotFound) {
+              console.log(
+                "✅ Profile not found based on error message - treating as 404"
+              );
+              setAcademyProfile(null);
+            } else {
+              console.warn("⚠️ Academy profile returned 401:", errorDetail);
+              // Still allow user to continue - they might need to create profile
+              setAcademyProfile(null);
+            }
+          }
+          // 403 means forbidden
+          else if (status === 403) {
+            console.error("Access forbidden to academy profile");
+            toast.error(
+              "Access Denied: You don't have permission to access academy settings."
+            );
+          }
+          // Other errors
+          else {
+            console.error("Error fetching academy profile:", academyError);
+            toast.error(
+              "Error fetching profile: Could not load academy profile data. Please try again."
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Unexpected error fetching academy data:", error);
+        toast.error("Failed to load academy data");
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchAcademyData();
+  }, [user, authLoading]);
 
   // Cleanup preview URL on unmount
   useEffect(() => {
@@ -71,10 +183,15 @@ export default function SettingsPage() {
 
   // Get initials for avatar
   const getInitials = () => {
-    if (firstName && lastName) {
-      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+    if (academyName) {
+      return academyName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
     }
-    return user?.email?.charAt(0).toUpperCase() || "U";
+    return user?.email?.charAt(0).toUpperCase() || "A";
   };
 
   // Phone number validation
@@ -199,7 +316,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleProfileClick = async (e: React.FormEvent) => {
+  const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isEditing) {
@@ -209,13 +326,20 @@ export default function SettingsPage() {
 
     // Check if there are any changes
     const hasChanges =
-      firstName !== (user?.first_name || "") ||
-      lastName !== (user?.last_name || "") ||
-      phoneNumber !== (user?.phone_number || "");
+      academyName !== (academyProfile?.academy_name || "") ||
+      phoneNumber !== (user?.phone_number || "") ||
+      websiteUrl !== (academyProfile?.website_url || "") ||
+      contactEmail !== (academyProfile?.contact_email || "");
 
     if (!hasChanges) {
       // No changes made, just revert to disabled state
       setIsEditing(false);
+      return;
+    }
+
+    // Validate required fields
+    if (!academyName.trim()) {
+      toast.error("Academy name is required.");
       return;
     }
 
@@ -233,21 +357,81 @@ export default function SettingsPage() {
     }
 
     try {
-      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-        first_name: firstName,
-        last_name: lastName,
-        phone_number: phoneNumber,
-      });
+      // Update phone number through profile API
+      if (phoneNumber !== (user?.phone_number || "")) {
+        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+          phone_number: phoneNumber,
+        });
+        console.log("Phone number updated successfully");
+      }
+
+      // ✅ Update academy profile through API (same pattern as AcademyProfilePage)
+      // Use POST if profile doesn't exist, PATCH if it does
+      try {
+        const method = academyProfile ? "patch" : "post";
+        const academyData = {
+          academy_name: academyName.trim(),
+          description: academyProfile?.description || "", // Preserve existing description
+          website_url: websiteUrl.trim() || null,
+          contact_email: contactEmail.trim() || null,
+        };
+
+        const academyResponse = await apiClient[method](
+          API_ENDPOINTS.ACADEMY.PROFILE,
+          academyData
+        );
+
+        if (academyResponse.data) {
+          // Update academy profile state
+          const updatedProfile: AcademyProfile = {
+            id: academyProfile?.id || academyResponse.data.id || "",
+            academy_name: academyName.trim(),
+            description:
+              academyResponse.data.description ||
+              academyProfile?.description ||
+              "",
+            website_url: websiteUrl.trim() || "",
+            contact_email: contactEmail.trim() || "",
+            logo_url:
+              academyProfile?.logo_url || academyResponse.data.logo_url || null,
+          };
+          setAcademyProfile(updatedProfile);
+          console.log(
+            "✅ Academy profile updated successfully:",
+            updatedProfile
+          );
+        }
+      } catch (academyError: unknown) {
+        console.error("Error updating academy profile:", academyError);
+        const axiosError = academyError as AxiosError;
+        let errorMessage =
+          "Failed to update academy profile. Please try again.";
+
+        if (axiosError.response?.data) {
+          const errorData = axiosError.response.data as {
+            detail?: string;
+            message?: string;
+          };
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } else if (academyError instanceof Error) {
+          errorMessage = academyError.message;
+        }
+
+        throw new Error(errorMessage);
+      }
 
       toast.success("Profile updated successfully!");
       setIsEditing(false);
     } catch (err: unknown) {
+      console.error("Error updating profile:", err);
       let errorMessage = "Failed to update profile.";
       if (axios.isAxiosError(err) && err.response) {
         errorMessage =
           err.response.data.detail ||
           err.response.data.message ||
           "An error occurred.";
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
       }
       toast.error(errorMessage);
     } finally {
@@ -342,7 +526,18 @@ export default function SettingsPage() {
       setPasswordLoading(false);
     }
   };
-  // --- END: New Password Reset Functions ---
+  // --- END: Password Reset Functions ---
+
+  // Show loading state while fetching data
+  if (loadingData || authLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Loading academy settings...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -378,36 +573,47 @@ export default function SettingsPage() {
           </Card>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Profile Information */}
+            {/* Academy Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
+                <CardTitle>Academy Information</CardTitle>
                 <CardDescription>
-                  Update your personal information.
+                  Update your academy's information.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleProfileClick} className="space-y-4">
+                <form onSubmit={handleProfileSave} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
+                    <Label htmlFor="academyName">Academy Name</Label>
                     <Input
-                      id="firstName"
+                      id="academyName"
                       type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      value={academyName}
+                      onChange={(e) => setAcademyName(e.target.value)}
                       disabled={!isEditing}
-                      placeholder="Enter your first name"
+                      placeholder="Enter academy name"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
+                    <Label htmlFor="websiteUrl">Website URL</Label>
                     <Input
-                      id="lastName"
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      id="websiteUrl"
+                      type="url"
+                      value={websiteUrl}
+                      onChange={(e) => setWebsiteUrl(e.target.value)}
                       disabled={!isEditing}
-                      placeholder="Enter your last name"
+                      placeholder="https://example.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contactEmail">Contact Email</Label>
+                    <Input
+                      id="contactEmail"
+                      type="email"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="contact@example.com"
                     />
                   </div>
                   <div className="space-y-2">
@@ -439,16 +645,14 @@ export default function SettingsPage() {
                     <Input
                       id="email"
                       type="email"
-                      value={email}
+                      value={user?.email || ""}
                       disabled
                       className="bg-muted/50 text-muted-foreground"
                       placeholder="Email address"
                     />
-                    {/* ✅ START: FIX */}
                     <p className="text-xs text-muted-foreground">
                       Email cannot be changed from this page.
                     </p>
-                    {/* ✅ END: FIX */}
                   </div>
                   <Button
                     type="submit"

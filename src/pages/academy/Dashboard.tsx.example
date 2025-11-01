@@ -1,0 +1,69 @@
+/**
+ * Academy Dashboard Page
+ * 
+ * Main dashboard for academy users
+ * Displays course management, student analytics, and academy profile
+ * 
+ * Location: src/pages/academy/Dashboard.tsx
+ */
+
+import React from 'react';
+import { AcademyLayout } from '@/layouts/academy/AcademyLayout';
+import { useAuth } from '@/contexts/AuthContext';
+
+/**
+ * AcademyDashboard Component
+ * 
+ * Features:
+ * - Course management overview
+ * - Student enrollment statistics
+ * - Revenue analytics
+ * - Quick actions (add course, manage students, etc.)
+ */
+const AcademyDashboard: React.FC = () => {
+  const { user } = useAuth();
+
+  return (
+    <AcademyLayout>
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-6">
+          Academy Dashboard
+        </h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Statistics Cards */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Total Courses</h3>
+            <p className="text-3xl font-bold">0</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Total Students</h3>
+            <p className="text-3xl font-bold">0</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Active Courses</h3>
+            <p className="text-3xl font-bold">0</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Revenue</h3>
+            <p className="text-3xl font-bold">$0</p>
+          </div>
+        </div>
+
+        {/* Course Management Section */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Course Management</h2>
+          <p className="text-gray-600">
+            Manage your courses, students, and academy settings
+          </p>
+        </div>
+      </div>
+    </AcademyLayout>
+  );
+};
+
+export default AcademyDashboard;
+

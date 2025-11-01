@@ -11,43 +11,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import OptimizedAvatar, {
-  useImagePreloader,
-} from "@/components/ui/OptimizedAvatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import apiClient, { API_ENDPOINTS, createFormDataRequest } from "@/lib/api";
+import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
-import { Camera } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 
-interface AcademyProfile {
-  id: string;
-  academy_name: string;
-  description: string;
-  website_url: string;
-  contact_email: string;
-  logo_url: string | null;
-}
-
-export default function AcademySettingsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { preloadImage } = useImagePreloader();
+export default function SettingsPage() {
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [loadingData, setLoadingData] = useState(true);
 
   // Profile form state
-  const [academyName, setAcademyName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [websiteUrl, setWebsiteUrl] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
   const [phoneError, setPhoneError] = useState("");
-  const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
-    null
-  );
 
   // --- Password Reset State ---
   const [passwordStep, setPasswordStep] = useState(1);
@@ -57,66 +37,15 @@ export default function AcademySettingsPage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   // ---
 
-  // Fetch academy profile data
+  // Populate form with user data from AuthContext
   useEffect(() => {
-    const fetchAcademyData = async () => {
-      if (!user) return;
-
-      try {
-        const userId = String(user.id);
-        console.log("Fetching academy data for user ID:", userId);
-
-        // Get phone number from user context
-        setPhoneNumber(user.phone_number || "");
-
-        // Fetch academy profile from Supabase
-        const { data, error } = await supabase
-          .from("academy_profiles")
-          .select("*")
-          .eq("user_id", userId)
-          .single();
-
-        if (error) {
-          console.error("Supabase error fetching academy profile:", error);
-          // Don't show error toast if it's just "not found" - might be first time user
-          if (error.code !== "PGRST116") {
-            throw error;
-          }
-          return;
-        }
-
-        if (data) {
-          console.log("Academy profile data:", data);
-          setAcademyProfile(data);
-          setAcademyName(data.academy_name || "");
-          setWebsiteUrl(data.website_url || "");
-          setContactEmail(data.contact_email || "");
-        } else {
-          console.log("No academy profile found for user:", userId);
-        }
-      } catch (error) {
-        console.error("Error fetching academy data:", error);
-        toast.error("Failed to load academy data");
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    if (!authLoading && user) {
-      fetchAcademyData();
-    } else if (!authLoading && !user) {
-      setLoadingData(false);
+    if (user) {
+      setFirstName(user.first_name || "");
+      setLastName(user.last_name || "");
+      setEmail(user.email || "");
+      setPhoneNumber(user.phone_number || "");
     }
-  }, [user, authLoading]);
-
-  // Cleanup preview URL on unmount
-  useEffect(() => {
-    return () => {
-      if (imagePreview) {
-        URL.revokeObjectURL(imagePreview);
-      }
-    };
-  }, [imagePreview]);
+  }, [user]);
 
   // Clear phone error when editing is disabled
   useEffect(() => {
@@ -124,19 +53,6 @@ export default function AcademySettingsPage() {
       setPhoneError("");
     }
   }, [isEditing]);
-
-  // Get initials for avatar
-  const getInitials = () => {
-    if (academyName) {
-      return academyName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-    }
-    return user?.email?.charAt(0).toUpperCase() || "A";
-  };
 
   // Phone number validation
   const validatePhoneNumber = (phone: string): boolean => {
@@ -174,93 +90,7 @@ export default function AcademySettingsPage() {
     return true;
   };
 
-  const handlePhotoUploadClick = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = handlePhotoUpload;
-    input.click();
-  };
-
-  const handlePhotoUpload = async (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const file = target.files?.[0];
-    if (!file) return;
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File size must be less than 5MB");
-      return;
-    }
-
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select a valid image file");
-      return;
-    }
-
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
-
-    if (!user || !user.id) {
-      toast.error("User ID not found. Please log in again.");
-      return;
-    }
-
-    try {
-      setPhotoUploading(true);
-
-      // Create FormData for file upload
-      const formData = createFormDataRequest({ profile_image: file });
-
-      // Upload the image using the correct endpoint (no ID in URL)
-      const response = await apiClient.patch(
-        API_ENDPOINTS.AUTH.PROFILE,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      // Update user data in AuthContext
-      if (response.data && user) {
-        const updatedUser = {
-          ...user,
-          profile_image: response.data.profile_image,
-        };
-
-        // Preload the new image for better performance
-        if (response.data.profile_image) {
-          preloadImage(response.data.profile_image).catch(console.error);
-        }
-
-        toast.success("Profile photo updated successfully!");
-
-        // Clear preview and reload the page to refresh user data
-        setImagePreview(null);
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("Photo upload failed:", error);
-      if (axios.isAxiosError(error)) {
-        const errorMessage =
-          error.response?.data?.detail ||
-          error.response?.data?.error ||
-          error.response?.data?.message ||
-          "Failed to upload profile photo. Please try again.";
-        toast.error(errorMessage);
-      } else {
-        toast.error("Failed to upload profile photo. Please try again.");
-      }
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
-
-  const handleProfileSave = async (e: React.FormEvent) => {
+  const handleProfileClick = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!isEditing) {
@@ -270,10 +100,9 @@ export default function AcademySettingsPage() {
 
     // Check if there are any changes
     const hasChanges =
-      academyName !== (academyProfile?.academy_name || "") ||
-      phoneNumber !== (user?.phone_number || "") ||
-      websiteUrl !== (academyProfile?.website_url || "") ||
-      contactEmail !== (academyProfile?.contact_email || "");
+      firstName !== (user?.first_name || "") ||
+      lastName !== (user?.last_name || "") ||
+      phoneNumber !== (user?.phone_number || "");
 
     if (!hasChanges) {
       // No changes made, just revert to disabled state
@@ -295,54 +124,21 @@ export default function AcademySettingsPage() {
     }
 
     try {
-      // Update phone number through profile API
-      if (phoneNumber !== (user?.phone_number || "")) {
-        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-          phone_number: phoneNumber,
-        });
-        console.log("Phone number updated successfully");
-      }
-
-      // Only update academy profile if it exists
-      if (academyProfile && academyProfile.id) {
-        // Update academy profile through Supabase
-        const { data, error } = await supabase
-          .from("academy_profiles")
-          .update({
-            academy_name: academyName,
-            website_url: websiteUrl,
-            contact_email: contactEmail,
-          })
-          .eq("id", academyProfile.id)
-          .select()
-          .single();
-
-        if (error) {
-          console.error("Error updating academy profile:", error);
-          throw error;
-        }
-
-        // Update local state
-        if (data) {
-          setAcademyProfile(data);
-          console.log("Academy profile updated successfully:", data);
-        }
-      } else {
-        console.log("No academy profile to update");
-      }
+      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber,
+      });
 
       toast.success("Profile updated successfully!");
       setIsEditing(false);
     } catch (err: unknown) {
-      console.error("Error updating profile:", err);
       let errorMessage = "Failed to update profile.";
       if (axios.isAxiosError(err) && err.response) {
         errorMessage =
           err.response.data.detail ||
           err.response.data.message ||
           "An error occurred.";
-      } else if (err instanceof Error) {
-        errorMessage = err.message;
       }
       toast.error(errorMessage);
     } finally {
@@ -437,94 +233,43 @@ export default function AcademySettingsPage() {
       setPasswordLoading(false);
     }
   };
-  // --- END: Password Reset Functions ---
-
-  // Show loading state while fetching data
-  if (loadingData || authLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Loading academy settings...</p>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // --- END: New Password Reset Functions ---
 
   return (
     <DashboardLayout>
       <div className="max-w-none mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16 space-y-6">
         <div className="space-y-6">
-          {/* Profile Photo and Info */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="relative">
-                  <OptimizedAvatar
-                    src={imagePreview || user?.profile_image}
-                    alt="Profile photo"
-                    fallback={getInitials()}
-                    size="xl"
-                    loading="eager"
-                    className="h-32 w-32"
-                  />
-                  <button
-                    onClick={handlePhotoUploadClick}
-                    disabled={photoUploading}
-                    className="absolute bottom-1 right-1 bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-full p-2 shadow-lg transition-colors disabled:opacity-50"
-                  >
-                    {photoUploading ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Academy Information */}
+            {/* Profile Information */}
             <Card>
               <CardHeader>
-                <CardTitle>Academy Information</CardTitle>
+                <CardTitle>Profile Information</CardTitle>
                 <CardDescription>
-                  Update your academy's information.
+                  Update your personal information.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleProfileSave} className="space-y-4">
+                <form onSubmit={handleProfileClick} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="academyName">Academy Name</Label>
+                    <Label htmlFor="firstName">First Name</Label>
                     <Input
-                      id="academyName"
+                      id="firstName"
                       type="text"
-                      value={academyName}
-                      onChange={(e) => setAcademyName(e.target.value)}
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
                       disabled={!isEditing}
-                      placeholder="Enter academy name"
+                      placeholder="Enter your first name"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="websiteUrl">Website URL</Label>
+                    <Label htmlFor="lastName">Last Name</Label>
                     <Input
-                      id="websiteUrl"
-                      type="url"
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
+                      id="lastName"
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
                       disabled={!isEditing}
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contactEmail">Contact Email</Label>
-                    <Input
-                      id="contactEmail"
-                      type="email"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      disabled={!isEditing}
-                      placeholder="contact@example.com"
+                      placeholder="Enter your last name"
                     />
                   </div>
                   <div className="space-y-2">
@@ -556,14 +301,16 @@ export default function AcademySettingsPage() {
                     <Input
                       id="email"
                       type="email"
-                      value={user?.email || ""}
+                      value={email}
                       disabled
                       className="bg-muted/50 text-muted-foreground"
                       placeholder="Email address"
                     />
+                    {/* ✅ START: FIX */}
                     <p className="text-xs text-muted-foreground">
                       Email cannot be changed from this page.
                     </p>
+                    {/* ✅ END: FIX */}
                   </div>
                   <Button
                     type="submit"

@@ -1,40 +1,30 @@
+/**
+ * Main App Component
+ * 
+ * Root component that sets up providers and routing
+ * Uses the organized route structure from routes/AppRoutes.tsx
+ */
+
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
-import AuthPage from "./pages/AuthPage";
-import InterestsPage from "./pages/InterestsPage";
-import SkillTestPage from "./pages/SkillTestPage";
-import SkillPathPage from "./pages/SkillPathPage";
-import JobsPage from "./pages/JobsPage";
-import CoursesPage from "./pages/CoursesPage";
-import CoursePage from "./pages/CoursePage"; // Import the new course page
-import NotificationsPage from "./pages/NotificationsPage";
-import ProfilePage from "./pages/ProfilePage";
-import AcademyDashboard from "./pages/AcademyDashboard";
-import AcademyPage from "./pages/AcademyPage";
-import NotFound from "./pages/NotFound";
-import EmailConfirmed from "./pages/EmailConfirmed";
-import LoginPage from "./pages/LoginPage";
-
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import { Settings } from "lucide-react";
-import UserSettings from "./pages/UserSettings";
-import AcademyProfilePage from "./pages/AcademyProfilePage";
-import AcademySettings from "./pages/AcademySettings";
-import EmailVerification from "./pages/EmailVerification";
-import AcademyRegistrationPage from "./pages/AcademyRegistrationPage";
-import TermsOfUse from "./pages/TermsOfUse";
-import HelpCenter from "./pages/HelpCenter";
+import { AppRoutes } from "./routes/AppRoutes";
 
 const queryClient = new QueryClient();
 
+/**
+ * App Component
+ * 
+ * Wraps the application with necessary providers:
+ * - QueryClientProvider: React Query for data fetching
+ * - TooltipProvider: Tooltip context
+ * - BrowserRouter: React Router for navigation
+ * - AuthProvider: Authentication context
+ */
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -42,148 +32,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/" element={<LoginPage />} />
-            <Route path="/auth/login" element={<LoginPage />} />
-            <Route path="/auth/signup" element={<AuthPage />} />
-            <Route
-              path="/auth"
-              element={<Navigate to="/auth/login" replace />}
-            />
-            <Route
-              path="/auth/reset-password"
-              element={<ResetPasswordPage />}
-            />
-            <Route path="/email-confirmed" element={<EmailConfirmed />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/interests"
-              element={
-                <ProtectedRoute>
-                  <InterestsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/skill-test"
-              element={
-                <ProtectedRoute>
-                  <SkillTestPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/skill-path"
-              element={
-                <ProtectedRoute>
-                  <SkillPathPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/jobs"
-              element={
-                <ProtectedRoute>
-                  <JobsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/courses"
-              element={
-                <ProtectedRoute>
-                  <CoursesPage />
-                </ProtectedRoute>
-              }
-            />
-            {/* Add the new route for a single course */}
-            <Route
-              path="/course/:courseId"
-              element={
-                <ProtectedRoute>
-                  <CoursePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notifications"
-              element={
-                <ProtectedRoute>
-                  <NotificationsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <UserSettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/terms-of-use"
-              element={
-                <ProtectedRoute>
-                  <TermsOfUse />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/help"
-              element={
-                <ProtectedRoute>
-                  <HelpCenter />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/academy/:academySlug"
-              element={
-                <ProtectedRoute>
-                  <AcademyPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/academy/profile"
-              element={
-                <ProtectedRoute>
-                  <AcademyProfilePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/academy/settings"
-              element={
-                <ProtectedRoute>
-                  <AcademySettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/email-verification" element={<EmailVerification />} />
-            <Route
-              path="/academy/register"
-              element={<AcademyRegistrationPage />}
-            />
-
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

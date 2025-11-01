@@ -68,7 +68,8 @@ export function AuthForm({
     const { error } = await signIn(email, password);
 
     if (!error) {
-      navigate("/dashboard");
+      // Navigation is handled by AuthContext login function based on user role
+      // This will redirect to appropriate dashboard (user or academy)
     }
 
     setLoading(false);

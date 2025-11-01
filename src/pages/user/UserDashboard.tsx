@@ -12,11 +12,6 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { calculateSkillScores } from "@/utils/skillTestUtils";
-import { numericIdToUuid } from "@/lib/utils";
-import AcademyDashboard from "./AcademyDashboard";
 
 interface Job {
   id: string;
@@ -45,71 +40,23 @@ const fetchJobs = async () => {
   return data.jobs || [];
 };
 
-const Dashboard = () => {
+const UserDashboard = () => {
   const { user } = useAuth();
 
-  // Check user role to determine which dashboard to show
-  // First try to use user_type from the user object (set during login)
-  // If not available, query the database
-  const { data: userRole, isLoading: roleLoading } = useQuery({
-    queryKey: ["user-role", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-
-      // If user_type is already available from login, use it
-      if (user.user_type) {
-        return user.user_type;
-      }
-
-      // Otherwise, query the database
-      const { data } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", numericIdToUuid(user.id))
-        .single();
-
-      return data?.role || "user";
-    },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-  });
+  // This is a USER-ONLY dashboard component
+  // Academy users are redirected to /academy/dashboard by route protection
 
   // Mock user data - using real user data where available
   const userData = {
     name:
-      (user as any)?.user_metadata?.full_name ||
+      (user as { user_metadata?: { full_name?: string } })?.user_metadata
+        ?.full_name ||
       user?.email?.split("@")[0] ||
       "User",
     skillTestTaken: false,
   };
 
-  // Fetch user's skill scores - always call this hook
-  const { data: userSkillScores = {}, isLoading: skillsLoading } = useQuery({
-    queryKey: ["user-skills", user?.id],
-    queryFn: async () => {
-      if (!user) return {};
-
-      try {
-        const { data: answers, error } = await supabase
-          .from("usertestanswers")
-          .select("*")
-          .eq("userid", numericIdToUuid(user.id));
-
-        if (error || !answers || answers.length === 0) {
-          return {};
-        }
-
-        return calculateSkillScores(answers);
-      } catch (error) {
-        console.error("Error fetching user skills:", error);
-        return {};
-      }
-    },
-    enabled: !!user && userRole !== "academy",
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Fetch real jobs - always call this hook
+  // Fetch real jobs
   const {
     data: jobs = [],
     isLoading: jobsLoading,
@@ -117,54 +64,20 @@ const Dashboard = () => {
   } = useQuery({
     queryKey: ["dashboard-jobs"],
     queryFn: fetchJobs,
-    enabled: userRole !== "academy",
+    enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Show loading state while checking role
-  if (roleLoading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading...</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // Render academy dashboard for academy users
-  if (userRole === "academy") {
-    return <AcademyDashboard />;
-  }
-
-  // Calculate job match percentage based on user's skills
-  const calculateJobMatch = (jobTitle: string, jobDescription: string) => {
-    if (Object.keys(userSkillScores).length === 0) {
-      return Math.floor(Math.random() * 30) + 70; // Fallback to random for demo
-    }
-
-    const jobText = `${jobTitle} ${jobDescription}`.toLowerCase();
-    let matchingSkills = 0;
-    const totalUserSkills = Object.keys(userSkillScores).length;
-
-    Object.entries(userSkillScores).forEach(([skill, score]) => {
-      if (jobText.includes(skill.toLowerCase())) {
-        matchingSkills += score as number;
-      }
-    });
-
-    if (totalUserSkills === 0) return 0;
-    const matchPercentage = Math.round((matchingSkills / totalUserSkills) * 10);
-    return Math.min(Math.max(matchPercentage, 0), 95); // Cap between 0-95%
+  // Calculate job match percentage (simplified without Supabase skill scores)
+  const calculateJobMatch = () => {
+    // Return a random match percentage for now
+    return Math.floor(Math.random() * 30) + 70;
   };
 
   // Transform jobs and calculate matches
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformedJobs = jobs.map((job: any) => {
-    const matchPercentage = calculateJobMatch(job.title, job.description || "");
+    const matchPercentage = calculateJobMatch();
 
     return {
       id: job.id,
@@ -199,17 +112,6 @@ const Dashboard = () => {
   return (
     <DashboardLayout>
       <div>
-        {/* <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 md:mb-6 space-y-3 sm:space-y-0">
-          <h1 className="text-xl md:text-2xl font-bold text-breneo-navy">
-            Welcome, {userData.name}
-          </h1>
-          <div className="hidden md:flex items-center space-x-2">
-            <Button variant="ghost" size="sm" className="p-2">
-              <Bell className="h-5 w-5 text-gray-600" />
-            </Button>
-          </div>
-        </div> */}
-
         {!userData.skillTestTaken && (
           <Card className="mb-4 md:mb-6 bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 border-breneo-blue/20 rounded-[24px]">
             <CardContent className="p-6">
@@ -245,7 +147,7 @@ const Dashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-              {jobsLoading || skillsLoading ? (
+              {jobsLoading ? (
                 <div className="space-y-4">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="border rounded-[24px] p-3 md:p-4">
@@ -380,4 +282,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default UserDashboard;
