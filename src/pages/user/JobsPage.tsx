@@ -28,14 +28,27 @@ interface Job {
   is_saved: boolean;
 }
 
+// API response job structure
+interface ApiJob {
+  job_id: string;
+  job_title: string;
+  employer_name: string;
+  job_city?: string;
+  job_state?: string;
+  job_country?: string;
+  job_apply_link?: string;
+  employer_logo?: string;
+}
+
 // Filter state shape
 interface JobFilters {
   country: string;
   jobTypes: string[];
   isRemote: boolean;
+  datePosted?: string; // Add date_posted filter
 }
 
-const JSEARCH_API_KEY = import.meta.env.VITE_JSEARCH_API_KEY;
+const JSEARCH_API_KEY = "f438e914d7msh480f4890d34c417p1f564ajsnce17947c5ab2";
 
 // Updated fetchJobs to include filters and pagination
 const fetchJobs = async (
@@ -43,19 +56,33 @@ const fetchJobs = async (
   filters: JobFilters,
   page: number
 ) => {
-  if (!JSEARCH_API_KEY) {
-    throw new Error(
-      "JSearch API key is missing. Please add VITE_JSEARCH_API_KEY to your .env file."
-    );
-  }
+  // Map country name to country code (e.g., "United States" -> "us")
+  const countryCodeMap: Record<string, string> = {
+    "United States": "us",
+    Canada: "ca",
+    "United Kingdom": "uk",
+    // Add more mappings as needed
+  };
+  const countryCode =
+    countryCodeMap[filters.country] ||
+    filters.country.toLowerCase().slice(0, 2);
 
-  // Use page parameter for fetching
+  // Build query parameters
   const params = new URLSearchParams({
-    query: `${searchTerm} in ${filters.country}`,
-    num_pages: String(page), // Dynamically set the page number
-    employment_types: filters.jobTypes.join(","),
-    work_from_home: String(filters.isRemote),
+    query: searchTerm,
+    page: String(page),
+    num_pages: "1",
+    country: countryCode,
+    date_posted: filters.datePosted || "all",
   });
+
+  // Add optional parameters if they have values
+  if (filters.jobTypes.length > 0) {
+    params.append("employment_types", filters.jobTypes.join(","));
+  }
+  if (filters.isRemote) {
+    params.append("work_from_home", "true");
+  }
 
   const API_ENDPOINT = `https://jsearch.p.rapidapi.com/search?${params.toString()}`;
   const API_HOST = "jsearch.p.rapidapi.com";
@@ -63,8 +90,8 @@ const fetchJobs = async (
   const response = await fetch(API_ENDPOINT, {
     method: "GET",
     headers: {
-      "x-rapidapi-key": JSEARCH_API_KEY,
-      "x-rapidapi-host": API_HOST,
+      "X-Rapidapi-Key": JSEARCH_API_KEY,
+      "X-Rapidapi-Host": API_HOST,
     },
   });
 
@@ -90,7 +117,7 @@ const JobsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [searchTerm, setSearchTerm] = useState("Software Developer");
+  const [searchTerm, setSearchTerm] = useState("");
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1); // New state for current page
 
@@ -99,6 +126,7 @@ const JobsPage = () => {
     country: "United States",
     jobTypes: ["FULLTIME"],
     isRemote: false,
+    datePosted: "all",
   });
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
@@ -231,7 +259,7 @@ const JobsPage = () => {
 
   const transformedJobs = React.useMemo(() => {
     return (jobs || []).map(
-      (job: any): Job => ({
+      (job: ApiJob): Job => ({
         id: job.job_id,
         title: job.job_title,
         company: job.employer_name,
@@ -298,7 +326,7 @@ const JobsPage = () => {
         )}
 
         {isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
                 <CardContent className="p-5">
@@ -319,7 +347,7 @@ const JobsPage = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
           {transformedJobs.map((job) => (
             <Card
               key={job.id}

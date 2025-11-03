@@ -971,9 +971,9 @@ const ProfilePage = () => {
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
         {/* Left Column - Profile Summary */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-4 md:space-y-6">
           {/* Profile Header Card */}
           <Card>
             <CardContent className="flex flex-col items-center pb-6 pt-6">
@@ -1136,7 +1136,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Right Column - Details */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
           {/* About Me Card */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">

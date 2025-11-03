@@ -49,7 +49,7 @@ const ProgressBar = ({
           {/* Stage 1 */}
           <div className="flex flex-col items-center flex-1">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
+              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
                 currentStage >= 1
                   ? "bg-[#01bfff] text-white scale-110 shadow-lg dark:shadow-blue-500/20"
                   : "bg-gray-200 dark:bg-muted text-gray-500 dark:text-muted-foreground"
@@ -60,7 +60,7 @@ const ProgressBar = ({
               </span>
             </div>
             <span
-              className={`text-xs mt-2 text-center transition-all duration-300 ${
+              className={`text-[10px] md:text-xs mt-1 md:mt-2 text-center transition-all duration-300 ${
                 currentStage >= 1
                   ? "text-[#01bfff] font-semibold dark:text-[#5AC9F8]"
                   : "text-gray-500 dark:text-muted-foreground"
@@ -72,7 +72,7 @@ const ProgressBar = ({
 
           {/* Connector Line 1 */}
           <div
-            className={`flex-1 h-1 mx-2 transition-all duration-500 ease-in-out ${
+            className={`flex-1 h-1 mx-1 md:mx-2 transition-all duration-500 ease-in-out ${
               currentStage > 1 ? "bg-[#01bfff]" : "bg-gray-200 dark:bg-muted"
             }`}
           ></div>
@@ -80,7 +80,7 @@ const ProgressBar = ({
           {/* Stage 2 */}
           <div className="flex flex-col items-center flex-1">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
+              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
                 currentStage >= 2
                   ? "bg-[#01bfff] text-white scale-110 shadow-lg dark:shadow-blue-500/20"
                   : "bg-gray-200 dark:bg-muted text-gray-500 dark:text-muted-foreground"
@@ -91,7 +91,7 @@ const ProgressBar = ({
               </span>
             </div>
             <span
-              className={`text-xs mt-2 text-center transition-all duration-300 ${
+              className={`text-[10px] md:text-xs mt-1 md:mt-2 text-center transition-all duration-300 ${
                 currentStage >= 2
                   ? "text-[#01bfff] font-semibold dark:text-[#5AC9F8]"
                   : "text-gray-500 dark:text-muted-foreground"
@@ -103,7 +103,7 @@ const ProgressBar = ({
 
           {/* Connector Line 2 */}
           <div
-            className={`flex-1 h-1 mx-2 transition-all duration-500 ease-in-out ${
+            className={`flex-1 h-1 mx-1 md:mx-2 transition-all duration-500 ease-in-out ${
               currentStage > 2 ? "bg-[#01bfff]" : "bg-gray-200 dark:bg-muted"
             }`}
           ></div>
@@ -111,7 +111,7 @@ const ProgressBar = ({
           {/* Stage 3 */}
           <div className="flex flex-col items-center flex-1">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
+              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
                 currentStage >= 3
                   ? "bg-[#01bfff] text-white scale-110 shadow-lg dark:shadow-blue-500/20"
                   : "bg-gray-200 dark:bg-muted text-gray-500 dark:text-muted-foreground"
@@ -122,7 +122,7 @@ const ProgressBar = ({
               </span>
             </div>
             <span
-              className={`text-xs mt-2 text-center transition-all duration-300 ${
+              className={`text-[10px] md:text-xs mt-1 md:mt-2 text-center transition-all duration-300 ${
                 currentStage >= 3
                   ? "text-[#01bfff] font-semibold dark:text-[#5AC9F8]"
                   : "text-gray-500 dark:text-muted-foreground"
@@ -234,7 +234,7 @@ const SkillTestPage = () => {
   if (!testStarted) {
     return (
       <DashboardLayout>
-        <div className="p">
+        <div className="pb-32 md:pb-0">
           <StartScreen onStart={() => setTestStarted(true)} />
         </div>
       </DashboardLayout>
@@ -243,7 +243,7 @@ const SkillTestPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6">
+      <div className="pb-32 md:pb-0">
         {/* Progress Bar */}
         <ProgressBar
           phase={phase}

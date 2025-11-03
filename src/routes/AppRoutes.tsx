@@ -22,7 +22,7 @@ import EmailVerification from "@/pages/auth/EmailVerification";
 import EmailConfirmed from "@/pages/auth/EmailConfirmed";
 
 // User pages (User-only)
-import UserDashboard from "@/pages/user/UserDashboard";
+import UserDashboard from "@/pages/user/UserHome";
 import UserProfile from "@/pages/user/ProfilePage";
 import UserSettings from "@/pages/user/UserSettings";
 import JobsPage from "@/pages/user/JobsPage";
@@ -66,6 +66,14 @@ export const AppRoutes = () => {
       {/* ==========================================
           USER-ONLY ROUTES - Require role "user"
           ========================================== */}
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute requiredRole="user">
+            <UserDashboard />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={
@@ -152,6 +160,14 @@ export const AppRoutes = () => {
           ========================================== */}
       <Route path="/academy/register" element={<AcademyRegistrationPage />} />
       <Route
+        path="/academy/home"
+        element={
+          <ProtectedRoute requiredRole="academy">
+            <AcademyDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/academy/dashboard"
         element={
           <ProtectedRoute requiredRole="academy">
@@ -162,7 +178,7 @@ export const AppRoutes = () => {
       <Route
         path="/academy/profile"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="academy">
             <AcademyProfile />
           </ProtectedRoute>
         }

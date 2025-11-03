@@ -13,7 +13,7 @@ import {
   Phone,
   MessageCircle,
   BookOpen,
-  User,
+  CircleUserRound,
   Settings,
   Briefcase,
 } from "lucide-react";
@@ -55,7 +55,7 @@ const HelpCenter = () => {
     },
     {
       title: "Account & Profile",
-      icon: User,
+      icon: CircleUserRound,
       questions: [
         {
           q: "როგორ შევცვალო ელფოსტა?",
@@ -126,7 +126,7 @@ const HelpCenter = () => {
       <main
         className={`h-full overflow-y-auto transition-all duration-300 ${
           sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]"
-        } pt-24 pb-20 md:pt-24 md:pb-0 px-3 md:px-6`}
+        } pt-24 pb-32 md:pt-24 md:pb-0 px-3 md:px-6`}
       >
         <div className="max-w-4xl mx-auto py-8">
           {/* Header */}

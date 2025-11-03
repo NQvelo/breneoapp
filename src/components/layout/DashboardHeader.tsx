@@ -12,6 +12,13 @@ interface DashboardHeaderProps {
 
 // Helper function to get the page title from the pathname
 const getPageTitle = (pathname: string, username?: string) => {
+  if (pathname.startsWith("/home") || pathname.startsWith("/academy/home")) {
+    return (
+      <>
+        Welcome, <span className="font-bold">{username || "User"}</span>!
+      </>
+    );
+  }
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/academy/dashboard")) {
     return (
       <>
@@ -25,7 +32,7 @@ const getPageTitle = (pathname: string, username?: string) => {
   if (pathname.startsWith("/profile") || pathname.startsWith("/academy/profile")) return "Profile";
   if (pathname.startsWith("/notifications")) return "Notifications";
   if (pathname.startsWith("/skill-test")) return "Skill Test";
-  return "Dashboard";
+  return "Home";
 };
 
 export function DashboardHeader({

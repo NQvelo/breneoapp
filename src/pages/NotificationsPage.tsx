@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Bell,
   Users,
-  User,
   CheckCircle,
   AlertTriangle,
   XCircle,

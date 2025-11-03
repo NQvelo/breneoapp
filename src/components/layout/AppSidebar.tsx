@@ -4,9 +4,11 @@ import {
   LayoutDashboard,
   Briefcase,
   BookOpen,
+  GraduationCap,
+  Home,
   Settings,
   HelpCircle,
-  User,
+  CircleUserRound,
   Bell,
   Moon,
   Sun,
@@ -77,25 +79,25 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   const navItems = isAcademy
     ? [
         {
-          icon: LayoutDashboard,
-          label: "Dashboard",
-          href: "/academy/dashboard",
+          icon: Home,
+          label: "Home",
+          href: "/academy/home",
         },
       ]
     : [
-        { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+        { icon: Home, label: "Home", href: "/home" },
         { icon: Briefcase, label: "Job Offers", href: "/jobs" },
-        { icon: BookOpen, label: "Courses", href: "/courses" },
+        { icon: GraduationCap, label: "Courses", href: "/courses" },
       ];
 
   const profilePath = isAcademy ? "/academy/profile" : "/profile";
   const settingsPath = isAcademy ? "/academy/settings" : "/settings";
-  const dashboardPath = isAcademy ? "/academy/dashboard" : "/dashboard";
+  const homePath = isAcademy ? "/academy/home" : "/home";
 
   // Mobile navigation
   const mobileNavItems = [
     ...navItems,
-    { icon: User, label: "Profile", href: profilePath },
+    { icon: CircleUserRound, label: "Profile", href: profilePath },
   ];
 
   return (
@@ -103,7 +105,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-card border-b border-gray-200 dark:border-border px-4 py-3">
         <div className="flex items-center justify-between">
-          <Link to={dashboardPath} className="flex items-center">
+          <Link to={homePath} className="flex items-center">
             <img
               src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
               alt="Breneo Logo"
@@ -150,7 +152,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-1",
                   "hover:bg-breneo-blue/10 active:bg-breneo-blue/20",
                   isActive
-                    ? "bg-breneo-blue/10 text-breneo-blue"
+                    ? "text-gray-600"
                     : "text-gray-600 hover:text-breneo-blue"
                 )}
               >
@@ -160,15 +162,15 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "transition-colors duration-200 mb-1",
                     isActive
                       ? "text-breneo-blue"
-                      : "group-hover:text-breneo-blue"
+                      : "text-gray-600 group-hover:text-breneo-blue"
                   )}
                 />
                 <span
                   className={cn(
                     "text-xs font-medium transition-colors duration-200 text-center",
                     isActive
-                      ? "text-breneo-blue"
-                      : "group-hover:text-breneo-blue"
+                      ? "text-gray-600"
+                      : "text-gray-600 group-hover:text-breneo-blue"
                   )}
                 >
                   {item.label}
@@ -189,7 +191,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
         {/* Header */}
         <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-border">
           {!collapsed ? (
-            <Link to={dashboardPath} className="flex items-center space-x-2">
+            <Link to={homePath} className="flex items-center space-x-2">
               <img
                 src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
                 alt="Breneo Logo"
