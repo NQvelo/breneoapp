@@ -15,6 +15,7 @@ import {
   Upload,
   ExternalLink,
   Link2,
+  AlertCircle,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +50,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import usePhoneVerification from "@/hooks/usePhoneVerification";
 
 interface SkillTestResult {
   final_role?: string;
@@ -262,6 +265,30 @@ const ProfilePage = () => {
   const [savingSocialLink, setSavingSocialLink] = useState(false);
 
   const { toast } = useToast();
+
+  const phoneVerifiedFromServer = React.useMemo(() => {
+    const getValue = (source: unknown, key: string) => {
+      if (source && typeof source === "object") {
+        return (source as Record<string, unknown>)[key];
+      }
+      return undefined;
+    };
+
+    const profileRoot = profileData as unknown;
+
+    const candidates = [
+      getValue(profileRoot, "phone_verified"),
+      getValue(profileRoot, "is_phone_verified"),
+      getValue(getValue(profileRoot, "profile"), "phone_verified"),
+      getValue(getValue(profileRoot, "profile"), "is_phone_verified"),
+      getValue(getValue(profileRoot, "user"), "phone_verified"),
+      getValue(getValue(profileRoot, "user"), "is_phone_verified"),
+      getValue(user as unknown, "phone_verified"),
+      getValue(user as unknown, "is_phone_verified"),
+    ];
+
+    return candidates.some((value) => value === true || value === "true");
+  }, [profileData, user]);
 
   // Fetch skill test results
   useEffect(() => {
@@ -925,6 +952,67 @@ const ProfilePage = () => {
   // ✅ Use the 'user' object from the context directly
   const { first_name, last_name, email, phone_number } = user;
 
+  const {
+    isPhoneVerified,
+    isSendingCode,
+    isVerifyingCode,
+    codeSent,
+    codeInput,
+    resendCooldown,
+    sendCode: triggerPhoneVerificationCode,
+    verifyCode: confirmPhoneVerificationCode,
+    setCodeInput,
+  } = usePhoneVerification({
+    phoneNumber: phone_number,
+    ownerId: user?.id,
+    role: user?.user_type,
+    initiallyVerified: phoneVerifiedFromServer,
+  });
+
+  const handleSendPhoneVerification = async () => {
+    try {
+      await triggerPhoneVerificationCode();
+      toast({
+        title: "Verification code sent",
+        description: phone_number
+          ? `We've sent a 6-digit code to ${phone_number}.`
+          : "Verification code sent",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to send verification code. Please try again.";
+      toast({
+        title: "Unable to send code",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmPhoneVerification = async () => {
+    try {
+      const success = await confirmPhoneVerificationCode();
+      if (success) {
+        toast({
+          title: "Phone verified",
+          description: "Your phone number has been verified successfully.",
+        });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Verification failed. Please check the code and try again.";
+      toast({
+        title: "Verification failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Use profile image from user context (same as UserSettings)
   // profileImage state is updated after upload to show the new image
   const displayProfileImage = profileImage || user?.profile_image;
@@ -1042,9 +1130,23 @@ const ProfilePage = () => {
                 <div className="bg-breneo-blue/10 rounded-full p-2">
                   <Phone size={18} className="text-breneo-blue" />
                 </div>
-                <span className="text-sm">
-                  {phone_number || "Not provided"}
-                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                  <span className="text-sm">
+                    {phone_number || "Not provided"}
+                  </span>
+                  {phone_number ? (
+                    <Badge
+                      variant={isPhoneVerified ? "secondary" : "outline"}
+                      className={
+                        isPhoneVerified
+                          ? "mt-1 sm:mt-0 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                          : "mt-1 sm:mt-0 border-orange-300 text-orange-600"
+                      }
+                    >
+                      {isPhoneVerified ? "Verified" : "Unverified"}
+                    </Badge>
+                  ) : null}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="bg-breneo-blue/10 rounded-full p-2">
@@ -1052,6 +1154,83 @@ const ProfilePage = () => {
                 </div>
                 <span className="text-sm">{email}</span>
               </div>
+              {!isPhoneVerified && (
+                <Alert className="border-orange-300 bg-orange-50 dark:border-orange-900/60 dark:bg-orange-950/30">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-orange-600 mt-1" />
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <AlertTitle>Verify your phone number</AlertTitle>
+                        <AlertDescription>
+                          Confirm your phone number to protect your account and
+                          unlock all features.
+                        </AlertDescription>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Button
+                            onClick={handleSendPhoneVerification}
+                            disabled={
+                              !phone_number ||
+                              isSendingCode ||
+                              (codeSent && resendCooldown > 0)
+                            }
+                          >
+                            {isSendingCode
+                              ? "Sending..."
+                              : codeSent
+                              ? "Resend code"
+                              : "Send verification code"}
+                          </Button>
+                          {resendCooldown > 0 && (
+                            <span className="text-xs text-orange-700 dark:text-orange-300">
+                              You can request a new code in {resendCooldown}s
+                            </span>
+                          )}
+                        </div>
+                        {codeSent && (
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={6}
+                              placeholder="Enter 6-digit code"
+                              value={codeInput}
+                              onChange={(event) =>
+                                setCodeInput(
+                                  event.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 6)
+                                )
+                              }
+                              className="sm:max-w-[200px]"
+                            />
+                            <Button
+                              onClick={handleConfirmPhoneVerification}
+                              disabled={
+                                codeInput.length !== 6 || isVerifyingCode
+                              }
+                            >
+                              {isVerifyingCode ? "Verifying..." : "Verify"}
+                            </Button>
+                          </div>
+                        )}
+                        {!phone_number && (
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate("/settings")}
+                            >
+                              Add phone number in settings
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 

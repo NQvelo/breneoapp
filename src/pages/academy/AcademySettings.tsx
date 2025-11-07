@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import OptimizedAvatar, {
   useImagePreloader,
 } from "@/components/ui/OptimizedAvatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios, { AxiosError } from "axios";
+import { Link, useLocation } from "react-router-dom";
 import { Camera } from "lucide-react";
+import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 
 interface AcademyProfile {
   id: string;
@@ -31,15 +36,24 @@ interface AcademyProfile {
 }
 
 export default function AcademySettingsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const { preloadImage } = useImagePreloader();
+  const location = useLocation();
+  const [mounted, setMounted] = useState(false);
+
+  // Preferences state
+  const [soundEffects, setSoundEffects] = useState(true);
+  const [animations, setAnimations] = useState(true);
+  const [motivationalMessages, setMotivationalMessages] = useState(true);
+  const [listeningExercises, setListeningExercises] = useState(true);
+
+  // Profile editing state
   const [isEditing, setIsEditing] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
-
-  // Profile form state
   const [academyName, setAcademyName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -49,18 +63,69 @@ export default function AcademySettingsPage() {
     null
   );
 
-  // --- Password Reset State ---
+  // Password Reset State
   const [passwordStep, setPasswordStep] = useState(1);
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
-  // ---
+
+  // Load preferences from localStorage
+  useEffect(() => {
+    setMounted(true);
+    const savedSoundEffects = localStorage.getItem("pref_sound_effects");
+    const savedAnimations = localStorage.getItem("pref_animations");
+    const savedMotivationalMessages = localStorage.getItem(
+      "pref_motivational_messages"
+    );
+    const savedListeningExercises = localStorage.getItem(
+      "pref_listening_exercises"
+    );
+
+    if (savedSoundEffects !== null)
+      setSoundEffects(savedSoundEffects === "true");
+    if (savedAnimations !== null)
+      setAnimations(savedAnimations === "true");
+    if (savedMotivationalMessages !== null)
+      setMotivationalMessages(savedMotivationalMessages === "true");
+    if (savedListeningExercises !== null)
+      setListeningExercises(savedListeningExercises === "true");
+  }, []);
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("pref_sound_effects", String(soundEffects));
+    }
+  }, [soundEffects, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("pref_animations", String(animations));
+    }
+  }, [animations, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem(
+        "pref_motivational_messages",
+        String(motivationalMessages)
+      );
+    }
+  }, [motivationalMessages, mounted]);
+
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem(
+        "pref_listening_exercises",
+        String(listeningExercises)
+      );
+    }
+  }, [listeningExercises, mounted]);
 
   // Fetch academy profile data
   useEffect(() => {
     const fetchAcademyData = async () => {
-      // Wait for auth to complete
       if (authLoading) {
         return;
       }
@@ -70,7 +135,6 @@ export default function AcademySettingsPage() {
         return;
       }
 
-      // ✅ Check if token exists before making API calls
       const hasToken =
         typeof window !== "undefined" && !!localStorage.getItem("authToken");
       if (!hasToken) {
@@ -83,10 +147,8 @@ export default function AcademySettingsPage() {
       }
 
       try {
-        // Get phone number from user context
         setPhoneNumber(user.phone_number || "");
 
-        // ✅ Fetch academy profile from API (same as AcademyProfilePage)
         try {
           const academyResponse = await apiClient.get(
             API_ENDPOINTS.ACADEMY.PROFILE
@@ -101,7 +163,6 @@ export default function AcademySettingsPage() {
             setContactEmail(data.contact_email || "");
           }
         } catch (error: unknown) {
-          // Handle specific error cases without triggering logout
           const academyError = error as AxiosError;
           const status = academyError.response?.status;
           const errorData = academyError.response?.data as
@@ -111,16 +172,12 @@ export default function AcademySettingsPage() {
               }
             | undefined;
 
-          // 404 means academy profile doesn't exist yet - this is okay
           if (status === 404) {
             console.log(
               "✅ Academy profile not found (404) - user may need to create one"
             );
-            // Don't show error - user can create profile from settings
             setAcademyProfile(null);
-          }
-          // 401 might mean profile doesn't exist or permissions issue
-          else if (status === 401) {
+          } else if (status === 401) {
             const errorDetail = errorData?.detail || errorData?.message || "";
             const errorMessage = String(errorDetail).toLowerCase();
             const isProfileNotFound =
@@ -135,19 +192,14 @@ export default function AcademySettingsPage() {
               setAcademyProfile(null);
             } else {
               console.warn("⚠️ Academy profile returned 401:", errorDetail);
-              // Still allow user to continue - they might need to create profile
               setAcademyProfile(null);
             }
-          }
-          // 403 means forbidden
-          else if (status === 403) {
+          } else if (status === 403) {
             console.error("Access forbidden to academy profile");
             toast.error(
               "Access Denied: You don't have permission to access academy settings."
             );
-          }
-          // Other errors
-          else {
+          } else {
             console.error("Error fetching academy profile:", academyError);
             toast.error(
               "Error fetching profile: Could not load academy profile data. Please try again."
@@ -196,19 +248,10 @@ export default function AcademySettingsPage() {
 
   // Phone number validation
   const validatePhoneNumber = (phone: string): boolean => {
-    if (!phone) return true; // Empty is allowed (optional field)
-
-    // International phone number regex:
-    // - Optional + at the start
-    // - Only digits (0-9) and spaces, dashes, parentheses, and dots allowed
-    // - Minimum 7 digits (shortest valid international number like Tuvalu: +688)
-    // - Maximum 15 digits (ITU-T E.164 standard limit)
+    if (!phone) return true;
     const phoneRegex = /^\+?[\d\s\-().]{7,15}$/;
-
-    // Remove all non-digit characters for length check
     const digitsOnly = phone.replace(/\D/g, "");
 
-    // Check format and length
     if (!phoneRegex.test(phone)) {
       setPhoneError(
         "Phone number can only contain digits, spaces, hyphens, parentheses, and dots, optionally starting with +"
@@ -243,19 +286,16 @@ export default function AcademySettingsPage() {
     const file = target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("File size must be less than 5MB");
       return;
     }
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select a valid image file");
       return;
     }
 
-    // Create preview URL
     const previewUrl = URL.createObjectURL(file);
     setImagePreview(previewUrl);
 
@@ -266,11 +306,8 @@ export default function AcademySettingsPage() {
 
     try {
       setPhotoUploading(true);
-
-      // Create FormData for file upload
       const formData = createFormDataRequest({ profile_image: file });
 
-      // Upload the image using the correct endpoint (no ID in URL)
       const response = await apiClient.patch(
         API_ENDPOINTS.AUTH.PROFILE,
         formData,
@@ -281,21 +318,17 @@ export default function AcademySettingsPage() {
         }
       );
 
-      // Update user data in AuthContext
       if (response.data && user) {
         const updatedUser = {
           ...user,
           profile_image: response.data.profile_image,
         };
 
-        // Preload the new image for better performance
         if (response.data.profile_image) {
           preloadImage(response.data.profile_image).catch(console.error);
         }
 
         toast.success("Profile photo updated successfully!");
-
-        // Clear preview and reload the page to refresh user data
         setImagePreview(null);
         window.location.reload();
       }
@@ -324,7 +357,6 @@ export default function AcademySettingsPage() {
       return;
     }
 
-    // Check if there are any changes
     const hasChanges =
       academyName !== (academyProfile?.academy_name || "") ||
       phoneNumber !== (user?.phone_number || "") ||
@@ -332,18 +364,15 @@ export default function AcademySettingsPage() {
       contactEmail !== (academyProfile?.contact_email || "");
 
     if (!hasChanges) {
-      // No changes made, just revert to disabled state
       setIsEditing(false);
       return;
     }
 
-    // Validate required fields
     if (!academyName.trim()) {
       toast.error("Academy name is required.");
       return;
     }
 
-    // Validate phone number before submitting
     if (!validatePhoneNumber(phoneNumber)) {
       return;
     }
@@ -357,7 +386,6 @@ export default function AcademySettingsPage() {
     }
 
     try {
-      // Update phone number through profile API
       if (phoneNumber !== (user?.phone_number || "")) {
         await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
           phone_number: phoneNumber,
@@ -365,13 +393,11 @@ export default function AcademySettingsPage() {
         console.log("Phone number updated successfully");
       }
 
-      // ✅ Update academy profile through API (same pattern as AcademyProfilePage)
-      // Use POST if profile doesn't exist, PATCH if it does
       try {
         const method = academyProfile ? "patch" : "post";
         const academyData = {
           academy_name: academyName.trim(),
-          description: academyProfile?.description || "", // Preserve existing description
+          description: academyProfile?.description || "",
           website_url: websiteUrl.trim() || null,
           contact_email: contactEmail.trim() || null,
         };
@@ -382,7 +408,6 @@ export default function AcademySettingsPage() {
         );
 
         if (academyResponse.data) {
-          // Update academy profile state
           const updatedProfile: AcademyProfile = {
             id: academyProfile?.id || academyResponse.data.id || "",
             academy_name: academyName.trim(),
@@ -439,7 +464,7 @@ export default function AcademySettingsPage() {
     }
   };
 
-  // --- START: Password Reset Functions ---
+  // Password Reset Functions
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordLoading(true);
@@ -511,7 +536,6 @@ export default function AcademySettingsPage() {
         }
       );
       toast.success(res.data.message || "Password updated successfully!");
-      // Reset everything
       setPasswordStep(1);
       setCode("");
       setNewPassword("");
@@ -526,7 +550,10 @@ export default function AcademySettingsPage() {
       setPasswordLoading(false);
     }
   };
-  // --- END: Password Reset Functions ---
+
+  const handleLogout = () => {
+    logout();
+  };
 
   // Show loading state while fetching data
   if (loadingData || authLoading) {
@@ -539,277 +566,183 @@ export default function AcademySettingsPage() {
     );
   }
 
+  // Get dark mode value for display
+  const darkModeValue = theme === "dark" ? "ON" : "OFF";
+
   return (
     <DashboardLayout>
-      <div className="max-w-none mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16 space-y-6">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
+        <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+          {/* Left Column - Preferences */}
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">Preferences</h1>
+
+            {/* Lesson experience section */}
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-medium text-muted-foreground mb-2">
+                  Lesson experience
+                </h2>
+                <Separator />
+              </div>
         <div className="space-y-6">
-          {/* Profile Photo and Info */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="relative">
-                  <OptimizedAvatar
-                    src={imagePreview || user?.profile_image}
-                    alt="Profile photo"
-                    fallback={getInitials()}
-                    size="xl"
-                    loading="eager"
-                    className="h-32 w-32"
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sound-effects" className="text-base font-normal">
+                    Sound effects
+                  </Label>
+                  <Switch
+                    id="sound-effects"
+                    checked={soundEffects}
+                    onCheckedChange={setSoundEffects}
                   />
-                  <button
-                    onClick={handlePhotoUploadClick}
-                    disabled={photoUploading}
-                    className="absolute bottom-1 right-1 bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-full p-2 shadow-lg transition-colors disabled:opacity-50"
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="animations" className="text-base font-normal">
+                    Animations
+                  </Label>
+                  <Switch
+                    id="animations"
+                    checked={animations}
+                    onCheckedChange={setAnimations}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="motivational-messages"
+                    className="text-base font-normal"
                   >
-                    {photoUploading ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
-                  </button>
+                    Motivational messages
+                  </Label>
+                  <Switch
+                    id="motivational-messages"
+                    checked={motivationalMessages}
+                    onCheckedChange={setMotivationalMessages}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="listening-exercises"
+                    className="text-base font-normal"
+                  >
+                    Listening exercises
+                  </Label>
+                  <Switch
+                    id="listening-exercises"
+                    checked={listeningExercises}
+                    onCheckedChange={setListeningExercises}
+                  />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Academy Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Academy Information</CardTitle>
-                <CardDescription>
-                  Update your academy's information.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleProfileSave} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="academyName">Academy Name</Label>
-                    <Input
-                      id="academyName"
-                      type="text"
-                      value={academyName}
-                      onChange={(e) => setAcademyName(e.target.value)}
-                      disabled={!isEditing}
-                      placeholder="Enter academy name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="websiteUrl">Website URL</Label>
-                    <Input
-                      id="websiteUrl"
-                      type="url"
-                      value={websiteUrl}
-                      onChange={(e) => setWebsiteUrl(e.target.value)}
-                      disabled={!isEditing}
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contactEmail">Contact Email</Label>
-                    <Input
-                      id="contactEmail"
-                      type="email"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                      disabled={!isEditing}
-                      placeholder="contact@example.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Mobile Number</Label>
-                    <Input
-                      id="phoneNumber"
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => {
-                        setPhoneNumber(e.target.value);
-                        if (isEditing) {
-                          validatePhoneNumber(e.target.value);
-                        }
-                      }}
-                      disabled={!isEditing}
-                      placeholder="+1 234 567 8900"
-                      className={phoneError ? "border-red-500" : ""}
-                    />
-                    {phoneError && (
-                      <p className="text-sm text-red-500">{phoneError}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      International format: minimum 7 digits, maximum 15 digits.
-                      (e.g., +1 234 567 8900)
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={user?.email || ""}
-                      disabled
-                      className="bg-muted/50 text-muted-foreground"
-                      placeholder="Email address"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Email cannot be changed from this page.
-                    </p>
-                  </div>
-                  <Button
-                    type="submit"
-                    disabled={profileLoading}
-                    className="w-full"
-                  >
-                    {isEditing
-                      ? profileLoading
-                        ? "Updating..."
-                        : "Update Info"
-                      : "Edit Your Info"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Password Change */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Change Password</CardTitle>
-                <CardDescription>
-                  Update your password to keep your account secure.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Step 1: Send Code */}
-                {passwordStep === 1 && (
-                  <form onSubmit={handleSendCode} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email_pass_reset">Email</Label>
-                      <Input
-                        id="email_pass_reset"
-                        type="email"
-                        value={user?.email || ""}
-                        disabled
-                        className="bg-muted/50 text-muted-foreground"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        A verification code will be sent to this email.
-                      </p>
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={passwordLoading}
-                      className="w-full"
-                    >
-                      {passwordLoading ? "Sending..." : "Send Code"}
-                    </Button>
-                  </form>
-                )}
-
-                {/* Step 2: Verify Code */}
-                {passwordStep === 2 && (
-                  <form onSubmit={handleVerifyCode} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="code">Verification Code</Label>
-                      <Input
-                        id="code"
-                        type="text"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="Enter 6-digit code"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={passwordLoading}
-                      className="w-full"
-                    >
-                      {passwordLoading ? "Verifying..." : "Verify Code"}
-                    </Button>
-                    <Button
-                      variant="link"
-                      type="button"
-                      onClick={() => setPasswordStep(1)}
-                      className="p-0 h-auto"
-                    >
-                      Back
-                    </Button>
-                  </form>
-                )}
-
-                {/* Step 3: Set New Password */}
-                {passwordStep === 3 && (
-                  <form onSubmit={handleSetNewPassword} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <Input
-                        id="newPassword"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Enter new password"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">
-                        Confirm New Password
-                      </Label>
-                      <Input
-                        id="confirmPassword"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={passwordLoading}
-                      className="w-full"
-                    >
-                      {passwordLoading ? "Updating..." : "Set New Password"}
-                    </Button>
-                    <Button
-                      variant="link"
-                      type="button"
-                      onClick={() => setPasswordStep(2)}
-                      className="p-0 h-auto"
-                    >
-                      Back
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
+            {/* Appearance section */}
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-medium text-muted-foreground mb-2">
+                  Appearance
+                </h2>
+                <Separator />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="dark-mode" className="text-base font-normal">
+                  Dark mode
+                </Label>
+                <Select
+                  value={theme || "light"}
+                  onValueChange={(value) => setTheme(value as "light" | "dark")}
+                >
+                  <SelectTrigger id="dark-mode" className="w-32">
+                    <SelectValue>
+                      {darkModeValue}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">OFF</SelectItem>
+                    <SelectItem value="dark">ON</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
-          {/* Account Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-              <CardDescription>
-                View your account details and status.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Email:</span>
-                  <span className="text-sm text-muted-foreground">
-                    {user?.email}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">User Type:</span>
-                  <span className="text-sm text-muted-foreground">
-                    {user?.user_type
-                      ? user.user_type.charAt(0).toUpperCase() +
-                        user.user_type.slice(1)
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
+          {/* Right Column - Sidebar Navigation */}
+          <div className="space-y-4">
+            <PWAInstallCard />
+            
+            {/* Account Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Account</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Link
+                  to="/academy/settings"
+                  className={`block text-sm transition-colors ${
+                    location.pathname === "/academy/settings"
+                      ? "text-primary font-medium"
+                      : "text-foreground hover:text-primary"
+                  }`}
+                >
+                  Preferences
+                </Link>
+                <Link
+                  to="/academy/profile"
+                  className={`block text-sm transition-colors ${
+                    location.pathname === "/academy/profile"
+                      ? "text-primary font-medium"
+                      : "text-foreground hover:text-primary"
+                  }`}
+                >
+                  Profile
+                </Link>
+                <Link
+                  to="/academy/profile"
+                  className="block text-sm text-foreground hover:text-primary transition-colors"
+                >
+                  Privacy settings
+                </Link>
             </CardContent>
           </Card>
+
+            {/* Subscription Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Subscription</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Link
+                  to="/subscription"
+                  className="block text-sm text-foreground hover:text-primary transition-colors"
+                >
+                  Choose a plan
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Support Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Support</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Link
+                  to="/help"
+                  className="block text-sm text-foreground hover:text-primary transition-colors"
+                >
+                  Help Center
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Logout Button */}
+            <Button
+              variant="link"
+              onClick={handleLogout}
+              className="w-full text-primary hover:text-primary/80 justify-center"
+            >
+              LOG OUT
+            </Button>
+          </div>
         </div>
       </div>
     </DashboardLayout>

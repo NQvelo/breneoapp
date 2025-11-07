@@ -65,6 +65,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useMobile } from "@/hooks/use-mobile";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
 
 // Interfaces
 interface Course {
@@ -87,6 +88,7 @@ interface Course {
 interface AcademyProfile {
   id: string;
   academy_name: string;
+  first_name?: string;
   description: string;
   website_url: string;
   contact_email: string;
@@ -341,30 +343,43 @@ const AcademyDashboard = () => {
   const fetchAcademyData = useCallback(async () => {
     if (!user) return;
     try {
-      // Create academy profile from Django user data
-      // The backend provides academy info in the user profile or user metadata
-      const academyName =
-        (user as any)?.academy_name || user.email?.split("@")[0] || "Academy";
+      // Fetch academy profile from API endpoint to get the academy_id
+      const response = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+      
+      if (response.data) {
+        const data = response.data;
+        const academyProfile: AcademyProfile = {
+          id: data.id || data.academy_id || String(user.id),
+          academy_name: data.academy_name || "",
+          first_name: data.first_name || data.firstName || user.first_name || data.academy_name || "",
+          description: data.description || "",
+          website_url: data.website_url || "",
+          contact_email: data.contact_email || user.email || "",
+          is_verified: data.is_verified || false,
+          logo_url: data.logo_url || data.profile_photo_url || null,
+        };
 
-      const academyProfile: AcademyProfile = {
-        id: String(user.id),
-        academy_name: academyName,
-        description: (user as any)?.academy_description || "",
-        website_url: (user as any)?.website_url || "",
-        contact_email: user.email || "",
-        is_verified: (user as any)?.is_verified || false,
-        logo_url: (user as any)?.logo_url || user.profile_image || null,
-      };
-
-      setAcademyProfile(academyProfile);
-      console.log("✅ Academy profile loaded from Django API:", academyProfile);
+        setAcademyProfile(academyProfile);
+        console.log("✅ Academy profile loaded from API:", academyProfile);
+      }
     } catch (error: any) {
       console.error("Failed to load academy profile:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load academy profile",
-        variant: "destructive",
-      });
+      // If 404, academy profile doesn't exist yet
+      if (error.response?.status === 404) {
+        toast({
+          title: "Academy Profile Not Found",
+          description: "Please set up your academy profile first",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load academy profile",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   }, [user, toast]);
 
@@ -372,17 +387,34 @@ const AcademyDashboard = () => {
     if (!academyProfile) return;
 
     try {
-      const response = await apiClient.get(API_ENDPOINTS.ACADEMY.COURSES);
-      setCourses(response.data || []);
+      // Fetch courses from Supabase filtered by academy_id
+      const { data, error } = await supabase
+        .from("courses")
+        .select("*")
+        .eq("academy_id", academyProfile.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const coursesData = (data || []).map((course) => ({
+        ...course,
+        required_skills: course.required_skills || [],
+        topics: course.topics || [],
+        enrolled: course.enrolled || false,
+        popular: course.popular || false,
+        is_academy_course: course.is_academy_course || false,
+      })) as Course[];
+
+      setCourses(coursesData);
     } catch (error: any) {
       console.error("Error fetching courses:", error);
       toast({
         title: "Error",
-        description: "Failed to load courses",
+        description: error.message || "Failed to load courses",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   }, [academyProfile, toast]);
 
@@ -391,7 +423,7 @@ const AcademyDashboard = () => {
   }, [fetchAcademyData]);
 
   useEffect(() => {
-    if (academyProfile) {
+    if (academyProfile && academyProfile.id) {
       fetchCourses();
     }
   }, [academyProfile, fetchCourses]);
@@ -422,72 +454,97 @@ const AcademyDashboard = () => {
   };
 
   const handleAddCourse = async () => {
-    if (!academyProfile) return;
+    if (!academyProfile || !academyProfile.id) {
+      toast({
+        title: "Error",
+        description: "Academy profile ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
+      // Process required skills and topics
+      const requiredSkills = courseForm.required_skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+      
+      const topics = courseForm.topics
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
 
-      // Add course data to FormData
-      formData.append("title", courseForm.title);
-      formData.append("description", courseForm.description);
-      formData.append("category", courseForm.category);
-      formData.append("level", courseForm.level);
-      formData.append("duration", courseForm.duration);
-      formData.append("provider", academyProfile.academy_name);
-      formData.append(
-        "required_skills",
-        JSON.stringify(
-          courseForm.required_skills
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s)
-        )
-      );
-      formData.append(
-        "topics",
-        JSON.stringify(
-          courseForm.topics
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s)
-        )
-      );
-      formData.append("enrolled", "false");
-      formData.append("popular", "false");
+      // Handle image upload
+      let imageUrl = "/lovable-uploads/no_photo.png"; // Default placeholder
 
-      // Add image if provided
       if (courseImage) {
-        formData.append("image", courseImage);
-      }
+        // Upload image to Supabase storage
+        const fileExt = courseImage.name.split(".").pop();
+        const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("course-images")
+          .upload(fileName, courseImage, {
+            cacheControl: "3600",
+            upsert: false,
+          });
 
-      const response = await apiClient.post(
-        API_ENDPOINTS.ACADEMY.COURSES,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+        if (uploadError) {
+          // If storage bucket doesn't exist or upload fails, use placeholder
+          console.warn("Image upload failed, using placeholder:", uploadError);
+          imageUrl = "/lovable-uploads/no_photo.png";
+        } else {
+          // Get public URL for the uploaded image
+          const { data: urlData } = supabase.storage
+            .from("course-images")
+            .getPublicUrl(fileName);
+          
+          imageUrl = urlData.publicUrl;
         }
-      );
-
-      if (response.data) {
-        toast({
-          title: "Success",
-          description: "Course added successfully",
-        });
-
-        fetchCourses();
-        handleModalOpenChange(false);
       }
+
+      // Get provider name - use first_name from API, fallback to academy_name
+      const providerName = academyProfile.first_name || academyProfile.academy_name || "";
+
+      // Insert course directly into Supabase
+      const { data: courseData, error: insertError } = await supabase
+        .from("courses")
+        .insert({
+          title: courseForm.title,
+          description: courseForm.description,
+          category: courseForm.category,
+          level: courseForm.level,
+          duration: courseForm.duration,
+          provider: providerName,
+          required_skills: requiredSkills,
+          topics: topics,
+          image: imageUrl,
+          enrolled: false,
+          popular: false,
+          academy_id: academyProfile.id,
+          is_academy_course: true,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      toast({
+        title: "Success",
+        description: "Course added successfully",
+      });
+
+      fetchCourses();
+      handleModalOpenChange(false);
     } catch (error: any) {
       console.error("Error adding course:", error);
       toast({
         title: "Error",
-        description:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to add course",
+        description: error.message || "Failed to add course",
         variant: "destructive",
       });
     } finally {
@@ -496,69 +553,81 @@ const AcademyDashboard = () => {
   };
 
   const handleUpdateCourse = async () => {
-    if (!editingCourse) return;
+    if (!editingCourse || !academyProfile || !academyProfile.id) return;
 
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
+      // Process required skills and topics
+      const requiredSkills = courseForm.required_skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
+      
+      const topics = courseForm.topics
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s);
 
-      // Add course data to FormData
-      formData.append("title", courseForm.title);
-      formData.append("description", courseForm.description);
-      formData.append("category", courseForm.category);
-      formData.append("level", courseForm.level);
-      formData.append("duration", courseForm.duration);
-      formData.append(
-        "required_skills",
-        JSON.stringify(
-          courseForm.required_skills
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s)
-        )
-      );
-      formData.append(
-        "topics",
-        JSON.stringify(
-          courseForm.topics
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s)
-        )
-      );
+      // Handle image upload if a new image was provided
+      let imageUrl = editingCourse.image; // Keep existing image by default
 
-      // Add image if provided (new image uploaded)
       if (courseImage) {
-        formData.append("image", courseImage);
-      }
+        // Upload new image to Supabase storage
+        const fileExt = courseImage.name.split(".").pop();
+        const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("course-images")
+          .upload(fileName, courseImage, {
+            cacheControl: "3600",
+            upsert: false,
+          });
 
-      const response = await apiClient.patch(
-        `${API_ENDPOINTS.ACADEMY.COURSES}${editingCourse.id}/`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+        if (!uploadError) {
+          // Get public URL for the uploaded image
+          const { data: urlData } = supabase.storage
+            .from("course-images")
+            .getPublicUrl(fileName);
+          
+          imageUrl = urlData.publicUrl;
         }
-      );
-
-      if (response.data) {
-        toast({
-          title: "Success",
-          description: "Course updated successfully",
-        });
-
-        fetchCourses();
-        handleModalOpenChange(false);
       }
+
+      // Get provider name - use first_name from API, fallback to academy_name
+      const providerName = academyProfile.first_name || academyProfile.academy_name || "";
+
+      // Update course in Supabase
+      const { error: updateError } = await supabase
+        .from("courses")
+        .update({
+          title: courseForm.title,
+          description: courseForm.description,
+          category: courseForm.category,
+          level: courseForm.level,
+          duration: courseForm.duration,
+          required_skills: requiredSkills,
+          topics: topics,
+          image: imageUrl,
+          provider: providerName,
+        })
+        .eq("id", editingCourse.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      toast({
+        title: "Success",
+        description: "Course updated successfully",
+      });
+
+      fetchCourses();
+      handleModalOpenChange(false);
     } catch (error: any) {
       console.error("Error updating course:", error);
       toast({
         title: "Error",
-        description:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to update course",
+        description: error.message || "Failed to update course",
         variant: "destructive",
       });
     } finally {
@@ -568,7 +637,15 @@ const AcademyDashboard = () => {
 
   const handleDeleteCourse = async (courseId: string) => {
     try {
-      await apiClient.delete(`${API_ENDPOINTS.ACADEMY.COURSES}${courseId}/`);
+      // Delete course from Supabase
+      const { error } = await supabase
+        .from("courses")
+        .delete()
+        .eq("id", courseId);
+
+      if (error) {
+        throw error;
+      }
 
       toast({
         title: "Success",
@@ -581,7 +658,7 @@ const AcademyDashboard = () => {
       console.error("Error deleting course:", error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to delete course",
+        description: error.message || "Failed to delete course",
         variant: "destructive",
       });
     }

@@ -43,6 +43,7 @@ import AcademyRegistrationPage from "@/pages/academy/AcademyRegistrationPage";
 // Common pages (Available to all authenticated users)
 import TermsOfUse from "@/pages/TermsOfUse";
 import HelpCenter from "@/pages/HelpCenter";
+import SubscriptionPage from "@/pages/SubscriptionPage";
 import NotFound from "@/pages/NotFound";
 
 /**
@@ -216,6 +217,14 @@ export const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <HelpCenter />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription"
+        element={
+          <ProtectedRoute>
+            <SubscriptionPage />
           </ProtectedRoute>
         }
       />

@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, ExternalLink, Mail, Globe } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import apiClient from "@/api/auth/apiClient";
 import { useAuth } from "@/contexts/AuthContext";
+import { slugToAcademyName } from "@/utils/academyUtils";
 
 interface Course {
   id: string;
@@ -38,61 +39,133 @@ interface AcademyProfile {
 }
 
 const AcademyPage = () => {
-  const { academySlug } = useParams<{ academySlug: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
 
-  const { data: academyProfile, isLoading: profileLoading } = useQuery({
-    queryKey: ["academy-profile", academySlug],
+  const {
+    data: academyProfile,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useQuery({
+    queryKey: ["academy-profile", slug],
     queryFn: async () => {
-      if (!academySlug) return null;
+      if (!slug) return null;
 
-      // Call the new database function
-      const { data, error } = await supabase
-        .rpc("get_academy_by_slug", { academy_slug: academySlug })
-        .single();
-
-      if (error) {
-        console.error("Error calling get_academy_by_slug:", error);
-        return null;
+      try {
+        // Try the endpoint with singular "academy" using slug
+        const response = await apiClient.get(`/api/academy/${slug}/`);
+        console.log("✅ Academy profile fetched:", {
+          academySlug: slug,
+          data: response.data,
+        });
+        return response.data as AcademyProfile;
+      } catch (err: unknown) {
+        // If singular fails, try plural "academies"
+        try {
+          const response = await apiClient.get(`/api/academies/${slug}/`);
+          console.log("✅ Academy profile fetched (plural endpoint):", {
+            academySlug: slug,
+            data: response.data,
+          });
+          return response.data as AcademyProfile;
+        } catch (error: unknown) {
+          console.error("❌ Error fetching academy profile:", {
+            singularError: err,
+            pluralError: error,
+            academySlug: slug,
+            endpointsTried: [
+              `/api/academy/${slug}/`,
+              `/api/academies/${slug}/`,
+            ],
+          });
+          // Log detailed error info
+          if (error && typeof error === "object" && "response" in error) {
+            const axiosError = error as {
+              response?: { status?: number; data?: unknown };
+            };
+            console.error("Error details:", {
+              status: axiosError.response?.status,
+              data: axiosError.response?.data,
+            });
+          }
+          throw error; // Re-throw to let React Query handle it
+        }
       }
-
-      return data as AcademyProfile;
     },
-    enabled: !!academySlug,
+    enabled: !!slug,
+    retry: 1, // Only retry once
   });
 
-  const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ["academy-courses", academyProfile?.id],
+  const {
+    data: courses,
+    isLoading: coursesLoading,
+    error: coursesError,
+  } = useQuery({
+    queryKey: ["academy-courses", academyProfile?.id, slug],
     queryFn: async () => {
-      if (!academyProfile) return [];
+      if (!academyProfile || !slug) return [];
 
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("academy_id", academyProfile.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching academy courses:", error);
-        return [];
+      try {
+        // Try plural endpoint first (as used in AcademyCoursesPage) using slug
+        const response = await apiClient.get(`/api/academies/${slug}/courses/`);
+        const coursesData = response.data?.courses || response.data || [];
+        console.log("✅ Academy courses fetched:", {
+          academySlug: slug,
+          courses: coursesData,
+        });
+        return Array.isArray(coursesData)
+          ? coursesData.map((course: Course) => ({
+              ...course,
+              topics: course.topics || [],
+              required_skills: course.required_skills || [],
+            }))
+          : [];
+      } catch (err: unknown) {
+        // If plural fails, try singular
+        try {
+          const response = await apiClient.get(`/api/academy/${slug}/courses/`);
+          const coursesData = response.data?.courses || response.data || [];
+          console.log("✅ Academy courses fetched (singular endpoint):", {
+            academySlug: slug,
+            courses: coursesData,
+          });
+          return Array.isArray(coursesData)
+            ? coursesData.map((course: Course) => ({
+                ...course,
+                topics: course.topics || [],
+                required_skills: course.required_skills || [],
+              }))
+            : [];
+        } catch (error: unknown) {
+          console.error("❌ Error fetching academy courses:", {
+            pluralError: err,
+            singularError: error,
+            academySlug: slug,
+          });
+          // Log detailed error info
+          if (error && typeof error === "object" && "response" in error) {
+            const axiosError = error as {
+              response?: { status?: number; data?: unknown };
+            };
+            console.error("Courses error details:", {
+              status: axiosError.response?.status,
+              data: axiosError.response?.data,
+            });
+          }
+          // Return empty array if courses endpoint doesn't exist
+          return [];
+        }
       }
-
-      return (
-        data?.map((course) => ({
-          ...course,
-          topics: course.topics || [],
-          required_skills: course.required_skills || [],
-        })) || []
-      );
     },
-    enabled: !!academyProfile,
+    enabled: !!academyProfile && !!slug,
+    retry: 1,
   });
 
-  if (!academySlug) {
+  if (!slug) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">
-          <p className="text-red-500">Academy not found</p>
+          <p className="text-red-500">Academy slug is required</p>
           <Link to="/courses">
             <Button variant="outline" className="mt-4">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -104,7 +177,8 @@ const AcademyPage = () => {
     );
   }
 
-  const academyDisplayName = academyProfile?.academy_name || academySlug;
+  const academyDisplayName =
+    academyProfile?.academy_name || slugToAcademyName(slug);
 
   return (
     <DashboardLayout>
@@ -192,12 +266,26 @@ const AcademyPage = () => {
               </div>
             </div>
           </div>
+        ) : profileError ? (
+          <div className="mb-8 p-6 bg-white rounded-lg shadow-sm border border-red-200">
+            <h1 className="text-3xl font-bold text-breneo-navy mb-3">
+              {academyDisplayName}
+            </h1>
+            <p className="text-red-600 mb-2">Error loading academy profile</p>
+            <p className="text-gray-600 text-sm">
+              {profileError instanceof Error
+                ? profileError.message
+                : "Failed to fetch academy information. Please check the academy slug."}
+            </p>
+            <p className="text-gray-500 text-xs mt-2">Academy Slug: {slug}</p>
+          </div>
         ) : (
           <div className="mb-8 p-6 bg-white rounded-lg shadow-sm border">
             <h1 className="text-3xl font-bold text-breneo-navy mb-3">
               {academyDisplayName}
             </h1>
             <p className="text-gray-600">Academy profile not found</p>
+            <p className="text-gray-500 text-sm mt-2">Academy Slug: {slug}</p>
           </div>
         )}
 

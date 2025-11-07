@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
@@ -45,9 +45,15 @@ import {
   Plus,
   Link2,
   ExternalLink,
+  Camera,
+  Upload,
+  AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import usePhoneVerification from "@/hooks/usePhoneVerification";
 
 // Academy Profile API endpoint
 const ACADEMY_PROFILE_API = "https://breneo.onrender.com/api/academy/profile/";
@@ -238,6 +244,96 @@ const AcademyProfilePage = () => {
     url: "",
   });
   const [savingSocialLink, setSavingSocialLink] = useState(false);
+  // Profile image upload state
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+
+  const phoneVerifiedFromServer = useMemo(() => {
+    const getValue = (source: unknown, key: string) => {
+      if (source && typeof source === "object") {
+        return (source as Record<string, unknown>)[key];
+      }
+      return undefined;
+    };
+
+    const candidates = [
+      getValue(user as unknown, "phone_verified"),
+      getValue(user as unknown, "is_phone_verified"),
+      getValue(userProfile as unknown, "phone_verified"),
+      getValue(userProfile as unknown, "is_phone_verified"),
+    ];
+
+    return candidates.some((value) => value === true || value === "true");
+  }, [user, userProfile]);
+
+  const {
+    isPhoneVerified,
+    isSendingCode,
+    isVerifyingCode,
+    codeSent,
+    codeInput,
+    resendCooldown,
+    sendCode: triggerPhoneVerificationCode,
+    verifyCode: confirmPhoneVerificationCode,
+    setCodeInput,
+  } = usePhoneVerification({
+    phoneNumber: user?.phone_number,
+    ownerId: user?.id,
+    role: user?.user_type ?? "academy",
+    initiallyVerified: phoneVerifiedFromServer,
+  });
+
+  const handleSendPhoneVerification = async () => {
+    try {
+      await triggerPhoneVerificationCode();
+      toast({
+        title: "Verification code sent",
+        description: user?.phone_number
+          ? `We've sent a 6-digit code to ${user.phone_number}.`
+          : "Verification code sent",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to send verification code. Please try again.";
+      toast({
+        title: "Unable to send code",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmPhoneVerification = async () => {
+    try {
+      const success = await confirmPhoneVerificationCode();
+      if (success) {
+        toast({
+          title: "Phone verified",
+          description: "Your phone number has been verified successfully.",
+        });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Verification failed. Please check the code and try again.";
+      toast({
+        title: "Verification failed",
+        description: message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Initialize profile image from user context on mount
+  useEffect(() => {
+    if (user?.profile_image) {
+      setProfileImage(user.profile_image);
+    }
+  }, [user?.profile_image]);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -755,6 +851,22 @@ const AcademyProfilePage = () => {
     setIsSocialLinkModalOpen(true);
   };
 
+  // Helper function to validate URL
+  const isValidUrl = (urlString: string): boolean => {
+    try {
+      const url = new URL(urlString);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      // If URL constructor throws, try adding https://
+      try {
+        const url = new URL(`https://${urlString}`);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
   // Handler to save/update social link or website
   const handleSaveSocialLink = async () => {
     if (
@@ -771,22 +883,42 @@ const AcademyProfilePage = () => {
       return;
     }
 
+    // Validate URL format
+    const urlToValidate = socialLinkForm.url.trim();
+    if (!isValidUrl(urlToValidate)) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid URL (e.g., https://example.com).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSavingSocialLink(true);
 
     try {
       // Handle website separately (save to academy profile)
       if (socialLinkForm.platform === "website") {
+        // Normalize URL - add https:// if missing
+        let normalizedUrl = urlToValidate;
+        if (
+          !normalizedUrl.startsWith("http://") &&
+          !normalizedUrl.startsWith("https://")
+        ) {
+          normalizedUrl = `https://${normalizedUrl}`;
+        }
+
         const response = await apiClient.patch(ACADEMY_PROFILE_API, {
           academy_name: academyProfile.academy_name,
           description: academyProfile.description,
-          website_url: socialLinkForm.url.trim() || null,
+          website_url: normalizedUrl || null,
           contact_email: academyProfile.contact_email,
         });
 
         if (response && response.data) {
           const updatedProfile: AcademyProfile = {
             ...academyProfile,
-            website_url: socialLinkForm.url.trim() || "",
+            website_url: normalizedUrl || "",
           };
           setAcademyProfile(updatedProfile);
           setFormState((prev) => ({
@@ -813,58 +945,127 @@ const AcademyProfilePage = () => {
 
       // Handle social links (save to social-links API)
       const token = localStorage.getItem("authToken");
+      if (!token) {
+        throw new Error("Authentication token is missing");
+      }
+
       const platform = socialLinkForm.platform as SocialPlatform;
       const role = "academy";
       const academyId = academyProfile.id;
       const userEmail = user?.email;
 
-      // Update the specific platform in the object
-      const updateData = {
-        [platform]: socialLinkForm.url.trim(),
+      if (!academyId || !userEmail) {
+        throw new Error(
+          "Missing required information: academy ID or user email"
+        );
+      }
+
+      // Normalize URL - add https:// if missing
+      let normalizedUrl = urlToValidate;
+      if (
+        !normalizedUrl.startsWith("http://") &&
+        !normalizedUrl.startsWith("https://")
+      ) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+
+      // Prepare the data object with all required fields
+      const socialLinkData = {
+        [platform]: normalizedUrl,
         role,
         academy: academyId,
         user_email: userEmail,
       } as Record<string, unknown>;
 
-      // PATCH the social links object
-      const response = await apiClient.patch("/api/social-links/", updateData, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
+      console.log("💾 Saving social link:", {
+        platform,
+        url: normalizedUrl,
+        role,
+        academy: academyId,
+        user_email: userEmail,
       });
 
-      if (!response || !response.data) {
-        throw new Error("No response data received");
+      // Try PATCH first (for updates), then POST if it fails (for creates)
+      let response;
+      try {
+        // Attempt PATCH (update existing record)
+        response = await apiClient.patch("/api/social-links/", socialLinkData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        console.log("✅ Social link saved via PATCH:", response.data);
+      } catch (patchError) {
+        const axiosPatchError = patchError as AxiosError;
+        // If PATCH fails with 404 or similar, try POST (create new record)
+        if (
+          axiosPatchError.response?.status === 404 ||
+          axiosPatchError.response?.status === 400
+        ) {
+          console.log("⚠️ PATCH failed, trying POST to create new record...");
+          try {
+            response = await apiClient.post(
+              "/api/social-links/",
+              socialLinkData,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            console.log("✅ Social link created via POST:", response.data);
+          } catch (postError) {
+            // If POST also fails, throw the original error
+            console.error("❌ Both PATCH and POST failed:", postError);
+            throw patchError;
+          }
+        } else {
+          // For other errors, throw the original error
+          throw patchError;
+        }
       }
 
-      // Update local state with response
-      setSocialLinks({
-        ...socialLinks,
-        [platform]: socialLinkForm.url.trim(),
-      });
+      if (!response || !response.data) {
+        throw new Error("No response data received from server");
+      }
 
-      // Re-fetch from server to ensure persisted state
+      // Update local state immediately with the saved value
+      setSocialLinks((prev) => ({
+        ...prev,
+        [platform]: normalizedUrl,
+      }));
+
+      // Re-fetch from server to ensure we have the persisted state
       try {
         const refreshed = await apiClient.get("/api/social-links/", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: { Authorization: `Bearer ${token}` },
           params: { role, academy: academyId, user_email: userEmail },
         });
+
         if (
           refreshed.data &&
           typeof refreshed.data === "object" &&
           !Array.isArray(refreshed.data)
         ) {
-          setSocialLinks({
+          const refreshedLinks = {
             github: refreshed.data.github || "",
             linkedin: refreshed.data.linkedin || "",
             facebook: refreshed.data.facebook || "",
             instagram: refreshed.data.instagram || "",
             dribbble: refreshed.data.dribbble || "",
             behance: refreshed.data.behance || "",
-          });
+          };
+          setSocialLinks(refreshedLinks);
+          console.log("✅ Social links refreshed from server:", refreshedLinks);
         }
-      } catch (e) {
-        console.warn("Could not refresh social links:", e);
+      } catch (refreshError) {
+        console.warn(
+          "⚠️ Could not refresh social links from server:",
+          refreshError
+        );
+        // Don't throw - we already updated local state, so continue
       }
 
       toast({
@@ -902,7 +1103,176 @@ const AcademyProfilePage = () => {
     }
   };
 
-  // Handler to delete social link (set to empty string)
+  // Profile image upload handler
+  const handleImageUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid File",
+        description: "Please select an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File Too Large",
+        description: "Image size should be less than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+
+    // Clear current image to show fallback
+    setProfileImage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("profile_image", file);
+
+      const token = localStorage.getItem("authToken");
+
+      // Upload the image
+      const uploadResponse = await apiClient.patch(
+        API_ENDPOINTS.AUTH.PROFILE,
+        formData,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      console.log("✅ Image upload response:", uploadResponse.data);
+
+      // Update local state
+      const newProfileImage =
+        uploadResponse.data?.profile_image ||
+        uploadResponse.data?.profile?.profile_image ||
+        uploadResponse.data?.user?.profile_image ||
+        null;
+
+      // Update the image with the new URL
+      setProfileImage(newProfileImage);
+
+      toast({
+        title: "Success",
+        description: "Profile image has been updated successfully.",
+      });
+
+      // Reload page to refresh user context with new profile image
+      // This ensures the image persists and is available everywhere
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+
+      console.log("✅ Profile image uploaded successfully");
+    } catch (error: unknown) {
+      console.error("❌ Error uploading profile image:", error);
+      const axiosError = error as AxiosError;
+      let errorMessage = "Failed to upload profile image. Please try again.";
+
+      if (axiosError.response?.data) {
+        const errorData = axiosError.response.data as {
+          detail?: string;
+          message?: string;
+        };
+        errorMessage = errorData.detail || errorData.message || errorMessage;
+      }
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Handler to open profile image options modal
+  const handleImageModalClick = () => {
+    setIsProfileImageModalOpen(true);
+  };
+
+  // Handler to trigger file input click from modal
+  const handleUploadFromModal = () => {
+    document.getElementById("profile-image-input")?.click();
+    setIsProfileImageModalOpen(false);
+  };
+
+  // Handler to remove profile image
+  const handleRemoveImage = async () => {
+    if (!user) return;
+
+    if (!confirm("Are you sure you want to remove your profile image?")) {
+      setIsProfileImageModalOpen(false);
+      return;
+    }
+
+    setUploadingImage(true);
+    setIsProfileImageModalOpen(false);
+
+    try {
+      const token = localStorage.getItem("authToken");
+
+      const response = await apiClient.patch(
+        API_ENDPOINTS.AUTH.PROFILE,
+        { profile_image: null },
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+
+      console.log("✅ Image removal response:", response.data);
+
+      setProfileImage(null);
+
+      // Refresh profile data
+      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+      if (profileResponse.data) {
+        // Update any profile data state if needed
+      }
+
+      toast({
+        title: "Success",
+        description: "Profile image has been removed.",
+      });
+
+      // Reload page to refresh user context
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+
+      console.log("✅ Profile image removed successfully");
+    } catch (error: unknown) {
+      console.error("❌ Error removing profile image:", error);
+      toast({
+        title: "Error",
+        description: "Failed to remove profile image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleDeleteSocialLink = async (platform: SocialPlatform) => {
     if (
       !user ||
@@ -914,9 +1284,26 @@ const AcademyProfilePage = () => {
 
     try {
       const token = localStorage.getItem("authToken");
+      if (!token) {
+        throw new Error("Authentication token is missing");
+      }
+
       const role = "academy";
       const academyId = academyProfile.id;
       const userEmail = user?.email;
+
+      if (!academyId || !userEmail) {
+        throw new Error(
+          "Missing required information: academy ID or user email"
+        );
+      }
+
+      console.log("🗑️ Deleting social link:", {
+        platform,
+        role,
+        academy: academyId,
+        user_email: userEmail,
+      });
 
       // PATCH to set the platform URL to empty string
       const updateData = {
@@ -926,20 +1313,29 @@ const AcademyProfilePage = () => {
         user_email: userEmail,
       } as Record<string, unknown>;
 
-      await apiClient.patch("/api/social-links/", updateData, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const response = await apiClient.patch("/api/social-links/", updateData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
-      // Update local state
+      if (!response || !response.data) {
+        throw new Error("No response data received from server");
+      }
+
+      console.log("✅ Social link deleted:", response.data);
+
+      // Update local state immediately
       setSocialLinks((prev) => ({
         ...prev,
         [platform]: "",
       }));
 
-      // Re-fetch to ensure server truth
+      // Re-fetch to ensure server state is synchronized
       try {
         const refreshed = await apiClient.get("/api/social-links/", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: { Authorization: `Bearer ${token}` },
           params: { role, academy: academyId, user_email: userEmail },
         });
         if (
@@ -947,27 +1343,50 @@ const AcademyProfilePage = () => {
           typeof refreshed.data === "object" &&
           !Array.isArray(refreshed.data)
         ) {
-          setSocialLinks({
+          const refreshedLinks = {
             github: refreshed.data.github || "",
             linkedin: refreshed.data.linkedin || "",
             facebook: refreshed.data.facebook || "",
             instagram: refreshed.data.instagram || "",
             dribbble: refreshed.data.dribbble || "",
             behance: refreshed.data.behance || "",
-          });
+          };
+          setSocialLinks(refreshedLinks);
+          console.log(
+            "✅ Social links refreshed from server after deletion:",
+            refreshedLinks
+          );
         }
-      } catch (e) {
-        // ignored
+      } catch (refreshError) {
+        console.warn(
+          "⚠️ Could not refresh social links from server:",
+          refreshError
+        );
+        // Don't throw - we already updated local state
       }
 
       toast({
         title: "Success",
         description: "Social link removed successfully.",
       });
-    } catch (error) {
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError;
+      let errorMessage = "Failed to remove social link. Please try again.";
+
+      if (axiosError.response?.data) {
+        const errorData = axiosError.response.data as {
+          detail?: string;
+          message?: string;
+        };
+        errorMessage = errorData.detail || errorData.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      console.error("❌ Error deleting social link:", error);
       toast({
         title: "Error",
-        description: "Failed to remove social link. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -1094,26 +1513,54 @@ const AcademyProfilePage = () => {
           {/* Profile Header Card */}
           <Card>
             <CardContent className="flex flex-col items-center pb-6 pt-6">
-              <OptimizedAvatar
-                src={
-                  user?.profile_image || userProfile?.profile_image || undefined
-                }
-                alt={academyProfile?.academy_name || "Academy"}
-                fallback={(() => {
-                  if (academyProfile?.academy_name) {
-                    return academyProfile.academy_name.charAt(0).toUpperCase();
+              <div
+                className="relative group cursor-pointer"
+                onClick={handleImageModalClick}
+              >
+                <OptimizedAvatar
+                  src={
+                    profileImage ||
+                    user?.profile_image ||
+                    userProfile?.profile_image ||
+                    undefined
                   }
-                  if (user?.first_name) {
-                    return user.first_name.charAt(0).toUpperCase();
-                  }
-                  if (user?.email) {
-                    return user.email.charAt(0).toUpperCase();
-                  }
-                  return "A";
-                })()}
-                size="xl"
-                loading="lazy"
-                className="h-32 w-32"
+                  alt={academyProfile?.academy_name || "Academy"}
+                  fallback={(() => {
+                    if (academyProfile?.academy_name) {
+                      return academyProfile.academy_name
+                        .charAt(0)
+                        .toUpperCase();
+                    }
+                    if (user?.first_name) {
+                      return user.first_name.charAt(0).toUpperCase();
+                    }
+                    if (user?.email) {
+                      return user.email.charAt(0).toUpperCase();
+                    }
+                    return "A";
+                  })()}
+                  size="xl"
+                  loading="lazy"
+                  className="h-32 w-32"
+                />
+                {uploadingImage ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl z-10">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                    <Camera className="h-8 w-8 text-white" />
+                  </div>
+                )}
+              </div>
+              {/* Hidden file input */}
+              <input
+                id="profile-image-input"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+                className="hidden"
               />
               {(user?.first_name || user?.last_name) && (
                 <h1 className="text-2xl font-bold mt-4 text-center">
@@ -1166,7 +1613,19 @@ const AcademyProfilePage = () => {
                   <div className="bg-breneo-blue/10 rounded-full p-2">
                     <Phone size={18} className="text-breneo-blue" />
                   </div>
-                  <span className="text-sm">{user.phone_number}</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                    <span className="text-sm">{user.phone_number}</span>
+                    <Badge
+                      variant={isPhoneVerified ? "secondary" : "outline"}
+                      className={
+                        isPhoneVerified
+                          ? "mt-1 sm:mt-0 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                          : "mt-1 sm:mt-0 border-orange-300 text-orange-600"
+                      }
+                    >
+                      {isPhoneVerified ? "Verified" : "Unverified"}
+                    </Badge>
+                  </div>
                 </div>
               )}
               <div className="flex items-center gap-3">
@@ -1185,6 +1644,83 @@ const AcademyProfilePage = () => {
                   </span>
                 </div>
               )}
+              {!isPhoneVerified && (
+                <Alert className="border-orange-300 bg-orange-50 dark:border-orange-900/60 dark:bg-orange-950/30">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-orange-600 mt-1" />
+                    <div className="flex-1 space-y-3">
+                      <div>
+                        <AlertTitle>Verify your phone number</AlertTitle>
+                        <AlertDescription>
+                          Confirm your phone number to ensure students and
+                          partners can trust your academy.
+                        </AlertDescription>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Button
+                            onClick={handleSendPhoneVerification}
+                            disabled={
+                              !user?.phone_number ||
+                              isSendingCode ||
+                              (codeSent && resendCooldown > 0)
+                            }
+                          >
+                            {isSendingCode
+                              ? "Sending..."
+                              : codeSent
+                              ? "Resend code"
+                              : "Send verification code"}
+                          </Button>
+                          {resendCooldown > 0 && (
+                            <span className="text-xs text-orange-700 dark:text-orange-300">
+                              You can request a new code in {resendCooldown}s
+                            </span>
+                          )}
+                        </div>
+                        {codeSent && (
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={6}
+                              placeholder="Enter 6-digit code"
+                              value={codeInput}
+                              onChange={(event) =>
+                                setCodeInput(
+                                  event.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 6)
+                                )
+                              }
+                              className="sm:max-w-[200px]"
+                            />
+                            <Button
+                              onClick={handleConfirmPhoneVerification}
+                              disabled={
+                                codeInput.length !== 6 || isVerifyingCode
+                              }
+                            >
+                              {isVerifyingCode ? "Verifying..." : "Verify"}
+                            </Button>
+                          </div>
+                        )}
+                        {!user?.phone_number && (
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => navigate("/academy/settings")}
+                            >
+                              Add phone number in settings
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
@@ -1193,26 +1729,14 @@ const AcademyProfilePage = () => {
             <CardHeader className="flex flex-row items-center justify-between">
               <h3 className="text-lg font-bold">Social Networks</h3>
               {academyProfile && (
-                <div className="flex items-center gap-2">
-                  {!academyProfile.website_url && (
-                    <Button
-                      variant="link"
-                      className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-                      onClick={handleOpenWebsiteModal}
-                    >
-                      <Plus size={16} />
-                      Website
-                    </Button>
-                  )}
-                  <Button
-                    variant="link"
-                    className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-                    onClick={handleOpenSocialLinkModal}
-                  >
-                    <Plus size={16} />
-                    Social
-                  </Button>
-                </div>
+                <Button
+                  variant="link"
+                  className="text-breneo-blue p-0 h-auto flex items-center gap-1"
+                  onClick={handleOpenSocialLinkModal}
+                >
+                  <Plus size={16} />
+                  Add
+                </Button>
               )}
             </CardHeader>
             <CardContent>
@@ -1220,62 +1744,6 @@ const AcademyProfilePage = () => {
                 <div className="text-center py-4 text-gray-500">Loading...</div>
               ) : (
                 <div className="space-y-3">
-                  {/* Website - shown first */}
-                  {academyProfile?.website_url && (
-                    <div className="flex items-center justify-between group">
-                      <a
-                        href={
-                          academyProfile.website_url.startsWith("http://") ||
-                          academyProfile.website_url.startsWith("https://")
-                            ? academyProfile.website_url
-                            : `https://${academyProfile.website_url}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 flex-1 hover:text-breneo-blue transition-colors"
-                      >
-                        <div className="bg-breneo-blue/10 rounded-full p-2">
-                          <Globe size={18} className="text-breneo-blue" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                            Website
-                          </p>
-                        </div>
-                        <ExternalLink
-                          size={14}
-                          className="text-gray-400 group-hover:text-breneo-blue"
-                        />
-                      </a>
-                      <div className="flex items-center gap-1 ml-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={handleOpenWebsiteModal}
-                        >
-                          <Edit size={14} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                          onClick={async () => {
-                            if (
-                              confirm(
-                                "Are you sure you want to remove the website?"
-                              )
-                            ) {
-                              await handleDeleteWebsite();
-                            }
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Social Links */}
                   {Object.entries(socialLinks).some(
                     ([_, url]) => url && url.trim() !== ""
@@ -1329,12 +1797,12 @@ const AcademyProfilePage = () => {
                           </div>
                         </div>
                       ))
-                  ) : !academyProfile?.website_url ? (
+                  ) : (
                     <div className="text-center py-4 text-gray-500">
                       No social links added yet. Click "Add" to add your social
                       media profiles or website.
                     </div>
-                  ) : null}
+                  )}
                 </div>
               )}
             </CardContent>
@@ -1726,6 +2194,91 @@ const AcademyProfilePage = () => {
                     : editingPlatform
                     ? "Update"
                     : "Add"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Profile Image Upload Modal */}
+        {isMobile ? (
+          <Drawer
+            open={isProfileImageModalOpen}
+            onOpenChange={setIsProfileImageModalOpen}
+          >
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>Profile Photo</DrawerTitle>
+              </DrawerHeader>
+              <div className="px-4 pb-4">
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleUploadFromModal}
+                    className="w-full justify-start gap-3"
+                    variant="ghost"
+                    disabled={uploadingImage}
+                  >
+                    <Upload className="h-5 w-5" />
+                    {profileImage || user?.profile_image
+                      ? "Update Photo"
+                      : "Upload Photo"}
+                  </Button>
+                  {profileImage || user?.profile_image ? (
+                    <Button
+                      onClick={handleRemoveImage}
+                      className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+                      variant="ghost"
+                      disabled={uploadingImage}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      Remove Photo
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Dialog
+            open={isProfileImageModalOpen}
+            onOpenChange={setIsProfileImageModalOpen}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Profile Photo</DialogTitle>
+              </DialogHeader>
+              <div className="py-4">
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleUploadFromModal}
+                    className="w-full justify-start gap-3"
+                    variant="ghost"
+                    disabled={uploadingImage}
+                  >
+                    <Upload className="h-5 w-5" />
+                    {profileImage || user?.profile_image
+                      ? "Update Photo"
+                      : "Upload Photo"}
+                  </Button>
+                  {profileImage || user?.profile_image ? (
+                    <Button
+                      onClick={handleRemoveImage}
+                      className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+                      variant="ghost"
+                      disabled={uploadingImage}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                      Remove Photo
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsProfileImageModalOpen(false)}
+                >
+                  Cancel
                 </Button>
               </DialogFooter>
             </DialogContent>
