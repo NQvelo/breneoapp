@@ -14,7 +14,6 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppRoutes } from "./routes/AppRoutes";
 import { PWAUpdatePrompt } from "./components/common/PWAUpdatePrompt";
-import { ThemeMetaUpdater } from "./components/common/ThemeMetaUpdater";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +32,6 @@ const App = () => (
       <Toaster />
       <Sonner />
       <PWAUpdatePrompt />
-      <ThemeMetaUpdater />
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -8,23 +8,24 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Smartphone, CheckCircle2, X } from "lucide-react";
-import { toast } from "sonner";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+interface NavigatorStandalone extends Navigator {
+  standalone?: boolean;
+}
+
 export const PWAInstallCard: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isChrome, setIsChrome] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
 
   useEffect(() => {
     // Check if app is already installed
@@ -34,8 +35,7 @@ export const PWAInstallCard: React.FC = () => {
     }
 
     // Check if app is installed on iOS
-    const nav = window.navigator as Navigator & { standalone?: boolean };
-    if (nav.standalone === true) {
+    if ((window.navigator as NavigatorStandalone).standalone === true) {
       setIsInstalled(true);
       return;
     }
@@ -45,11 +45,10 @@ export const PWAInstallCard: React.FC = () => {
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
     const isAndroidDevice = /android/.test(userAgent);
     const isChromeBrowser = /chrome/.test(userAgent) && !/edg/.test(userAgent);
-    const isEdgeBrowser = /edg/.test(userAgent);
 
     setIsIOS(isIOSDevice);
     setIsAndroid(isAndroidDevice);
-    setIsChrome(isChromeBrowser || isEdgeBrowser);
+    setIsChrome(isChromeBrowser);
 
     // Check if dismissed
     const dismissed = localStorage.getItem("pwa-install-card-dismissed");
@@ -65,16 +64,10 @@ export const PWAInstallCard: React.FC = () => {
 
     const handler = (e: Event) => {
       e.preventDefault();
-      const prompt = e as BeforeInstallPromptEvent;
-      deferredPromptRef.current = prompt;
-      setDeferredPrompt(prompt);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
 
-    // Listen for the beforeinstallprompt event
     window.addEventListener("beforeinstallprompt", handler);
-
-    // Also check if prompt is already available (for cases where event fired before component mounted)
-    // This is a workaround - we can't directly access it, but we can set up the listener
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
@@ -82,131 +75,33 @@ export const PWAInstallCard: React.FC = () => {
   }, []);
 
   const handleInstall = async () => {
-    setIsInstalling(true);
-
-    // Check if we have the deferred prompt (using ref for immediate check)
-    const currentPrompt = deferredPromptRef.current || deferredPrompt;
-
-    // If we have the deferred prompt, use it immediately
-    if (currentPrompt) {
-      try {
-        currentPrompt.prompt();
-        const { outcome } = await currentPrompt.userChoice;
-
-        if (outcome === "accepted") {
-          setIsInstalled(true);
-          setDeferredPrompt(null);
-          deferredPromptRef.current = null;
-          toast.success("App installed successfully!", {
-            description: "Breneo is now available on your device",
-          });
-        } else {
-          toast.info("Installation cancelled", {
-            description: "You can install the app anytime from your browser",
-          });
-        }
-      } catch (error) {
-        console.error("Error installing PWA:", error);
-        toast.error("Installation failed", {
-          description: "Please try again or follow the manual instructions",
-        });
-      } finally {
-        setIsInstalling(false);
-      }
-      return;
-    }
-
-    // Wait a brief moment to see if the prompt becomes available
-    // Sometimes the beforeinstallprompt event fires on user interaction
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    // Check again if prompt is now available (using ref for immediate access)
-    const promptAfterWait = deferredPromptRef.current || deferredPrompt;
-    if (promptAfterWait) {
-      try {
-        promptAfterWait.prompt();
-        const { outcome } = await promptAfterWait.userChoice;
-
-        if (outcome === "accepted") {
-          setIsInstalled(true);
-          setDeferredPrompt(null);
-          deferredPromptRef.current = null;
-          toast.success("App installed successfully!", {
-            description: "Breneo is now available on your device",
-          });
-        } else {
-          toast.info("Installation cancelled", {
-            description: "You can install the app anytime from your browser",
-          });
-        }
-      } catch (error) {
-        console.error("Error installing PWA:", error);
-        toast.error("Installation failed", {
-          description: "Please try again or follow the manual instructions",
-        });
-      } finally {
-        setIsInstalling(false);
-      }
-      return;
-    }
-
-    // For iOS - show instructions immediately
-    if (isIOS) {
+    if (!deferredPrompt) {
+      // If no deferred prompt, try to trigger browser's native install dialog
+      // by scrolling to instructions (for iOS) or doing nothing (browser will handle)
       const instructions = document.getElementById("pwa-instructions");
       if (instructions) {
-        instructions.scrollIntoView({ behavior: "smooth", block: "center" });
-        instructions.classList.add("ring-2", "ring-primary", "ring-offset-2");
-        setTimeout(() => {
-          instructions.classList.remove(
-            "ring-2",
-            "ring-primary",
-            "ring-offset-2"
-          );
-        }, 3000);
+        instructions.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
       }
-      toast.info("Install on iOS", {
-        description: "Use Safari's Share button → Add to Home Screen",
-        duration: 5000,
-      });
-      setIsInstalling(false);
       return;
     }
 
-    // For Android Chrome - show instructions
-    if (isAndroid) {
-      toast.info("Installing...", {
-        description: isChrome
-          ? "Check for install prompt, or use Chrome menu → Install app"
-          : "Use Chrome browser for the best installation experience",
-        duration: 4000,
-      });
+    try {
+      // Directly trigger the native browser install prompt - no alerts
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
 
-      // Scroll to instructions
-      const instructions = document.getElementById("pwa-instructions");
-      if (instructions) {
-        setTimeout(() => {
-          instructions.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 500);
+      if (outcome === "accepted") {
+        setIsInstalled(true);
+        setDeferredPrompt(null);
       }
-      setIsInstalling(false);
-      return;
+      // Silently handle the outcome - no toast notifications
+    } catch (error) {
+      console.error("Error installing PWA:", error);
+      // Silently handle errors - user can try again
     }
-
-    // For desktop browsers - show instructions
-    toast.info("Installing app...", {
-      description: "Look for the install prompt, or check your browser menu",
-      duration: 4000,
-    });
-
-    // Scroll to instructions
-    const instructions = document.getElementById("pwa-instructions");
-    if (instructions) {
-      setTimeout(() => {
-        instructions.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 500);
-    }
-
-    setIsInstalling(false);
   };
 
   const handleDismiss = () => {
@@ -260,19 +155,10 @@ export const PWAInstallCard: React.FC = () => {
           </div>
         </div>
 
-        {/* Download/Install Button - Always visible and triggers install directly */}
-        <Button
-          onClick={handleInstall}
-          className="w-full"
-          size="lg"
-          disabled={isInstalling}
-        >
+        {/* Download/Install Button - Always visible */}
+        <Button onClick={handleInstall} className="w-full" size="lg">
           <Download className="mr-2 h-4 w-4" />
-          {isInstalling
-            ? "Installing..."
-            : deferredPrompt
-            ? "Download & Install Now"
-            : "Download App"}
+          {deferredPrompt ? "Download & Install Now" : "Download App"}
         </Button>
 
         {/* Instructions Section */}

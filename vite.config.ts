@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["favicon.ico", "robots.txt", "lovable-uploads/*.png"],
+      includeAssets: ["robots.txt", "lovable-uploads/*.png"],
       manifest: {
         name: "Breneo - AI-Powered Learning & Job Matching Platform",
         short_name: "Breneo",
@@ -76,8 +76,9 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,svg,woff,woff2,ttf}"],
+        globPatterns: ["**/*.{js,css,html,svg,woff,woff2,ttf}"],
         globIgnores: [
+          "**/favicon.ico",
           "**/lovable-uploads/academy.png",
           "**/lovable-uploads/future.png",
           "**/lovable-uploads/way.png",
