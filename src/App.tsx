@@ -1,6 +1,6 @@
 /**
  * Main App Component
- * 
+ *
  * Root component that sets up providers and routing
  * Uses the organized route structure from routes/AppRoutes.tsx
  */
@@ -14,12 +14,13 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { AppRoutes } from "./routes/AppRoutes";
 import { PWAUpdatePrompt } from "./components/common/PWAUpdatePrompt";
+import { ThemeMetaUpdater } from "./components/common/ThemeMetaUpdater";
 
 const queryClient = new QueryClient();
 
 /**
  * App Component
- * 
+ *
  * Wraps the application with necessary providers:
  * - QueryClientProvider: React Query for data fetching
  * - TooltipProvider: Tooltip context
@@ -32,6 +33,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <PWAUpdatePrompt />
+      <ThemeMetaUpdater />
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />

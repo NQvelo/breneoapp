@@ -403,9 +403,9 @@ const CoursesPage = () => {
                   <CardContent className="p-5">
                     <h3 className="font-medium text-lg mb-2">{course.title}</h3>
                     <div className="flex items-center gap-2 mb-3 text-sm text-gray-500">
-                      {academyProfileName && academySlug ? (
+                      {academyProfileName && course.academy_id ? (
                         <Link
-                          to={`/academy/${academySlug}`}
+                          to={`/academy/${course.academy_id}`}
                           className="hover:underline text-blue-600 font-medium"
                         >
                           {academyName}

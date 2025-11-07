@@ -192,6 +192,13 @@ export const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* ==========================================
+          COMMON ROUTES - Available to all authenticated users
+          ========================================== */}
+      {/* Academy public view page - accessible to all authenticated users
+          Accepts academy_id (UUID) or slug as parameter
+          Displays academy profile and courses from Supabase */}
       <Route
         path="/academy/:academySlug"
         element={
@@ -200,10 +207,6 @@ export const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-
-      {/* ==========================================
-          COMMON ROUTES - Available to all authenticated users
-          ========================================== */}
       <Route
         path="/terms-of-use"
         element={
