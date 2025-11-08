@@ -2,22 +2,50 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="apple-mobile-web-app-title" content="Breneo" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="msapplication-TileColor" content="#ffffff" />
     <meta name="msapplication-config" content="/browserconfig.xml" />
-    
+
     <!-- Favicons - Must be early in head for best browser support -->
-    <link rel="shortcut icon" href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2" type="image/png" />
-    <link rel="icon" href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2" type="image/png" sizes="32x32" />
-    <link rel="icon" href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2" type="image/png" sizes="16x16" />
-    <link rel="apple-touch-icon" href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2" sizes="180x180" />
-    <link rel="icon" href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2" type="image/png" />
-    
+    <link
+      rel="shortcut icon"
+      href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2"
+      type="image/png"
+    />
+    <link
+      rel="icon"
+      href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2"
+      type="image/png"
+      sizes="32x32"
+    />
+    <link
+      rel="icon"
+      href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2"
+      type="image/png"
+      sizes="16x16"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2"
+      sizes="180x180"
+    />
+    <link
+      rel="icon"
+      href="/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=2"
+      type="image/png"
+    />
+
     <title>Breneo - AI-Powered Learning & Job Matching Platform</title>
     <meta
       name="description"
@@ -45,7 +73,6 @@
       name="twitter:image"
       content="https://lovable.dev/opengraph-image-p98pqg.png"
     />
-
     <script type="module" crossorigin src="/assets/index-S6R-xyGt.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-ZpIsMwAT.css">
   <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
@@ -56,22 +83,24 @@
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <!-- Force favicon update on page load -->
     <script>
-      (function() {
+      (function () {
         try {
-          const faviconUrl = '/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=' + new Date().getTime();
+          const faviconUrl =
+            "/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png?v=" +
+            new Date().getTime();
           // Force update favicon
           let link = document.querySelector("link[rel*='icon']");
           if (link) {
             link.href = faviconUrl;
           } else {
-            link = document.createElement('link');
-            link.rel = 'icon';
-            link.type = 'image/png';
+            link = document.createElement("link");
+            link.rel = "icon";
+            link.type = "image/png";
             link.href = faviconUrl;
             document.head.appendChild(link);
           }
-        } catch(e) {
-          console.warn('Favicon update failed:', e);
+        } catch (e) {
+          console.warn("Favicon update failed:", e);
         }
       })();
     </script>
