@@ -118,6 +118,15 @@
 }
 
 @layer utilities {
+  /* iOS safe area support for floating bottom navigation */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
   /* Dark mode support for custom background colors with improved contrast */
   .dark .bg-breneo-lightgray {
     background-color: hsl(var(--background));
