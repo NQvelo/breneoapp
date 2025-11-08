@@ -103,45 +103,88 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   return (
     <>
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-card border-b border-gray-200 dark:border-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <Link to={homePath} className="flex items-center">
-            <img
-              src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
-              alt="Breneo Logo"
-              className="h-7"
-            />
-          </Link>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              {mounted && theme === "dark" ? (
-                <Moon size={20} />
-              ) : (
-                <Sun size={20} />
-              )}
-            </button>
-            <Link
-              to="/notifications"
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <Bell size={20} />
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-50 px-4 pt-safe"
+        style={{
+          background:
+            mounted && theme === "dark"
+              ? "linear-gradient(to bottom, #181818, rgba(24, 24, 24, 0.4), transparent)"
+              : "linear-gradient(to bottom, #F8F9FA, rgba(248, 249, 250, 0.4), transparent)",
+        }}
+      >
+        <div className="py-5">
+          <div className="flex items-center justify-between">
+            <Link to={homePath} className="flex items-center">
+              <img
+                src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
+                alt="Breneo Logo"
+                className="h-8"
+              />
             </Link>
-            <Link
-              to={settingsPath}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <Settings size={20} />
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className={cn(
+                  "w-9 h-9 rounded-full backdrop-blur-md border border-gray-200 dark:border-border flex items-center justify-center transition-all",
+                  mounted && theme === "dark"
+                    ? "text-gray-300 hover:text-gray-100"
+                    : "text-gray-600 hover:text-gray-800"
+                )}
+                style={{
+                  background:
+                    mounted && theme === "dark"
+                      ? "rgba(36, 36, 36, 0.5)"
+                      : "rgba(255, 255, 255, 0.5)",
+                }}
+              >
+                {mounted && theme === "dark" ? (
+                  <Moon size={16} />
+                ) : (
+                  <Sun size={16} />
+                )}
+              </button>
+              <Link
+                to="/notifications"
+                className={cn(
+                  "w-9 h-9 rounded-full backdrop-blur-md border border-gray-200 dark:border-border flex items-center justify-center transition-all",
+                  mounted && theme === "dark"
+                    ? "text-gray-300 hover:text-gray-100"
+                    : "text-gray-600 hover:text-gray-800"
+                )}
+                style={{
+                  background:
+                    mounted && theme === "dark"
+                      ? "rgba(36, 36, 36, 0.5)"
+                      : "rgba(255, 255, 255, 0.5)",
+                }}
+              >
+                <Bell size={16} />
+              </Link>
+              <Link
+                to={settingsPath}
+                className={cn(
+                  "w-9 h-9 rounded-full backdrop-blur-md border border-gray-200 dark:border-border flex items-center justify-center transition-all",
+                  mounted && theme === "dark"
+                    ? "text-gray-300 hover:text-gray-100"
+                    : "text-gray-600 hover:text-gray-800"
+                )}
+                style={{
+                  background:
+                    mounted && theme === "dark"
+                      ? "rgba(36, 36, 36, 0.5)"
+                      : "rgba(255, 255, 255, 0.5)",
+                }}
+              >
+                <Settings size={16} />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Mobile Bottom Navigation - iOS Style Floating Toolbar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 pointer-events-none pb-safe">
-        <div className="px-6 pb-4">
+        <div className="px-6 pb-3">
           <div
             className={cn(
               "rounded-[100px] shadow-2xl",
@@ -150,20 +193,23 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
             )}
             style={{
               // Theme-aware navbar background with blur
-              background: mounted && theme === "dark" 
-                ? "rgba(36, 36, 36, 0.85)" 
-                : "rgba(255, 255, 255, 0.85)",
+              background:
+                mounted && theme === "dark"
+                  ? "rgba(36, 36, 36, 0.85)"
+                  : "rgba(255, 255, 255, 0.85)",
               WebkitBackdropFilter: "blur(10px) saturate(180%)",
               backdropFilter: "blur(10px) saturate(180%)",
-              border: mounted && theme === "dark"
-                ? "0.5px solid rgba(255, 255, 255, 0.1)"
-                : "0.5px solid rgba(0, 0, 0, 0.1)",
-              boxShadow: mounted && theme === "dark"
-                ? "0 8px 32px 0 rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.08)"
-                : "0 8px 32px 0 rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08)",
+              border:
+                mounted && theme === "dark"
+                  ? "0.5px solid rgba(255, 255, 255, 0.1)"
+                  : "0.5px solid rgba(0, 0, 0, 0.1)",
+              boxShadow:
+                mounted && theme === "dark"
+                  ? "0 8px 32px 0 rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.08)"
+                  : "0 8px 32px 0 rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08)",
             }}
           >
-            <nav className="flex justify-around items-center py-2.5 px-1">
+            <nav className="flex justify-around items-center py-2 px-1">
               {mobileNavItems.map((item, index) => {
                 const isActive = location.pathname === item.href;
                 return (
@@ -171,7 +217,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     key={index}
                     to={item.href}
                     className={cn(
-                      "flex flex-col items-center justify-center py-2 px-3 rounded-full transition-all duration-300 min-w-0 flex-1 mx-0.5 relative",
+                      "flex flex-col items-center justify-center py-1.5 px-2.5 rounded-full transition-all duration-300 min-w-0 flex-1 mx-0.5 relative",
                       "active:scale-95 active:opacity-80"
                     )}
                   >
@@ -180,16 +226,17 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                       <div
                         className="absolute inset-0 rounded-full"
                         style={{
-                          background: mounted && theme === "dark"
-                            ? "rgba(75, 75, 75, 0.8)"
-                            : "rgba(0, 0, 0, 0.08)",
+                          background:
+                            mounted && theme === "dark"
+                              ? "rgba(75, 75, 75, 0.8)"
+                              : "rgba(0, 0, 0, 0.08)",
                         }}
                       />
                     )}
                     <item.icon
-                      size={22}
+                      size={20}
                       className={cn(
-                        "transition-all duration-300 mb-1 relative z-10",
+                        "transition-all duration-300 mb-0.5 relative z-10",
                         mounted && theme === "dark"
                           ? "text-white"
                           : "text-gray-900"
@@ -197,7 +244,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     />
                     <span
                       className={cn(
-                        "text-xs font-medium transition-all duration-300 text-center leading-tight tracking-tight relative z-10",
+                        "text-[11px] font-medium transition-all duration-300 text-center leading-none tracking-tight relative z-10",
                         mounted && theme === "dark"
                           ? "text-white"
                           : "text-gray-900"
