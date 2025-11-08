@@ -120,12 +120,16 @@ export const usePhoneVerification = (
 
   const sendCode = useCallback(async () => {
     if (!phoneNumber) {
-      throw new Error("Phone number is missing. Please add it before verifying.");
+      throw new Error(
+        "Phone number is missing. Please add it before verifying."
+      );
     }
 
     if (resendCooldown > 0) {
       throw new Error(
-        `Please wait ${resendCooldown} second${resendCooldown === 1 ? "" : "s"} before requesting a new code.`
+        `Please wait ${resendCooldown} second${
+          resendCooldown === 1 ? "" : "s"
+        } before requesting a new code.`
       );
     }
 
@@ -200,5 +204,3 @@ export const usePhoneVerification = (
 };
 
 export default usePhoneVerification;
-
-

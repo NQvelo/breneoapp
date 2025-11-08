@@ -115,7 +115,7 @@
     font-family: "Mark GEO", sans-serif; /* Apply the font here */
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-  
+
   #root {
     /* Ensure root element uses full viewport in PWA mode */
     min-height: 100vh;
@@ -128,15 +128,15 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
-  
+
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0);
   }
-  
+
   .pl-safe {
     padding-left: env(safe-area-inset-left, 0);
   }
-  
+
   .pr-safe {
     padding-right: env(safe-area-inset-right, 0);
   }

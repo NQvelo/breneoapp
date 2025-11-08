@@ -48,5 +48,3 @@ export const sendSmsVerificationCode = async ({
 };
 
 export default sendSmsVerificationCode;
-
-
