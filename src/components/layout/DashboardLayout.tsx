@@ -50,8 +50,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           "h-full overflow-y-auto transition-all duration-300",
           sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]",
           // Adjusted top padding for the new header position
-          // Bottom padding accounts for floating toolbar (height ~70px + margin)
-          "pt-24 pb-24 md:pt-24 md:pb-0",
+          "pt-24 pb-32 md:pt-24 md:pb-0",
           "px-3 md:px-6"
         )}
       >

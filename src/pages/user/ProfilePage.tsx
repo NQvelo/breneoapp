@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
 import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { PieChart, Pie, Cell } from "recharts";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +57,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
+import { useQuery } from "@tanstack/react-query";
+import { Briefcase, GraduationCap, ArrowRight, MapPin } from "lucide-react";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SkillTestResult {
   final_role?: string;
@@ -87,6 +96,29 @@ interface SocialLinks {
 }
 
 type SocialPlatform = keyof SocialLinks;
+
+interface SavedCourse {
+  id: string;
+  title: string;
+  provider: string;
+  category: string;
+  level: string;
+  duration: string;
+  image: string;
+  description: string;
+}
+
+interface SavedJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  company_logo?: string;
+  salary?: string;
+  employment_type?: string;
+  work_arrangement?: string;
+}
 
 // Social Platform Icons as React Components
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -264,7 +296,177 @@ const ProfilePage = () => {
   });
   const [savingSocialLink, setSavingSocialLink] = useState(false);
 
+  // Ref to track manual updates to prevent useEffect from overwriting
+  const manualSocialLinkUpdateRef = useRef(false);
+  const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const { toast } = useToast();
+
+  // Fetch saved courses from API (with Supabase fallback)
+  const { data: savedCourses = [], isLoading: loadingSavedCourses } = useQuery({
+    queryKey: ["savedCourses", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      // Try API first
+      try {
+        const response = await apiClient.get(API_ENDPOINTS.USER.SAVED_COURSES, {
+          params: { limit: 6 }, // Limit to 6 for display
+        });
+
+        // Handle different response structures
+        let courses: SavedCourse[] = [];
+        if (Array.isArray(response.data)) {
+          courses = response.data;
+        } else if (response.data && typeof response.data === "object") {
+          const data = response.data as Record<string, unknown>;
+          if (Array.isArray(data.results)) {
+            courses = data.results as SavedCourse[];
+          } else if (Array.isArray(data.courses)) {
+            courses = data.courses as SavedCourse[];
+          } else if (Array.isArray(data.data)) {
+            courses = data.data as SavedCourse[];
+          }
+        }
+
+        if (courses.length > 0) {
+          return courses.map((course: unknown) => {
+            const c = course as Record<string, unknown>;
+            return {
+              id: (c.id as string) || (c.course_id as string) || "",
+              title: (c.title as string) || "",
+              provider: (c.provider as string) || "",
+              category: (c.category as string) || "",
+              level: (c.level as string) || "",
+              duration: (c.duration as string) || "",
+              image: (c.image as string) || "lovable-uploads/no_photo.png",
+              description: (c.description as string) || "",
+            } as SavedCourse;
+          });
+        }
+      } catch (error) {
+        console.warn(
+          "Error fetching saved courses from API, trying Supabase:",
+          error
+        );
+      }
+
+      // Fallback to Supabase: fetch saved course IDs and then get course details
+      try {
+        const { data: savedCourseIds, error: supabaseError } = await supabase
+          .from("saved_courses")
+          .select("course_id")
+          .eq("user_id", String(user.id))
+          .limit(6);
+
+        if (supabaseError) {
+          console.error(
+            "Error fetching saved courses from Supabase:",
+            supabaseError
+          );
+          return [];
+        }
+
+        if (!savedCourseIds || savedCourseIds.length === 0) {
+          return [];
+        }
+
+        // Fetch course details from Supabase
+        const courseIds = savedCourseIds.map((item) => item.course_id);
+        const { data: coursesData, error: coursesError } = await supabase
+          .from("courses")
+          .select(
+            "id, title, provider, category, level, duration, image, description"
+          )
+          .in("id", courseIds);
+
+        if (coursesError) {
+          console.error(
+            "Error fetching course details from Supabase:",
+            coursesError
+          );
+          return [];
+        }
+
+        return (coursesData || []).map((course) => ({
+          id: course.id,
+          title: course.title || "",
+          provider: course.provider || "",
+          category: course.category || "",
+          level: course.level || "",
+          duration: course.duration || "",
+          image: course.image || "lovable-uploads/no_photo.png",
+          description: course.description || "",
+        })) as SavedCourse[];
+      } catch (error) {
+        console.error("Error in Supabase fallback:", error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch saved jobs from API
+  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery({
+    queryKey: ["savedJobs", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      try {
+        const response = await apiClient.get(API_ENDPOINTS.USER.SAVED_JOBS, {
+          params: { limit: 6 }, // Limit to 6 for display
+        });
+
+        // Handle different response structures
+        let jobs: SavedJob[] = [];
+        if (Array.isArray(response.data)) {
+          jobs = response.data;
+        } else if (response.data && typeof response.data === "object") {
+          const data = response.data as Record<string, unknown>;
+          if (Array.isArray(data.results)) {
+            jobs = data.results as SavedJob[];
+          } else if (Array.isArray(data.jobs)) {
+            jobs = data.jobs as SavedJob[];
+          } else if (Array.isArray(data.data)) {
+            jobs = data.data as SavedJob[];
+          }
+        }
+
+        return jobs.map((job: unknown) => {
+          const j = job as Record<string, unknown>;
+          return {
+            id: (j.id as string) || (j.job_id as string) || "",
+            title: (j.title as string) || (j.job_title as string) || "",
+            company:
+              (j.company as string) ||
+              (j.employer_name as string) ||
+              (j.company_name as string) ||
+              "",
+            location: (j.location as string) || "",
+            url:
+              (j.url as string) ||
+              (j.job_apply_link as string) ||
+              (j.apply_link as string) ||
+              "",
+            company_logo:
+              (j.company_logo as string) ||
+              (j.employer_logo as string) ||
+              (j.logo as string) ||
+              undefined,
+            salary: (j.salary as string) || undefined,
+            employment_type:
+              (j.employment_type as string) ||
+              (j.job_employment_type as string) ||
+              undefined,
+            work_arrangement: (j.work_arrangement as string) || undefined,
+          } as SavedJob;
+        });
+      } catch (error) {
+        console.error("Error fetching saved jobs from API:", error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
 
   const phoneVerifiedFromServer = React.useMemo(() => {
     const getValue = (source: unknown, key: string) => {
@@ -433,6 +635,45 @@ const ProfilePage = () => {
         setProfileImage(profileImageValue);
         console.log("✅ Extracted profile_image value:", profileImageValue);
 
+        // Extract social links from profile response if available
+        const socialLinksFromProfile =
+          response.data?.social_links ||
+          response.data?.profile?.social_links ||
+          response.data?.user?.social_links ||
+          response.data?.social_networks ||
+          response.data?.profile?.social_networks ||
+          null;
+
+        if (
+          socialLinksFromProfile &&
+          typeof socialLinksFromProfile === "object"
+        ) {
+          console.log(
+            "✅ Found social links in profile response:",
+            socialLinksFromProfile
+          );
+          setSocialLinks({
+            github:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .github as string) || "",
+            linkedin:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .linkedin as string) || "",
+            facebook:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .facebook as string) || "",
+            instagram:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .instagram as string) || "",
+            dribbble:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .dribbble as string) || "",
+            behance:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .behance as string) || "",
+          });
+        }
+
         // Log all other profile fields that might be useful
         console.log("📊 Available profile fields:");
         Object.entries(response.data || {}).forEach(([key, value]) => {
@@ -481,65 +722,180 @@ const ProfilePage = () => {
     fetchProfileData();
   }, [user]);
 
-  // Fetch social links from API
+  // Extract social links from profile data (fetched from /api/profile/ endpoint)
   useEffect(() => {
-    const fetchSocialLinks = async () => {
-      if (!user) return;
+    if (!user) return;
 
-      setLoadingSocialLinks(true);
-      try {
-        const token = localStorage.getItem("authToken");
-        console.log("🔑 User Auth Token:", token);
-        const role = user?.user_type === "academy" ? "academy" : "user";
-        const ownerId = user?.id;
-        const userEmail = user?.email;
-        const response = await apiClient.get("/api/social-links/", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          params: { role, owner: ownerId, user_email: userEmail },
-        });
+    // Skip if we just made a manual update (prevent overwriting)
+    if (manualSocialLinkUpdateRef.current) {
+      console.log(
+        "⏭️ Skipping social links extraction - manual update in progress"
+      );
+      return;
+    }
 
-        // Handle object response with platform keys
+    setLoadingSocialLinks(true);
+
+    try {
+      // Extract social links from profile data
+      if (profileData) {
+        console.log(
+          "🔍 Extracting social links from profileData:",
+          profileData
+        );
+        const socialLinksFromProfile =
+          (profileData as Record<string, unknown>)?.social_links ||
+          (
+            (profileData as Record<string, unknown>).profile as Record<
+              string,
+              unknown
+            >
+          )?.social_links ||
+          (
+            (profileData as Record<string, unknown>).user as Record<
+              string,
+              unknown
+            >
+          )?.social_links ||
+          (profileData as Record<string, unknown>)?.social_networks ||
+          (
+            (profileData as Record<string, unknown>).profile as Record<
+              string,
+              unknown
+            >
+          )?.social_networks ||
+          null;
+
+        console.log(
+          "🔍 Extracted socialLinksFromProfile:",
+          socialLinksFromProfile
+        );
+
         if (
-          response.data &&
-          typeof response.data === "object" &&
-          !Array.isArray(response.data)
+          socialLinksFromProfile &&
+          typeof socialLinksFromProfile === "object"
         ) {
-          setSocialLinks({
-            github: response.data.github || "",
-            linkedin: response.data.linkedin || "",
-            facebook: response.data.facebook || "",
-            instagram: response.data.instagram || "",
-            dribbble: response.data.dribbble || "",
-            behance: response.data.behance || "",
-          });
+          console.log(
+            "✅ Using social links from profile data:",
+            socialLinksFromProfile
+          );
+          const extractedLinks = {
+            github:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .github as string) || "",
+            linkedin:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .linkedin as string) || "",
+            facebook:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .facebook as string) || "",
+            instagram:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .instagram as string) || "",
+            dribbble:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .dribbble as string) || "",
+            behance:
+              ((socialLinksFromProfile as Record<string, unknown>)
+                .behance as string) || "",
+          };
+          console.log("✅ Setting social links to:", extractedLinks);
+          setSocialLinks(extractedLinks);
         } else {
-          // Default empty state
-          setSocialLinks({
+          // No social links in profile - only set empty if we don't have any links
+          console.log("⚠️ No social links found in profile data");
+          // Don't reset if we already have links (might be a manual update)
+          setSocialLinks((prev) => {
+            const hasAnyLinks = Object.values(prev).some(
+              (v) => v && v.trim() !== ""
+            );
+            if (hasAnyLinks) {
+              console.log("⚠️ Keeping existing social links:", prev);
+              return prev;
+            }
+            return {
+              github: "",
+              linkedin: "",
+              facebook: "",
+              instagram: "",
+              dribbble: "",
+              behance: "",
+            };
+          });
+        }
+      } else {
+        // Profile data not loaded yet - don't reset if we have links
+        console.log("⚠️ Profile data not loaded yet");
+        setSocialLinks((prev) => {
+          const hasAnyLinks = Object.values(prev).some(
+            (v) => v && v.trim() !== ""
+          );
+          if (hasAnyLinks) {
+            return prev;
+          }
+          return {
             github: "",
             linkedin: "",
             facebook: "",
             instagram: "",
             dribbble: "",
             behance: "",
-          });
+          };
+        });
+      }
+    } catch (error) {
+      console.error("❌ Error extracting social links from profile:", error);
+      // Don't reset on error if we have links
+      setSocialLinks((prev) => {
+        const hasAnyLinks = Object.values(prev).some(
+          (v) => v && v.trim() !== ""
+        );
+        if (hasAnyLinks) {
+          return prev;
         }
-      } catch (error) {
-        // console.error("❌ Error fetching social links:", error);
-        setSocialLinks({
+        return {
           github: "",
           linkedin: "",
           facebook: "",
           instagram: "",
           dribbble: "",
           behance: "",
-        });
-      } finally {
-        setLoadingSocialLinks(false);
+        };
+      });
+    } finally {
+      setLoadingSocialLinks(false);
+    }
+  }, [user, profileData]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (socialLinksUpdateTimeoutRef.current) {
+        clearTimeout(socialLinksUpdateTimeoutRef.current);
       }
     };
+  }, []);
 
-    fetchSocialLinks();
-  }, [user]);
+  // ✅ Use the 'user' object from the context directly
+  const { first_name, last_name, email, phone_number } = user || {};
+
+  // Phone verification hook - must be called before any early returns
+  const {
+    isPhoneVerified,
+    isSendingCode,
+    isVerifyingCode,
+    codeSent,
+    codeInput,
+    resendCooldown,
+    sendCode: triggerPhoneVerificationCode,
+    verifyCode: confirmPhoneVerificationCode,
+    setCodeInput,
+  } = usePhoneVerification({
+    phoneNumber: phone_number || "",
+    ownerId: user?.id,
+    role: user?.user_type,
+    initiallyVerified: phoneVerifiedFromServer,
+  });
 
   // ✅ Show loading text based on the context's loading state
   if (loading) {
@@ -735,9 +1091,49 @@ const ProfilePage = () => {
     setIsSocialLinkModalOpen(true);
   };
 
+  // Helper function to validate and normalize URL
+  const normalizeUrl = (urlString: string): string => {
+    const trimmed = urlString.trim();
+    if (!trimmed) return trimmed;
+
+    // If it already starts with http:// or https://, return as is
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+
+    // Otherwise, add https://
+    return `https://${trimmed}`;
+  };
+
+  // Helper function to validate URL
+  const isValidUrl = (urlString: string): boolean => {
+    try {
+      const url = new URL(normalizeUrl(urlString));
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
+
   // Handler to save/update social link
   const handleSaveSocialLink = async () => {
-    if (!user || !socialLinkForm.platform || !socialLinkForm.url.trim()) {
+    console.log("🚀 handleSaveSocialLink called");
+    console.log("🚀 Form data:", socialLinkForm);
+    console.log("🚀 User:", user);
+    console.log("🚀 Current social links:", socialLinks);
+
+    if (!user) {
+      console.error("❌ No user found");
+      toast({
+        title: "Error",
+        description: "Please log in to save social links.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!socialLinkForm.platform || !socialLinkForm.url.trim()) {
+      console.error("❌ Missing platform or URL");
       toast({
         title: "Error",
         description: "Please select a platform and provide a URL.",
@@ -746,63 +1142,235 @@ const ProfilePage = () => {
       return;
     }
 
+    // Validate URL
+    if (!isValidUrl(socialLinkForm.url)) {
+      console.error("❌ Invalid URL:", socialLinkForm.url);
+      toast({
+        title: "Invalid URL",
+        description:
+          "Please enter a valid URL (e.g., https://example.com or example.com).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log("✅ Validation passed, starting save...");
     setSavingSocialLink(true);
 
     try {
+      const platform = socialLinkForm.platform as SocialPlatform;
       const token = localStorage.getItem("authToken");
 
-      const platform = socialLinkForm.platform as SocialPlatform;
-      const role = user?.user_type === "academy" ? "academy" : "user";
-      const ownerId = user?.id;
-      const userEmail = user?.email;
+      // Normalize the URL before saving
+      const normalizedUrl = normalizeUrl(socialLinkForm.url.trim());
 
-      // Update the specific platform in the object
-      const updateData = {
-        [platform]: socialLinkForm.url.trim(),
-        role,
-        owner: ownerId,
-        user_email: userEmail,
-        user: ownerId,
-      } as Record<string, unknown>;
+      // Prepare updated social links object with all existing links plus the new one
+      const updatedSocialLinks = {
+        ...socialLinks,
+        [platform]: normalizedUrl,
+      };
 
-      // PATCH the social links object
-      const response = await apiClient.patch("/api/social-links/", updateData, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
+      // Filter out empty strings - only send platforms with values
+      const socialLinksToSend: Record<string, string> = {};
+      Object.entries(updatedSocialLinks).forEach(([key, value]) => {
+        if (value && value.trim() !== "") {
+          socialLinksToSend[key] = value;
+        }
       });
 
-      // Update local state with response
-      if (response.data) {
-        setSocialLinks({
-          ...socialLinks,
-          [platform]: socialLinkForm.url.trim(),
-        });
+      console.log("📤 Sending social links to API:", socialLinksToSend);
+      console.log("📤 Platform:", platform);
+      console.log("📤 Normalized URL:", normalizedUrl);
+      console.log(
+        "📤 Full payload:",
+        JSON.stringify({ social_links: socialLinksToSend }, null, 2)
+      );
+
+      // Set flag to prevent useEffect from overwriting - MUST BE SET BEFORE ANY STATE UPDATES
+      manualSocialLinkUpdateRef.current = true;
+
+      // Clear any existing timeout
+      if (socialLinksUpdateTimeoutRef.current) {
+        clearTimeout(socialLinksUpdateTimeoutRef.current);
       }
 
-      // Re-fetch from server to ensure persisted state (owner scoping)
+      console.log("🔒 Manual update flag set to true");
+
+      // Update local state immediately for UI feedback
+      setSocialLinks(updatedSocialLinks);
+      console.log("✅ Updated local state immediately:", updatedSocialLinks);
+
+      // Save to profile endpoint with social_links object
+      // Try sending as nested object first, if that fails, try sending individual fields
+      let response;
       try {
-        const refreshed = await apiClient.get("/api/social-links/", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          params: { role, owner: ownerId, user_email: userEmail },
-        });
-        if (
-          refreshed.data &&
-          typeof refreshed.data === "object" &&
-          !Array.isArray(refreshed.data)
-        ) {
-          setSocialLinks({
-            github: refreshed.data.github || "",
-            linkedin: refreshed.data.linkedin || "",
-            facebook: refreshed.data.facebook || "",
-            instagram: refreshed.data.instagram || "",
-            dribbble: refreshed.data.dribbble || "",
-            behance: refreshed.data.behance || "",
-          });
+        console.log("📤 Attempting PATCH with social_links object...");
+        response = await apiClient.patch(
+          API_ENDPOINTS.AUTH.PROFILE,
+          {
+            social_links: socialLinksToSend,
+          },
+          {
+            headers: {
+              Authorization: token ? `Bearer ${token}` : undefined,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        console.log("✅ PATCH successful with social_links object");
+      } catch (apiError) {
+        console.error(
+          "❌ PATCH with social_links object failed, error:",
+          apiError
+        );
+
+        // Check if it's a validation error about the format
+        const error = apiError as {
+          response?: {
+            data?: unknown;
+            status?: number;
+          };
+        };
+
+        // If 400 error, try sending individual fields instead
+        if (error.response?.status === 400) {
+          console.log(
+            "🔄 Trying alternative format - sending individual fields..."
+          );
+          try {
+            // Try sending social links as individual fields on the profile
+            const individualFieldsPayload: Record<string, unknown> = {};
+            Object.entries(socialLinksToSend).forEach(([key, value]) => {
+              individualFieldsPayload[key] = value;
+            });
+
+            console.log(
+              "📤 Trying individual fields payload:",
+              individualFieldsPayload
+            );
+            response = await apiClient.patch(
+              API_ENDPOINTS.AUTH.PROFILE,
+              individualFieldsPayload,
+              {
+                headers: {
+                  Authorization: token ? `Bearer ${token}` : undefined,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            console.log("✅ PATCH successful with individual fields");
+          } catch (individualError) {
+            console.error(
+              "❌ PATCH with individual fields also failed:",
+              individualError
+            );
+            // Reset flag on error
+            manualSocialLinkUpdateRef.current = false;
+            throw apiError; // Throw original error
+          }
+        } else {
+          // Reset flag on error
+          manualSocialLinkUpdateRef.current = false;
+          throw apiError;
         }
-      } catch (e) {
-        // ignored
       }
+
+      console.log("✅ Response status:", response.status);
+      console.log("✅ Response data:", JSON.stringify(response.data, null, 2));
+      console.log("✅ Response headers:", response.headers);
+
+      // After successful PATCH, refetch the profile to get the latest data from server
+      // This ensures we have the most up-to-date social links
+      try {
+        console.log("🔄 Refetching profile data to verify save...");
+        const refreshedProfileResponse = await apiClient.get(
+          API_ENDPOINTS.AUTH.PROFILE,
+          {
+            headers: {
+              Authorization: token ? `Bearer ${token}` : undefined,
+            },
+          }
+        );
+
+        console.log(
+          "✅ Refreshed profile data:",
+          JSON.stringify(refreshedProfileResponse.data, null, 2)
+        );
+
+        if (refreshedProfileResponse.data) {
+          const refreshedData = refreshedProfileResponse.data as Record<
+            string,
+            unknown
+          >;
+
+          // Update profile data
+          setProfileData(refreshedProfileResponse.data as ProfileData);
+
+          // Extract social links from refreshed data
+          const socialLinksFromRefreshed =
+            refreshedData?.social_links ||
+            (refreshedData?.profile as Record<string, unknown>)?.social_links ||
+            (refreshedData?.user as Record<string, unknown>)?.social_links ||
+            null;
+
+          console.log(
+            "🔍 Social links from refreshed profile:",
+            socialLinksFromRefreshed
+          );
+
+          if (
+            socialLinksFromRefreshed &&
+            typeof socialLinksFromRefreshed === "object" &&
+            !Array.isArray(socialLinksFromRefreshed)
+          ) {
+            const extractedLinks = {
+              github:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .github as string) || "",
+              linkedin:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .linkedin as string) || "",
+              facebook:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .facebook as string) || "",
+              instagram:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .instagram as string) || "",
+              dribbble:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .dribbble as string) || "",
+              behance:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .behance as string) || "",
+            };
+            console.log(
+              "✅ Setting social links from refreshed data:",
+              extractedLinks
+            );
+            setSocialLinks(extractedLinks);
+          } else {
+            console.log(
+              "⚠️ No social links in refreshed data, checking if our update was saved..."
+            );
+            // If no social links in response, check if our update should have been there
+            // This might indicate the API doesn't return social_links in the response
+            console.log("⚠️ Keeping local update:", updatedSocialLinks);
+          }
+        }
+      } catch (refreshError) {
+        console.error("❌ Error refreshing profile after save:", refreshError);
+        // Even if refresh fails, keep the local update since PATCH succeeded
+        console.log("⚠️ Keeping local update due to refresh error");
+      }
+
+      // Reset the manual update flag after a delay
+      if (socialLinksUpdateTimeoutRef.current) {
+        clearTimeout(socialLinksUpdateTimeoutRef.current);
+      }
+      socialLinksUpdateTimeoutRef.current = setTimeout(() => {
+        manualSocialLinkUpdateRef.current = false;
+        console.log("✅ Manual update flag reset after timeout");
+      }, 3000);
 
       setIsSocialLinkModalOpen(false);
       setSocialLinkForm({ platform: "", url: "" });
@@ -815,11 +1383,75 @@ const ProfilePage = () => {
           : "Social link added successfully.",
       });
     } catch (error) {
-      // console.error("❌ Error saving social link:", error);
+      console.error("❌ Error saving social link:", error);
+      let errorMessage = "Failed to save social link. Please try again.";
+
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as {
+          response?: {
+            data?: unknown;
+            status?: number;
+            statusText?: string;
+          };
+          message?: string;
+          request?: unknown;
+        };
+
+        console.error("❌ Full error object:", {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          data: axiosError.response?.data,
+          message: axiosError.message,
+          request: axiosError.request,
+        });
+
+        if (axiosError.response?.data) {
+          const errorData = axiosError.response.data as {
+            detail?: string;
+            message?: string;
+            social_links?: unknown;
+            [key: string]: unknown;
+          };
+
+          // Check for field-specific errors
+          if (errorData.social_links) {
+            errorMessage =
+              typeof errorData.social_links === "string"
+                ? errorData.social_links
+                : "Invalid social links format. Please check your input.";
+          } else {
+            errorMessage =
+              errorData.detail || errorData.message || errorMessage;
+          }
+
+          console.error(
+            "❌ Error response data:",
+            JSON.stringify(errorData, null, 2)
+          );
+        }
+
+        // Provide more specific error messages based on status code
+        if (axiosError.response?.status === 400) {
+          errorMessage =
+            "Invalid request. Please check the URL format and try again.";
+        } else if (axiosError.response?.status === 401) {
+          errorMessage = "Authentication failed. Please log in again.";
+        } else if (axiosError.response?.status === 403) {
+          errorMessage = "You don't have permission to update social links.";
+        } else if (axiosError.response?.status === 500) {
+          errorMessage =
+            "Server error. Please try again later or contact support.";
+        }
+      } else if (error instanceof Error) {
+        console.error("❌ Error message:", error.message);
+        errorMessage = error.message || errorMessage;
+      }
+
       toast({
         title: "Error",
-        description: "Failed to save social link. Please try again.",
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setSavingSocialLink(false);
@@ -838,63 +1470,205 @@ const ProfilePage = () => {
     try {
       const token = localStorage.getItem("authToken");
 
-      const role = user?.user_type === "academy" ? "academy" : "user";
-      const ownerId = user?.id;
-      const userEmail = user?.email;
+      // Create a new object without the platform to remove
+      const updatedSocialLinks = { ...socialLinks };
+      delete updatedSocialLinks[platform];
 
-      // PATCH to set the platform URL to empty string
-      const updateData = {
-        [platform]: "",
-        role,
-        owner: ownerId,
-        user_email: userEmail,
-        user: ownerId,
-      } as Record<string, unknown>;
-
-      await apiClient.patch("/api/social-links/", updateData, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      // Filter out empty strings - only send platforms with values
+      const socialLinksToSend: Record<string, string> = {};
+      Object.entries(updatedSocialLinks).forEach(([key, value]) => {
+        if (value && value.trim() !== "") {
+          socialLinksToSend[key] = value;
+        }
       });
 
-      // Update local state
-      setSocialLinks((prev) => ({
-        ...prev,
-        [platform]: "",
-      }));
+      console.log("📤 Removing social link, sending:", socialLinksToSend);
+      console.log(
+        "📤 Full payload:",
+        JSON.stringify({ social_links: socialLinksToSend }, null, 2)
+      );
 
-      // Re-fetch to ensure server truth
-      try {
-        const refreshed = await apiClient.get("/api/social-links/", {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          params: { role, owner: ownerId, user_email: userEmail },
-        });
-        if (
-          refreshed.data &&
-          typeof refreshed.data === "object" &&
-          !Array.isArray(refreshed.data)
-        ) {
-          setSocialLinks({
-            github: refreshed.data.github || "",
-            linkedin: refreshed.data.linkedin || "",
-            facebook: refreshed.data.facebook || "",
-            instagram: refreshed.data.instagram || "",
-            dribbble: refreshed.data.dribbble || "",
-            behance: refreshed.data.behance || "",
-          });
-        }
-      } catch (e) {
-        // ignored
+      // Set flag to prevent useEffect from overwriting - MUST BE SET BEFORE ANY STATE UPDATES
+      manualSocialLinkUpdateRef.current = true;
+
+      // Clear any existing timeout
+      if (socialLinksUpdateTimeoutRef.current) {
+        clearTimeout(socialLinksUpdateTimeoutRef.current);
       }
+
+      console.log("🔒 Manual update flag set to true (delete)");
+
+      // Update local state immediately - set the removed platform to empty string
+      const finalSocialLinks = {
+        ...socialLinks,
+        [platform]: "",
+      };
+      setSocialLinks(finalSocialLinks);
+      console.log("✅ Updated local state immediately:", finalSocialLinks);
+
+      // Save to profile endpoint with updated social_links object (without the removed platform)
+      let response;
+      try {
+        response = await apiClient.patch(
+          API_ENDPOINTS.AUTH.PROFILE,
+          {
+            social_links: socialLinksToSend,
+          },
+          {
+            headers: {
+              Authorization: token ? `Bearer ${token}` : undefined,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      } catch (apiError) {
+        // Reset flag on error
+        manualSocialLinkUpdateRef.current = false;
+        throw apiError;
+      }
+
+      console.log("✅ Response status:", response.status);
+      console.log("✅ Response data:", JSON.stringify(response.data, null, 2));
+      console.log("✅ Response headers:", response.headers);
+
+      // After successful PATCH, refetch the profile to get the latest data from server
+      try {
+        console.log("🔄 Refetching profile data to verify delete...");
+        const refreshedProfileResponse = await apiClient.get(
+          API_ENDPOINTS.AUTH.PROFILE,
+          {
+            headers: {
+              Authorization: token ? `Bearer ${token}` : undefined,
+            },
+          }
+        );
+
+        console.log(
+          "✅ Refreshed profile data (delete):",
+          JSON.stringify(refreshedProfileResponse.data, null, 2)
+        );
+
+        if (refreshedProfileResponse.data) {
+          const refreshedData = refreshedProfileResponse.data as Record<
+            string,
+            unknown
+          >;
+
+          // Update profile data
+          setProfileData(refreshedProfileResponse.data as ProfileData);
+
+          // Extract social links from refreshed data
+          const socialLinksFromRefreshed =
+            refreshedData?.social_links ||
+            (refreshedData?.profile as Record<string, unknown>)?.social_links ||
+            (refreshedData?.user as Record<string, unknown>)?.social_links ||
+            null;
+
+          console.log(
+            "🔍 Social links from refreshed profile (delete):",
+            socialLinksFromRefreshed
+          );
+
+          if (
+            socialLinksFromRefreshed &&
+            typeof socialLinksFromRefreshed === "object" &&
+            !Array.isArray(socialLinksFromRefreshed)
+          ) {
+            const extractedLinks = {
+              github:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .github as string) || "",
+              linkedin:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .linkedin as string) || "",
+              facebook:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .facebook as string) || "",
+              instagram:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .instagram as string) || "",
+              dribbble:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .dribbble as string) || "",
+              behance:
+                ((socialLinksFromRefreshed as Record<string, unknown>)
+                  .behance as string) || "",
+            };
+            console.log(
+              "✅ Setting social links from refreshed data (delete):",
+              extractedLinks
+            );
+            setSocialLinks(extractedLinks);
+          } else {
+            console.log("⚠️ No social links in refreshed data after delete");
+            // The platform should be removed, so finalSocialLinks is correct
+            console.log(
+              "✅ Keeping local update (platform removed):",
+              finalSocialLinks
+            );
+          }
+        }
+      } catch (refreshError) {
+        console.error(
+          "❌ Error refreshing profile after delete:",
+          refreshError
+        );
+        // Keep the local update since PATCH succeeded
+      }
+
+      // Reset the manual update flag after a delay
+      if (socialLinksUpdateTimeoutRef.current) {
+        clearTimeout(socialLinksUpdateTimeoutRef.current);
+      }
+      socialLinksUpdateTimeoutRef.current = setTimeout(() => {
+        manualSocialLinkUpdateRef.current = false;
+        console.log("✅ Manual update flag reset after timeout (delete)");
+      }, 3000);
 
       toast({
         title: "Success",
         description: "Social link removed successfully.",
       });
     } catch (error) {
-      // console.error("❌ Error deleting social link:", error);
+      console.error("❌ Error deleting social link:", error);
+      let errorMessage = "Failed to remove social link. Please try again.";
+
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as {
+          response?: {
+            data?: unknown;
+            status?: number;
+            statusText?: string;
+          };
+          message?: string;
+        };
+
+        console.error("❌ Full error object:", {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          data: axiosError.response?.data,
+          message: axiosError.message,
+        });
+
+        if (axiosError.response?.data) {
+          const errorData = axiosError.response.data as {
+            detail?: string;
+            message?: string;
+            [key: string]: unknown;
+          };
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+          console.error(
+            "❌ Error response data:",
+            JSON.stringify(errorData, null, 2)
+          );
+        }
+      }
+
       toast({
         title: "Error",
-        description: "Failed to remove social link. Please try again.",
+        description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       });
     }
   };
@@ -948,26 +1722,6 @@ const ProfilePage = () => {
       setUpdatingAboutMe(false);
     }
   };
-
-  // ✅ Use the 'user' object from the context directly
-  const { first_name, last_name, email, phone_number } = user;
-
-  const {
-    isPhoneVerified,
-    isSendingCode,
-    isVerifyingCode,
-    codeSent,
-    codeInput,
-    resendCooldown,
-    sendCode: triggerPhoneVerificationCode,
-    verifyCode: confirmPhoneVerificationCode,
-    setCodeInput,
-  } = usePhoneVerification({
-    phoneNumber: phone_number,
-    ownerId: user?.id,
-    role: user?.user_type,
-    initiallyVerified: phoneVerifiedFromServer,
-  });
 
   const handleSendPhoneVerification = async () => {
     try {
@@ -1057,6 +1811,24 @@ const ProfilePage = () => {
     return filtered;
   };
 
+  // Prepare data for pie charts
+  const prepareSkillPieData = (skill: { name: string; percentage: number }) => {
+    return [
+      {
+        name: skill.name,
+        value: skill.percentage,
+        fill: skill.percentage >= 70 ? "#10b981" : "#f59e0b",
+      },
+      { name: "Remaining", value: 100 - skill.percentage, fill: "#e5e7eb" },
+    ];
+  };
+
+  const COLORS = {
+    strong: "#10b981", // green-500
+    moderate: "#f59e0b", // amber-500
+    light: "#e5e7eb", // gray-200
+  };
+
   return (
     <DashboardLayout>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
@@ -1064,44 +1836,48 @@ const ProfilePage = () => {
         <div className="lg:col-span-1 space-y-4 md:space-y-6">
           {/* Profile Header Card */}
           <Card>
-            <CardContent className="flex flex-col items-center pb-6 pt-6">
-              <div
-                className="relative group cursor-pointer"
-                onClick={handleImageModalClick}
-              >
-                <OptimizedAvatar
-                  key={`avatar-${imageTimestamp}`}
-                  src={displayProfileImage || undefined}
-                  alt="Profile photo"
-                  fallback={
-                    first_name ? first_name.charAt(0).toUpperCase() : "U"
-                  }
-                  size="xl"
-                  loading="eager"
-                  className="h-32 w-32"
+            <CardContent className="pb-6 pt-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div
+                  className="relative group cursor-pointer flex-shrink-0"
+                  onClick={handleImageModalClick}
+                >
+                  <OptimizedAvatar
+                    key={`avatar-${imageTimestamp}`}
+                    src={displayProfileImage || undefined}
+                    alt="Profile photo"
+                    fallback={
+                      first_name ? first_name.charAt(0).toUpperCase() : "U"
+                    }
+                    size="lg"
+                    loading="eager"
+                    className="h-16 w-16"
+                  />
+                  {uploadingImage ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                      <Camera className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                </div>
+                <input
+                  id="profile-image-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  disabled={uploadingImage}
                 />
-                {uploadingImage ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl z-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                    <Camera className="h-8 w-8 text-white" />
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {first_name} {last_name}
+                  </h1>
+                </div>
               </div>
-              <input
-                id="profile-image-input"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-                disabled={uploadingImage}
-              />
-              <h1 className="text-2xl font-bold mt-4 text-center">
-                {first_name} {last_name}
-              </h1>
-              <div className="mt-4 flex items-center gap-2 w-full">
+              <div className="flex items-center gap-2 w-full">
                 <Button
                   variant="outline"
                   className="flex-[4] flex items-center justify-center gap-2"
@@ -1421,41 +2197,106 @@ const ProfilePage = () => {
                     </div>
                   )}
 
-                  {/* Skills List - Top 5 */}
+                  {/* Skills with Pie Charts */}
                   {getAllSkills().length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                    <div>
+                      <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-4">
                         Top Skills
                       </h4>
-                      {getAllSkills().map((skill) => {
-                        const isStrong = skill.percentage >= 70;
-                        return (
-                          <div key={skill.name} className="space-y-1">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-700 dark:text-gray-300">
-                                {skill.name}
-                              </span>
-                              <span
-                                className={`font-semibold ${
-                                  isStrong
-                                    ? "text-green-600 dark:text-green-400"
-                                    : "text-orange-600 dark:text-orange-400"
-                                }`}
-                              >
-                                {skill.percentage.toFixed(0)}%
-                              </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {getAllSkills().map((skill) => {
+                          const isStrong = skill.percentage >= 70;
+                          const pieData = prepareSkillPieData(skill);
+                          const chartConfig = {
+                            [skill.name]: {
+                              label: skill.name,
+                              color: isStrong ? COLORS.strong : COLORS.moderate,
+                            },
+                            Remaining: {
+                              label: "Remaining",
+                              color: COLORS.light,
+                            },
+                          };
+
+                          return (
+                            <div
+                              key={skill.name}
+                              className="group relative p-5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-breneo-blue dark:hover:border-breneo-blue transition-all duration-300 bg-white dark:bg-gray-800/50 hover:shadow-lg"
+                            >
+                              <div className="flex flex-col items-center space-y-4">
+                                {/* Pie Chart */}
+                                <div className="relative w-32 h-32">
+                                  <ChartContainer
+                                    config={chartConfig}
+                                    className="h-full w-full [&>div]:aspect-square"
+                                  >
+                                    <PieChart>
+                                      <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={35}
+                                        outerRadius={50}
+                                        paddingAngle={2}
+                                        dataKey="value"
+                                        startAngle={90}
+                                        endAngle={-270}
+                                      >
+                                        {pieData.map((entry, index) => (
+                                          <Cell
+                                            key={`cell-${index}`}
+                                            fill={entry.fill}
+                                            stroke="none"
+                                          />
+                                        ))}
+                                      </Pie>
+                                      <ChartTooltip
+                                        content={
+                                          <ChartTooltipContent
+                                            formatter={(value) => [
+                                              `${value}%`,
+                                              "",
+                                            ]}
+                                          />
+                                        }
+                                      />
+                                    </PieChart>
+                                  </ChartContainer>
+                                  {/* Center percentage */}
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="text-center">
+                                      <div
+                                        className={`text-2xl font-bold ${
+                                          isStrong
+                                            ? "text-green-600 dark:text-green-400"
+                                            : "text-amber-600 dark:text-amber-400"
+                                        }`}
+                                      >
+                                        {skill.percentage.toFixed(0)}%
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                {/* Skill Name */}
+                                <div className="text-center">
+                                  <h5 className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                                    {skill.name}
+                                  </h5>
+                                  <div
+                                    className={`mt-1 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                      isStrong
+                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                    }`}
+                                  >
+                                    {isStrong ? "Strong" : "Moderate"}
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                            <Progress
-                              value={skill.percentage}
-                              className={`h-2 ${
-                                isStrong
-                                  ? "bg-green-100 dark:bg-green-900/30"
-                                  : "bg-orange-100 dark:bg-orange-900/30"
-                              }`}
-                            />
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -1470,6 +2311,194 @@ const ProfilePage = () => {
                 <div className="text-center py-4 text-gray-500">
                   No skill test results available. Take a skill test to see your
                   results here.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Saved Courses Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-breneo-blue" />
+                <h3 className="text-lg font-bold">Saved Courses</h3>
+              </div>
+              {savedCourses.length > 0 && (
+                <Button
+                  variant="link"
+                  className="text-breneo-blue p-0 h-auto"
+                  onClick={() => navigate("/courses")}
+                >
+                  View All
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {loadingSavedCourses ? (
+                <div className="text-center py-4 text-gray-500">Loading...</div>
+              ) : savedCourses.length > 0 ? (
+                <div className="space-y-3">
+                  {savedCourses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/course/${course.id}`)}
+                    >
+                      <div className="flex-shrink-0">
+                        <img
+                          src={course.image || "lovable-uploads/no_photo.png"}
+                          alt={course.title}
+                          className="w-16 h-16 rounded-lg object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = "lovable-uploads/no_photo.png";
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm mb-1 line-clamp-1">
+                          {course.title}
+                        </h4>
+                        <p className="text-xs text-gray-500 mb-1">
+                          {course.provider}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>{course.level}</span>
+                          <span>•</span>
+                          <span>{course.duration}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {savedCourses.length >= 6 && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => navigate("/courses")}
+                    >
+                      View All Saved Courses
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No saved courses yet. Browse courses and save your favorites!
+                  <Button
+                    variant="link"
+                    className="mt-2 text-breneo-blue"
+                    onClick={() => navigate("/courses")}
+                  >
+                    Browse Courses
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Saved Jobs Card */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-breneo-blue" />
+                <h3 className="text-lg font-bold">Saved Jobs</h3>
+              </div>
+              {savedJobs.length > 0 && (
+                <Button
+                  variant="link"
+                  className="text-breneo-blue p-0 h-auto"
+                  onClick={() => navigate("/jobs")}
+                >
+                  View All
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {loadingSavedJobs ? (
+                <div className="text-center py-4 text-gray-500">Loading...</div>
+              ) : savedJobs.length > 0 ? (
+                <div className="space-y-3">
+                  {savedJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    >
+                      <div className="flex-shrink-0">
+                        {job.company_logo ? (
+                          <img
+                            src={job.company_logo}
+                            alt={`${job.company} logo`}
+                            className="w-12 h-12 rounded-lg object-cover border border-gray-200"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              if (target.nextElementSibling) {
+                                (
+                                  target.nextElementSibling as HTMLElement
+                                ).style.display = "flex";
+                              }
+                            }}
+                          />
+                        ) : null}
+                        {!job.company_logo && (
+                          <div className="w-12 h-12 rounded-lg bg-breneo-accent flex items-center justify-center">
+                            <Briefcase className="h-6 w-6 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm mb-1 line-clamp-1">
+                          {job.title}
+                        </h4>
+                        <p className="text-xs text-gray-500 mb-1">
+                          {job.company}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                          <MapPin className="h-3 w-3" />
+                          <span className="line-clamp-1">{job.location}</span>
+                        </div>
+                        {job.salary && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            {job.salary}
+                          </p>
+                        )}
+                        {job.url && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 text-xs h-7"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(job.url, "_blank");
+                            }}
+                          >
+                            View Job
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {savedJobs.length >= 6 && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => navigate("/jobs")}
+                    >
+                      View All Saved Jobs
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500">
+                  No saved jobs yet. Browse jobs and save your favorites!
+                  <Button
+                    variant="link"
+                    className="mt-2 text-breneo-blue"
+                    onClick={() => navigate("/jobs")}
+                  >
+                    Browse Jobs
+                  </Button>
                 </div>
               )}
             </CardContent>

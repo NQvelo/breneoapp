@@ -700,12 +700,6 @@ const AcademyPage = () => {
                     Back to Courses
                   </Button>
                 </Link>
-                {academyProfile.description && (
-                  <p className="text-lg text-gray-600">
-                    {academyProfile.description.split(".")[0]}
-                    {academyProfile.description.split(".").length > 1 && "."}
-                  </p>
-                )}
               </div>
 
               {/* About Section */}

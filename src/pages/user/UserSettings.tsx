@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -19,14 +19,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,38 +47,99 @@ import {
   CreditCard,
   BookOpen,
   Link as LinkIcon,
-  HelpCircle,
   Eye,
   Globe,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
+import { useMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 type SettingsSection =
-  | "preferences"
   | "account"
   | "notifications"
   | "privacy"
   | "subscription"
   | "learning"
-  | "integrations"
-  | "support"
   | "accessibility";
+
+const settingsSections: Array<{ id: SettingsSection; label: string }> = [
+  { id: "account", label: "Account Settings" },
+  { id: "notifications", label: "Notifications" },
+  { id: "privacy", label: "Privacy & Security" },
+  { id: "subscription", label: "Subscription & Billing" },
+  { id: "learning", label: "Learning Preferences" },
+  { id: "accessibility", label: "Theme & Accessibility" },
+];
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
-  const location = useLocation();
+  const isMobile = useMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const [mounted, setMounted] = useState(false);
-  const [activeSection, setActiveSection] = useState<SettingsSection>(
-    (searchParams.get("section") as SettingsSection) || "preferences"
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const activeButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Get initial section from URL or default to account
+  const getInitialSection = (): SettingsSection => {
+    const validSections: SettingsSection[] = [
+      "account",
+      "notifications",
+      "privacy",
+      "subscription",
+      "learning",
+      "accessibility",
+    ];
+    try {
+      const sectionFromUrl = searchParams.get("section") as SettingsSection;
+      if (sectionFromUrl && validSections.includes(sectionFromUrl)) {
+        return sectionFromUrl;
+      }
+    } catch (error) {
+      console.error("Error getting initial section:", error);
+    }
+    return "account";
+  };
+  
+  const [activeSection, setActiveSection] = useState<SettingsSection>(() => 
+    getInitialSection()
   );
 
-  // Preferences state
-  const [soundEffects, setSoundEffects] = useState(true);
-  const [animations, setAnimations] = useState(true);
-  const [motivationalMessages, setMotivationalMessages] = useState(true);
-  const [listeningExercises, setListeningExercises] = useState(true);
+  // Scroll active button into view on mobile
+  useEffect(() => {
+    if (!isMobile || !scrollContainerRef.current) return;
+
+    // Use a small timeout to ensure DOM is updated after ref assignment
+    const timeoutId = setTimeout(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      // Find the active button by data attribute instead of ref
+      const activeButton = container.querySelector(
+        `[data-section="${activeSection}"]`
+      ) as HTMLButtonElement;
+
+      if (!activeButton) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = activeButton.getBoundingClientRect();
+
+      const scrollLeft = container.scrollLeft;
+      const buttonLeft = buttonRect.left - containerRect.left + scrollLeft;
+      const buttonWidth = buttonRect.width;
+      const containerWidth = containerRect.width;
+
+      // Center the button in the container
+      const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+
+      container.scrollTo({
+        left: Math.max(0, targetScroll),
+        behavior: "smooth",
+      });
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [activeSection, isMobile]);
 
   // Account Settings
   const [passwordStep, setPasswordStep] = useState(1);
@@ -128,29 +188,43 @@ export default function SettingsPage() {
   );
   const [language, setLanguage] = useState("en");
 
-  // Support
-  const [supportMessage, setSupportMessage] = useState("");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [supportLoading, setSupportLoading] = useState(false);
+  // Handler to change section
+  const handleSectionChange = (section: SettingsSection) => {
+    setActiveSection(section);
+  };
 
-  // Update URL when section changes
-  useEffect(() => {
-    setSearchParams({ section: activeSection });
-  }, [activeSection, setSearchParams]);
-
-  // Load preferences from localStorage
+  // Load preferences from localStorage and set mounted
   useEffect(() => {
     setMounted(true);
-    // Load all preferences
+    // Load all preferences with error handling
     const loadPreference = <T,>(key: string, defaultValue: T): T => {
-      const saved = localStorage.getItem(key);
-      return saved !== null ? JSON.parse(saved) : defaultValue;
+      try {
+        const saved = localStorage.getItem(key);
+        if (saved !== null) {
+          const parsed = JSON.parse(saved);
+          // Validate the parsed value matches the expected type
+          return parsed;
+        }
+      } catch (error) {
+        console.error(`Error loading preference ${key}:`, error);
+        // Clear invalid data
+        localStorage.removeItem(key);
+      }
+      return defaultValue;
     };
 
-    setSoundEffects(loadPreference("pref_sound_effects", true));
-    setAnimations(loadPreference("pref_animations", true));
-    setMotivationalMessages(loadPreference("pref_motivational_messages", true));
-    setListeningExercises(loadPreference("pref_listening_exercises", true));
+    // Validate activityVisibility value
+    const activityVisibilityValue = loadPreference(
+      "privacy_activity_visibility",
+      "private"
+    );
+    const validVisibilityValues = ["public", "employers", "academies", "private"];
+    if (validVisibilityValues.includes(activityVisibilityValue)) {
+      setActivityVisibility(activityVisibilityValue);
+    } else {
+      setActivityVisibility("private");
+    }
+
     setEmailJobMatches(loadPreference("notif_email_job_matches", true));
     setEmailNewCourses(loadPreference("notif_email_new_courses", true));
     setEmailSkillUpdates(loadPreference("notif_email_skill_updates", true));
@@ -158,9 +232,6 @@ export default function SettingsPage() {
     setInAppProgress(loadPreference("notif_in_app_progress", true));
     setNewsletter(loadPreference("notif_newsletter", false));
     setPushNotifications(loadPreference("notif_push", false));
-    setActivityVisibility(
-      loadPreference("privacy_activity_visibility", "private")
-    );
     setShowSkills(loadPreference("privacy_show_skills", true));
     setShowTestResults(loadPreference("privacy_show_test_results", true));
     setShowCompletedCourses(
@@ -175,33 +246,13 @@ export default function SettingsPage() {
     setLanguage(loadPreference("accessibility_language", "en"));
   }, []);
 
+  // Update URL when section changes (only after component is mounted)
+  useEffect(() => {
+    if (!mounted) return;
+    setSearchParams({ section: activeSection }, { replace: false });
+  }, [activeSection, mounted, setSearchParams]);
+
   // Save preferences to localStorage
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("pref_sound_effects", JSON.stringify(soundEffects));
-    }
-  }, [soundEffects, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("pref_animations", JSON.stringify(animations));
-    }
-  }, [animations, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(
-        "pref_motivational_messages",
-        JSON.stringify(motivationalMessages)
-      );
-    }
-  }, [motivationalMessages, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(
-        "pref_listening_exercises",
-        JSON.stringify(listeningExercises)
-      );
-    }
-  }, [listeningExercises, mounted]);
   useEffect(() => {
     if (mounted) {
       localStorage.setItem(
@@ -450,105 +501,10 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSubmitSupport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSupportLoading(true);
-    try {
-      // TODO: Implement support ticket API call
-      toast.success("Support request submitted! We'll get back to you soon.");
-      setSupportMessage("");
-    } catch (error) {
-      toast.error("Failed to submit support request.");
-    } finally {
-      setSupportLoading(false);
-    }
-  };
-
-  const handleSubmitFeedback = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // TODO: Implement feedback API call
-      toast.success("Thank you for your feedback!");
-      setFeedbackMessage("");
-    } catch (error) {
-      toast.error("Failed to submit feedback.");
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-  };
-
   const darkModeValue = theme === "dark" ? "ON" : "OFF";
 
   const renderContent = () => {
     switch (activeSection) {
-      case "preferences":
-        return (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Preferences</h1>
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-medium text-muted-foreground mb-2">
-                  Lesson experience
-                </h2>
-                <Separator />
-              </div>
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="sound-effects"
-                    className="text-base font-normal"
-                  >
-                    Sound effects
-                  </Label>
-                  <Switch
-                    id="sound-effects"
-                    checked={soundEffects}
-                    onCheckedChange={setSoundEffects}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="animations" className="text-base font-normal">
-                    Animations
-                  </Label>
-                  <Switch
-                    id="animations"
-                    checked={animations}
-                    onCheckedChange={setAnimations}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="motivational-messages"
-                    className="text-base font-normal"
-                  >
-                    Motivational messages
-                  </Label>
-                  <Switch
-                    id="motivational-messages"
-                    checked={motivationalMessages}
-                    onCheckedChange={setMotivationalMessages}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="listening-exercises"
-                    className="text-base font-normal"
-                  >
-                    Listening exercises
-                  </Label>
-                  <Switch
-                    id="listening-exercises"
-                    checked={listeningExercises}
-                    onCheckedChange={setListeningExercises}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
       case "account":
         return (
           <div className="space-y-8">
@@ -915,6 +871,12 @@ export default function SettingsPage() {
         );
 
       case "privacy":
+        // Ensure activityVisibility is always a valid value
+        const validActivityVisibility: "public" | "employers" | "academies" | "private" = 
+          activityVisibility && ["public", "employers", "academies", "private"].includes(activityVisibility)
+            ? activityVisibility
+            : "private";
+
         return (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Privacy & Security</h1>
@@ -930,7 +892,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Who can see your activity</Label>
                   <Select
-                    value={activityVisibility}
+                    value={validActivityVisibility}
                     onValueChange={(
                       value: "public" | "employers" | "academies" | "private"
                     ) => setActivityVisibility(value)}
@@ -938,7 +900,7 @@ export default function SettingsPage() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-[100]">
                       <SelectItem value="public">Public</SelectItem>
                       <SelectItem value="employers">Employers Only</SelectItem>
                       <SelectItem value="academies">Academies Only</SelectItem>
@@ -1187,151 +1149,6 @@ export default function SettingsPage() {
           </div>
         );
 
-      case "integrations":
-        return (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">
-              Connected Apps & Integrations
-            </h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Productivity Tools</CardTitle>
-                <CardDescription>
-                  Connect with productivity tools
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Notion</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Sync your learning progress to Notion
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Connect
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Google Calendar</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Schedule learning sessions in your calendar
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Connect
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Job Boards</CardTitle>
-                <CardDescription>
-                  Integrate with external job boards
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>LinkedIn</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Sync job applications with LinkedIn
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Connect
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Indeed</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Import jobs from Indeed
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Connect
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-
-      case "support":
-        return (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Support & Help</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Support</CardTitle>
-                <CardDescription>
-                  Get help from our support team
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmitSupport} className="space-y-4">
-                  <Textarea
-                    placeholder="Describe your issue..."
-                    value={supportMessage}
-                    onChange={(e) => setSupportMessage(e.target.value)}
-                    rows={5}
-                  />
-                  <Button
-                    type="submit"
-                    disabled={supportLoading || !supportMessage.trim()}
-                  >
-                    {supportLoading ? "Submitting..." : "Submit Request"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Help Resources</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Link to="/help">
-                  <Button variant="outline" className="w-full justify-start">
-                    <HelpCircle className="h-4 w-4 mr-2" />
-                    FAQ / Help Center
-                  </Button>
-                </Link>
-                <Button variant="outline" className="w-full justify-start">
-                  <HelpCircle className="h-4 w-4 mr-2" />
-                  Report a Problem
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Feedback</CardTitle>
-                <CardDescription>Help us improve Breneo</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmitFeedback} className="space-y-4">
-                  <Textarea
-                    placeholder="Share your feedback..."
-                    value={feedbackMessage}
-                    onChange={(e) => setFeedbackMessage(e.target.value)}
-                    rows={5}
-                  />
-                  <Button type="submit" disabled={!feedbackMessage.trim()}>
-                    Submit Feedback
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        );
-
       case "accessibility":
         return (
           <div className="space-y-8">
@@ -1411,159 +1228,96 @@ export default function SettingsPage() {
         );
 
       default:
-        return null;
+        return (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">Settings</h1>
+            <p className="text-muted-foreground">Section not found</p>
+          </div>
+        );
     }
   };
 
   return (
     <DashboardLayout>
+      {/* Mobile: Fixed Horizontal Scrollable Navigation */}
+      {isMobile && (
+        <div className="fixed top-[53px] left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm md:hidden">
+          <div
+            ref={scrollContainerRef}
+            className="overflow-x-auto scrollbar-hide touch-pan-x"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            <div className="flex gap-4 px-6 py-4 min-w-max">
+              {settingsSections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  data-section={section.id}
+                  ref={activeSection === section.id ? activeButtonRef : null}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSectionChange(section.id);
+                  }}
+                  onTouchStart={(e) => {
+                    // Prevent scroll when tapping button
+                    e.stopPropagation();
+                  }}
+                  className={cn(
+                    "text-sm whitespace-nowrap transition-colors py-1 cursor-pointer touch-manipulation",
+                    activeSection === section.id
+                      ? "text-primary font-medium border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground active:text-foreground"
+                  )}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
           {/* Left Column - Content */}
-          <div>{renderContent()}</div>
-
-          {/* Right Column - Sidebar Navigation */}
-          <div className="space-y-4">
-            <PWAInstallCard />
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <button
-                  onClick={() => setActiveSection("preferences")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "preferences"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Preferences
-                </button>
-                <button
-                  onClick={() => setActiveSection("account")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "account"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Account Settings
-                </button>
-                <button
-                  onClick={() => setActiveSection("notifications")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "notifications"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Notifications
-                </button>
-                <button
-                  onClick={() => setActiveSection("privacy")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "privacy"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Privacy & Security
-                </button>
-                <button
-                  onClick={() => setActiveSection("subscription")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "subscription"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Subscription & Billing
-                </button>
-                <button
-                  onClick={() => setActiveSection("learning")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "learning"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Learning Preferences
-                </button>
-                <button
-                  onClick={() => setActiveSection("integrations")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "integrations"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Connected Apps
-                </button>
-                <button
-                  onClick={() => setActiveSection("support")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "support"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Support & Help
-                </button>
-                <button
-                  onClick={() => setActiveSection("accessibility")}
-                  className={`w-full text-left text-sm transition-colors ${
-                    activeSection === "accessibility"
-                      ? "text-primary font-medium"
-                      : "text-foreground hover:text-primary"
-                  }`}
-                >
-                  Theme & Accessibility
-                </button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Quick Links</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Link
-                  to="/profile"
-                  className="block text-sm text-foreground hover:text-primary transition-colors"
-                >
-                  Profile
-                </Link>
-                <Link
-                  to="/courses"
-                  className="block text-sm text-foreground hover:text-primary transition-colors"
-                >
-                  Courses
-                </Link>
-                <Link
-                  to="/subscription"
-                  className="block text-sm text-foreground hover:text-primary transition-colors"
-                >
-                  Choose a plan
-                </Link>
-                <Link
-                  to="/help"
-                  className="block text-sm text-foreground hover:text-primary transition-colors"
-                >
-                  Help Center
-                </Link>
-              </CardContent>
-            </Card>
-
-            <Button
-              variant="link"
-              onClick={handleLogout}
-              className="w-full text-primary hover:text-primary/80 justify-center"
-            >
-              LOG OUT
-            </Button>
+          <div className={cn(isMobile && "mt-[120px] min-h-screen")}>
+            {renderContent()}
           </div>
+
+          {/* Right Column - Sidebar Navigation (Desktop Only) */}
+          {!isMobile && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {settingsSections.map((section) => (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleSectionChange(section.id);
+                      }}
+                      className={cn(
+                        "w-full text-left text-sm transition-colors",
+                        activeSection === section.id
+                          ? "text-primary font-medium"
+                          : "text-foreground hover:text-primary"
+                      )}
+                    >
+                      {section.label}
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <PWAInstallCard />
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>
