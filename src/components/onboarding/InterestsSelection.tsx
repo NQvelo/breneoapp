@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 const INTERESTS = [{
@@ -46,7 +46,6 @@ export function InterestsSelection() {
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
   const toggleInterest = (id: number) => {
     if (selected.includes(id)) {
@@ -57,19 +56,12 @@ export function InterestsSelection() {
   };
   const handleContinue = async () => {
     if (selected.length === 0) {
-      toast({
-        title: "Please select at least one area of interest",
-        variant: "destructive"
-      });
+      toast.error("Please select at least one area of interest");
       return;
     }
 
     if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to save your interests.",
-        variant: "destructive"
-      });
+      toast.error("Please sign in to save your interests.");
       return;
     }
 
@@ -94,18 +86,11 @@ export function InterestsSelection() {
         throw error;
       }
 
-      toast({
-        title: "Interests saved!",
-        description: "Your personalized experience is ready."
-      });
+      toast.success("Interests saved! Your personalized experience is ready.");
       
       navigate('/dashboard');
     } catch (error: any) {
-      toast({
-        title: "Failed to save interests",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast.error(`Failed to save interests: ${error.message}`);
     } finally {
       setLoading(false);
     }

@@ -5,14 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Bell,
-  Users,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-} from "lucide-react";
+import { toast } from "sonner";
+import { Bell, Users, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Define the shape of a notification
@@ -28,7 +22,6 @@ interface Notification {
 
 const NotificationsPage = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const queryKey = ["user-notifications", user?.id];
 
@@ -80,11 +73,7 @@ const NotificationsPage = () => {
       if (context?.previousNotifications) {
         queryClient.setQueryData(queryKey, context.previousNotifications);
       }
-      toast({
-        title: "Error",
-        description: "Could not mark notification as read.",
-        variant: "destructive",
-      });
+      toast.error("Could not mark notification as read.");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey });
@@ -98,10 +87,21 @@ const NotificationsPage = () => {
     const handleNewNotification = (payload: any) => {
       queryClient.invalidateQueries({ queryKey });
       if (payload.new) {
-        toast({
-          title: payload.new.title,
-          description: payload.new.message,
-        });
+        const notification = payload.new;
+        const message = `${notification.title}: ${notification.message}`;
+        switch (notification.type) {
+          case "success":
+            toast.success(message);
+            break;
+          case "error":
+            toast.error(message);
+            break;
+          case "warning":
+            toast.warning(message);
+            break;
+          default:
+            toast.info(message);
+        }
       }
     };
 
@@ -137,7 +137,7 @@ const NotificationsPage = () => {
       supabase.removeChannel(personalChannel);
       supabase.removeChannel(broadcastChannel);
     };
-  }, [queryClient, user?.id, toast, queryKey]);
+  }, [queryClient, user?.id, queryKey]);
 
   // Helper function to get an icon based on notification type
   const getNotificationIcon = (type: Notification["type"]) => {

@@ -56,7 +56,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
 import { useQuery } from "@tanstack/react-query";
@@ -309,8 +309,6 @@ const ProfilePage = () => {
   // Ref to track manual updates to prevent useEffect from overwriting
   const manualSocialLinkUpdateRef = useRef(false);
   const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const { toast } = useToast();
 
   // Fetch saved courses from API (with Supabase fallback)
   const { data: savedCourses = [], isLoading: loadingSavedCourses } = useQuery({
@@ -994,10 +992,7 @@ const ProfilePage = () => {
       // Update timestamp to force image reload
       setImageTimestamp(Date.now());
 
-      toast({
-        title: "Success",
-        description: "Profile image has been updated successfully.",
-      });
+      toast.success("Profile image has been updated successfully.");
 
       // Reload page to refresh user context with new profile image
       // This ensures the image persists and is available everywhere
@@ -1063,10 +1058,7 @@ const ProfilePage = () => {
       });
       setProfileData(profileResponse.data);
 
-      toast({
-        title: "Success",
-        description: "Profile image has been removed.",
-      });
+      toast.success("Profile image has been removed.");
 
       // Reload page to refresh user context
       setTimeout(() => {
@@ -1076,11 +1068,7 @@ const ProfilePage = () => {
       console.log("✅ Profile image removed successfully");
     } catch (error) {
       console.error("❌ Error removing profile image:", error);
-      toast({
-        title: "Error",
-        description: "Failed to remove profile image. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to remove profile image. Please try again.");
     } finally {
       setUploadingImage(false);
     }
@@ -1142,33 +1130,22 @@ const ProfilePage = () => {
 
     if (!user) {
       console.error("❌ No user found");
-      toast({
-        title: "Error",
-        description: "Please log in to save social links.",
-        variant: "destructive",
-      });
+      toast.error("Please log in to save social links.");
       return;
     }
 
     if (!socialLinkForm.platform || !socialLinkForm.url.trim()) {
       console.error("❌ Missing platform or URL");
-      toast({
-        title: "Error",
-        description: "Please select a platform and provide a URL.",
-        variant: "destructive",
-      });
+      toast.error("Please select a platform and provide a URL.");
       return;
     }
 
     // Validate URL
     if (!isValidUrl(socialLinkForm.url)) {
       console.error("❌ Invalid URL:", socialLinkForm.url);
-      toast({
-        title: "Invalid URL",
-        description:
-          "Please enter a valid URL (e.g., https://example.com or example.com).",
-        variant: "destructive",
-      });
+      toast.error(
+        "Please enter a valid URL (e.g., https://example.com or example.com)."
+      );
       return;
     }
 
@@ -1394,12 +1371,11 @@ const ProfilePage = () => {
       setSocialLinkForm({ platform: "", url: "" });
       setEditingPlatform(null);
 
-      toast({
-        title: "Success",
-        description: editingPlatform
+      toast.success(
+        editingPlatform
           ? "Social link updated successfully."
-          : "Social link added successfully.",
-      });
+          : "Social link added successfully."
+      );
     } catch (error) {
       console.error("❌ Error saving social link:", error);
       let errorMessage = "Failed to save social link. Please try again.";
@@ -1465,12 +1441,7 @@ const ProfilePage = () => {
         errorMessage = error.message || errorMessage;
       }
 
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 5000,
-      });
+      toast.error(errorMessage);
     } finally {
       setSavingSocialLink(false);
     }
@@ -1643,10 +1614,7 @@ const ProfilePage = () => {
         console.log("✅ Manual update flag reset after timeout (delete)");
       }, 3000);
 
-      toast({
-        title: "Success",
-        description: "Social link removed successfully.",
-      });
+      toast.success("Social link removed successfully.");
     } catch (error) {
       console.error("❌ Error deleting social link:", error);
       let errorMessage = "Failed to remove social link. Please try again.";
@@ -1682,12 +1650,7 @@ const ProfilePage = () => {
         }
       }
 
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 5000,
-      });
+      toast.error(errorMessage);
     }
   };
 
@@ -1725,17 +1688,10 @@ const ProfilePage = () => {
 
       setIsAboutMeModalOpen(false);
 
-      toast({
-        title: "Success",
-        description: "About Me has been updated successfully.",
-      });
+      toast.success("About Me has been updated successfully.");
     } catch (error) {
       console.error("❌ Error updating about me:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update About Me. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to update About Me. Please try again.");
     } finally {
       setUpdatingAboutMe(false);
     }
@@ -1754,22 +1710,14 @@ const ProfilePage = () => {
 
     // Validate email
     if (!emailEditValue.trim()) {
-      toast({
-        title: "Error",
-        description: "Email cannot be empty.",
-        variant: "destructive",
-      });
+      toast.error("Email cannot be empty.");
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailEditValue.trim())) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address.",
-        variant: "destructive",
-      });
+      toast.error("Please enter a valid email address.");
       return;
     }
 
@@ -1815,10 +1763,7 @@ const ProfilePage = () => {
 
       setIsContactEditModalOpen(false);
 
-      toast({
-        title: "Success",
-        description: "Contact information has been updated successfully.",
-      });
+      toast.success("Contact information has been updated successfully.");
     } catch (error) {
       console.error("❌ Error updating contact information:", error);
       const errorMessage =
@@ -1827,11 +1772,7 @@ const ProfilePage = () => {
               ?.data?.detail ||
             "Failed to update contact information. Please try again."
           : "Failed to update contact information. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     } finally {
       setUpdatingContact(false);
     }
@@ -1840,22 +1781,17 @@ const ProfilePage = () => {
   const handleSendPhoneVerification = async () => {
     try {
       await triggerPhoneVerificationCode();
-      toast({
-        title: "Verification code sent",
-        description: phone_number
+      toast.info(
+        phone_number
           ? `We've sent a 6-digit code to ${phone_number}.`
-          : "Verification code sent",
-      });
+          : "We've sent a 6-digit code to your phone."
+      );
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Failed to send verification code. Please try again.";
-      toast({
-        title: "Unable to send code",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     }
   };
 
@@ -1863,21 +1799,14 @@ const ProfilePage = () => {
     try {
       const success = await confirmPhoneVerificationCode();
       if (success) {
-        toast({
-          title: "Phone verified",
-          description: "Your phone number has been verified successfully.",
-        });
+        toast.success("Your phone number has been verified successfully.");
       }
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Verification failed. Please check the code and try again.";
-      toast({
-        title: "Verification failed",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     }
   };
 
@@ -2042,15 +1971,12 @@ const ProfilePage = () => {
                       <span>Settings</span>
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="default"
                       size="icon"
                       onClick={handleLogout}
-                      className="h-12 w-12 bg-[#ffe2e2] text-red-600 hover:bg-[#ffcaca] active:bg-[#ffb0b0] dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 dark:active:bg-red-900/70 transition-colors"
+                      className="h-12 w-12 bg-red-100 text-red-600 hover:bg-red-200 active:bg-red-300 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 dark:active:bg-red-900/70"
                     >
-                      <LogOut
-                        size={16}
-                        className="text-red-600 dark:text-red-300"
-                      />
+                      <LogOut size={16} />
                     </Button>
                   </div>
                 </div>
@@ -2169,7 +2095,7 @@ const ProfilePage = () => {
                               </button>
                               <button
                                 type="button"
-                                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 dark:hover:bg-red-900/30"
+                                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10 dark:hover:bg-primary/20"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleDeleteSocialLink(platform);
@@ -2177,7 +2103,7 @@ const ProfilePage = () => {
                               >
                                 <Trash2
                                   size={14}
-                                  className="text-red-600 dark:text-red-400"
+                                  className="text-gray-600 dark:text-gray-400"
                                 />
                               </button>
                             </div>
@@ -2662,7 +2588,12 @@ const ProfilePage = () => {
               </p>
             </div>
             <DrawerFooter>
-              <Button onClick={handleConfirmLogout}>Log out</Button>
+              <Button
+                onClick={handleConfirmLogout}
+                className="bg-red-500 text-white hover:bg-red-600 active:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 dark:active:bg-red-800"
+              >
+                Log out
+              </Button>
               <DrawerClose asChild>
                 <Button variant="outline">Cancel</Button>
               </DrawerClose>
@@ -2685,7 +2616,12 @@ const ProfilePage = () => {
               <Button variant="outline" onClick={handleCancelLogout}>
                 Cancel
               </Button>
-              <Button onClick={handleConfirmLogout}>Log out</Button>
+              <Button
+                onClick={handleConfirmLogout}
+                className="bg-red-500 text-white hover:bg-red-600 active:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 dark:active:bg-red-800"
+              >
+                Log out
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

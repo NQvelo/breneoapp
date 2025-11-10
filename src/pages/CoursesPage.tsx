@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { calculateSkillScores, getTopSkills } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bookmark } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { createAcademySlug } from "@/utils/academyUtils";
@@ -53,7 +53,6 @@ interface Course {
 
 const CoursesPage = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [currentTab, setCurrentTab] = React.useState("all");
@@ -430,13 +429,11 @@ const CoursesPage = () => {
       // Invalidate queries to refresh the UI in both CoursesPage and ProfilePage
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["savedCourses"] });
-      toast({
-        title: variables.is_saved ? "Course Unsaved" : "Course Saved",
-        description: `"${variables.title}" has been ${
+      toast.success(
+        `"${variables.title}" has been ${
           variables.is_saved ? "unsaved" : "saved"
-        } successfully.`,
-        duration: 1750,
-      });
+        } successfully.`
+      );
     },
     onError: (error) => {
       console.error("Error saving/unsaving course:", error);
@@ -444,12 +441,7 @@ const CoursesPage = () => {
         error instanceof Error
           ? error.message
           : "Failed to save course. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 2000,
-      });
+      toast.error(errorMessage);
     },
   });
 

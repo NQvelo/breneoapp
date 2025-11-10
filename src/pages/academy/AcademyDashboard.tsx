@@ -62,7 +62,7 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useMobile } from "@/hooks/use-mobile";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
@@ -280,7 +280,6 @@ const CourseForm = ({
 
 const AcademyDashboard = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [courses, setCourses] = useState<Course[]>([]);
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null
@@ -345,13 +344,18 @@ const AcademyDashboard = () => {
     try {
       // Fetch academy profile from API endpoint to get the academy_id
       const response = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
-      
+
       if (response.data) {
         const data = response.data;
         const academyProfile: AcademyProfile = {
           id: data.id || data.academy_id || String(user.id),
           academy_name: data.academy_name || "",
-          first_name: data.first_name || data.firstName || user.first_name || data.academy_name || "",
+          first_name:
+            data.first_name ||
+            data.firstName ||
+            user.first_name ||
+            data.academy_name ||
+            "",
           description: data.description || "",
           website_url: data.website_url || "",
           contact_email: data.contact_email || user.email || "",
@@ -366,22 +370,14 @@ const AcademyDashboard = () => {
       console.error("Failed to load academy profile:", error);
       // If 404, academy profile doesn't exist yet
       if (error.response?.status === 404) {
-        toast({
-          title: "Academy Profile Not Found",
-          description: "Please set up your academy profile first",
-          variant: "destructive",
-        });
+        toast.error("Please set up your academy profile first");
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to load academy profile",
-          variant: "destructive",
-        });
+        toast.error("Failed to load academy profile");
       }
     } finally {
       setLoading(false);
     }
-  }, [user, toast]);
+  }, [user]);
 
   const fetchCourses = useCallback(async () => {
     if (!academyProfile) return;
@@ -410,13 +406,9 @@ const AcademyDashboard = () => {
       setCourses(coursesData);
     } catch (error: any) {
       console.error("Error fetching courses:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load courses",
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to load courses");
     }
-  }, [academyProfile, toast]);
+  }, [academyProfile]);
 
   useEffect(() => {
     fetchAcademyData();
@@ -470,7 +462,7 @@ const AcademyDashboard = () => {
         .split(",")
         .map((s) => s.trim())
         .filter((s) => s);
-      
+
       const topics = courseForm.topics
         .split(",")
         .map((s) => s.trim())
@@ -483,7 +475,7 @@ const AcademyDashboard = () => {
         // Upload image to Supabase storage
         const fileExt = courseImage.name.split(".").pop();
         const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("course-images")
           .upload(fileName, courseImage, {
@@ -500,13 +492,14 @@ const AcademyDashboard = () => {
           const { data: urlData } = supabase.storage
             .from("course-images")
             .getPublicUrl(fileName);
-          
+
           imageUrl = urlData.publicUrl;
         }
       }
 
       // Get provider name - use first_name from API, fallback to academy_name
-      const providerName = academyProfile.first_name || academyProfile.academy_name || "";
+      const providerName =
+        academyProfile.first_name || academyProfile.academy_name || "";
 
       // Insert course directly into Supabase
       const { data: courseData, error: insertError } = await supabase
@@ -533,20 +526,13 @@ const AcademyDashboard = () => {
         throw insertError;
       }
 
-      toast({
-        title: "Success",
-        description: "Course added successfully",
-      });
+      toast.success("Course added successfully");
 
       fetchCourses();
       handleModalOpenChange(false);
     } catch (error: any) {
       console.error("Error adding course:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add course",
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to add course");
     } finally {
       setIsSubmitting(false);
     }
@@ -562,7 +548,7 @@ const AcademyDashboard = () => {
         .split(",")
         .map((s) => s.trim())
         .filter((s) => s);
-      
+
       const topics = courseForm.topics
         .split(",")
         .map((s) => s.trim())
@@ -575,7 +561,7 @@ const AcademyDashboard = () => {
         // Upload new image to Supabase storage
         const fileExt = courseImage.name.split(".").pop();
         const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("course-images")
           .upload(fileName, courseImage, {
@@ -588,13 +574,14 @@ const AcademyDashboard = () => {
           const { data: urlData } = supabase.storage
             .from("course-images")
             .getPublicUrl(fileName);
-          
+
           imageUrl = urlData.publicUrl;
         }
       }
 
       // Get provider name - use first_name from API, fallback to academy_name
-      const providerName = academyProfile.first_name || academyProfile.academy_name || "";
+      const providerName =
+        academyProfile.first_name || academyProfile.academy_name || "";
 
       // Update course in Supabase
       const { error: updateError } = await supabase
@@ -616,20 +603,13 @@ const AcademyDashboard = () => {
         throw updateError;
       }
 
-      toast({
-        title: "Success",
-        description: "Course updated successfully",
-      });
+      toast.success("Course updated successfully");
 
       fetchCourses();
       handleModalOpenChange(false);
     } catch (error: any) {
       console.error("Error updating course:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update course",
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to update course");
     } finally {
       setIsSubmitting(false);
     }
@@ -647,20 +627,13 @@ const AcademyDashboard = () => {
         throw error;
       }
 
-      toast({
-        title: "Success",
-        description: "Course deleted successfully",
-      });
+      toast.success("Course deleted successfully");
 
       fetchCourses();
       handleModalOpenChange(false);
     } catch (error: any) {
       console.error("Error deleting course:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete course",
-        variant: "destructive",
-      });
+      toast.error(error.message || "Failed to delete course");
     }
   };
 
@@ -703,7 +676,7 @@ const AcademyDashboard = () => {
             {isMobile ? (
               <Drawer open={open} onOpenChange={handleModalOpenChange}>
                 <DrawerTrigger asChild>
-                  <Button className="bg-breneo-blue hover:bg-breneo-blue/90">
+                  <Button>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Course
                   </Button>
@@ -784,7 +757,7 @@ const AcademyDashboard = () => {
             ) : (
               <Dialog open={open} onOpenChange={handleModalOpenChange}>
                 <DialogTrigger asChild>
-                  <Button className="bg-breneo-blue hover:bg-breneo-blue/90">
+                  <Button>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Course
                   </Button>

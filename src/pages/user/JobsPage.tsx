@@ -8,13 +8,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Bookmark,
   AlertCircle,
   Filter,
@@ -33,9 +26,18 @@ import {
   Tag,
   Sun,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { countries } from "@/data/countries";
+import { LocationDropdown } from "@/components/jobs/LocationDropdown";
+import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
+import { useMobile } from "@/hooks/use-mobile";
+import apiClient from "@/api/auth/apiClient";
+import {
+  getUserTestAnswers,
+  calculateSkillScores,
+  getTopSkills,
+} from "@/utils/skillTestUtils";
 
 // Updated Job interface for the new API
 interface Job {
@@ -101,9 +103,11 @@ interface ApiJob {
 // Filter state shape
 interface JobFilters {
   country: string;
+  cities: string[]; // Array of city IDs for Georgian cities
   jobTypes: string[];
   isRemote: boolean;
   datePosted?: string; // Add date_posted filter
+  skills: string[]; // User interests/skills from test results
 }
 
 const JSEARCH_API_KEY = "f438e914d7msh480f4890d34c417p1f564ajsnce17947c5ab2";
@@ -251,30 +255,111 @@ const fetchJobs = async (
 
 const JobsPage = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useMobile();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
   const [page, setPage] = useState(1); // New state for current page
 
+  // State for user's top skills from test results
+  const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(true);
+
   // Filters are now managed in a single state object
   const [activeFilters, setActiveFilters] = useState<JobFilters>({
-    country: "United States",
+    country: "Georgia",
+    cities: [],
     jobTypes: ["FULLTIME"],
     isRemote: false,
     datePosted: "all",
+    skills: [],
   });
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
 
-  // Local state for search bar dropdowns
-  const [selectedJobType, setSelectedJobType] = useState<string>(
-    activeFilters.jobTypes.length > 0 ? activeFilters.jobTypes[0] : "all"
-  );
-  const [selectedLocation, setSelectedLocation] = useState<string>(
-    activeFilters.country
-  );
+  // Fetch user's top skills from test results
+  useEffect(() => {
+    const fetchUserSkills = async () => {
+      if (!user) {
+        setLoadingSkills(false);
+        return;
+      }
+
+      try {
+        setLoadingSkills(true);
+
+        // Try to fetch from API first (skill test results)
+        try {
+          const response = await apiClient.get("/api/skilltest/results/");
+          if (
+            response.data &&
+            Array.isArray(response.data) &&
+            response.data.length > 0
+          ) {
+            const result = response.data[0];
+            const skillsJson = result.skills_json;
+
+            // Extract skills from tech and soft skills
+            const allSkills: string[] = [];
+            if (skillsJson?.tech) {
+              allSkills.push(...Object.keys(skillsJson.tech));
+            }
+            if (skillsJson?.soft) {
+              allSkills.push(...Object.keys(skillsJson.soft));
+            }
+
+            // Get top 5 skills
+            const topSkills = allSkills.slice(0, 5);
+            setUserTopSkills(topSkills);
+
+            // Auto-populate filters with top skills if not already set
+            setActiveFilters((prev) => ({
+              ...prev,
+              skills: prev.skills.length === 0 ? topSkills : prev.skills,
+            }));
+            setTempFilters((prev) => ({
+              ...prev,
+              skills: prev.skills.length === 0 ? topSkills : prev.skills,
+            }));
+
+            setLoadingSkills(false);
+            return;
+          }
+        } catch (apiError) {
+          console.log("API endpoint not available, trying Supabase...");
+        }
+
+        // Fallback to Supabase: fetch from usertestanswers
+        const answers = await getUserTestAnswers(String(user.id));
+        if (answers && answers.length > 0) {
+          const skillScores = calculateSkillScores(answers);
+          const topSkillsData = getTopSkills(skillScores, 5);
+          const topSkills = topSkillsData.map((s) => s.skill);
+
+          setUserTopSkills(topSkills);
+
+          // Auto-populate filters with top skills if not already set
+          setActiveFilters((prev) => ({
+            ...prev,
+            skills: prev.skills.length === 0 ? topSkills : prev.skills,
+          }));
+          setTempFilters((prev) => ({
+            ...prev,
+            skills: prev.skills.length === 0 ? topSkills : prev.skills,
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching user skills:", error);
+      } finally {
+        setLoadingSkills(false);
+      }
+    };
+
+    fetchUserSkills();
+  }, [user]);
+
+  // Removed selectedJobType state as we now use WorkTypeDropdown with multi-select
 
   const handleDetectLocation = React.useCallback(() => {
     // Check if location toast has already been shown in this session
@@ -293,27 +378,24 @@ const JobsPage = () => {
             setActiveFilters((prev) => ({
               ...prev,
               country: data.countryName,
+              cities: data.countryName === "Georgia" ? prev.cities : [],
             }));
-            setTempFilters((prev) => ({ ...prev, country: data.countryName }));
+            setTempFilters((prev) => ({
+              ...prev,
+              country: data.countryName,
+              cities: data.countryName === "Georgia" ? prev.cities : [],
+            }));
 
             // Only show toast if not shown in this session
             if (!locationToastShown) {
-              toast({
-                title: "Location Detected",
-                description: `Showing jobs in ${data.countryName}.`,
-                duration: 2000,
-              });
+              toast.info(`Showing jobs in ${data.countryName}.`);
               sessionStorage.setItem("locationToastShown", "true");
             }
           }
         } catch (error) {
           // Only show error toast if not shown in this session
           if (!locationToastShown) {
-            toast({
-              title: "Could not determine your location.",
-              variant: "destructive",
-              duration: 2000,
-            });
+            toast.error("Could not determine your location.");
             sessionStorage.setItem("locationToastShown", "true");
           }
         }
@@ -321,16 +403,14 @@ const JobsPage = () => {
       () => {
         // Only show permission denied toast if not shown in this session
         if (!locationToastShown) {
-          toast({
-            title: "Location permission denied.",
-            description: "Defaulting to United States.",
-            duration: 2000,
-          });
+          toast.info(
+            "Location permission denied. Defaulting to United States."
+          );
           sessionStorage.setItem("locationToastShown", "true");
         }
       }
     );
-  }, [toast]);
+  }, []);
 
   // Effect to detect user's location on page load
   useEffect(() => {
@@ -396,9 +476,7 @@ const JobsPage = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
-      toast({
-        title: variables.is_saved ? "Job Unsaved" : "Job Saved",
-      });
+      toast.success(variables.is_saved ? "Job Unsaved" : "Job Saved");
     },
   });
 
@@ -501,37 +579,27 @@ const JobsPage = () => {
     });
   }, [jobs, savedJobs]);
 
-  // Handle work type change
-  const handleWorkTypeChange = (value: string) => {
-    setSelectedJobType(value);
+  // Handle work types change
+  const handleWorkTypesChange = (workTypes: string[]) => {
     setActiveFilters((prev) => ({
       ...prev,
-      jobTypes: value === "all" || !value ? ["FULLTIME"] : [value],
+      jobTypes: workTypes.length === 0 ? ["FULLTIME"] : workTypes,
     }));
     setPage(1);
     queryClient.invalidateQueries({ queryKey: ["jobs"] });
   };
 
-  // Handle location change
-  const handleLocationChange = (value: string) => {
-    setSelectedLocation(value);
+  // Handle cities change
+  const handleCitiesChange = (cities: string[]) => {
     setActiveFilters((prev) => ({
       ...prev,
-      country: value,
+      cities: cities,
     }));
     setPage(1);
     queryClient.invalidateQueries({ queryKey: ["jobs"] });
   };
 
-  // Update selected values when filters change externally (e.g., from filter modal)
-  useEffect(() => {
-    if (activeFilters.jobTypes.length > 0) {
-      setSelectedJobType(activeFilters.jobTypes[0]);
-    } else {
-      setSelectedJobType("all");
-    }
-    setSelectedLocation(activeFilters.country);
-  }, [activeFilters]);
+  // No need to sync selectedJobType anymore as we use WorkTypeDropdown directly
 
   const handleApplyFilters = () => {
     setActiveFilters(tempFilters);
@@ -561,92 +629,69 @@ const JobsPage = () => {
     <DashboardLayout>
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
-        <div className="mb-8">
-          <div className="relative flex flex-col md:flex-row items-stretch md:items-center bg-white border-2 border-breneo-accent rounded-full px-3 md:px-4 py-2 shadow-sm gap-2 md:gap-0">
-            {/* Search Field */}
-            <div className="flex items-center flex-1 min-w-0 order-1">
-              <Briefcase className="h-5 w-5 text-breneo-accent flex-shrink-0 mr-2 md:mr-3" />
-              <Input
-                placeholder="Search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 text-sm text-gray-900 flex-1 min-w-0 bg-transparent"
-              />
-            </div>
+        <div className="mb-8 relative">
+          <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-accent dark:border-gray-600 rounded-full pl-3 md:pl-4 pr-2.5 md:pr-3 py-2.5 md:py-3 overflow-visible">
+            {/* Briefcase Icon - Purple outline */}
+            <Briefcase
+              className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2 md:mr-3"
+              strokeWidth={2}
+            />
 
-            {/* Separator - Hidden on mobile */}
-            <div className="hidden md:block h-8 w-px bg-gray-300 mx-2 flex-shrink-0" />
+            {/* Search Input Field */}
+            <Input
+              placeholder="ძებნა"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm md:text-base text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
+            />
 
-            {/* Work Types Field */}
-            <div className="flex items-center flex-1 min-w-0 order-2 md:order-3">
-              <Users className="h-5 w-5 text-breneo-accent flex-shrink-0 mr-2 md:mr-3" />
-              <Select
-                value={selectedJobType || "all"}
-                onValueChange={(value) =>
-                  handleWorkTypeChange(value === "all" ? "" : value)
-                }
-              >
-                <SelectTrigger className="border-0 focus:ring-0 focus:ring-offset-0 px-0 h-auto py-0 shadow-none text-gray-400 data-[placeholder]:text-gray-400 text-sm flex-1 min-w-0 [&>span]:text-left bg-transparent hover:bg-transparent">
-                  <SelectValue placeholder="Work types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {jobTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {jobTypeLabels[type] || type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Work Types Field - Hidden on mobile, shown on desktop */}
+            {!isMobile && (
+              <>
+                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                <div className="flex items-center flex-1 min-w-0 relative">
+                  <WorkTypeDropdown
+                    selectedWorkTypes={activeFilters.jobTypes}
+                    onWorkTypesChange={handleWorkTypesChange}
+                  />
+                </div>
+              </>
+            )}
 
-            {/* Separator - Hidden on mobile */}
-            <div className="hidden md:block h-8 w-px bg-gray-300 mx-2 flex-shrink-0" />
+            {/* Location Field - Hidden on mobile, shown on desktop */}
+            {!isMobile && (
+              <>
+                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                <div className="flex items-center flex-1 min-w-0 relative">
+                  <LocationDropdown
+                    selectedLocations={activeFilters.cities}
+                    onLocationsChange={handleCitiesChange}
+                  />
+                </div>
+              </>
+            )}
 
-            {/* Location Field */}
-            <div className="flex items-center flex-1 min-w-0 order-3 md:order-5">
-              <MapPin className="h-5 w-5 text-breneo-accent flex-shrink-0 mr-2 md:mr-3" />
-              <Select
-                value={selectedLocation}
-                onValueChange={handleLocationChange}
-              >
-                <SelectTrigger className="border-0 focus:ring-0 focus:ring-offset-0 px-0 h-auto py-0 shadow-none text-gray-400 data-[placeholder]:text-gray-400 text-sm flex-1 min-w-0 [&>span]:text-left bg-transparent hover:bg-transparent">
-                  <SelectValue placeholder="Location" />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {countries.map((country) => (
-                    <SelectItem key={country.code} value={country.name}>
-                      {country.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Filter Button - Light gray background, dark gray icon */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 border-0 flex-shrink-0 mr-2 p-0"
+              onClick={() => setFilterModalOpen(true)}
+              aria-label="Filter jobs"
+            >
+              <Filter className="h-4 w-4 md:h-5 md:w-5" strokeWidth={2} />
+            </Button>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 md:ml-4 flex-shrink-0 order-4 md:order-6">
-              {/* Filter Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full bg-gray-100 hover:bg-gray-200 text-breneo-accent border-0"
-                onClick={() => setFilterModalOpen(true)}
-                aria-label="Filter jobs"
-              >
-                <Filter className="h-5 w-5" />
-              </Button>
-
-              {/* Search Button */}
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-full bg-breneo-accent hover:bg-breneo-accent/90 text-white md:-mr-2 shadow-md"
-                onClick={handleSearch}
-                aria-label="Search jobs"
-              >
-                <Search className="h-5 w-5" />
-              </Button>
-            </div>
+            {/* Search Button - Purple background, white icon, integrated into rounded end */}
+            <Button
+              size="icon"
+              className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-breneo-accent hover:bg-breneo-accent/90 text-white border-0 flex-shrink-0 p-0 shadow-none"
+              onClick={handleSearch}
+              aria-label="Search jobs"
+            >
+              <Search className="h-4 w-4 md:h-5 md:w-5" strokeWidth={2.5} />
+            </Button>
           </div>
         </div>
 
@@ -857,7 +902,8 @@ const JobsPage = () => {
         onClose={() => setFilterModalOpen(false)}
         filters={tempFilters}
         onFiltersChange={setTempFilters}
-        onApply={handleApplyFilters} // Use the new handler
+        onApply={handleApplyFilters}
+        userTopSkills={userTopSkills}
       />
     </DashboardLayout>
   );

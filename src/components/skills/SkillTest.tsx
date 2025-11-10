@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 // Comprehensive questions for skill assessment
 const QUESTIONS = [
@@ -352,7 +352,6 @@ export function SkillTest() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const handleNext = () => {
     if (selectedOption) {
@@ -368,10 +367,7 @@ export function SkillTest() {
         finishTest();
       }
     } else {
-      toast({
-        title: "Please select an option",
-        variant: "destructive"
-      });
+      toast.error("Please select an option");
     }
   };
 
@@ -385,10 +381,7 @@ export function SkillTest() {
   };
 
   const finishTest = () => {
-    toast({
-      title: "Test completed!",
-      description: "Your personalized results are ready.",
-    });
+    toast.success("Test completed! Your personalized results are ready.");
     navigate('/dashboard');
   };
 

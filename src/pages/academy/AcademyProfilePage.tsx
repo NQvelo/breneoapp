@@ -3,7 +3,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useMobile } from "@/hooks/use-mobile";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
@@ -202,7 +202,6 @@ interface UserProfile {
 
 const AcademyProfilePage = () => {
   const { user, logout, loading: authLoading } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const isMobile = useMobile();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
@@ -287,22 +286,17 @@ const AcademyProfilePage = () => {
   const handleSendPhoneVerification = async () => {
     try {
       await triggerPhoneVerificationCode();
-      toast({
-        title: "Verification code sent",
-        description: user?.phone_number
+      toast.info(
+        user?.phone_number
           ? `We've sent a 6-digit code to ${user.phone_number}.`
-          : "Verification code sent",
-      });
+          : "We've sent a 6-digit code to your phone."
+      );
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Failed to send verification code. Please try again.";
-      toast({
-        title: "Unable to send code",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     }
   };
 
@@ -310,21 +304,14 @@ const AcademyProfilePage = () => {
     try {
       const success = await confirmPhoneVerificationCode();
       if (success) {
-        toast({
-          title: "Phone verified",
-          description: "Your phone number has been verified successfully.",
-        });
+        toast.success("Your phone number has been verified successfully.");
       }
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Verification failed. Please check the code and try again.";
-      toast({
-        title: "Verification failed",
-        description: message,
-        variant: "destructive",
-      });
+      toast.error(message);
     }
   };
 
@@ -355,11 +342,7 @@ const AcademyProfilePage = () => {
       if (!hasToken) {
         console.error("❌ No token available, cannot fetch academy profile");
         setLoading(false);
-        toast({
-          title: "Authentication Error",
-          description: "Please log in again to access your academy profile.",
-          variant: "destructive",
-        });
+        toast.error("Please log in again to access your academy profile.");
         return;
       }
 
@@ -411,12 +394,7 @@ const AcademyProfilePage = () => {
           // 403 means forbidden - user might not have academy role or permissions
           else if (status === 403) {
             console.error("Access forbidden to academy profile");
-            toast({
-              title: "Access Denied",
-              description:
-                "You don't have permission to access academy profile.",
-              variant: "destructive",
-            });
+            toast.error("You don't have permission to access academy profile.");
           }
           // 401 might mean:
           // 1. Token expired and refresh failed (but check error detail first)
@@ -496,12 +474,9 @@ const AcademyProfilePage = () => {
           // Other errors (500, network errors, etc.)
           else {
             console.error("Error fetching academy profile:", academyError);
-            toast({
-              title: "Error fetching profile",
-              description:
-                "Could not load academy profile data. Please try again.",
-              variant: "destructive",
-            });
+            toast.error(
+              "Could not load academy profile data. Please try again."
+            );
           }
         }
 
@@ -664,12 +639,11 @@ const AcademyProfilePage = () => {
           website_url: updatedProfile.website_url,
           contact_email: updatedProfile.contact_email,
         });
-        toast({
-          title: "Success",
-          description: academyProfile
+        toast.success(
+          academyProfile
             ? "Your academy profile has been updated."
-            : "Your academy profile has been created.",
-        });
+            : "Your academy profile has been created."
+        );
         setIsEditing(false);
       }
     } catch (error: unknown) {
@@ -687,11 +661,7 @@ const AcademyProfilePage = () => {
       }
 
       console.error("Error updating academy profile:", errorMessage);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -740,10 +710,7 @@ const AcademyProfilePage = () => {
           ...prev,
           contact_email: updatedProfile.contact_email,
         }));
-        toast({
-          title: "Success",
-          description: "Contact information has been updated.",
-        });
+        toast.success("Contact information has been updated.");
         setIsContactModalOpen(false);
       } else {
         throw new Error("No response data received");
@@ -764,11 +731,7 @@ const AcademyProfilePage = () => {
       }
 
       console.error("Error updating contact information:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -814,11 +777,7 @@ const AcademyProfilePage = () => {
       }
 
       console.error("Error removing website:", errorMessage);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -875,22 +834,14 @@ const AcademyProfilePage = () => {
       !socialLinkForm.platform ||
       !socialLinkForm.url.trim()
     ) {
-      toast({
-        title: "Error",
-        description: "Please select a platform and provide a URL.",
-        variant: "destructive",
-      });
+      toast.error("Please select a platform and provide a URL.");
       return;
     }
 
     // Validate URL format
     const urlToValidate = socialLinkForm.url.trim();
     if (!isValidUrl(urlToValidate)) {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid URL (e.g., https://example.com).",
-        variant: "destructive",
-      });
+      toast.error("Please enter a valid URL (e.g., https://example.com).");
       return;
     }
 
@@ -926,13 +877,11 @@ const AcademyProfilePage = () => {
             website_url: updatedProfile.website_url,
           }));
 
-          toast({
-            title: "Success",
-            description:
-              editingPlatform === "website"
-                ? "Website updated successfully."
-                : "Website added successfully.",
-          });
+          toast.success(
+            editingPlatform === "website"
+              ? "Website updated successfully."
+              : "Website added successfully."
+          );
 
           setIsSocialLinkModalOpen(false);
           setSocialLinkForm({ platform: "", url: "" });
@@ -1068,12 +1017,11 @@ const AcademyProfilePage = () => {
         // Don't throw - we already updated local state, so continue
       }
 
-      toast({
-        title: "Success",
-        description: editingPlatform
+      toast.success(
+        editingPlatform
           ? "Social link updated successfully."
-          : "Social link added successfully.",
-      });
+          : "Social link added successfully."
+      );
 
       setIsSocialLinkModalOpen(false);
       setSocialLinkForm({ platform: "", url: "" });
@@ -1093,11 +1041,7 @@ const AcademyProfilePage = () => {
       }
 
       console.error("Error saving social link/website:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     } finally {
       setSavingSocialLink(false);
     }
@@ -1112,21 +1056,13 @@ const AcademyProfilePage = () => {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      toast({
-        title: "Invalid File",
-        description: "Please select an image file.",
-        variant: "destructive",
-      });
+      toast.error("Please select an image file.");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File Too Large",
-        description: "Image size should be less than 5MB.",
-        variant: "destructive",
-      });
+      toast.error("Image size should be less than 5MB.");
       return;
     }
 
@@ -1165,10 +1101,7 @@ const AcademyProfilePage = () => {
       // Update the image with the new URL
       setProfileImage(newProfileImage);
 
-      toast({
-        title: "Success",
-        description: "Profile image has been updated successfully.",
-      });
+      toast.success("Profile image has been updated successfully.");
 
       // Reload page to refresh user context with new profile image
       // This ensures the image persists and is available everywhere
@@ -1190,11 +1123,7 @@ const AcademyProfilePage = () => {
         errorMessage = errorData.detail || errorData.message || errorMessage;
       }
 
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     } finally {
       setUploadingImage(false);
     }
@@ -1250,10 +1179,7 @@ const AcademyProfilePage = () => {
         // Update any profile data state if needed
       }
 
-      toast({
-        title: "Success",
-        description: "Profile image has been removed.",
-      });
+      toast.success("Profile image has been removed.");
 
       // Reload page to refresh user context
       setTimeout(() => {
@@ -1263,11 +1189,7 @@ const AcademyProfilePage = () => {
       console.log("✅ Profile image removed successfully");
     } catch (error: unknown) {
       console.error("❌ Error removing profile image:", error);
-      toast({
-        title: "Error",
-        description: "Failed to remove profile image. Please try again.",
-        variant: "destructive",
-      });
+      toast.error("Failed to remove profile image. Please try again.");
     } finally {
       setUploadingImage(false);
     }
@@ -1365,10 +1287,7 @@ const AcademyProfilePage = () => {
         // Don't throw - we already updated local state
       }
 
-      toast({
-        title: "Success",
-        description: "Social link removed successfully.",
-      });
+      toast.success("Social link removed successfully.");
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
       let errorMessage = "Failed to remove social link. Please try again.";
@@ -1384,11 +1303,7 @@ const AcademyProfilePage = () => {
       }
 
       console.error("❌ Error deleting social link:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast.error(errorMessage);
     }
   };
 

@@ -318,7 +318,7 @@ const AcademyRegistrationPage = () => {
                   <Button
                     type="button" // Use type="button" to prevent form submission
                     onClick={handleNextStep}
-                    className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                    className="w-full h-14"
                   >
                     Next
                   </Button>
@@ -336,7 +336,7 @@ const AcademyRegistrationPage = () => {
                     </Button>
                     <Button
                       type="submit" // Use type="submit" for final submission
-                      className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                      className="w-full h-14"
                       disabled={isLoading}
                     >
                       {isLoading ? "Registering..." : "Register"}

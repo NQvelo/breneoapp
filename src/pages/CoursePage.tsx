@@ -10,7 +10,7 @@ import { createAcademySlug } from "@/utils/academyUtils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
 
 interface AcademyProfile {
@@ -22,7 +22,6 @@ interface AcademyProfile {
 const CoursePage = () => {
   const { courseId } = useParams();
   const { user } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
 
@@ -228,13 +227,11 @@ const CoursePage = () => {
       queryClient.invalidateQueries({ queryKey: ["savedCourses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
 
-      toast({
-        title: shouldSave ? "Course Saved" : "Course Unsaved",
-        description: `"${course?.title}" has been ${
+      toast.success(
+        `"${course?.title}" has been ${
           shouldSave ? "saved" : "unsaved"
-        } successfully.`,
-        duration: 2000,
-      });
+        } successfully.`
+      );
     },
     onError: (error) => {
       console.error("Error saving/unsaving course:", error);
@@ -242,22 +239,13 @@ const CoursePage = () => {
         error instanceof Error
           ? error.message
           : "Failed to save course. Please try again.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 3000,
-      });
+      toast.error(errorMessage);
     },
   });
 
   const handleSaveCourse = () => {
     if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to save courses.",
-        variant: "destructive",
-      });
+      toast.error("Please log in to save courses.");
       return;
     }
     saveCourseMutation.mutate(!isSaved);

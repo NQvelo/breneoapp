@@ -216,7 +216,7 @@ export function AuthForm({
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-breneo-blue hover:bg-breneo-blue/90 text-white font-medium"
+                className="w-full h-12"
                 disabled={loading}
               >
                 {loading ? "Signing In..." : "Sign In"}
@@ -260,7 +260,7 @@ export function AuthForm({
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-breneo-blue hover:bg-breneo-blue/90 text-white font-medium"
+                className="w-full h-12"
                 disabled={forgotPasswordLoading || !email}
               >
                 {forgotPasswordLoading ? "Sending..." : "Send Recovery Link"}
@@ -374,7 +374,7 @@ export function AuthForm({
 
                   <Button
                     type="submit"
-                    className="w-full h-12 bg-breneo-blue hover:bg-breneo-blue/90 text-white font-medium"
+                    className="w-full h-12"
                     disabled={loading}
                   >
                     {loading ? "Creating Account..." : "Sign Up"}
@@ -598,7 +598,7 @@ export function AuthForm({
                         </Button>
                         <Button
                           type="submit"
-                          className="flex-1 h-12 bg-breneo-blue hover:bg-breneo-blue/90 text-white font-medium"
+                          className="flex-1 h-12"
                           disabled={loading}
                         >
                           {loading
