@@ -76,18 +76,18 @@ const CoursesPage = () => {
     queryKey: ["savedCourses", userId],
     queryFn: async () => {
       if (!userId || !canUseUserId) return [];
-      
+
       // Fetch from Supabase (source of truth for saving)
       const { data, error } = await supabase
         .from("saved_courses")
         .select("course_id")
         .eq("user_id", userId);
-      
+
       if (error) {
         console.error("Error fetching saved courses from Supabase:", error);
         return [];
       }
-      
+
       return data.map((item) => item.course_id);
     },
     enabled: canUseUserId,
@@ -173,25 +173,35 @@ const CoursesPage = () => {
               if (response.data) {
                 // API returns nested structure: { profile_data: {...}, profile_type: 'academy', ... }
                 const responseData = response.data as Record<string, unknown>;
-                const profileData = (responseData.profile_data as Record<string, unknown>) || responseData;
-                
-                const getStringField = (field: string, source: Record<string, unknown> = profileData) => {
+                const profileData =
+                  (responseData.profile_data as Record<string, unknown>) ||
+                  responseData;
+
+                const getStringField = (
+                  field: string,
+                  source: Record<string, unknown> = profileData
+                ) => {
                   const value = source[field];
                   return typeof value === "string" ? value : undefined;
                 };
 
                 // Debug: Log all available fields from API
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`[Academy ${academyId}] API Response structure:`, {
-                    hasProfileData: !!responseData.profile_data,
-                    profileDataKeys: profileData ? Object.keys(profileData) : [],
-                    fullResponse: responseData,
-                  });
+                if (process.env.NODE_ENV === "development") {
+                  console.log(
+                    `[Academy ${academyId}] API Response structure:`,
+                    {
+                      hasProfileData: !!responseData.profile_data,
+                      profileDataKeys: profileData
+                        ? Object.keys(profileData)
+                        : [],
+                      fullResponse: responseData,
+                    }
+                  );
                 }
 
                 // Extract academy ID - check both profile_data and root level
                 const academyIdFromApi =
-                  getStringField("id", profileData) || 
+                  getStringField("id", profileData) ||
                   getStringField("academy_id", profileData) ||
                   getStringField("id", responseData) ||
                   getStringField("academy_id", responseData) ||
@@ -206,19 +216,19 @@ const CoursesPage = () => {
                   getStringField("first_name", profileData) ||
                   getStringField("firstName", profileData);
 
-                const descriptionFromApi = 
+                const descriptionFromApi =
                   getStringField("description", profileData) ||
                   getStringField("description", responseData);
-                const websiteFromApi = 
+                const websiteFromApi =
                   getStringField("website_url", profileData) ||
                   getStringField("websiteUrl", profileData) ||
                   getStringField("website_url", responseData);
-                const contactEmailFromApi = 
+                const contactEmailFromApi =
                   getStringField("contact_email", profileData) ||
                   getStringField("contactEmail", profileData) ||
                   getStringField("email", profileData) ||
                   getStringField("contact_email", responseData);
-                
+
                 // Extract logo - check profile_data first
                 const logoFromApi =
                   getStringField("logo_url", profileData) ||
@@ -226,7 +236,7 @@ const CoursesPage = () => {
                   getStringField("logo", profileData) ||
                   getStringField("logo_url", responseData) ||
                   getStringField("logoUrl", responseData);
-                
+
                 // Extract profile photo
                 const profilePhotoFromApi =
                   getStringField("profile_photo_url", profileData) ||
@@ -234,7 +244,7 @@ const CoursesPage = () => {
                   getStringField("profile_photo", profileData) ||
                   getStringField("profilePhoto", profileData) ||
                   getStringField("profile_photo_url", responseData);
-                
+
                 // Extract profile image - try multiple variations
                 const profileImageFromApi =
                   getStringField("profile_image_url", profileData) ||
@@ -247,13 +257,13 @@ const CoursesPage = () => {
                   getStringField("profileImageUrl", responseData) ||
                   // Fallback to profile_photo if profile_image not found
                   profilePhotoFromApi;
-                
-                const slugFromApi = 
+
+                const slugFromApi =
                   getStringField("slug", profileData) ||
                   getStringField("slug", responseData);
 
                 // Debug: Log what we found
-                if (process.env.NODE_ENV === 'development') {
+                if (process.env.NODE_ENV === "development") {
                   console.log(`[Academy ${academyId}] Extracted values:`, {
                     academy_id: academyIdFromApi,
                     academy_name: academyNameFromApi,
@@ -278,8 +288,8 @@ const CoursesPage = () => {
                   profile_photo_url:
                     profilePhotoFromApi || supabaseData?.profile_photo_url,
                   profile_image_url:
-                    profileImageFromApi || 
-                    supabaseData?.profile_image_url || 
+                    profileImageFromApi ||
+                    supabaseData?.profile_image_url ||
                     supabaseData?.profile_photo_url,
                   slug:
                     slugFromApi ||
@@ -388,7 +398,7 @@ const CoursesPage = () => {
   const saveCourseMutation = useMutation({
     mutationFn: async (course: Course) => {
       if (!userId) throw new Error("User not logged in");
-      
+
       if (course.is_saved) {
         // Unsave: Delete from Supabase
         const { error } = await supabase
@@ -396,7 +406,7 @@ const CoursesPage = () => {
           .delete()
           .eq("user_id", userId)
           .eq("course_id", course.id);
-        
+
         if (error) {
           throw new Error(`Failed to unsave course: ${error.message}`);
         }
@@ -405,7 +415,7 @@ const CoursesPage = () => {
         const { error } = await supabase
           .from("saved_courses")
           .insert({ user_id: userId, course_id: course.id });
-        
+
         if (error) {
           // Handle duplicate entry (course already saved)
           if (error.code === "23505") {
@@ -422,15 +432,18 @@ const CoursesPage = () => {
       queryClient.invalidateQueries({ queryKey: ["savedCourses"] });
       toast({
         title: variables.is_saved ? "Course Unsaved" : "Course Saved",
-        description: `"${variables.title}" has been ${variables.is_saved ? "unsaved" : "saved"} successfully.`,
+        description: `"${variables.title}" has been ${
+          variables.is_saved ? "unsaved" : "saved"
+        } successfully.`,
         duration: 1750,
       });
     },
     onError: (error) => {
       console.error("Error saving/unsaving course:", error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to save course. Please try again.";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to save course. Please try again.";
       toast({
         title: "Error",
         description: errorMessage,
@@ -455,19 +468,22 @@ const CoursesPage = () => {
 
   // Group courses by academy
   const coursesByAcademy = React.useMemo(() => {
-    const grouped = new Map<string, { academy: AcademyProfile | null; courses: Course[] }>();
-    
+    const grouped = new Map<
+      string,
+      { academy: AcademyProfile | null; courses: Course[] }
+    >();
+
     filteredCourses.forEach((course) => {
       const academyId = course.academy_id || "no-academy";
       const academy = course.academy_profile_data;
-      
+
       if (!grouped.has(academyId)) {
         grouped.set(academyId, {
           academy: academy || null,
           courses: [],
         });
       }
-      
+
       grouped.get(academyId)!.courses.push(course);
     });
 
@@ -480,30 +496,25 @@ const CoursesPage = () => {
   }, [filteredCourses]);
 
   const renderCourseCard = (course: Course) => {
-    const academyProfileName =
-      course.academy_profile_data?.academy_name || "";
+    const academyProfileName = course.academy_profile_data?.academy_name || "";
     const academyName =
       academyProfileName || course.provider || "Unknown Academy";
 
     return (
-      <Card 
-        key={course.id} 
+      <Card
+        key={course.id}
         className="overflow-hidden group/card h-full flex flex-col transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-0 shadow-md bg-white"
       >
         <div className="relative h-48 overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
           <img
-            src={
-              course.image
-                ? course.image
-                : "lovable-uploads/no_photo.png"
-            }
+            src={course.image ? course.image : "lovable-uploads/no_photo.png"}
             alt={course.title}
             className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300" />
           <div className="absolute top-3 right-3">
-            <Badge 
-              variant="secondary" 
+            <Badge
+              variant="secondary"
               className="bg-white/90 backdrop-blur-sm text-gray-900 font-semibold shadow-md"
             >
               {course.match}% Match
@@ -540,15 +551,13 @@ const CoursesPage = () => {
               size="icon"
               variant="ghost"
               onClick={() => saveCourseMutation.mutate(course)}
-              aria-label={
-                course.is_saved ? "Unsave course" : "Save course"
-              }
+              aria-label={course.is_saved ? "Unsave course" : "Save course"}
               className="transition-all duration-300 hover:scale-110 hover:bg-gray-100"
             >
               <Bookmark
                 className={`h-5 w-5 transition-all duration-300 ${
-                  course.is_saved 
-                    ? "fill-primary text-primary scale-110" 
+                  course.is_saved
+                    ? "fill-primary text-primary scale-110"
                     : "text-gray-400 hover:text-primary"
                 }`}
               />
@@ -571,7 +580,9 @@ const CoursesPage = () => {
       "#FFF8E1", // Light yellow
       "#EDE7F6", // Light indigo
     ];
-    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hash = name
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[(hash + idx) % colors.length];
   };
 
@@ -581,10 +592,12 @@ const CoursesPage = () => {
     academyCourses: Course[];
     index: number;
   }> = ({ academy, academyCourses, index }) => {
-    const academyName = academy?.academy_name || academyCourses[0]?.provider || "Unknown Academy";
+    const academyName =
+      academy?.academy_name || academyCourses[0]?.provider || "Unknown Academy";
     const academyId = academy?.id || academyCourses[0]?.academy_id;
     const academyLogo = academy?.logo_url;
-    const academyProfilePicture = academy?.profile_image_url || academy?.profile_photo_url;
+    const academyProfilePicture =
+      academy?.profile_image_url || academy?.profile_photo_url;
     const imageUrl = academyProfilePicture || academyLogo;
     const hasMoreCourses = academyCourses.length > 3;
     const top3Courses = academyCourses.slice(0, 3);
@@ -596,7 +609,7 @@ const CoursesPage = () => {
 
     // Debug: Log academy data
     React.useEffect(() => {
-      if (process.env.NODE_ENV === 'development' && academy) {
+      if (process.env.NODE_ENV === "development" && academy) {
         console.log(`[Academy Section ${index}] ${academyName}:`, {
           academy_id: academyId,
           profile_image_url: academy.profile_image_url,
@@ -622,19 +635,25 @@ const CoursesPage = () => {
         key={academyId || `no-academy-${index}`}
         className="group relative rounded-2xl p-8 md:p-10 transition-all duration-500 hover:shadow-xl overflow-hidden"
         style={{
-          background: `linear-gradient(135deg, transparent 0%, ${hexToRgba(displayColor, 0.15)} 50%, ${hexToRgba(displayColor, 0.25)} 100%)`,
-          boxShadow: `0 4px 20px ${hexToRgba(displayColor, 0.1)}, 0 1px 3px ${hexToRgba(displayColor, 0.08)}`,
+          background: `linear-gradient(135deg, transparent 0%, ${hexToRgba(
+            displayColor,
+            0.15
+          )} 50%, ${hexToRgba(displayColor, 0.25)} 100%)`,
+          boxShadow: `0 4px 20px ${hexToRgba(
+            displayColor,
+            0.1
+          )}, 0 1px 3px ${hexToRgba(displayColor, 0.08)}`,
           border: `1px solid ${hexToRgba(displayColor, 0.2)}`,
         }}
       >
         {/* Decorative accent */}
-        <div 
+        <div
           className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 blur-3xl transition-opacity duration-500 group-hover:opacity-20"
           style={{
             background: displayColor,
           }}
         />
-        
+
         <div className="relative space-y-8">
           {/* Academy Header */}
           <div className="flex items-start gap-5">
@@ -700,7 +719,10 @@ const CoursesPage = () => {
           {top3Courses.length > 0 ? (
             <div className="flex md:grid md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 overflow-x-auto md:overflow-x-visible pb-4 md:pb-0 -mx-2 md:mx-0 px-2 md:px-0 scrollbar-hide snap-x snap-mandatory md:snap-none">
               {top3Courses.map((course) => (
-                <div key={course.id} className="flex-shrink-0 w-[300px] md:w-auto snap-start md:flex-shrink md:snap-none">
+                <div
+                  key={course.id}
+                  className="flex-shrink-0 w-[300px] md:w-auto snap-start md:flex-shrink md:snap-none"
+                >
                   {renderCourseCard(course)}
                 </div>
               ))}
@@ -717,10 +739,10 @@ const CoursesPage = () => {
                 style={{
                   backgroundColor: hexToRgba(displayColor, 0.1),
                   borderColor: hexToRgba(displayColor, 0.3),
-                  color: isDarkColor(displayColor) 
-                    ? displayColor 
+                  color: isDarkColor(displayColor)
+                    ? displayColor
                     : `${displayColor}dd`,
-                  borderWidth: '2px',
+                  borderWidth: "2px",
                 }}
               >
                 View More Courses ({academyCourses.length - 3} more)

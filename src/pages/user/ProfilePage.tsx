@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Link2,
   AlertCircle,
+  Eye,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -272,6 +273,12 @@ const ProfilePage = () => {
 
   // Profile image options modal state
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
+
+  // Contact Information edit modal state (combined phone and email)
+  const [isContactEditModalOpen, setIsContactEditModalOpen] = useState(false);
+  const [phoneEditValue, setPhoneEditValue] = useState("");
+  const [emailEditValue, setEmailEditValue] = useState("");
+  const [updatingContact, setUpdatingContact] = useState(false);
 
   // Social links state
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
@@ -1723,6 +1730,102 @@ const ProfilePage = () => {
     }
   };
 
+  // Handler to open contact information edit modal
+  const handleOpenContactEditModal = () => {
+    setPhoneEditValue(phone_number || "");
+    setEmailEditValue(email || "");
+    setIsContactEditModalOpen(true);
+  };
+
+  // Handler to save contact information (phone and email)
+  const handleSaveContact = async () => {
+    if (!user) return;
+
+    // Validate email
+    if (!emailEditValue.trim()) {
+      toast({
+        title: "Error",
+        description: "Email cannot be empty.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailEditValue.trim())) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingContact(true);
+
+    try {
+      const token = localStorage.getItem("authToken");
+
+      // Prepare update payload
+      const updateData: { phone_number?: string; email: string } = {
+        email: emailEditValue.trim(),
+      };
+
+      // Only include phone_number if it's provided
+      if (phoneEditValue.trim()) {
+        updateData.phone_number = phoneEditValue.trim();
+      }
+
+      const response = await apiClient.patch(
+        API_ENDPOINTS.AUTH.PROFILE,
+        updateData,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+
+      console.log("✅ Contact information updated:", response.data);
+
+      // Refresh profile data
+      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+      setProfileData(profileResponse.data);
+
+      // Reload to update user context
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+
+      setIsContactEditModalOpen(false);
+
+      toast({
+        title: "Success",
+        description: "Contact information has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("❌ Error updating contact information:", error);
+      const errorMessage =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { detail?: string } } }).response
+              ?.data?.detail ||
+            "Failed to update contact information. Please try again."
+          : "Failed to update contact information. Please try again.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingContact(false);
+    }
+  };
+
   const handleSendPhoneVerification = async () => {
     try {
       await triggerPhoneVerificationCode();
@@ -1832,288 +1935,290 @@ const ProfilePage = () => {
   return (
     <DashboardLayout>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
-        {/* Left Column - Profile Summary */}
-        <div className="lg:col-span-1 space-y-4 md:space-y-6">
-          {/* Profile Header Card */}
-          <Card>
-            <CardContent className="pb-6 pt-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div
-                  className="relative group cursor-pointer flex-shrink-0"
-                  onClick={handleImageModalClick}
-                >
-                  <OptimizedAvatar
-                    key={`avatar-${imageTimestamp}`}
-                    src={displayProfileImage || undefined}
-                    alt="Profile photo"
-                    fallback={
-                      first_name ? first_name.charAt(0).toUpperCase() : "U"
-                    }
-                    size="lg"
-                    loading="eager"
-                    className="h-16 w-16"
-                  />
-                  {uploadingImage ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+        {/* Left Column - Profile Summary, Contact Info, Social Networks */}
+        <div className="lg:col-span-1">
+          <div className="space-y-4 md:space-y-6">
+            {/* Profile Header Card */}
+            <Card className="bg-transparent border-0 md:bg-card md:border">
+              <CardContent className="pb-4 pt-6 px-6 md:pb-6">
+                {/* Mobile: Horizontal layout, Desktop: Vertical centered */}
+                <div className="flex flex-col md:items-center">
+                  {/* Top Section: Name/Info on left, Picture on right (Mobile) | Picture on top, Name below (Desktop) */}
+                  <div className="flex items-start justify-between gap-4 mb-4 md:flex-col md:items-center md:mb-4">
+                    {/* Profile Picture - Right side (Mobile) | Top (Desktop) */}
+                    <div className="relative flex-shrink-0 md:relative md:order-1">
+                      <div
+                        className="relative group cursor-pointer rounded-full overflow-hidden"
+                        onClick={handleImageModalClick}
+                      >
+                        <OptimizedAvatar
+                          key={`avatar-${imageTimestamp}`}
+                          src={displayProfileImage || undefined}
+                          alt="Profile photo"
+                          fallback={
+                            first_name
+                              ? first_name.charAt(0).toUpperCase()
+                              : "U"
+                          }
+                          size="lg"
+                          loading="eager"
+                          className="h-16 w-16 md:h-28 md:w-28 rounded-full"
+                        />
+                        {uploadingImage ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <Camera className="h-5 w-5 md:h-7 md:w-7 text-white" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                      <Camera className="h-5 w-5 text-white" />
-                    </div>
-                  )}
-                </div>
-                <input
-                  id="profile-image-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={uploadingImage}
-                />
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                    {first_name} {last_name}
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 w-full">
-                <Button
-                  variant="outline"
-                  className="flex-[4] flex items-center justify-center gap-2"
-                >
-                  <Settings size={16} />
-                  Settings
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleLogout}
-                  className="flex-[1] flex items-center justify-center border-breneo-danger text-breneo-danger hover:bg-breneo-danger/10"
-                >
-                  <LogOut size={16} />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                    <input
+                      id="profile-image-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={uploadingImage}
+                    />
 
-          {/* Contact Information Card */}
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-bold">Contact Information</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-breneo-blue/10 rounded-full p-2">
-                  <Phone size={18} className="text-breneo-blue" />
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-                  <span className="text-sm">
-                    {phone_number || "Not provided"}
-                  </span>
-                  {phone_number ? (
-                    <Badge
-                      variant={isPhoneVerified ? "secondary" : "outline"}
-                      className={
-                        isPhoneVerified
-                          ? "mt-1 sm:mt-0 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                          : "mt-1 sm:mt-0 border-orange-300 text-orange-600"
-                      }
-                    >
-                      {isPhoneVerified ? "Verified" : "Unverified"}
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-breneo-blue/10 rounded-full p-2">
-                  <Mail size={18} className="text-breneo-blue" />
-                </div>
-                <span className="text-sm">{email}</span>
-              </div>
-              {!isPhoneVerified && (
-                <Alert className="border-orange-300 bg-orange-50 dark:border-orange-900/60 dark:bg-orange-950/30">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-orange-600 mt-1" />
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <AlertTitle>Verify your phone number</AlertTitle>
-                        <AlertDescription>
-                          Confirm your phone number to protect your account and
-                          unlock all features.
-                        </AlertDescription>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                          <Button
-                            onClick={handleSendPhoneVerification}
-                            disabled={
-                              !phone_number ||
-                              isSendingCode ||
-                              (codeSent && resendCooldown > 0)
-                            }
-                          >
-                            {isSendingCode
-                              ? "Sending..."
-                              : codeSent
-                              ? "Resend code"
-                              : "Send verification code"}
-                          </Button>
-                          {resendCooldown > 0 && (
-                            <span className="text-xs text-orange-700 dark:text-orange-300">
-                              You can request a new code in {resendCooldown}s
-                            </span>
-                          )}
-                        </div>
-                        {codeSent && (
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Input
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              maxLength={6}
-                              placeholder="Enter 6-digit code"
-                              value={codeInput}
-                              onChange={(event) =>
-                                setCodeInput(
-                                  event.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 6)
-                                )
-                              }
-                              className="sm:max-w-[200px]"
-                            />
-                            <Button
-                              onClick={handleConfirmPhoneVerification}
-                              disabled={
-                                codeInput.length !== 6 || isVerifyingCode
-                              }
-                            >
-                              {isVerifyingCode ? "Verifying..." : "Verify"}
-                            </Button>
-                          </div>
-                        )}
-                        {!phone_number && (
-                          <div className="pt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate("/settings")}
-                            >
-                              Add phone number in settings
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                    {/* Name and Info - Left side (Mobile) | Below picture (Desktop) */}
+                    <div className="flex-1 min-w-0 md:text-center md:flex-none md:mb-4 md:order-2">
+                      <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                        {first_name} {last_name}
+                      </h1>
+                      {(user as { job_title?: string; position?: string })
+                        ?.job_title && (
+                        <p className="text-sm font-semibold md:font-normal text-gray-900 dark:text-gray-100 md:text-gray-600 md:dark:text-gray-400 mb-1">
+                          {(user as { job_title?: string }).job_title}
+                        </p>
+                      )}
+                      {(user as { city?: string; location?: string })?.city ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {(user as { city?: string }).city}
+                          {(user as { country?: string })?.country &&
+                            `, ${(user as { country?: string }).country}`}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {phone_number || "Location not specified"}
+                        </p>
+                      )}
                     </div>
                   </div>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Social Networks Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Social Networks</h3>
-              <Button
-                variant="link"
-                className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-                onClick={handleOpenSocialLinkModal}
-              >
-                <Plus size={16} />
-                Add
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {loadingSocialLinks ? (
-                <div className="text-center py-4 text-gray-500">Loading...</div>
-              ) : Object.entries(socialLinks).some(
-                  ([_, url]) => url && url.trim() !== ""
-                ) ? (
-                <div className="space-y-3">
-                  {(Object.entries(socialLinks) as [SocialPlatform, string][])
-                    .filter(([_, url]) => url && url.trim() !== "")
-                    .map(([platform, url]) => (
-                      <div
-                        key={platform}
-                        className="flex items-center justify-between group"
-                      >
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 flex-1 hover:text-breneo-blue transition-colors"
+                  {/* Hidden Profile Badge */}
+                  {(user as { is_profile_hidden?: boolean })
+                    ?.is_profile_hidden && (
+                    <div className="mb-4 md:text-center">
+                      <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-0">
+                        <Eye size={12} className="mr-1" />
+                        Hidden Profile
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Bottom Section: Settings and Logout Buttons */}
+                  <div className="flex items-center gap-2 w-full pt-3 md:mt-2 md:pt-0">
+                    <Button
+                      variant="outline"
+                      className="flex-[4] md:flex-1 flex items-center justify-center gap-2 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 hover:bg-breneo-blue/20 md:bg-transparent md:text-gray-900 md:dark:text-gray-100 md:border-gray-200 md:dark:border-gray-700 md:hover:bg-gray-50 md:dark:hover:bg-gray-800"
+                      onClick={() => navigate("/settings")}
+                    >
+                      <Settings size={16} />
+                      <span className="md:hidden">Settings</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleLogout}
+                      className="flex-[1] md:flex-1 flex items-center justify-center gap-2 border-breneo-danger text-breneo-danger bg-breneo-danger/10 hover:bg-breneo-danger/20 md:border-breneo-danger md:hover:bg-breneo-danger/10"
+                    >
+                      <LogOut size={16} />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact Information Card */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  Contact Information
+                </h3>
+                <Button
+                  variant="link"
+                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
+                  onClick={handleOpenContactEditModal}
+                >
+                  Edit
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-0 p-0">
+                <div className="px-6 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
+                      <Phone size={18} className="text-breneo-blue" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {phone_number || "Not provided"}
+                    </span>
+                  </div>
+                </div>
+                <div className="px-6 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
+                      <Mail size={18} className="text-breneo-blue" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                      {email}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Social Networks Card */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  Social Networks
+                </h3>
+                <Button
+                  variant="link"
+                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
+                  onClick={handleOpenSocialLinkModal}
+                >
+                  Add
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loadingSocialLinks ? (
+                  <div className="text-center py-4 text-gray-500 text-sm px-6">
+                    Loading...
+                  </div>
+                ) : Object.entries(socialLinks).some(
+                    ([_, url]) => url && url.trim() !== ""
+                  ) ? (
+                  <div>
+                    {(Object.entries(socialLinks) as [SocialPlatform, string][])
+                      .filter(([_, url]) => url && url.trim() !== "")
+                      .map(([platform, url], index, filteredArray) => (
+                        <div
+                          key={platform}
+                          className={`px-6 py-4 ${
+                            index < filteredArray.length - 1
+                              ? "border-b border-gray-200 dark:border-gray-700"
+                              : ""
+                          } group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
                         >
-                          <div className="bg-breneo-blue/10 rounded-full p-2">
-                            {getSocialIcon(
-                              platform,
-                              "h-[18px] w-[18px] text-breneo-blue"
-                            )}
+                          <div className="flex items-center justify-between">
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 flex-1 min-w-0"
+                            >
+                              <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
+                                {getSocialIcon(
+                                  platform,
+                                  "h-[18px] w-[18px] text-breneo-blue"
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                  {platformLabels[platform]}
+                                </p>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {url
+                                    .replace(/^https?:\/\//, "")
+                                    .replace(/^www\./, "")}
+                                </p>
+                              </div>
+                            </a>
+                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                              <button
+                                type="button"
+                                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditSocialLink(platform);
+                                }}
+                              >
+                                <Edit
+                                  size={14}
+                                  className="text-gray-600 dark:text-gray-400"
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 dark:hover:bg-red-900/30"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSocialLink(platform);
+                                }}
+                              >
+                                <Trash2
+                                  size={14}
+                                  className="text-red-600 dark:text-red-400"
+                                />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                              {platformLabels[platform]}
-                            </p>
-                          </div>
-                          <ExternalLink
-                            size={14}
-                            className="text-gray-400 group-hover:text-breneo-blue"
-                          />
-                        </a>
-                        <div className="flex items-center gap-1 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => handleEditSocialLink(platform)}
-                          >
-                            <Edit size={14} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                            onClick={() => handleDeleteSocialLink(platform)}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
                         </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500">
-                  No social links added yet. Click "Add" to add your social
-                  media profiles.
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500 text-sm px-6">
+                    No social links added yet. Click "Add" to add your social
+                    media profiles.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Right Column - Details */}
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
           {/* About Me Card */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">About Me</h3>
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                About Me
+              </h3>
               <Button
                 variant="link"
-                className="text-breneo-blue p-0 h-auto"
+                className="text-breneo-blue p-0 h-auto font-normal hover:underline"
                 onClick={handleOpenAboutMeModal}
               >
-                <Edit size={16} className="mr-2" />
                 Edit
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-6 py-4">
               {loadingProfile ? (
                 <div className="text-center py-4 text-gray-500">Loading...</div>
               ) : aboutMe ? (
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {aboutMe}
-                </p>
+                <div>
+                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
+                    {aboutMe.length > 200
+                      ? `${aboutMe.substring(0, 200)}...`
+                      : aboutMe}
+                  </p>
+                  {aboutMe.length > 200 && (
+                    <Button
+                      variant="link"
+                      className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
+                      onClick={handleOpenAboutMeModal}
+                    >
+                      View More
+                    </Button>
+                  )}
+                </div>
               ) : (
-                <p className="text-gray-500 italic">
+                <p className="text-sm text-gray-500 italic">
                   No information available. Add some details about yourself!
                 </p>
               )}
@@ -2171,10 +2276,12 @@ const ProfilePage = () => {
 
           {/* Personal Skills Card */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Personal Skills</h3>
+            <CardHeader className="p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Personal Skills
+              </h3>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-6 py-4">
               {loadingResults ? (
                 <div className="text-center py-4 text-gray-500">
                   Loading skill results...
@@ -2184,14 +2291,16 @@ const ProfilePage = () => {
                 <div className="space-y-4">
                   {/* Final Role */}
                   {skillResults.final_role && (
-                    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-lg border border-breneo-blue/20 dark:border-breneo-blue/30">
                       <div className="flex items-center gap-2 mb-2">
-                        <Award className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                        <div className="bg-breneo-blue/10 rounded-full p-2">
+                          <Award className="h-5 w-5 text-breneo-blue" />
+                        </div>
+                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
                           Recommended Role
                         </span>
                       </div>
-                      <Badge className="text-base px-4 py-2 bg-blue-600 hover:bg-blue-700">
+                      <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
                         {skillResults.final_role}
                       </Badge>
                     </div>
@@ -2200,10 +2309,10 @@ const ProfilePage = () => {
                   {/* Skills with Pie Charts */}
                   {getAllSkills().length > 0 && (
                     <div>
-                      <h4 className="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-4">
+                      <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
                         Top Skills
                       </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {getAllSkills().map((skill) => {
                           const isStrong = skill.percentage >= 70;
                           const pieData = prepareSkillPieData(skill);
@@ -2221,11 +2330,11 @@ const ProfilePage = () => {
                           return (
                             <div
                               key={skill.name}
-                              className="group relative p-5 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:border-breneo-blue dark:hover:border-breneo-blue transition-all duration-300 bg-white dark:bg-gray-800/50 hover:shadow-lg"
+                              className="group relative p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-breneo-blue dark:hover:border-breneo-blue transition-all duration-300 bg-white dark:bg-gray-800/50"
                             >
-                              <div className="flex flex-col items-center space-y-4">
+                              <div className="flex flex-col items-center space-y-3">
                                 {/* Pie Chart */}
-                                <div className="relative w-32 h-32">
+                                <div className="relative w-24 h-24">
                                   <ChartContainer
                                     config={chartConfig}
                                     className="h-full w-full [&>div]:aspect-square"
@@ -2235,8 +2344,8 @@ const ProfilePage = () => {
                                         data={pieData}
                                         cx="50%"
                                         cy="50%"
-                                        innerRadius={35}
-                                        outerRadius={50}
+                                        innerRadius={28}
+                                        outerRadius={40}
                                         paddingAngle={2}
                                         dataKey="value"
                                         startAngle={90}
@@ -2266,7 +2375,7 @@ const ProfilePage = () => {
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="text-center">
                                       <div
-                                        className={`text-2xl font-bold ${
+                                        className={`text-lg font-bold ${
                                           isStrong
                                             ? "text-green-600 dark:text-green-400"
                                             : "text-amber-600 dark:text-amber-400"
@@ -2279,11 +2388,11 @@ const ProfilePage = () => {
                                 </div>
                                 {/* Skill Name */}
                                 <div className="text-center">
-                                  <h5 className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                                  <h5 className="font-medium text-sm text-gray-900 dark:text-gray-100">
                                     {skill.name}
                                   </h5>
                                   <div
-                                    className={`mt-1 inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                                    className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                                       isStrong
                                         ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                                         : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
@@ -2301,14 +2410,14 @@ const ProfilePage = () => {
                   )}
 
                   {getAllSkills().length === 0 && !loadingResults && (
-                    <div className="text-center py-4 text-gray-500">
+                    <div className="text-center py-4 text-gray-500 text-sm">
                       No skill test results available. Take a skill test to see
                       your results here.
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-gray-500 text-sm">
                   No skill test results available. Take a skill test to see your
                   results here.
                 </div>
@@ -2318,75 +2427,83 @@ const ProfilePage = () => {
 
           {/* Saved Courses Card */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-breneo-blue" />
-                <h3 className="text-lg font-bold">Saved Courses</h3>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Saved Courses
+              </h3>
               {savedCourses.length > 0 && (
                 <Button
                   variant="link"
-                  className="text-breneo-blue p-0 h-auto"
+                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
                   onClick={() => navigate("/courses")}
                 >
                   View All
-                  <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {loadingSavedCourses ? (
-                <div className="text-center py-4 text-gray-500">Loading...</div>
+                <div className="text-center py-4 text-gray-500 text-sm px-6">
+                  Loading...
+                </div>
               ) : savedCourses.length > 0 ? (
-                <div className="space-y-3">
-                  {savedCourses.map((course) => (
+                <div>
+                  {savedCourses.map((course, index) => (
                     <div
                       key={course.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer"
+                      className={`px-6 py-4 ${
+                        index < savedCourses.length - 1
+                          ? "border-b border-gray-200 dark:border-gray-700"
+                          : ""
+                      } cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
                       onClick={() => navigate(`/course/${course.id}`)}
                     >
-                      <div className="flex-shrink-0">
-                        <img
-                          src={course.image || "lovable-uploads/no_photo.png"}
-                          alt={course.title}
-                          className="w-16 h-16 rounded-lg object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = "lovable-uploads/no_photo.png";
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm mb-1 line-clamp-1">
-                          {course.title}
-                        </h4>
-                        <p className="text-xs text-gray-500 mb-1">
-                          {course.provider}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span>{course.level}</span>
-                          <span>•</span>
-                          <span>{course.duration}</span>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          <img
+                            src={course.image || "lovable-uploads/no_photo.png"}
+                            alt={course.title}
+                            className="w-12 h-12 rounded-lg object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "lovable-uploads/no_photo.png";
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 line-clamp-1">
+                            {course.title}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            {course.provider}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>{course.level}</span>
+                            <span>•</span>
+                            <span>{course.duration}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
                   {savedCourses.length >= 6 && (
-                    <Button
-                      variant="outline"
-                      className="w-full mt-2"
-                      onClick={() => navigate("/courses")}
-                    >
-                      View All Saved Courses
-                    </Button>
+                    <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                      <Button
+                        variant="link"
+                        className="text-breneo-blue p-0 h-auto font-normal text-sm w-full justify-center hover:underline"
+                        onClick={() => navigate("/courses")}
+                      >
+                        View All Saved Courses
+                      </Button>
+                    </div>
                   )}
                 </div>
               ) : (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-gray-500 text-sm px-6">
                   No saved courses yet. Browse courses and save your favorites!
                   <Button
                     variant="link"
-                    className="mt-2 text-breneo-blue"
+                    className="mt-2 text-breneo-blue font-normal text-sm hover:underline"
                     onClick={() => navigate("/courses")}
                   >
                     Browse Courses
@@ -2398,103 +2515,111 @@ const ProfilePage = () => {
 
           {/* Saved Jobs Card */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-breneo-blue" />
-                <h3 className="text-lg font-bold">Saved Jobs</h3>
-              </div>
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Saved Jobs
+              </h3>
               {savedJobs.length > 0 && (
                 <Button
                   variant="link"
-                  className="text-breneo-blue p-0 h-auto"
+                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
                   onClick={() => navigate("/jobs")}
                 >
                   View All
-                  <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {loadingSavedJobs ? (
-                <div className="text-center py-4 text-gray-500">Loading...</div>
+                <div className="text-center py-4 text-gray-500 text-sm px-6">
+                  Loading...
+                </div>
               ) : savedJobs.length > 0 ? (
-                <div className="space-y-3">
-                  {savedJobs.map((job) => (
+                <div>
+                  {savedJobs.map((job, index) => (
                     <div
                       key={job.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      className={`px-6 py-4 ${
+                        index < savedJobs.length - 1
+                          ? "border-b border-gray-200 dark:border-gray-700"
+                          : ""
+                      } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
                     >
-                      <div className="flex-shrink-0">
-                        {job.company_logo ? (
-                          <img
-                            src={job.company_logo}
-                            alt={`${job.company} logo`}
-                            className="w-12 h-12 rounded-lg object-cover border border-gray-200"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = "none";
-                              if (target.nextElementSibling) {
-                                (
-                                  target.nextElementSibling as HTMLElement
-                                ).style.display = "flex";
-                              }
-                            }}
-                          />
-                        ) : null}
-                        {!job.company_logo && (
-                          <div className="w-12 h-12 rounded-lg bg-breneo-accent flex items-center justify-center">
-                            <Briefcase className="h-6 w-6 text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm mb-1 line-clamp-1">
-                          {job.title}
-                        </h4>
-                        <p className="text-xs text-gray-500 mb-1">
-                          {job.company}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                          <MapPin className="h-3 w-3" />
-                          <span className="line-clamp-1">{job.location}</span>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          {job.company_logo ? (
+                            <img
+                              src={job.company_logo}
+                              alt={`${job.company} logo`}
+                              className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = "none";
+                                if (target.nextElementSibling) {
+                                  (
+                                    target.nextElementSibling as HTMLElement
+                                  ).style.display = "flex";
+                                }
+                              }}
+                            />
+                          ) : null}
+                          {!job.company_logo && (
+                            <div className="w-12 h-12 rounded-lg bg-breneo-blue/10 flex items-center justify-center">
+                              <Briefcase className="h-6 w-6 text-breneo-blue" />
+                            </div>
+                          )}
                         </div>
-                        {job.salary && (
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 line-clamp-1">
+                            {job.title}
+                          </h4>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            {job.salary}
+                            {job.company}
                           </p>
-                        )}
-                        {job.url && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="mt-2 text-xs h-7"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(job.url, "_blank");
-                            }}
-                          >
-                            View Job
-                          </Button>
-                        )}
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                            <MapPin className="h-3 w-3" />
+                            <span className="line-clamp-1">{job.location}</span>
+                          </div>
+                          {job.salary && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                              {job.salary}
+                            </p>
+                          )}
+                          {job.url && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs h-7 mt-1 border-breneo-blue text-breneo-blue hover:bg-breneo-blue hover:text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(job.url, "_blank");
+                              }}
+                            >
+                              View Job
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
                   {savedJobs.length >= 6 && (
-                    <Button
-                      variant="outline"
-                      className="w-full mt-2"
-                      onClick={() => navigate("/jobs")}
-                    >
-                      View All Saved Jobs
-                    </Button>
+                    <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                      <Button
+                        variant="link"
+                        className="text-breneo-blue p-0 h-auto font-normal text-sm w-full justify-center hover:underline"
+                        onClick={() => navigate("/jobs")}
+                      >
+                        View All Saved Jobs
+                      </Button>
+                    </div>
                   )}
                 </div>
               ) : (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-gray-500 text-sm px-6">
                   No saved jobs yet. Browse jobs and save your favorites!
                   <Button
                     variant="link"
-                    className="mt-2 text-breneo-blue"
+                    className="mt-2 text-breneo-blue font-normal text-sm hover:underline"
                     onClick={() => navigate("/jobs")}
                   >
                     Browse Jobs
@@ -2823,6 +2948,117 @@ const ProfilePage = () => {
                   : editingPlatform
                   ? "Update"
                   : "Add"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Contact Information Edit Modal (Phone and Email) */}
+      {isMobile ? (
+        <Drawer
+          open={isContactEditModalOpen}
+          onOpenChange={setIsContactEditModalOpen}
+        >
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Edit Contact Information</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="phone-number">Phone Number</Label>
+                  <Input
+                    id="phone-number"
+                    type="tel"
+                    placeholder="+995591552495"
+                    value={phoneEditValue}
+                    onChange={(e) => setPhoneEditValue(e.target.value)}
+                    className="mt-2"
+                    disabled={updatingContact}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email-address">Email Address</Label>
+                  <Input
+                    id="email-address"
+                    type="email"
+                    placeholder="example@email.com"
+                    value={emailEditValue}
+                    onChange={(e) => setEmailEditValue(e.target.value)}
+                    className="mt-2"
+                    disabled={updatingContact}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <DrawerFooter>
+              <Button
+                onClick={handleSaveContact}
+                disabled={updatingContact || !emailEditValue.trim()}
+              >
+                {updatingContact ? "Saving..." : "Save Changes"}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" disabled={updatingContact}>
+                  Cancel
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog
+          open={isContactEditModalOpen}
+          onOpenChange={setIsContactEditModalOpen}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Contact Information</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="phone-number-desktop">Phone Number</Label>
+                  <Input
+                    id="phone-number-desktop"
+                    type="tel"
+                    placeholder="+995591552495"
+                    value={phoneEditValue}
+                    onChange={(e) => setPhoneEditValue(e.target.value)}
+                    className="mt-2"
+                    disabled={updatingContact}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email-address-desktop">Email Address</Label>
+                  <Input
+                    id="email-address-desktop"
+                    type="email"
+                    placeholder="example@email.com"
+                    value={emailEditValue}
+                    onChange={(e) => setEmailEditValue(e.target.value)}
+                    className="mt-2"
+                    disabled={updatingContact}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsContactEditModalOpen(false)}
+                disabled={updatingContact}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveContact}
+                disabled={updatingContact || !emailEditValue.trim()}
+              >
+                {updatingContact ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </DialogContent>

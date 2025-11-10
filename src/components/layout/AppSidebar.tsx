@@ -103,7 +103,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   return (
     <>
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-card border-b border-gray-200 dark:border-border px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] px-4 py-3">
         <div className="flex items-center justify-between">
           <Link to={homePath} className="flex items-center">
             <img
@@ -140,7 +140,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-card border-t border-gray-200 dark:border-border">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-t border-black/[0.03] dark:border-white/[0.03]">
         <nav className="flex justify-around items-center py-2">
           {mobileNavItems.map((item, index) => {
             const isActive = location.pathname === item.href;
@@ -150,7 +150,6 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 to={item.href}
                 className={cn(
                   "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-1",
-                  "hover:bg-breneo-blue/10 active:bg-breneo-blue/20",
                   isActive
                     ? "text-gray-600"
                     : "text-gray-600 hover:text-breneo-blue"

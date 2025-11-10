@@ -79,7 +79,7 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeButtonRef = useRef<HTMLButtonElement>(null);
-  
+
   // Get initial section from URL or default to account
   const getInitialSection = (): SettingsSection => {
     const validSections: SettingsSection[] = [
@@ -100,8 +100,8 @@ export default function SettingsPage() {
     }
     return "account";
   };
-  
-  const [activeSection, setActiveSection] = useState<SettingsSection>(() => 
+
+  const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
     getInitialSection()
   );
 
@@ -130,7 +130,7 @@ export default function SettingsPage() {
       const containerWidth = containerRect.width;
 
       // Center the button in the container
-      const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+      const targetScroll = buttonLeft - containerWidth / 2 + buttonWidth / 2;
 
       container.scrollTo({
         left: Math.max(0, targetScroll),
@@ -218,7 +218,12 @@ export default function SettingsPage() {
       "privacy_activity_visibility",
       "private"
     );
-    const validVisibilityValues = ["public", "employers", "academies", "private"];
+    const validVisibilityValues = [
+      "public",
+      "employers",
+      "academies",
+      "private",
+    ];
     if (validVisibilityValues.includes(activityVisibilityValue)) {
       setActivityVisibility(activityVisibilityValue);
     } else {
@@ -870,10 +875,17 @@ export default function SettingsPage() {
           </div>
         );
 
-      case "privacy":
+      case "privacy": {
         // Ensure activityVisibility is always a valid value
-        const validActivityVisibility: "public" | "employers" | "academies" | "private" = 
-          activityVisibility && ["public", "employers", "academies", "private"].includes(activityVisibility)
+        const validActivityVisibility:
+          | "public"
+          | "employers"
+          | "academies"
+          | "private" =
+          activityVisibility &&
+          ["public", "employers", "academies", "private"].includes(
+            activityVisibility
+          )
             ? activityVisibility
             : "private";
 
@@ -993,6 +1005,7 @@ export default function SettingsPage() {
             </Card>
           </div>
         );
+      }
 
       case "subscription":
         return (
@@ -1241,7 +1254,7 @@ export default function SettingsPage() {
     <DashboardLayout>
       {/* Mobile: Fixed Horizontal Scrollable Navigation */}
       {isMobile && (
-        <div className="fixed top-[53px] left-0 right-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border shadow-sm md:hidden">
+        <div className="fixed top-[53px] left-0 right-0 z-40 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] md:hidden">
           <div
             ref={scrollContainerRef}
             className="overflow-x-auto scrollbar-hide touch-pan-x"
