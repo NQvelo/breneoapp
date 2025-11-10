@@ -572,13 +572,13 @@ const CoursesPage = () => {
   const getFallbackColor = (name: string, idx: number): string => {
     const colors = [
       "#E3F2FD", // Light blue
-      "#F3E5F5", // Light purple
+      "#E0F7FD", // Light aqua
       "#E8F5E9", // Light green
       "#FFF3E0", // Light orange
       "#FCE4EC", // Light pink
       "#E0F2F1", // Light teal
       "#FFF8E1", // Light yellow
-      "#EDE7F6", // Light indigo
+      "#E6F2FF", // Light sky blue
     ];
     const hash = name
       .split("")

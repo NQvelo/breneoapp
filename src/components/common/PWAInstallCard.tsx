@@ -197,7 +197,7 @@ export const PWAInstallCard: React.FC = () => {
           cx="50"
           cy="75"
           r="1.5"
-          fill={isDark ? "#a78bfa" : "#8b5cf6"}
+          fill={isDark ? "#33C3ED" : "#19ACE5"}
           opacity="0.6"
         />
         <circle

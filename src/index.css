@@ -45,8 +45,8 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 197 80% 50%;
+    --primary-foreground: 0 0% 9.4%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -57,12 +57,12 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 197 80% 50%;
     --radius: 0.5rem;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222.2 84% 4.9%;
-    --sidebar-primary: 222.2 47.4% 11.2%;
-    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-primary: 197 80% 50%;
+    --sidebar-primary-foreground: 0 0% 9.4%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 214.3 31.8% 91.4%;
@@ -83,7 +83,7 @@
     --popover-foreground: 0 0% 90%;
 
     /* Primary for interactive elements */
-    --primary: 210 100% 65%;
+    --primary: 197 80% 55%;
     --primary-foreground: 0 0% 9.4%;
 
     /* Secondary elements */
@@ -105,12 +105,12 @@
     /* Borders with subtle contrast */
     --border: 0 0% 20%;
     --input: 0 0% 20%;
-    --ring: 210 100% 65%;
+    --ring: 197 80% 55%;
 
     /* Sidebar */
     --sidebar-background: 0 0% 14.1%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 210 100% 65%;
+    --sidebar-primary: 197 80% 55%;
     --sidebar-primary-foreground: 0 0% 9.4%;
     --sidebar-accent: 0 0% 14.1%;
     --sidebar-accent-foreground: 0 0% 90%;

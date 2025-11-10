@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Drawer,
@@ -302,6 +303,8 @@ const ProfilePage = () => {
     url: "",
   });
   const [savingSocialLink, setSavingSocialLink] = useState(false);
+
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   // Ref to track manual updates to prevent useEffect from overwriting
   const manualSocialLinkUpdateRef = useRef(false);
@@ -927,8 +930,16 @@ const ProfilePage = () => {
   }
 
   const handleLogout = () => {
-    // ✅ Call the logout function directly from the context
+    setIsLogoutConfirmOpen(true);
+  };
+
+  const handleConfirmLogout = () => {
+    setIsLogoutConfirmOpen(false);
     logout();
+  };
+
+  const handleCancelLogout = () => {
+    setIsLogoutConfirmOpen(false);
   };
 
   const handleImageUpload = async (
@@ -1946,7 +1957,7 @@ const ProfilePage = () => {
                   {/* Top Section: Name/Info on left, Picture on right (Mobile) | Picture on top, Name below (Desktop) */}
                   <div className="flex items-start justify-between gap-4 mb-4 md:flex-col md:items-center md:mb-4">
                     {/* Profile Picture - Right side (Mobile) | Top (Desktop) */}
-                    <div className="relative flex-shrink-0 md:relative md:order-1">
+                    <div className="relative flex-shrink-0 order-2 md:relative md:order-1">
                       <div
                         className="relative group cursor-pointer rounded-full overflow-hidden"
                         onClick={handleImageModalClick}
@@ -1985,7 +1996,7 @@ const ProfilePage = () => {
                     />
 
                     {/* Name and Info - Left side (Mobile) | Below picture (Desktop) */}
-                    <div className="flex-1 min-w-0 md:text-center md:flex-none md:mb-4 md:order-2">
+                    <div className="flex-1 min-w-0 order-1 md:text-center md:flex-none md:mb-4 md:order-2">
                       <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
                         {first_name} {last_name}
                       </h1>
@@ -2013,7 +2024,7 @@ const ProfilePage = () => {
                   {(user as { is_profile_hidden?: boolean })
                     ?.is_profile_hidden && (
                     <div className="mb-4 md:text-center">
-                      <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border-0">
+                      <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-0">
                         <Eye size={12} className="mr-1" />
                         Hidden Profile
                       </Badge>
@@ -2024,18 +2035,22 @@ const ProfilePage = () => {
                   <div className="flex items-center gap-2 w-full pt-3 md:mt-2 md:pt-0">
                     <Button
                       variant="outline"
-                      className="flex-[4] md:flex-1 flex items-center justify-center gap-2 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 hover:bg-breneo-blue/20 md:bg-transparent md:text-gray-900 md:dark:text-gray-100 md:border-gray-200 md:dark:border-gray-700 md:hover:bg-gray-50 md:dark:hover:bg-gray-800"
+                      className="flex-[5] md:flex-1 flex items-center justify-center gap-2 h-12 px-6 bg-breneo-blue/10 text-breneo-blue border-0 hover:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                       onClick={() => navigate("/settings")}
                     >
                       <Settings size={16} />
-                      <span className="md:hidden">Settings</span>
+                      <span>Settings</span>
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="ghost"
+                      size="icon"
                       onClick={handleLogout}
-                      className="flex-[1] md:flex-1 flex items-center justify-center gap-2 border-breneo-danger text-breneo-danger bg-breneo-danger/10 hover:bg-breneo-danger/20 md:border-breneo-danger md:hover:bg-breneo-danger/10"
+                      className="h-12 w-12 bg-[#ffe2e2] text-red-600 hover:bg-[#ffcaca] active:bg-[#ffb0b0] dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 dark:active:bg-red-900/70 transition-colors"
                     >
-                      <LogOut size={16} />
+                      <LogOut
+                        size={16}
+                        className="text-red-600 dark:text-red-300"
+                      />
                     </Button>
                   </div>
                 </div>
@@ -2630,6 +2645,51 @@ const ProfilePage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Logout Confirmation */}
+      {isMobile ? (
+        <Drawer
+          open={isLogoutConfirmOpen}
+          onOpenChange={setIsLogoutConfirmOpen}
+        >
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Log out</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Are you sure you want to log out?
+              </p>
+            </div>
+            <DrawerFooter>
+              <Button onClick={handleConfirmLogout}>Log out</Button>
+              <DrawerClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog
+          open={isLogoutConfirmOpen}
+          onOpenChange={setIsLogoutConfirmOpen}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Log out</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to log out?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelLogout}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmLogout}>Log out</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* About Me Edit Modal */}
       {isMobile ? (
