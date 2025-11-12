@@ -1294,8 +1294,14 @@ export default function SettingsPage() {
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
           {/* Left Column - Content */}
-          <div className={cn(isMobile && "mt-[120px] min-h-screen")}>
+          <div className={cn(isMobile && "mt-12 min-h-screen pb-12")}>
             {renderContent()}
+            {/* Mobile App Install Card - Mobile Only */}
+            {isMobile && (
+              <div className="mt-8">
+                <PWAInstallCard compact />
+              </div>
+            )}
           </div>
 
           {/* Right Column - Sidebar Navigation (Desktop Only) */}

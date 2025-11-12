@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, CheckCircle2 } from "lucide-react";
 import { useTheme } from "next-themes";
+import { cn } from "@/lib/utils";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -19,7 +20,11 @@ interface NavigatorStandalone extends Navigator {
   standalone?: boolean;
 }
 
-export const PWAInstallCard: React.FC = () => {
+interface PWAInstallCardProps {
+  compact?: boolean;
+}
+
+export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ compact = false }) => {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [deferredPrompt, setDeferredPrompt] =
@@ -103,145 +108,54 @@ export const PWAInstallCard: React.FC = () => {
     return null;
   }
 
-  const isDark = theme === "dark";
-
   // Mobile App Illustration Component
-  const MobileAppIllustration = () => (
-    <div className="w-full h-32 flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 rounded-lg overflow-hidden relative">
-      <svg
-        viewBox="0 0 200 120"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-        preserveAspectRatio="xMidYMid meet"
-      >
-        {/* Phone Frame */}
-        <rect
-          x="60"
-          y="15"
-          width="80"
-          height="90"
-          rx="8"
-          fill={isDark ? "#1a1a1a" : "#ffffff"}
-          stroke={isDark ? "#333333" : "#e5e5e5"}
-          strokeWidth="2"
-        />
-        
-        {/* Screen Content */}
-        <rect
-          x="65"
-          y="25"
-          width="70"
-          height="75"
-          rx="4"
-          fill={isDark ? "#0a0a0a" : "#f5f5f5"}
-        />
-        
-        {/* App Icon Grid */}
-        <circle cx="82" cy="42" r="4" fill={isDark ? "#3b82f6" : "#2563eb"} />
-        <circle cx="100" cy="42" r="4" fill={isDark ? "#10b981" : "#059669"} />
-        <circle cx="118" cy="42" r="4" fill={isDark ? "#f59e0b" : "#d97706"} />
-        
-        <rect
-          x="75"
-          y="52"
-          width="30"
-          height="4"
-          rx="2"
-          fill={isDark ? "#374151" : "#9ca3af"}
-        />
-        <rect
-          x="75"
-          y="60"
-          width="40"
-          height="4"
-          rx="2"
-          fill={isDark ? "#4b5563" : "#6b7280"}
-        />
-        
-        {/* Download Arrow */}
-        <g transform="translate(135, 35)">
-          <circle
-            cx="0"
-            cy="0"
-            r="12"
-            fill={isDark ? "#3b82f6" : "#2563eb"}
-            opacity="0.2"
-          />
-          <path
-            d="M-4 -2 L0 2 L4 -2 M0 2 L0 -6"
-            stroke={isDark ? "#60a5fa" : "#3b82f6"}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        </g>
-        
-        {/* Sparkles/Stars */}
-        <circle
-          cx="45"
-          cy="35"
-          r="2"
-          fill={isDark ? "#fbbf24" : "#f59e0b"}
-          opacity="0.6"
-        />
-        <circle
-          cx="155"
-          cy="55"
-          r="1.5"
-          fill={isDark ? "#60a5fa" : "#3b82f6"}
-          opacity="0.6"
-        />
-        <circle
-          cx="50"
-          cy="75"
-          r="1.5"
-          fill={isDark ? "#33C3ED" : "#19ACE5"}
-          opacity="0.6"
-        />
-        <circle
-          cx="150"
-          cy="85"
-          r="2"
-          fill={isDark ? "#34d399" : "#10b981"}
-          opacity="0.6"
-        />
-      </svg>
-    </div>
-  );
+  const MobileAppIllustration = () => {
+    return (
+      <img
+        src="/lovable-uploads/Bring-Solutions-To-Problems--Streamline-New-York (1).png"
+        alt="Install App Illustration"
+        className={cn(
+          "w-full h-auto object-contain",
+          compact ? "max-h-24" : "max-h-40"
+        )}
+        onError={(e) => {
+          console.error('Image failed to load:', e);
+        }}
+      />
+    );
+  };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className={cn(compact && "p-0")}>
+      <CardHeader className={cn(compact && "pb-3 px-4 pt-4")}>
         <CardTitle className="text-lg">Install App</CardTitle>
         <CardDescription>
           Download our app for a better experience
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className={cn("space-y-4", compact && "space-y-3 px-4 pb-4")}>
         {/* Illustration */}
         <MobileAppIllustration />
 
         {/* Features List */}
-        <div className="space-y-2">
+        <div className={cn("space-y-2", compact && "space-y-1.5")}>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <CheckCircle2 className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")} />
             <span>Works offline</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <CheckCircle2 className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")} />
             <span>Faster loading</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
+            <CheckCircle2 className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")} />
             <span>Home screen access</span>
           </div>
         </div>
 
         {/* Download/Install Button */}
-        <Button onClick={handleInstall} className="w-full">
-          <Download className="mr-2 h-4 w-4" />
+        <Button onClick={handleInstall} className={cn("w-full", compact && "h-9")}>
+          <Download className={cn("mr-2 h-4 w-4", compact && "h-3.5 w-3.5")} />
           {deferredPrompt ? "Download & Install Now" : "Download App"}
         </Button>
       </CardContent>

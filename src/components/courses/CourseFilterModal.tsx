@@ -12,51 +12,34 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerFooter,
-  DrawerClose,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useMobile } from "@/hooks/use-mobile";
-import { countries, Country } from "@/data/countries";
+import { countries } from "@/data/countries";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Search as SearchIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronLeft, Search as SearchIcon } from "lucide-react";
 
-const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
-
-interface JobFilterModalProps {
+interface CourseFilterModalProps {
   isOpen: boolean;
   onClose: () => void;
   filters: {
     country: string;
     countries: string[];
-    jobTypes: string[];
-    isRemote: boolean;
-    datePosted?: string;
     skills: string[];
   };
   onFiltersChange: (newFilters: {
     country: string;
     countries: string[];
-    jobTypes: string[];
-    isRemote: boolean;
-    datePosted?: string;
     skills: string[];
   }) => void;
   onApply: () => void;
   onClear?: () => void;
-  userTopSkills?: string[]; // User's top skills from test results
+  userTopSkills?: string[];
 }
 
 // Georgian translations
-const WORK_TYPE_LABEL_KA = "მუშაობის ტიპი";
 const COUNTRY_LABEL_KA = "ქვეყანა";
 const CHOOSE_LABEL_KA = "აირჩიე";
 const SEARCH_TITLE_KA = "მოძებნე";
@@ -65,67 +48,36 @@ const CLEAR_BUTTON_KA = "გასუფთავება";
 const SKILLS_LABEL_KA = "ინტერესები";
 const INTERESTS_LABEL = "Interests / Skills";
 
-const workTypeLabels: Record<string, string> = {
-  FULLTIME: "Full Time",
-  PARTTIME: "Part Time",
-  CONTRACTOR: "Contractor",
-  INTERN: "Intern",
-};
-
 interface FilterFormProps {
-  filters: JobFilterModalProps["filters"];
-  onFiltersChange: JobFilterModalProps["onFiltersChange"];
+  filters: CourseFilterModalProps["filters"];
+  onFiltersChange: CourseFilterModalProps["onFiltersChange"];
   isMobile?: boolean;
-  onWorkTypeClick?: () => void;
   onLocationClick?: () => void;
   userTopSkills?: string[];
 }
 
-const FilterForm: React.FC<FilterFormProps> = ({ 
-  filters, 
-  onFiltersChange, 
+const FilterForm: React.FC<FilterFormProps> = ({
+  filters,
+  onFiltersChange,
   isMobile = false,
-  onWorkTypeClick,
   onLocationClick,
   userTopSkills = [],
 }) => {
-  const handleJobTypeChange = (type: string) => {
-    const newJobTypes = filters.jobTypes.includes(type)
-      ? filters.jobTypes.filter((t) => t !== type)
-      : [...filters.jobTypes, type];
-    onFiltersChange({ 
-      ...filters, 
-      jobTypes: newJobTypes,
-      countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
-      skills: filters.skills || [],
-    });
-  };
-
   const handleCountryToggle = (countryCode: string) => {
     const newCountries = filters.countries.includes(countryCode)
       ? filters.countries.filter((code) => code !== countryCode)
       : [...filters.countries, countryCode];
-    onFiltersChange({ 
-      ...filters, 
+    onFiltersChange({
+      ...filters,
       countries: newCountries,
-      datePosted: filters.datePosted || "all",
       skills: filters.skills || [],
     });
-  };
-
-  const getWorkTypeDisplayText = () => {
-    if (filters.jobTypes.length === 0) return CHOOSE_LABEL_KA;
-    if (filters.jobTypes.length === 1) {
-      return workTypeLabels[filters.jobTypes[0]] || filters.jobTypes[0];
-    }
-    return `${filters.jobTypes.length} selected`;
   };
 
   const getLocationDisplayText = () => {
     if (filters.countries.length === 0) return "Choose";
     if (filters.countries.length === 1) {
-      const country = countries.find(c => c.code === filters.countries[0]);
+      const country = countries.find((c) => c.code === filters.countries[0]);
       return country?.name || "Choose";
     }
     return `${filters.countries.length} selected`;
@@ -147,20 +99,20 @@ const FilterForm: React.FC<FilterFormProps> = ({
       ...filters,
       skills: newSkills,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
     });
   };
 
   const handleSelectAllSkills = () => {
     if (userTopSkills.length === 0) return;
-    const allSelected = userTopSkills.every(skill => filters.skills.includes(skill));
+    const allSelected = userTopSkills.every((skill) =>
+      filters.skills.includes(skill)
+    );
     if (allSelected) {
       // Remove all
       onFiltersChange({
         ...filters,
         skills: [],
         countries: filters.countries || [],
-        datePosted: filters.datePosted || "all",
       });
     } else {
       // Select all
@@ -168,40 +120,31 @@ const FilterForm: React.FC<FilterFormProps> = ({
         ...filters,
         skills: userTopSkills,
         countries: filters.countries || [],
-        datePosted: filters.datePosted || "all",
       });
     }
   };
 
-  const isAllSkillsSelected = userTopSkills.length > 0 && userTopSkills.every(skill => filters.skills.includes(skill));
+  const isAllSkillsSelected =
+    userTopSkills.length > 0 &&
+    userTopSkills.every((skill) => filters.skills.includes(skill));
 
   if (isMobile) {
     return (
       <div className="space-y-4">
-        {/* Work Type Filter - Mobile Style */}
-        <div 
-          className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
-          onClick={onWorkTypeClick}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900">{WORK_TYPE_LABEL_KA}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{getWorkTypeDisplayText()}</span>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </div>
-          </div>
-        </div>
-
         {/* Location Filter - Mobile Style */}
-        <div 
+        <div
           className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
           onClick={onLocationClick}
         >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900">{COUNTRY_LABEL_KA}</span>
+            <span className="text-sm font-medium text-gray-900">
+              {COUNTRY_LABEL_KA}
+            </span>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{getLocationDisplayText()}</span>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
+              <span className="text-sm text-gray-600">
+                {getLocationDisplayText()}
+              </span>
+              <ChevronLeft className="h-4 w-4 text-gray-400 rotate-180" />
             </div>
           </div>
         </div>
@@ -210,7 +153,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
         {userTopSkills.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">{SKILLS_LABEL_KA}</Label>
+              <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {SKILLS_LABEL_KA}
+              </Label>
               <button
                 type="button"
                 onClick={handleSelectAllSkills}
@@ -253,7 +198,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
       {userTopSkills.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-base font-medium dark:text-gray-100">{INTERESTS_LABEL}</Label>
+            <Label className="text-base font-medium dark:text-gray-100">
+              {INTERESTS_LABEL}
+            </Label>
             <button
               type="button"
               onClick={handleSelectAllSkills}
@@ -290,7 +237,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   );
 };
 
-export const JobFilterModal: React.FC<JobFilterModalProps> = ({
+export const CourseFilterModal: React.FC<CourseFilterModalProps> = ({
   isOpen,
   onClose,
   filters,
@@ -300,10 +247,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   userTopSkills = [],
 }) => {
   const isMobile = useMobile();
-  const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
-  
+
   // Filter countries for mobile location picker
   const filteredCountriesMobile = React.useMemo(() => {
     if (!locationSearchQuery.trim()) {
@@ -317,31 +263,10 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     );
   }, [locationSearchQuery]);
 
-  const handleWorkTypeChange = (workTypes: string[]) => {
-    onFiltersChange({
-      ...filters,
-      jobTypes: workTypes,
-      countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
-      skills: filters.skills || [],
-    });
-  };
-
   const handleLocationChange = (countryCodes: string[]) => {
     onFiltersChange({
       ...filters,
       countries: countryCodes,
-      datePosted: filters.datePosted || "all",
-      skills: filters.skills || [],
-    });
-  };
-
-  const handleRemoteChange = (isRemote: boolean) => {
-    onFiltersChange({
-      ...filters,
-      isRemote: isRemote,
-      countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
       skills: filters.skills || [],
     });
   };
@@ -351,103 +276,29 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       skills: skills,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
     });
   };
 
   // Reset picker states when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setShowWorkTypePicker(false);
       setShowLocationPicker(false);
     }
   }, [isOpen]);
 
   if (isMobile) {
-    // Work Type Picker View
-    if (showWorkTypePicker) {
-      return (
-        <Drawer open={isOpen} onOpenChange={(open) => {
-          if (!open) {
-            setShowWorkTypePicker(false);
-            onClose();
-          }
-        }}>
-          <DrawerContent className="max-h-[90vh] flex flex-col">
-            <DrawerHeader className="border-b flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full -ml-2"
-                  onClick={() => setShowWorkTypePicker(false)}
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <DrawerTitle>{WORK_TYPE_LABEL_KA}</DrawerTitle>
-              </div>
-            </DrawerHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto -mx-4 px-4">
-              <div className="py-4 space-y-3">
-                {jobTypes.map((type) => {
-                  const isChecked = filters.jobTypes.includes(type);
-                  return (
-                    <Label
-                      key={type}
-                      htmlFor={type}
-                      className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 cursor-pointer min-h-[48px] active:bg-gray-50 transition-colors select-none"
-                    >
-                      <span className="flex-1 text-sm font-medium">
-                        {workTypeLabels[type] || type}
-                      </span>
-                      <Checkbox
-                        id={type}
-                        checked={isChecked}
-                        onCheckedChange={(checked) => {
-                          const newTypes = checked
-                            ? [...filters.jobTypes, type]
-                            : filters.jobTypes.filter((t) => t !== type);
-                          handleWorkTypeChange(newTypes);
-                        }}
-                      />
-                    </Label>
-                  );
-                })}
-                
-                {/* Remote Jobs Only - Separated with border */}
-                <div className="border-t border-gray-200 my-3" />
-                <Label
-                  htmlFor="remote-mobile"
-                  className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 cursor-pointer min-h-[48px] active:bg-gray-50 transition-colors select-none"
-                >
-                  <span className="flex-1 text-sm font-medium">
-                    Remote Jobs Only
-                  </span>
-                  <Checkbox
-                    id="remote-mobile"
-                    checked={filters.isRemote}
-                    onCheckedChange={(checked) => {
-                      handleRemoteChange(!!checked);
-                    }}
-                  />
-                </Label>
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
-      );
-    }
-
     // Location Picker View
     if (showLocationPicker) {
       return (
-        <Drawer open={isOpen} onOpenChange={(open) => {
-          if (!open) {
-            setShowLocationPicker(false);
-            setLocationSearchQuery("");
-            onClose();
-          }
-        }}>
+        <Drawer
+          open={isOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowLocationPicker(false);
+              onClose();
+            }
+          }}
+        >
           <DrawerContent className="max-h-[90vh] flex flex-col">
             <DrawerHeader className="border-b flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -502,7 +353,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                           onCheckedChange={(checked) => {
                             const newCountries = checked
                               ? [...filters.countries, country.code]
-                              : filters.countries.filter((code) => code !== country.code);
+                              : filters.countries.filter(
+                                  (code) => code !== country.code
+                                );
                             handleLocationChange(newCountries);
                           }}
                         />
@@ -531,15 +384,16 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <DrawerTitle className="text-xl font-bold">{SEARCH_TITLE_KA}</DrawerTitle>
+              <DrawerTitle className="text-xl font-bold">
+                {SEARCH_TITLE_KA}
+              </DrawerTitle>
             </div>
           </DrawerHeader>
           <div className="px-4 py-6 flex-1 overflow-y-auto">
-            <FilterForm 
-              filters={filters} 
+            <FilterForm
+              filters={filters}
               onFiltersChange={onFiltersChange}
               isMobile={true}
-              onWorkTypeClick={() => setShowWorkTypePicker(true)}
               onLocationClick={() => setShowLocationPicker(true)}
               userTopSkills={userTopSkills}
             />
@@ -550,7 +404,6 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                 <Button
                   onClick={() => {
                     onClear();
-                    setShowWorkTypePicker(false);
                     setShowLocationPicker(false);
                   }}
                   variant="ghost"
@@ -559,16 +412,15 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                   {CLEAR_BUTTON_KA}
                 </Button>
               )}
-            <Button 
-              onClick={() => {
-                onApply();
-                setShowWorkTypePicker(false);
-                setShowLocationPicker(false);
-              }}
+              <Button
+                onClick={() => {
+                  onApply();
+                  setShowLocationPicker(false);
+                }}
                 className="flex-1 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-lg h-12 text-base font-medium"
-            >
-              {SAVE_BUTTON_KA}
-            </Button>
+              >
+                {SAVE_BUTTON_KA}
+              </Button>
             </div>
           </DrawerFooter>
         </DrawerContent>
@@ -580,11 +432,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Filter Jobs</DialogTitle>
+          <DialogTitle>Filter Courses</DialogTitle>
         </DialogHeader>
         <div className="py-4">
-          <FilterForm 
-            filters={filters} 
+          <FilterForm
+            filters={filters}
             onFiltersChange={onFiltersChange}
             isMobile={false}
             userTopSkills={userTopSkills}
@@ -605,10 +457,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
             )}
             <Button onClick={onApply} className="flex-1 bg-breneo-blue text-white hover:bg-breneo-blue/90">
               Apply Filters
-          </Button>
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
+

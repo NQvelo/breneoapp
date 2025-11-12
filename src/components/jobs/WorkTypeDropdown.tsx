@@ -19,12 +19,16 @@ interface WorkTypeDropdownProps {
   selectedWorkTypes: string[];
   onWorkTypesChange: (workTypes: string[]) => void;
   placeholder?: string;
+  isRemote?: boolean;
+  onRemoteChange?: (isRemote: boolean) => void;
 }
 
 export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
   selectedWorkTypes,
   onWorkTypesChange,
   placeholder = "Work types",
+  isRemote = false,
+  onRemoteChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -79,23 +83,64 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
 
   const isPlaceholder = selectedWorkTypes.length === 0;
 
+  const handleRemoveWorkType = (e: React.MouseEvent, workTypeId: string) => {
+    e.stopPropagation();
+    const newWorkTypes = selectedWorkTypes.filter((id) => id !== workTypeId);
+    onWorkTypesChange(newWorkTypes);
+  };
+
+  const handleRemoveAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onWorkTypesChange([]);
+  };
+
   return (
     <div className="relative flex-1 min-w-0" ref={dropdownRef}>
       {/* Work Type Input Field */}
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "flex items-center w-full h-auto py-0 px-0 text-sm text-left bg-transparent border-0 focus:outline-none focus:ring-0",
-          "transition-colors cursor-pointer hover:opacity-80",
-          isPlaceholder 
-            ? "text-gray-400" 
-            : "text-gray-900"
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "flex items-center flex-1 min-w-0 h-auto py-0 px-0 text-sm text-left bg-transparent border-0 focus:outline-none focus:ring-0",
+            "transition-colors cursor-pointer hover:opacity-80",
+            isPlaceholder
+              ? "text-gray-400 dark:text-gray-500" 
+              : "text-gray-900 dark:text-gray-100"
+          )}
+        >
+          <Users className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
+          {selectedWorkTypes.length === 0 ? (
+            <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>
+          ) : selectedWorkTypes.length === 1 ? (
+            <span className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="truncate text-sm">
+                {workTypes.find((t) => t.id === selectedWorkTypes[0])?.label || placeholder}
+          </span>
+                  <button
+                    type="button"
+                onClick={(e) => handleRemoveWorkType(e, selectedWorkTypes[0])}
+                className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                aria-label="Remove work type"
+                  >
+                <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+                  </button>
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="truncate text-sm">{displayText}</span>
+            <button
+              type="button"
+                onClick={(e) => handleRemoveAll(e)}
+                className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                aria-label="Remove all work types"
+            >
+                <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
+            </button>
+            </span>
         )}
-      >
-        <Users className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
-        <span className="flex-1 min-w-0 truncate text-sm">{displayText}</span>
-      </button>
+        </button>
+      </div>
 
       {/* Dropdown Panel */}
       {isOpen && (
@@ -196,6 +241,38 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
                   </div>
                 );
               })}
+
+              {/* Remote Jobs Only - Separated with border */}
+              {onRemoteChange && (
+                <>
+                  <div className={cn(
+                    "border-t",
+                    "border-gray-100 dark:border-gray-700"
+                  )} />
+                  <div
+                    className={cn(
+                      "flex items-center px-4 py-3 cursor-pointer transition-colors",
+                      "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoteChange(!isRemote);
+                    }}
+                  >
+                    <Checkbox
+                      checked={isRemote}
+                      onCheckedChange={(checked) => {
+                        onRemoteChange(!!checked);
+                      }}
+                      className="mr-3"
+                    />
+                    <span className={cn(
+                      "text-sm",
+                      "text-gray-900 dark:text-gray-100"
+                    )}>Remote Jobs Only</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
       )}

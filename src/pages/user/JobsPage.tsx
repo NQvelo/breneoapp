@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,10 +27,11 @@ import {
   DollarSign,
   Tag,
   Sun,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
-import { countries } from "@/data/countries";
+import { countries, Country } from "@/data/countries";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { useMobile } from "@/hooks/use-mobile";
@@ -103,7 +106,7 @@ interface ApiJob {
 // Filter state shape
 interface JobFilters {
   country: string;
-  cities: string[]; // Array of city IDs for Georgian cities
+  countries: string[]; // Array of country codes
   jobTypes: string[];
   isRemote: boolean;
   datePosted?: string; // Add date_posted filter
@@ -253,30 +256,209 @@ const fetchJobs = async (
   }
 };
 
+// Session storage keys
+const JOBS_FILTERS_STORAGE_KEY = "jobsFilters";
+const COURSES_FILTERS_STORAGE_KEY = "coursesFilters";
+
+// Helper functions for session storage
+const saveFiltersToSession = (
+  key: string,
+  filters: unknown,
+  search: string
+) => {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ filters, search }));
+  } catch (error) {
+    console.error("Error saving filters to session storage:", error);
+  }
+};
+
+const loadFiltersFromSession = (
+  key: string
+): { filters: unknown; search: string } | null => {
+  try {
+    const stored = sessionStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error("Error loading filters from session storage:", error);
+  }
+  return null;
+};
+
 const JobsPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useMobile();
-
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
-  const [page, setPage] = useState(1); // New state for current page
 
   // State for user's top skills from test results
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
 
-  // Filters are now managed in a single state object
-  const [activeFilters, setActiveFilters] = useState<JobFilters>({
-    country: "Georgia",
-    cities: [],
-    jobTypes: ["FULLTIME"],
-    isRemote: false,
-    datePosted: "all",
-    skills: [],
+  // Helper function to update URL with current filters
+  const updateUrlWithFilters = useCallback(
+    (filters: JobFilters, search: string, pageNum: number) => {
+      // Don't update URL if we're currently syncing from URL (prevents circular updates)
+      if (isUpdatingFromUrl.current) {
+        return;
+      }
+
+      const params = new URLSearchParams();
+
+      if (search) {
+        params.set("search", search);
+      }
+      if (filters.countries.length > 0) {
+        params.set("countries", filters.countries.join(","));
+      }
+      if (filters.skills.length > 0) {
+        params.set("skills", filters.skills.join(","));
+      }
+      if (filters.jobTypes.length > 0) {
+        params.set("jobTypes", filters.jobTypes.join(","));
+      }
+      if (filters.isRemote) {
+        params.set("isRemote", "true");
+      }
+      if (filters.datePosted && filters.datePosted !== "all") {
+        params.set("datePosted", filters.datePosted);
+      }
+      if (filters.country && filters.country !== "Georgia") {
+        params.set("country", filters.country);
+      }
+      if (pageNum > 1) {
+        params.set("page", String(pageNum));
+      }
+
+      // Update URL without page reload
+      setSearchParams(params, { replace: true });
+
+      // Save to session storage
+      saveFiltersToSession(JOBS_FILTERS_STORAGE_KEY, filters, search);
+    },
+    [setSearchParams]
+  );
+
+  // Initialize filters from URL, session storage, or defaults
+  const [activeFilters, setActiveFilters] = useState<JobFilters>(() => {
+    // Try URL params first
+    const countriesParam = searchParams.get("countries");
+    const skillsParam = searchParams.get("skills");
+    const jobTypesParam = searchParams.get("jobTypes");
+    const isRemoteParam = searchParams.get("isRemote");
+    const datePostedParam = searchParams.get("datePosted");
+    const countryParam = searchParams.get("country");
+
+    if (
+      countriesParam ||
+      skillsParam ||
+      jobTypesParam ||
+      isRemoteParam ||
+      datePostedParam ||
+      countryParam
+    ) {
+      // URL params exist, use them
+      return {
+        country: countryParam || "Georgia",
+        countries: countriesParam
+          ? countriesParam.split(",").filter(Boolean)
+          : [],
+        jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
+        isRemote: isRemoteParam === "true",
+        datePosted: datePostedParam || "all",
+        skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
+      };
+    }
+
+    // Try session storage
+    const sessionData = loadFiltersFromSession(JOBS_FILTERS_STORAGE_KEY);
+    if (sessionData && sessionData.filters) {
+      return sessionData.filters as JobFilters;
+    }
+
+    // Default values
+    return {
+      country: "Georgia",
+      countries: [],
+      jobTypes: [],
+      isRemote: false,
+      datePosted: "all",
+      skills: [],
+    };
+  });
+
+  const [searchTerm, setSearchTerm] = useState(() => {
+    const urlSearch = searchParams.get("search");
+    if (urlSearch) return urlSearch;
+
+    const sessionData = loadFiltersFromSession(JOBS_FILTERS_STORAGE_KEY);
+    if (sessionData && sessionData.search) {
+      return sessionData.search as string;
+    }
+
+    return "";
+  });
+
+  const [page, setPage] = useState(() => {
+    const pageParam = searchParams.get("page");
+    return pageParam ? parseInt(pageParam, 10) : 1;
   });
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
+
+  // Ref to track if we're updating from URL (to prevent circular updates)
+  const isUpdatingFromUrl = React.useRef(false);
+
+  // Sync filters with URL params when URL changes (e.g., browser back/forward)
+  useEffect(() => {
+    const countriesParam = searchParams.get("countries");
+    const skillsParam = searchParams.get("skills");
+    const jobTypesParam = searchParams.get("jobTypes");
+    const isRemoteParam = searchParams.get("isRemote");
+    const datePostedParam = searchParams.get("datePosted");
+    const countryParam = searchParams.get("country");
+    const searchParam = searchParams.get("search") || "";
+    const pageParam = searchParams.get("page");
+
+    const urlFilters: JobFilters = {
+      country: countryParam || "Georgia",
+      countries: countriesParam
+        ? countriesParam.split(",").filter(Boolean)
+        : [],
+      jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
+      isRemote: isRemoteParam === "true",
+      datePosted: datePostedParam || "all",
+      skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
+    };
+
+    const urlPage = pageParam ? parseInt(pageParam, 10) : 1;
+
+    // Check if URL params differ from current state
+    const filtersChanged =
+      JSON.stringify(urlFilters) !== JSON.stringify(activeFilters);
+    const searchChanged = searchParam !== searchTerm;
+    const pageChanged = urlPage !== page;
+
+    if (filtersChanged || searchChanged || pageChanged) {
+      isUpdatingFromUrl.current = true;
+      setActiveFilters(urlFilters);
+      setTempFilters(urlFilters);
+      if (searchChanged) {
+        setSearchTerm(searchParam);
+      }
+      if (pageChanged) {
+        setPage(urlPage);
+      }
+      // Reset flag after state updates
+      setTimeout(() => {
+        isUpdatingFromUrl.current = false;
+      }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // Only depend on searchParams, not on state
 
   // Fetch user's top skills from test results
   useEffect(() => {
@@ -313,15 +495,27 @@ const JobsPage = () => {
             const topSkills = allSkills.slice(0, 5);
             setUserTopSkills(topSkills);
 
-            // Auto-populate filters with top skills if not already set
-            setActiveFilters((prev) => ({
-              ...prev,
-              skills: prev.skills.length === 0 ? topSkills : prev.skills,
-            }));
-            setTempFilters((prev) => ({
-              ...prev,
-              skills: prev.skills.length === 0 ? topSkills : prev.skills,
-            }));
+            // Auto-populate filters with top skills if not already set and no URL params
+            const hasSkillsInUrl = searchParams.get("skills") !== null;
+            if (!hasSkillsInUrl) {
+              setActiveFilters((prev) => {
+                const newFilters = {
+                  ...prev,
+                  skills: prev.skills.length === 0 ? topSkills : prev.skills,
+                };
+                // Save to session storage
+                saveFiltersToSession(
+                  JOBS_FILTERS_STORAGE_KEY,
+                  newFilters,
+                  searchTerm
+                );
+                return newFilters;
+              });
+              setTempFilters((prev) => ({
+                ...prev,
+                skills: prev.skills.length === 0 ? topSkills : prev.skills,
+              }));
+            }
 
             setLoadingSkills(false);
             return;
@@ -339,15 +533,27 @@ const JobsPage = () => {
 
           setUserTopSkills(topSkills);
 
-          // Auto-populate filters with top skills if not already set
-          setActiveFilters((prev) => ({
-            ...prev,
-            skills: prev.skills.length === 0 ? topSkills : prev.skills,
-          }));
-          setTempFilters((prev) => ({
-            ...prev,
-            skills: prev.skills.length === 0 ? topSkills : prev.skills,
-          }));
+          // Auto-populate filters with top skills if not already set and no URL params
+          const hasSkillsInUrl = searchParams.get("skills") !== null;
+          if (!hasSkillsInUrl) {
+            setActiveFilters((prev) => {
+              const newFilters = {
+                ...prev,
+                skills: prev.skills.length === 0 ? topSkills : prev.skills,
+              };
+              // Save to session storage
+              saveFiltersToSession(
+                JOBS_FILTERS_STORAGE_KEY,
+                newFilters,
+                searchTerm
+              );
+              return newFilters;
+            });
+            setTempFilters((prev) => ({
+              ...prev,
+              skills: prev.skills.length === 0 ? topSkills : prev.skills,
+            }));
+          }
         }
       } catch (error) {
         console.error("Error fetching user skills:", error);
@@ -361,29 +567,49 @@ const JobsPage = () => {
 
   // Removed selectedJobType state as we now use WorkTypeDropdown with multi-select
 
-  const handleDetectLocation = React.useCallback(() => {
+  // Effect to detect user's location on page load
+  useEffect(() => {
     // Check if location toast has already been shown in this session
     const locationToastShown = sessionStorage.getItem("locationToastShown");
+
+    // Don't detect location if countries are already set in URL
+    if (searchParams.get("countries")) {
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Note: This API call is kept as is for Geo-detection
           const response = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
           );
           const data = await response.json();
           if (data.countryName) {
-            setActiveFilters((prev) => ({
-              ...prev,
-              country: data.countryName,
-              cities: data.countryName === "Georgia" ? prev.cities : [],
-            }));
+            // Find country code from countries data
+            const country = countries.find((c) => c.name === data.countryName);
+            setActiveFilters((prev) => {
+              const newFilters = {
+                ...prev,
+                country: data.countryName,
+                countries: country ? [country.code] : prev.countries,
+              };
+              // Update URL and save to session storage
+              setTimeout(() => {
+                if (!isUpdatingFromUrl.current) {
+                  const currentPage = parseInt(
+                    searchParams.get("page") || "1",
+                    10
+                  );
+                  updateUrlWithFilters(newFilters, searchTerm, currentPage);
+                }
+              }, 0);
+              return newFilters;
+            });
             setTempFilters((prev) => ({
               ...prev,
               country: data.countryName,
-              cities: data.countryName === "Georgia" ? prev.cities : [],
+              countries: country ? [country.code] : prev.countries,
             }));
 
             // Only show toast if not shown in this session
@@ -403,19 +629,13 @@ const JobsPage = () => {
       () => {
         // Only show permission denied toast if not shown in this session
         if (!locationToastShown) {
-          toast.info(
-            "Location permission denied. Defaulting to United States."
-          );
+          toast.info("Location permission denied. Defaulting to Georgia.");
           sessionStorage.setItem("locationToastShown", "true");
         }
       }
     );
-  }, []);
-
-  // Effect to detect user's location on page load
-  useEffect(() => {
-    handleDetectLocation();
-  }, [handleDetectLocation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const { data: savedJobs = [] } = useQuery<string[]>({
     queryKey: ["savedJobs", user?.id],
@@ -448,8 +668,15 @@ const JobsPage = () => {
 
   // Refetch when search term changes (user presses Enter or clicks a Search button)
   const handleSearch = () => {
-    setPage(1); // Reset to first page on new search
+    const newPage = 1;
+    setPage(newPage);
+    updateUrlWithFilters(activeFilters, searchTerm, newPage);
     queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  // Handle search term change
+  const handleSearchTermChange = (value: string) => {
+    setSearchTerm(value);
   };
 
   // Handle key press for search (Enter)
@@ -581,40 +808,145 @@ const JobsPage = () => {
 
   // Handle work types change
   const handleWorkTypesChange = (workTypes: string[]) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      jobTypes: workTypes.length === 0 ? ["FULLTIME"] : workTypes,
-    }));
-    setPage(1);
+    const newFilters = {
+      ...activeFilters,
+      jobTypes: workTypes,
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
     queryClient.invalidateQueries({ queryKey: ["jobs"] });
   };
 
-  // Handle cities change
-  const handleCitiesChange = (cities: string[]) => {
-    setActiveFilters((prev) => ({
-      ...prev,
-      cities: cities,
-    }));
-    setPage(1);
+  // Handle remote change
+  const handleRemoteChange = (isRemote: boolean) => {
+    const newFilters = {
+      ...activeFilters,
+      isRemote: isRemote,
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  // Handle countries change
+  const handleCountriesChange = (countryCodes: string[]) => {
+    const newFilters = {
+      ...activeFilters,
+      countries: countryCodes,
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  // Handle removing a skill filter
+  const handleRemoveSkill = (skillToRemove: string) => {
+    const newFilters = {
+      ...activeFilters,
+      skills: activeFilters.skills.filter((skill) => skill !== skillToRemove),
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  // Handle removing a country filter
+  const handleRemoveCountry = (countryCodeToRemove: string) => {
+    const newFilters = {
+      ...activeFilters,
+      countries: activeFilters.countries.filter(
+        (code) => code !== countryCodeToRemove
+      ),
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  // Handle removing job type filter
+  const handleRemoveJobType = (jobTypeToRemove: string) => {
+    const newJobTypes = activeFilters.jobTypes.filter(
+      (type) => type !== jobTypeToRemove
+    );
+    const newFilters = {
+      ...activeFilters,
+      jobTypes: newJobTypes,
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  // Handle removing remote filter
+  const handleRemoveRemote = () => {
+    const newFilters = {
+      ...activeFilters,
+      isRemote: false,
+    };
+    const newPage = 1;
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    setPage(newPage);
+    updateUrlWithFilters(newFilters, searchTerm, newPage);
     queryClient.invalidateQueries({ queryKey: ["jobs"] });
   };
 
   // No need to sync selectedJobType anymore as we use WorkTypeDropdown directly
 
   const handleApplyFilters = () => {
+    const newPage = 1;
     setActiveFilters(tempFilters);
-    setPage(1); // Reset to first page when applying new filters
+    setPage(newPage);
+    updateUrlWithFilters(tempFilters, searchTerm, newPage);
     setFilterModalOpen(false);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+  };
+
+  const handleClearFilters = () => {
+    const clearedFilters: JobFilters = {
+      country: "Georgia",
+      countries: [],
+      jobTypes: [],
+      isRemote: false,
+      datePosted: "all",
+      skills: [],
+    };
+    const newPage = 1;
+    setTempFilters(clearedFilters);
+    setActiveFilters(clearedFilters);
+    setPage(newPage);
+    updateUrlWithFilters(clearedFilters, searchTerm, newPage);
+    setFilterModalOpen(false);
+    queryClient.invalidateQueries({ queryKey: ["jobs"] });
   };
 
   const handleNextPage = () => {
-    setPage((prev) => prev + 1);
+    const newPage = page + 1;
+    setPage(newPage);
+    updateUrlWithFilters(activeFilters, searchTerm, newPage);
     // Automatically scroll to the top of the job list on page change
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handlePrevPage = () => {
-    setPage((prev) => Math.max(1, prev - 1));
+    const newPage = Math.max(1, page - 1);
+    setPage(newPage);
+    updateUrlWithFilters(activeFilters, searchTerm, newPage);
     // Automatically scroll to the top of the job list on page change
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -630,67 +962,64 @@ const JobsPage = () => {
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
         <div className="mb-8 relative">
-          <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-accent dark:border-gray-600 rounded-full pl-3 md:pl-4 pr-2.5 md:pr-3 py-2.5 md:py-3 overflow-visible">
-            {/* Briefcase Icon - Purple outline */}
-            <Briefcase
-              className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2 md:mr-3"
-              strokeWidth={2}
-            />
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-accent dark:border-gray-600 rounded-lg pl-3 md:pl-4 pr-2.5 md:pr-3 py-[1rem] overflow-visible flex-1">
+              {/* Search Icon - Purple outline */}
+              <Search
+                className="h-4 w-4 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
+                strokeWidth={2}
+              />
 
-            {/* Search Input Field */}
-            <Input
-              placeholder="ძებნა"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm md:text-base text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
-            />
+              {/* Search Input Field */}
+              <Input
+                placeholder="ძებნა"
+                value={searchTerm}
+                onChange={(e) => handleSearchTermChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
+              />
 
-            {/* Work Types Field - Hidden on mobile, shown on desktop */}
-            {!isMobile && (
-              <>
-                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
-                <div className="flex items-center flex-1 min-w-0 relative">
-                  <WorkTypeDropdown
-                    selectedWorkTypes={activeFilters.jobTypes}
-                    onWorkTypesChange={handleWorkTypesChange}
-                  />
-                </div>
-              </>
-            )}
+              {/* Work Types Field - Hidden on mobile, shown on desktop */}
+              {!isMobile && (
+                <>
+                  <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                  <div className="flex items-center flex-1 min-w-0 relative">
+                    <WorkTypeDropdown
+                      selectedWorkTypes={activeFilters.jobTypes}
+                      onWorkTypesChange={handleWorkTypesChange}
+                      isRemote={activeFilters.isRemote}
+                      onRemoteChange={handleRemoteChange}
+                    />
+                  </div>
+                </>
+              )}
 
-            {/* Location Field - Hidden on mobile, shown on desktop */}
-            {!isMobile && (
-              <>
-                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
-                <div className="flex items-center flex-1 min-w-0 relative">
-                  <LocationDropdown
-                    selectedLocations={activeFilters.cities}
-                    onLocationsChange={handleCitiesChange}
-                  />
-                </div>
-              </>
-            )}
+              {/* Location Field - Hidden on mobile, shown on desktop */}
+              {!isMobile && (
+                <>
+                  <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                  <div className="flex items-center flex-1 min-w-0 relative">
+                    <LocationDropdown
+                      selectedLocations={activeFilters.countries}
+                      onLocationsChange={handleCountriesChange}
+                      placeholder="Location"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
 
-            {/* Filter Button - Light gray background, dark gray icon */}
+            {/* Filter Button - Outside search bar, on the right */}
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 border-0 flex-shrink-0 mr-2 p-0"
+              variant="outline"
               onClick={() => setFilterModalOpen(true)}
+              className="flex items-center gap-2 bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-[1rem] hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto"
               aria-label="Filter jobs"
             >
-              <Filter className="h-4 w-4 md:h-5 md:w-5" strokeWidth={2} />
-            </Button>
-
-            {/* Search Button - Purple background, white icon, integrated into rounded end */}
-            <Button
-              size="icon"
-              className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-breneo-accent hover:bg-breneo-accent/90 text-white border-0 flex-shrink-0 p-0 shadow-none"
-              onClick={handleSearch}
-              aria-label="Search jobs"
-            >
-              <Search className="h-4 w-4 md:h-5 md:w-5" strokeWidth={2.5} />
+              <Filter className="h-4 w-4" strokeWidth={2} />
+              <span className="hidden md:inline text-sm font-medium">
+                ფილტრები
+              </span>
             </Button>
           </div>
         </div>
@@ -903,6 +1232,7 @@ const JobsPage = () => {
         filters={tempFilters}
         onFiltersChange={setTempFilters}
         onApply={handleApplyFilters}
+        onClear={handleClearFilters}
         userTopSkills={userTopSkills}
       />
     </DashboardLayout>

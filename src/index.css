@@ -35,6 +35,11 @@
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
   }
+
+  /* Custom py-4 utility with 1rem padding on all sides */
+  .py-4 {
+    padding: 1rem;
+  }
 }
 
 @layer base {
