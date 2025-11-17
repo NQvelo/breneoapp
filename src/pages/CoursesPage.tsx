@@ -227,6 +227,13 @@ const CoursesPage = () => {
 
   const [tempFilters, setTempFilters] = useState<CourseFilters>(activeFilters);
 
+  // Sync tempFilters with activeFilters when modal opens to reflect current search bar location
+  useEffect(() => {
+    if (isFilterModalOpen) {
+      setTempFilters(activeFilters);
+    }
+  }, [isFilterModalOpen, activeFilters]);
+
   // Create a stable serialized key for filters to optimize React Query caching
   const filtersKey = React.useMemo(() => {
     return JSON.stringify({
@@ -1046,8 +1053,7 @@ const CoursesPage = () => {
 
     return (
       <Card
-        key={course.id}
-        className="flex flex-col hover:shadow-lg transition-shadow duration-200 border border-gray-200"
+        className="flex flex-col hover:shadow-lg transition-shadow duration-200 border border-gray-200 h-full"
       >
         <CardContent className="p-5 flex flex-col flex-grow">
           {/* Course Image */}
@@ -1237,9 +1243,9 @@ const CoursesPage = () => {
         </div>
 
         {coursesLoading && !shouldShowSavedCourses && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
+          <div className="flex gap-6 overflow-x-auto scrollbar-hide -mx-2 px-2 pb-32 md:pb-16">
             {[...Array(6)].map((_, i) => (
-              <Card key={i}>
+              <Card key={i} className="flex-shrink-0 w-80">
                 <CardContent className="p-5">
                   <Skeleton className="h-48 w-full mb-4" />
                   <Skeleton className="h-6 w-full mb-2" />
@@ -1267,8 +1273,12 @@ const CoursesPage = () => {
         {/* Course Cards Grid */}
         {(shouldShowSavedCourses ||
           (!coursesLoading && coursesToDisplay.length > 0)) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
-            {coursesToDisplay.map((course) => renderCourseCard(course))}
+          <div className="flex gap-6 overflow-x-auto scrollbar-hide -mx-2 px-2 pb-32 md:pb-16">
+            {coursesToDisplay.map((course) => (
+              <div key={course.id} className="flex-shrink-0 w-80">
+                {renderCourseCard(course)}
+              </div>
+            ))}
           </div>
         )}
       </div>

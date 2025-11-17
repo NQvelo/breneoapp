@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -100,21 +100,16 @@ const SkillPathPage = () => {
     CourseRecommendation[]
   >([]);
   const [missingSkills, setMissingSkills] = useState<MissingSkill[]>([]);
+  const [finalRole, setFinalRole] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/auth/login");
-      return;
-    }
-    loadSkillData();
-  }, [user, navigate]);
-
-  const loadSkillData = async () => {
+  const loadSkillData = useCallback(async () => {
     try {
+      console.log("🚀 Starting loadSkillData");
       setLoading(true);
 
       // Method 1: Try Django backend skill test results API (same as ProfilePage)
       try {
+        console.log("📡 Attempting Django API call...");
         const response = await apiClient.get(
           `/api/skilltest/results/?user=${user!.id}`
         );
@@ -133,6 +128,11 @@ const SkillPathPage = () => {
         ) {
           console.log("✅ Found skill test results from Django API");
           setHasTestAnswers(true);
+
+          // Store final_role if available
+          if (skillTestData.final_role) {
+            setFinalRole(skillTestData.final_role);
+          }
 
           // Extract skills from skills_json for display
           const skillsJson = skillTestData.skills_json || {};
@@ -223,12 +223,29 @@ const SkillPathPage = () => {
       const missing = await identifyMissingSkills(userSkillNames, [], paths);
       setMissingSkills(missing);
     } catch (error) {
-      console.error("Error loading skill data:", error);
+      console.error("❌ Error loading skill data:", error);
+      console.error(
+        "Error details:",
+        error instanceof Error ? error.message : String(error)
+      );
       setHasTestAnswers(false);
     } finally {
+      // Ensure loading is always set to false
+      console.log("🏁 loadSkillData finished - setting loading to false");
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    console.log("🔍 SkillPathPage useEffect - User:", user?.id);
+    if (!user) {
+      console.log("❌ No user, redirecting to login");
+      navigate("/auth/login");
+      return;
+    }
+    console.log("✅ User found, loading skill data");
+    loadSkillData();
+  }, [user, navigate, loadSkillData]);
 
   const generateJobPaths = (
     skills: Array<{ skill: string; score: number }>
@@ -531,7 +548,14 @@ const SkillPathPage = () => {
     };
 
     // Custom label component to show skill name at bottom of chart (below bars)
-    const CustomInsideLabel = (props: any) => {
+    const CustomInsideLabel = (props: {
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+      payload?: { skill?: string };
+      value?: string;
+    }) => {
       const { x, y, width, height, payload, value } = props;
       const skillName = payload?.skill || value || "";
 
@@ -541,10 +565,10 @@ const SkillPathPage = () => {
 
       const centerX = x + width / 2;
       // Position skill name at fixed bottom position of chart
-      // Chart height is 400px, bottom margin is 80px, so bottom is at ~320px
+      // Chart height is 250px, bottom margin is 60px, so bottom is at ~190px
       // Use a fixed Y position that's always at the bottom regardless of bar height
-      const chartHeight = 400;
-      const bottomMargin = 80;
+      const chartHeight = 250;
+      const bottomMargin = 60;
       const skillY = chartHeight - bottomMargin + 15; // Fixed position at bottom
 
       return (
@@ -563,7 +587,13 @@ const SkillPathPage = () => {
     };
 
     // Custom label component to show percentage at bottom of chart (below bars)
-    const CustomBottomLabel = (props: any) => {
+    const CustomBottomLabel = (props: {
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+      value?: number;
+    }) => {
       const { x, y, width, height, value } = props;
       const percentage = value || 0;
 
@@ -573,10 +603,10 @@ const SkillPathPage = () => {
 
       const centerX = x + width / 2;
       // Position percentage at fixed bottom position of chart
-      // Chart height is 400px, bottom margin is 80px, so bottom is at ~320px
+      // Chart height is 250px, bottom margin is 60px, so bottom is at ~190px
       // Use a fixed Y position that's always at the bottom regardless of bar height
-      const chartHeight = 400;
-      const bottomMargin = 80;
+      const chartHeight = 250;
+      const bottomMargin = 60;
       const percentY = chartHeight - bottomMargin + 35; // Fixed position below skill name
 
       return (
@@ -596,10 +626,10 @@ const SkillPathPage = () => {
 
     return (
       <div className="w-full -mb-4">
-        <ChartContainer config={chartConfig} className="h-[400px] w-full">
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
           <BarChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+            margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
             barCategoryGap="25%"
           >
             <defs>
@@ -668,7 +698,7 @@ const SkillPathPage = () => {
             />
             <Bar
               dataKey="percentage"
-              radius={[16, 16, 0, 0]}
+              radius={[8, 8, 8, 8]}
               animationDuration={1000}
               animationEasing="ease-out"
             >
@@ -692,13 +722,27 @@ const SkillPathPage = () => {
     );
   };
 
+  // Debug logging
+  console.log(
+    "🎨 SkillPathPage Render - Loading:",
+    loading,
+    "HasTestAnswers:",
+    hasTestAnswers,
+    "User:",
+    user?.id
+  );
+
   if (loading) {
+    console.log("⏳ Rendering loading state");
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p>Analyzing your skills...</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Loading skill data...
+            </p>
           </div>
         </div>
       </DashboardLayout>
@@ -707,6 +751,7 @@ const SkillPathPage = () => {
 
   // Show message if user hasn't completed the skill test
   if (!hasTestAnswers) {
+    console.log("📝 Rendering 'no test answers' state");
     return (
       <DashboardLayout>
         <div className="p-6">
@@ -732,9 +777,49 @@ const SkillPathPage = () => {
     );
   }
 
+  console.log("✅ Rendering main SkillPathPage content");
+  console.log("📊 Data summary:", {
+    topSkills: topSkills.length,
+    jobPaths: jobPaths.length,
+    courseRecommendations: courseRecommendations.length,
+    missingSkills: missingSkills.length,
+    techSkills: Object.keys(techSkills).length,
+    softSkills: Object.keys(softSkills).length,
+    finalRole,
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
+        {/* Debug Info - Development Only */}
+        {process.env.NODE_ENV === "development" && (
+          <Card className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+            <CardContent className="p-4">
+              <div className="text-xs space-y-1">
+                <p>
+                  <strong>Loading:</strong> {loading ? "Yes" : "No"}
+                </p>
+                <p>
+                  <strong>Has Test Answers:</strong>{" "}
+                  {hasTestAnswers ? "Yes" : "No"}
+                </p>
+                <p>
+                  <strong>User ID:</strong> {user?.id || "Not logged in"}
+                </p>
+                <p>
+                  <strong>Top Skills:</strong> {topSkills.length}
+                </p>
+                <p>
+                  <strong>Job Paths:</strong> {jobPaths.length}
+                </p>
+                <p>
+                  <strong>Final Role:</strong> {finalRole || "Not set"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -745,41 +830,62 @@ const SkillPathPage = () => {
           </p>
         </div>
 
-        {/* Tech and Soft Skills Breakdown */}
-        {(Object.keys(techSkills).length > 0 ||
-          Object.keys(softSkills).length > 0) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Technical Skills */}
-            {Object.keys(techSkills).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-xl">⚡</span>
-                    Technical Skills
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 pb-1">
-                  {renderSkillsChart(techSkills, "Technical Skills")}
-                </CardContent>
-              </Card>
-            )}
+        {/* Recommended Role and Skills Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recommended Role */}
+          {finalRole && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">🏆</span>
+                  Recommended Role
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 pb-1">
+                <div className="flex flex-col items-center justify-center py-4 gap-4">
+                  <img
+                    src="/lovable-uploads/Code-Learning--Streamline-New-York.png"
+                    alt="Code Learning"
+                    className="w-full h-auto max-w-[100px] object-contain"
+                  />
+                  <Badge className="text-lg px-6 py-3 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
+                    {finalRole}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-            {/* Soft Skills */}
-            {Object.keys(softSkills).length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-xl">🌟</span>
-                    Soft Skills
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 pb-1">
-                  {renderSkillsChart(softSkills, "Soft Skills")}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
+          {/* Technical Skills */}
+          {Object.keys(techSkills).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">⚡</span>
+                  Technical Skills
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 pb-1">
+                {renderSkillsChart(techSkills, "Technical Skills")}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Soft Skills */}
+          {Object.keys(softSkills).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <span className="text-xl">🌟</span>
+                  Soft Skills
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 pb-1">
+                {renderSkillsChart(softSkills, "Soft Skills")}
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         <Tabs defaultValue="jobs" className="w-full">
           <TabsList className="grid w-full grid-cols-4">

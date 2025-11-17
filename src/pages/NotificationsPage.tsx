@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { Bell, Users, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +23,7 @@ interface Notification {
 
 const NotificationsPage = () => {
   const { user } = useAuth();
+  const t = useTranslation();
   const queryClient = useQueryClient();
   const queryKey = ["user-notifications", user?.id];
 
@@ -194,12 +196,12 @@ const NotificationsPage = () => {
             <div className="divide-y divide-gray-200">
               {isLoading ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  Loading...
+                  {t.common.loading}
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>You have no new notifications.</p>
+                  <p>{t.notifications.noNotifications}</p>
                 </div>
               ) : (
                 notifications.map((notification) => (
@@ -237,7 +239,7 @@ const NotificationsPage = () => {
                             disabled={markAsReadMutation.isPending}
                           >
                             <CheckCircle className="h-4 w-4" />
-                            Mark as read
+                            {t.notifications.markAsRead}
                           </button>
                         )}
                     </div>

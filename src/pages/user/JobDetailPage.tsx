@@ -17,13 +17,13 @@ import {
   DollarSign,
   Clock,
   Calendar,
+  Calendar as CalendarIcon,
   Building2,
   ExternalLink,
   AlertCircle,
   Globe,
   Users,
   Factory,
-  Calendar as CalendarIcon,
   Home,
   GraduationCap,
   Award,
@@ -31,11 +31,23 @@ import {
   FileText,
   CheckCircle2,
   Sparkles,
+  Heart,
+  Smile,
+  Shield,
+  Car,
+  UtensilsCrossed,
+  Coffee,
+  Dumbbell,
+  Stethoscope,
+  Eye,
+  TrendingUp,
 } from "lucide-react";
 import { jobService, JobDetail, CompanyInfo } from "@/api/jobs";
 
 const JobDetailPage = () => {
-  const { jobId } = useParams<{ jobId: string }>();
+  const { jobId: rawJobId } = useParams<{ jobId: string }>();
+  // Decode the job ID in case it was URL-encoded
+  const jobId = rawJobId ? decodeURIComponent(rawJobId) : undefined;
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -49,7 +61,22 @@ const JobDetailPage = () => {
     queryKey: ["jobDetail", jobId],
     queryFn: async () => {
       if (!jobId) throw new Error("Job ID is required");
-      return await jobService.fetchJobDetail(jobId);
+      console.log("🔍 Fetching job details for ID:", jobId);
+      try {
+        const detail = await jobService.fetchJobDetail(jobId);
+        console.log("✅ Job details fetched successfully");
+        console.log("📋 Job Title:", detail.title || detail.job_title);
+        console.log("🏢 Company:", detail.company_name || detail.employer_name);
+        console.log("📍 Location:", detail.location || detail.job_location);
+        console.log(
+          "📝 Description length:",
+          detail.description?.length || detail.job_description?.length || 0
+        );
+        return detail;
+      } catch (err) {
+        console.error("❌ Error fetching job details:", err);
+        throw err;
+      }
     },
     enabled: !!jobId,
     retry: 1,
@@ -195,6 +222,15 @@ const JobDetailPage = () => {
   // Get apply URL
   const getApplyUrl = (): string => {
     if (!jobDetail) return "";
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+
+    // Check JSearch-specific job_apply_link field first
+    if (
+      jobDetailAny.job_apply_link &&
+      typeof jobDetailAny.job_apply_link === "string"
+    ) {
+      return jobDetailAny.job_apply_link;
+    }
 
     // Check all possible apply URL fields in order of preference
     const applyUrl =
@@ -258,6 +294,15 @@ const JobDetailPage = () => {
   // Get company name
   const getCompanyName = () => {
     if (!jobDetail) return "";
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+
+    // Check JSearch-specific employer_name field first
+    if (
+      jobDetailAny.employer_name &&
+      typeof jobDetailAny.employer_name === "string"
+    ) {
+      return jobDetailAny.employer_name.trim();
+    }
 
     // Check if company is a string
     if (typeof jobDetail.company === "string" && jobDetail.company.trim()) {
@@ -321,25 +366,59 @@ const JobDetailPage = () => {
   // Get job title
   const getJobTitle = () => {
     if (!jobDetail) return "Untitled Position";
-    return jobDetail.title || jobDetail.job_title || "Untitled Position";
+    // Check all possible title fields including JSearch format
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+    return (
+      jobDetail.title ||
+      jobDetail.job_title ||
+      (jobDetailAny.job_title as string) ||
+      "Untitled Position"
+    );
   };
 
   // Get location
   const getLocation = () => {
     if (!jobDetail) return "Location not specified";
-    return (
-      jobDetail.location ||
-      jobDetail.job_location ||
-      `${jobDetail.city || ""} ${jobDetail.state || ""} ${
-        jobDetail.country || ""
-      }`.trim() ||
-      "Location not specified"
-    );
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+
+    // Check standard location fields
+    if (jobDetail.location || jobDetail.job_location) {
+      return (
+        jobDetail.location || jobDetail.job_location || "Location not specified"
+      );
+    }
+
+    // Check JSearch-specific fields: job_city, job_state, job_country
+    const jobCity = (jobDetailAny.job_city as string) || jobDetail.city;
+    const jobState = (jobDetailAny.job_state as string) || jobDetail.state;
+    const jobCountry =
+      (jobDetailAny.job_country as string) || jobDetail.country;
+
+    if (jobCity || jobState || jobCountry) {
+      const locationParts = [jobCity, jobState, jobCountry].filter(Boolean);
+      return locationParts.join(", ") || "Location not specified";
+    }
+
+    // Fallback to combined city, state, country
+    const combined = `${jobDetail.city || ""} ${jobDetail.state || ""} ${
+      jobDetail.country || ""
+    }`.trim();
+
+    return combined || "Location not specified";
   };
 
   // Get company logo - check all possible logo fields
   const getCompanyLogo = () => {
     if (!jobDetail) return undefined;
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+
+    // Check JSearch-specific employer_logo field first
+    if (
+      jobDetailAny.employer_logo &&
+      typeof jobDetailAny.employer_logo === "string"
+    ) {
+      return jobDetailAny.employer_logo;
+    }
 
     // Check root level fields first
     if (jobDetail.company_logo) return jobDetail.company_logo;
@@ -440,15 +519,26 @@ const JobDetailPage = () => {
   // Get employment type
   const getEmploymentType = () => {
     if (!jobDetail) return "Full Time";
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+    // Check all possible employment type fields including JSearch format
     return (
-      jobDetail.employment_type || jobDetail.job_employment_type || "Full Time"
+      jobDetail.employment_type ||
+      jobDetail.job_employment_type ||
+      (jobDetailAny.job_employment_type as string) ||
+      "Full Time"
     );
   };
 
   // Get work arrangement
   const getWorkArrangement = () => {
     if (!jobDetail) return "On-site";
-    const isRemote = jobDetail.is_remote || jobDetail.remote === true;
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+    // Check all possible remote flags including JSearch format
+    const isRemote =
+      jobDetail.is_remote ||
+      jobDetail.remote === true ||
+      jobDetailAny.job_is_remote === true ||
+      jobDetailAny.remote === true;
     if (isRemote) return "Remote";
     const title = getJobTitle().toLowerCase();
     if (title.includes("hybrid")) return "Hybrid";
@@ -457,23 +547,52 @@ const JobDetailPage = () => {
 
   // Get description
   const getDescription = () => {
-    if (!jobDetail) return "";
-    return (
+    if (!jobDetail) return "No description available.";
+    const jobDetailAny = jobDetail as Record<string, unknown>;
+    // Check all possible description fields including JSearch format
+    const description =
       jobDetail.description ||
       jobDetail.job_description ||
-      "No description available."
-    );
+      (jobDetailAny.job_description as string | undefined) ||
+      undefined;
+
+    // Handle different data types
+    if (!description) return "No description available.";
+    if (typeof description === "string") return description;
+    if (Array.isArray(description)) {
+      // Convert array to string (join with newlines)
+      return (description as unknown[]).map((d) => String(d)).join("\n");
+    }
+    if (typeof description === "object") {
+      // Convert object to string representation
+      return JSON.stringify(description, null, 2);
+    }
+    // Convert to string as fallback
+    return String(description);
   };
 
   // Get requirements/qualifications
   const getRequirements = () => {
     if (!jobDetail) return undefined;
-    return (
+    const requirements =
       jobDetail.requirements ||
       jobDetail.job_requirements ||
       jobDetail.qualifications ||
-      undefined
-    );
+      undefined;
+
+    // Handle different data types
+    if (!requirements) return undefined;
+    if (typeof requirements === "string") return requirements;
+    if (Array.isArray(requirements)) {
+      // Convert array to string (join with newlines)
+      return (requirements as unknown[]).map((r) => String(r)).join("\n");
+    }
+    if (typeof requirements === "object") {
+      // Convert object to string representation
+      return JSON.stringify(requirements, null, 2);
+    }
+    // Convert to string as fallback
+    return String(requirements);
   };
 
   // Get required experience
@@ -520,15 +639,172 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get benefits
-  const getBenefits = () => {
-    if (!jobDetail) return undefined;
-    return (
+  // Parse benefits into an array of benefit items
+  const getBenefitsList = (): string[] => {
+    if (!jobDetail) return [];
+    const benefits =
       jobDetail.benefits ||
       jobDetail.job_benefits ||
       jobDetail.perks ||
-      undefined
-    );
+      undefined;
+
+    if (!benefits) return [];
+
+    // Handle array
+    if (Array.isArray(benefits)) {
+      return benefits.map((b) => String(b)).filter(Boolean);
+    }
+
+    // Handle string - split by common delimiters
+    if (typeof benefits === "string") {
+      // Try splitting by newlines, commas, or semicolons
+      return benefits
+        .split(/[\n,;]/)
+        .map((b: string) => b.trim())
+        .filter(Boolean) as string[];
+    }
+
+    // Handle object - extract keys or values
+    if (typeof benefits === "object") {
+      // If it's an object with boolean values, return the keys
+      const entries = Object.entries(benefits);
+      if (entries.every(([_, v]) => typeof v === "boolean")) {
+        return entries.filter(([_, v]) => v === true).map(([k]) => k);
+      }
+      // Otherwise return all keys
+      return Object.keys(benefits);
+    }
+
+    return [];
+  };
+
+  // Get benefit icon based on benefit name
+  const getBenefitIcon = (benefit: string) => {
+    const benefitLower = benefit.toLowerCase().replace(/[_\s-]/g, "");
+
+    // Health & Insurance
+    if (
+      benefitLower.includes("health") ||
+      benefitLower.includes("medical") ||
+      benefitLower.includes("insurance")
+    ) {
+      return <Stethoscope className="h-5 w-5" />;
+    }
+    if (benefitLower.includes("dental")) {
+      return <Smile className="h-5 w-5" />;
+    }
+    if (benefitLower.includes("vision") || benefitLower.includes("eye")) {
+      return <Eye className="h-5 w-5" />;
+    }
+
+    // Time off
+    if (
+      benefitLower.includes("pto") ||
+      benefitLower.includes("paidtimeoff") ||
+      benefitLower.includes("vacation") ||
+      benefitLower.includes("holiday")
+    ) {
+      return <Calendar className="h-5 w-5" />;
+    }
+    if (benefitLower.includes("sick") || benefitLower.includes("leave")) {
+      return <Heart className="h-5 w-5" />;
+    }
+
+    // Financial
+    if (
+      benefitLower.includes("salary") ||
+      benefitLower.includes("pay") ||
+      benefitLower.includes("compensation") ||
+      benefitLower.includes("bonus")
+    ) {
+      return <DollarSign className="h-5 w-5" />;
+    }
+    if (
+      benefitLower.includes("401k") ||
+      benefitLower.includes("retirement") ||
+      benefitLower.includes("pension")
+    ) {
+      return <Briefcase className="h-5 w-5" />;
+    }
+    if (
+      benefitLower.includes("stock") ||
+      benefitLower.includes("equity") ||
+      benefitLower.includes("options")
+    ) {
+      return <TrendingUp className="h-5 w-5" />;
+    }
+
+    // Work-life
+    if (
+      benefitLower.includes("remote") ||
+      benefitLower.includes("workfromhome") ||
+      benefitLower.includes("wfh")
+    ) {
+      return <Home className="h-5 w-5" />;
+    }
+    if (benefitLower.includes("flexible") || benefitLower.includes("flex")) {
+      return <Clock className="h-5 w-5" />;
+    }
+
+    // Professional Development
+    if (
+      benefitLower.includes("training") ||
+      benefitLower.includes("learning") ||
+      benefitLower.includes("education") ||
+      benefitLower.includes("development")
+    ) {
+      return <GraduationCap className="h-5 w-5" />;
+    }
+    if (
+      benefitLower.includes("conference") ||
+      benefitLower.includes("certification")
+    ) {
+      return <Award className="h-5 w-5" />;
+    }
+
+    // Perks
+    if (
+      benefitLower.includes("gym") ||
+      benefitLower.includes("fitness") ||
+      benefitLower.includes("wellness")
+    ) {
+      return <Dumbbell className="h-5 w-5" />;
+    }
+    if (
+      benefitLower.includes("food") ||
+      benefitLower.includes("meal") ||
+      benefitLower.includes("snack") ||
+      benefitLower.includes("catering")
+    ) {
+      return <UtensilsCrossed className="h-5 w-5" />;
+    }
+    if (
+      benefitLower.includes("coffee") ||
+      benefitLower.includes("drink") ||
+      benefitLower.includes("beverage")
+    ) {
+      return <Coffee className="h-5 w-5" />;
+    }
+    if (
+      benefitLower.includes("parking") ||
+      benefitLower.includes("transport") ||
+      benefitLower.includes("commute")
+    ) {
+      return <Car className="h-5 w-5" />;
+    }
+
+    // Default
+    return <Sparkles className="h-5 w-5" />;
+  };
+
+  // Format benefit name for display
+  const formatBenefitName = (benefit: string): string => {
+    // Replace underscores and hyphens with spaces, then capitalize
+    return benefit
+      .replace(/[_-]/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
   };
 
   // Get application deadline
@@ -909,7 +1185,9 @@ const JobDetailPage = () => {
                 <div
                   className="prose prose-sm max-w-none dark:prose-invert"
                   dangerouslySetInnerHTML={{
-                    __html: getDescription().replace(/\n/g, "<br />"),
+                    __html: getDescription()
+                      .toString()
+                      .replace(/\n/g, "<br />"),
                   }}
                 />
               </CardContent>
@@ -928,10 +1206,9 @@ const JobDetailPage = () => {
                   <div
                     className="prose prose-sm max-w-none dark:prose-invert"
                     dangerouslySetInnerHTML={{
-                      __html: (getRequirements() || "").replace(
-                        /\n/g,
-                        "<br />"
-                      ),
+                      __html: (getRequirements() || "")
+                        .toString()
+                        .replace(/\n/g, "<br />"),
                     }}
                   />
                 </CardContent>
@@ -1036,7 +1313,7 @@ const JobDetailPage = () => {
             )}
 
             {/* Benefits & Perks */}
-            {getBenefits() && (
+            {getBenefitsList().length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1045,16 +1322,51 @@ const JobDetailPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div
-                    className="prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{
-                      __html: (getBenefits() || "").replace(/\n/g, "<br />"),
-                    }}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {getBenefitsList().map((benefit, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <div className="flex-shrink-0 text-breneo-accent">
+                          {getBenefitIcon(benefit)}
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {formatBenefitName(benefit)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )}
           </div>
+        )}
+
+        {!isLoading && !jobDetail && !error && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center text-gray-500">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="font-semibold mb-2">No job details found</p>
+                <p className="text-sm">Job ID: {jobId || "Not provided"}</p>
+                <p className="text-sm mt-2">
+                  The API may not have returned data for this job.
+                </p>
+                <Button
+                  onClick={() => {
+                    queryClient.invalidateQueries({
+                      queryKey: ["jobDetail", jobId],
+                    });
+                  }}
+                  variant="outline"
+                  className="mt-4"
+                >
+                  Retry
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </DashboardLayout>

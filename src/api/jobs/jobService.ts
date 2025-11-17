@@ -1,8 +1,8 @@
 /**
  * Job API Service
  * 
- * Service for fetching active jobs from multiple job APIs
- * Supports Bing Jobs API, JSearch API, and other job data sources
+ * Service for fetching active jobs from JSearch API via RapidAPI
+ * Filters are only applied when user explicitly changes them in the frontend
  */
 
 import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from './types';
@@ -10,8 +10,8 @@ import { countries } from '@/data/countries';
 
 // API Configuration
 const JSEARCH_API_KEY = "329754c88fmsh45bf2cd651b0e37p1ad384jsnab7fd582cddb";
-const BING_JOBS_API_BASE = "https://jobs-api14.p.rapidapi.com/v2/bing";
-const API_HOST = "jobs-api14.p.rapidapi.com";
+const JSEARCH_API_BASE = "https://jsearch.p.rapidapi.com";
+const JSEARCH_API_HOST = "jsearch.p.rapidapi.com";
 
 // Logo API fallback - using Clearbit Logo API (free tier available)
 // Note: Clearbit Logo API will be discontinued Dec 2025, but works for now
@@ -56,14 +56,15 @@ const rateLimitedFetch = async (
 };
 
 /**
- * Fetch jobs from Bing Jobs API via RapidAPI
+ * Fetch jobs from JSearch API via RapidAPI
+ * Only adds filters when user explicitly changes them (not defaults)
  */
-const fetchJobsFromBingAPI = async (
+const fetchJobsFromJSearchAPI = async (
   params: JobSearchParams
 ): Promise<ApiJob[]> => {
   const { query, filters, page = 1 } = params;
   
-  // Build URL parameters for Bing Jobs API
+  // Build URL parameters for JSearch API
   const urlParams = new URLSearchParams();
 
   // Add query/search term (required)
@@ -73,79 +74,57 @@ const fetchJobsFromBingAPI = async (
     urlParams.append("query", "developer"); // Default query
   }
 
-  // Remote filter - Bing API uses remoteOnly as lowercase boolean string
-  urlParams.append("remoteOnly", filters.isRemote ? "true" : "false");
+  // Add page and num_pages
+  urlParams.append("page", String(page));
+  urlParams.append("num_pages", "1");
 
-  // Location - API requires either 'location' or 'token' parameter
-  // Try to get location from selected countries first
-  let locationSet = false;
+  // Only add filters if they are explicitly set by the user (not defaults)
+  // Country filter - only add if countries are selected
   if (filters.countries.length > 0) {
-    // Try to get country name from code
-    const country = countries.find((c) =>
-      filters.countries.includes(c.code.toLowerCase())
-    );
-    if (country && country.name) {
-      urlParams.append("location", country.name);
-      locationSet = true;
-    }
-  }
-  
-  // If no location was set from countries, use the default country from filters
-  if (!locationSet && filters.country) {
-    urlParams.append("location", filters.country);
-    locationSet = true;
-  }
-  
-  // If still no location, use a default (United States as fallback)
-  if (!locationSet) {
-    urlParams.append("location", "United States");
+    // Use the first country code (JSearch uses 2-letter country codes)
+    const countryCode = filters.countries[0].toLowerCase();
+    urlParams.append("country", countryCode);
   }
 
-  // Date posted filter - default to "week" to ensure only active/recent jobs
-  // API only accepts "day", "week", or empty (not "month")
-  const datePosted = filters.datePosted || "week";
-  if (datePosted !== "all") {
-    if (datePosted === "day" || datePosted === "week") {
-      urlParams.append("datePosted", datePosted);
-    }
-    // Note: "month" is not supported by API, so we use "week" as default
-    // If user selects "month", we'll use "week" instead
+  // Date posted filter - only add if explicitly set
+  if (filters.datePosted) {
+    // JSearch accepts: "all", "day", "week", "month"
+    urlParams.append("date_posted", filters.datePosted);
   }
-  // If "all" or "month" is selected, don't add datePosted parameter (empty = all jobs)
 
-  // Map employment types to Bing API format
-  const employmentTypes: string[] = [];
+  // Remote filter - only add if explicitly set to true
+  if (filters.isRemote) {
+    urlParams.append("remote_jobs_only", "true");
+  }
+
+  // Employment types - only add if explicitly selected
   if (filters.jobTypes.length > 0) {
-    filters.jobTypes.forEach((type) => {
-      const bingType = type.toLowerCase();
-      if (bingType === "fulltime") {
-        employmentTypes.push("fulltime");
-      } else if (bingType === "parttime") {
-        employmentTypes.push("parttime");
-      } else if (bingType === "contractor") {
-        employmentTypes.push("contractor");
-      } else if (bingType === "intern") {
-        employmentTypes.push("temporary"); // Bing uses "temporary" for intern
-      }
+    // Map to JSearch format: FULLTIME, PARTTIME, CONTRACTOR, INTERN
+    const employmentTypes = filters.jobTypes.map((type) => {
+      const upperType = type.toUpperCase();
+      // JSearch uses these exact values
+      if (upperType === "FULLTIME") return "FULLTIME";
+      if (upperType === "PARTTIME") return "PARTTIME";
+      if (upperType === "CONTRACTOR") return "CONTRACTOR";
+      if (upperType === "INTERN") return "INTERN";
+      return upperType;
     });
-  }
-
-  // Only add employmentTypes if we have specific types selected
-  if (employmentTypes.length > 0) {
-    urlParams.append("employmentTypes", employmentTypes.join(";"));
+    if (employmentTypes.length > 0) {
+      urlParams.append("employment_types", employmentTypes.join(","));
+    }
   }
 
   // Build the API endpoint
   const queryString = urlParams.toString();
-  const API_ENDPOINT = `${BING_JOBS_API_BASE}/search?${queryString}`;
+  const API_ENDPOINT = `${JSEARCH_API_BASE}/search?${queryString}`;
 
-  console.log("Bing Jobs API Request URL:", API_ENDPOINT);
+  console.log("JSearch API Request URL:", API_ENDPOINT);
 
   const response = await rateLimitedFetch(API_ENDPOINT, {
     method: "GET",
     headers: {
-      "X-Rapidapi-Key": JSEARCH_API_KEY,
-      "X-Rapidapi-Host": API_HOST,
+      "x-rapidapi-key": JSEARCH_API_KEY,
+      "x-rapidapi-host": JSEARCH_API_HOST,
     },
   });
 
@@ -163,17 +142,13 @@ const fetchJobsFromBingAPI = async (
       if (errorBody) {
         try {
           const errorJson = JSON.parse(errorBody);
-          // Handle structured error response from Bing API
-          if (errorJson.errors && Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
-            const apiError = errorJson.errors[0];
-            errorMessage = apiError.message || apiError.error || errorMessage;
-            console.error("API Error Details:", apiError);
-          } else {
-            errorMessage = errorJson.message || errorJson.error || errorMessage;
-            if (errorJson.details) {
-              console.error("API Error Details:", errorJson.details);
-            }
+          // Handle structured error response from JSearch API
+          if (errorJson.message) {
+            errorMessage = errorJson.message;
+          } else if (errorJson.error) {
+            errorMessage = errorJson.error;
           }
+          console.error("API Error Details:", errorJson);
         } catch (parseError) {
           errorMessage = `${errorMessage} - ${errorBody}`;
         }
@@ -186,29 +161,26 @@ const fetchJobsFromBingAPI = async (
 
   const result: unknown = await response.json();
 
-  // Handle Bing Jobs API response structure
+  // Handle JSearch API response structure
+  // JSearch returns: { data: [...jobs] }
   let jobsArray: ApiJob[] = [];
 
-  if (Array.isArray(result)) {
-    jobsArray = result as ApiJob[];
-  } else if (result && typeof result === "object") {
+  if (result && typeof result === "object") {
     const resultObj = result as Record<string, unknown>;
-    // Bing API typically returns data in a 'data' or 'jobs' array
+    // JSearch API returns data in a 'data' array
     if (Array.isArray(resultObj.data)) {
       jobsArray = resultObj.data as ApiJob[];
     } else if (Array.isArray(resultObj.jobs)) {
       jobsArray = resultObj.jobs as ApiJob[];
     } else if (Array.isArray(resultObj.results)) {
       jobsArray = resultObj.results as ApiJob[];
-    } else if (Array.isArray(resultObj.items)) {
-      jobsArray = resultObj.items as ApiJob[];
-    } else if (Array.isArray(resultObj.job_listings)) {
-      jobsArray = resultObj.job_listings as ApiJob[];
     }
+  } else if (Array.isArray(result)) {
+    jobsArray = result as ApiJob[];
   }
 
   // Log the raw response structure for debugging
-  console.log("Bing Jobs API Response structure:", {
+  console.log("JSearch API Response structure:", {
     isArray: Array.isArray(result),
     keys:
       result && typeof result === "object"
@@ -217,57 +189,23 @@ const fetchJobsFromBingAPI = async (
     firstJob: jobsArray.length > 0 ? jobsArray[0] : null,
   });
 
-  // Log logo fields from first job for debugging
-  if (jobsArray.length > 0) {
-    const firstJob = jobsArray[0];
-    console.log("🔍 Logo fields in API response:", {
-      employer_logo: firstJob.employer_logo,
-      company_logo: firstJob.company_logo,
-      logo: firstJob.logo,
-      logo_url: firstJob.logo_url,
-      companyLogo: firstJob.companyLogo,
-      company: firstJob.company,
-      employer: firstJob.employer,
-      allKeys: Object.keys(firstJob),
-    });
-    
-    // Check nested company/employer objects
-    if (firstJob.company && typeof firstJob.company === "object") {
-      console.log("🔍 Company object logo fields:", {
-        logo: (firstJob.company as Record<string, unknown>).logo,
-        company_logo: (firstJob.company as Record<string, unknown>).company_logo,
-        employer_logo: (firstJob.company as Record<string, unknown>).employer_logo,
-        logo_url: (firstJob.company as Record<string, unknown>).logo_url,
-        allKeys: Object.keys(firstJob.company as Record<string, unknown>),
-      });
-    }
-    if (firstJob.employer && typeof firstJob.employer === "object") {
-      console.log("🔍 Employer object logo fields:", {
-        logo: (firstJob.employer as Record<string, unknown>).logo,
-        company_logo: (firstJob.employer as Record<string, unknown>).company_logo,
-        employer_logo: (firstJob.employer as Record<string, unknown>).employer_logo,
-        logo_url: (firstJob.employer as Record<string, unknown>).logo_url,
-        allKeys: Object.keys(firstJob.employer as Record<string, unknown>),
-      });
-    }
-  }
-
   return jobsArray;
 };
 
 /**
- * Fetch job details from Bing Jobs API
+ * Fetch job details from JSearch API
  */
 export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   if (!jobId) throw new Error("Job ID is required");
 
-  const API_ENDPOINT = `${BING_JOBS_API_BASE}/get?id=${encodeURIComponent(jobId)}`;
+  // JSearch API uses job_id parameter for job details with country filter
+  const API_ENDPOINT = `${JSEARCH_API_BASE}/job-details?job_id=${encodeURIComponent(jobId)}&country=us`;
 
   const response = await rateLimitedFetch(API_ENDPOINT, {
     method: "GET",
     headers: {
-      "X-Rapidapi-Key": JSEARCH_API_KEY,
-      "X-Rapidapi-Host": API_HOST,
+      "x-rapidapi-key": JSEARCH_API_KEY,
+      "x-rapidapi-host": JSEARCH_API_HOST,
     },
   });
 
@@ -285,7 +223,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
       if (errorBody) {
         try {
           const errorJson = JSON.parse(errorBody);
-          // Handle structured error response from Bing API
+          // Handle structured error response from JSearch API
           if (errorJson.errors && Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
             const apiError = errorJson.errors[0];
             errorMessage = apiError.message || apiError.error || errorMessage;
@@ -306,26 +244,157 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   const result: unknown = await response.json();
 
   // Log the raw response for debugging
-  console.log("Raw API Response:", result);
+  console.log("Raw API Response:", JSON.stringify(result, null, 2));
 
-  // Handle different response structures
+  // Handle JSearch API response structure
+  // JSearch returns: { data: [{...job}] } or { data: {...job} } or { data: [] }
   let jobData: JobDetail | null = null;
   if (result && typeof result === "object") {
     const resultObj = result as Record<string, unknown>;
-    // Check if data is nested
-    if (resultObj.data && typeof resultObj.data === "object") {
-      jobData = resultObj.data as JobDetail;
+    // JSearch API returns job data in 'data' field - could be array or object
+    if (resultObj.data) {
+      if (Array.isArray(resultObj.data)) {
+        if (resultObj.data.length > 0) {
+          // If data is an array, take the first job
+          jobData = resultObj.data[0] as JobDetail;
+        } else {
+          // Empty array - no job found
+          console.warn("API returned empty data array for job ID:", jobId);
+          throw new Error(`No job found with ID: ${jobId}`);
+        }
+      } else if (typeof resultObj.data === "object" && resultObj.data !== null) {
+        // If data is an object, use it directly
+        jobData = resultObj.data as JobDetail;
+      }
     } else if (resultObj.job && typeof resultObj.job === "object") {
       jobData = resultObj.job as JobDetail;
+    } else if (resultObj.results && Array.isArray(resultObj.results) && resultObj.results.length > 0) {
+      // Some APIs return results array
+      jobData = resultObj.results[0] as JobDetail;
     } else {
-      // If result itself is the job object
-      jobData = result as JobDetail;
+      // Check if result itself is the job object (has job-like properties)
+      const hasJobProperties = 
+        (resultObj.job_title || resultObj.title || resultObj.job_id || resultObj.id);
+      if (hasJobProperties) {
+        jobData = result as JobDetail;
+      }
     }
   }
 
   if (!jobData) {
-    throw new Error("Invalid response format from API");
+    console.error("Failed to extract job data from response:", JSON.stringify(result, null, 2));
+    throw new Error(`Invalid response format from API. No job data found for ID: ${jobId}`);
   }
+  
+  // Validate that we have at least some job data
+  const hasAnyJobData = 
+    jobData.job_title || jobData.title || jobData.job_id || jobData.id ||
+    jobData.employer_name || jobData.company_name || jobData.company;
+  
+  if (!hasAnyJobData) {
+    console.error("Job data exists but has no recognizable fields:", jobData);
+    throw new Error(`Job data received but appears to be empty for ID: ${jobId}`);
+  }
+
+  // Normalize JSearch API field names to our standard format
+  // JSearch uses job_* prefix for many fields
+  const normalizedData = { ...jobData } as JobDetail;
+  
+  // Map JSearch-specific fields to standard fields
+  if (!normalizedData.title && (jobData as Record<string, unknown>).job_title) {
+    normalizedData.title = (jobData as Record<string, unknown>).job_title as string;
+  }
+  if (!normalizedData.job_title && normalizedData.title) {
+    normalizedData.job_title = normalizedData.title;
+  }
+  
+  // Handle location fields - JSearch uses job_city, job_state, job_country
+  if (!normalizedData.location && !normalizedData.job_location) {
+    const jobCity = (jobData as Record<string, unknown>).job_city as string | undefined;
+    const jobState = (jobData as Record<string, unknown>).job_state as string | undefined;
+    const jobCountry = (jobData as Record<string, unknown>).job_country as string | undefined;
+    if (jobCity || jobState || jobCountry) {
+      const locationParts = [jobCity, jobState, jobCountry].filter(Boolean);
+      normalizedData.location = locationParts.join(", ");
+      normalizedData.job_location = normalizedData.location;
+      if (jobCity) normalizedData.city = jobCity;
+      if (jobState) normalizedData.state = jobState;
+      if (jobCountry) normalizedData.country = jobCountry;
+    }
+  }
+  
+  // Handle description
+  if (!normalizedData.description && !normalizedData.job_description) {
+    const jobDesc = (jobData as Record<string, unknown>).job_description as string | undefined;
+    if (jobDesc) {
+      normalizedData.description = jobDesc;
+      normalizedData.job_description = jobDesc;
+    }
+  }
+  
+  // Handle apply URL
+  if (!normalizedData.apply_url && !normalizedData.job_apply_link && !normalizedData.url) {
+    const jobApplyLink = (jobData as Record<string, unknown>).job_apply_link as string | undefined;
+    if (jobApplyLink) {
+      normalizedData.apply_url = jobApplyLink;
+      normalizedData.job_apply_link = jobApplyLink;
+      normalizedData.url = jobApplyLink;
+    }
+  }
+  
+  // Handle employment type
+  if (!normalizedData.employment_type && !normalizedData.job_employment_type) {
+    const jobEmpType = (jobData as Record<string, unknown>).job_employment_type as string | undefined;
+    if (jobEmpType) {
+      normalizedData.employment_type = jobEmpType;
+      normalizedData.job_employment_type = jobEmpType;
+    }
+  }
+  
+  // Handle remote flag
+  if (normalizedData.is_remote === undefined && normalizedData.remote === undefined) {
+    const jobIsRemote = (jobData as Record<string, unknown>).job_is_remote as boolean | undefined;
+    if (jobIsRemote !== undefined) {
+      normalizedData.is_remote = jobIsRemote;
+      normalizedData.remote = jobIsRemote;
+    }
+  }
+  
+  // Handle salary fields
+  if (!normalizedData.min_salary && !normalizedData.max_salary) {
+    const jobMinSalary = (jobData as Record<string, unknown>).job_min_salary as number | undefined;
+    const jobMaxSalary = (jobData as Record<string, unknown>).job_max_salary as number | undefined;
+    const jobSalaryCurrency = (jobData as Record<string, unknown>).job_salary_currency as string | undefined;
+    const jobSalaryPeriod = (jobData as Record<string, unknown>).job_salary_period as string | undefined;
+    if (jobMinSalary !== undefined) normalizedData.min_salary = jobMinSalary;
+    if (jobMaxSalary !== undefined) normalizedData.max_salary = jobMaxSalary;
+    if (jobSalaryCurrency) normalizedData.salary_currency = jobSalaryCurrency;
+    if (jobSalaryPeriod) normalizedData.salary_period = jobSalaryPeriod;
+  }
+  
+  // Handle company/employer name
+  if (!normalizedData.company_name && !normalizedData.employer_name) {
+    const employerName = (jobData as Record<string, unknown>).employer_name as string | undefined;
+    if (employerName) {
+      normalizedData.employer_name = employerName;
+      normalizedData.company_name = employerName;
+      if (typeof normalizedData.company === "string") {
+        normalizedData.company = employerName;
+      }
+    }
+  }
+  
+  // Handle logo
+  if (!normalizedData.company_logo && !normalizedData.employer_logo && !normalizedData.logo_url) {
+    const employerLogo = (jobData as Record<string, unknown>).employer_logo as string | undefined;
+    if (employerLogo) {
+      normalizedData.employer_logo = employerLogo;
+      normalizedData.company_logo = employerLogo;
+      normalizedData.logo_url = employerLogo;
+    }
+  }
+  
+  jobData = normalizedData;
 
   // Extract company information from nested company object if it exists
   if (jobData.company && typeof jobData.company === "object") {
@@ -467,7 +536,8 @@ const isJobActive = (job: ApiJob): boolean => {
 
 /**
  * Main function to fetch active jobs
- * Combines search term with skills and fetches from Bing Jobs API
+ * Combines search term with skills and fetches from JSearch API
+ * Filters are only applied when user explicitly changes them
  * Only returns jobs that are currently active
  */
 export const fetchActiveJobs = async (
@@ -489,23 +559,19 @@ export const fetchActiveJobs = async (
     // Combine all query parts
     const query = queryParts.length > 0 ? queryParts.join(" ") : "";
 
-    // Ensure we're filtering for recent jobs (active jobs)
-    // Map "month" to "week" since API doesn't support "month"
-    let datePostedFilter = params.filters.datePosted || "week";
-    if (datePostedFilter === "month") {
-      datePostedFilter = "week"; // Use week instead of month
-    }
-    
-    const filtersWithActiveJobs = {
+    // Pass filters as-is - only add filters when user explicitly changes them
+    // No default filters are applied here
+    const filtersToUse = {
       ...params.filters,
-      datePosted: datePostedFilter, // Default to last week for active jobs
+      // Only include datePosted if it's explicitly set (not undefined/null)
+      datePosted: params.filters.datePosted || undefined,
     };
 
-    // Fetch jobs from Bing Jobs API
-    const allJobs = await fetchJobsFromBingAPI({
+    // Fetch jobs from JSearch API
+    const allJobs = await fetchJobsFromJSearchAPI({
       ...params,
       query,
-      filters: filtersWithActiveJobs,
+      filters: filtersToUse,
     });
 
     // Remove duplicates based on job_id
@@ -550,15 +616,13 @@ export const fetchActiveJobs = async (
 };
 
 /**
- * Fetch jobs from JSearch API (alternative API)
- * This can be used as a fallback or additional source
+ * Fetch jobs from JSearch API (legacy function - now using fetchJobsFromJSearchAPI)
+ * Kept for backward compatibility
  */
 export const fetchJobsFromJSearch = async (
   params: JobSearchParams
 ): Promise<ApiJob[]> => {
-  // JSearch API implementation can be added here
-  // For now, we'll use Bing Jobs API as the primary source
-  throw new Error("JSearch API not yet implemented");
+  return fetchJobsFromJSearchAPI(params);
 };
 
 /**
@@ -579,7 +643,7 @@ export const fetchJobsFromAdzuna = async (
 export const fetchJobsFromMultipleSources = async (
   params: JobSearchParams
 ): Promise<JobApiResponse> => {
-  // Try primary source (Bing Jobs API)
+  // Try primary source (JSearch API)
   try {
     return await fetchActiveJobs(params);
   } catch (error) {
@@ -593,7 +657,7 @@ export const fetchJobsFromMultipleSources = async (
 const jobService = {
   fetchActiveJobs,
   fetchJobDetail,
-  fetchJobsFromBingAPI,
+  fetchJobsFromJSearchAPI,
   fetchJobsFromJSearch,
   fetchJobsFromAdzuna,
   fetchJobsFromMultipleSources,

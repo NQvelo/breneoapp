@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
+import { getLocalizedPath, getLanguageFromPath } from "@/utils/localeUtils";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -55,11 +56,18 @@ const LoginPage: React.FC = () => {
   // Redirect already-authenticated users to their dashboard
   useEffect(() => {
     if (!authLoading && user) {
-      const userRole = user.user_type || localStorage.getItem("userRole") || "user";
+      const userRole =
+        user.user_type || localStorage.getItem("userRole") || "user";
+      const language =
+        getLanguageFromPath(window.location.pathname) ||
+        (localStorage.getItem("appLanguage") as "en" | "ka") ||
+        "en";
       if (userRole === "academy") {
-        navigate("/academy/dashboard", { replace: true });
+        const academyPath = getLocalizedPath("/academy/dashboard", language);
+        navigate(academyPath, { replace: true });
       } else {
-        navigate("/dashboard", { replace: true });
+        const homePath = getLocalizedPath("/home", language);
+        navigate(homePath, { replace: true });
       }
     }
   }, [user, authLoading, navigate]);
@@ -105,7 +113,9 @@ const LoginPage: React.FC = () => {
       const refreshToken = res.data.refresh;
 
       if (!token) {
-        throw new Error("Login succeeded but did not return the required token.");
+        throw new Error(
+          "Login succeeded but did not return the required token."
+        );
       }
 
       // Store tokens using TokenManager
@@ -144,7 +154,8 @@ const LoginPage: React.FC = () => {
           if (typeof errorData.detail === "string") detail = errorData.detail;
           else if (typeof errorData.message === "string")
             detail = errorData.message;
-          else if (typeof errorData.error === "string") detail = errorData.error;
+          else if (typeof errorData.error === "string")
+            detail = errorData.error;
           // Check for Django REST Framework's default non-field errors
           else if (
             Array.isArray(errorData.non_field_errors) &&

@@ -382,7 +382,7 @@ export function SkillTest() {
 
   const finishTest = () => {
     toast.success("Test completed! Your personalized results are ready.");
-    navigate('/dashboard');
+    navigate('/home');
   };
 
   const progress = ((currentQuestion + 1) / QUESTIONS.length) * 100;

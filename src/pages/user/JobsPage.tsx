@@ -405,10 +405,29 @@ const fetchJobs = async (
       pageSize: 20,
     });
 
-    return response.jobs;
+    // Validate that we got jobs back
+    if (!response || !Array.isArray(response.jobs)) {
+      console.warn("Invalid response format from job service:", response);
+      return [];
+    }
+
+    // Filter out jobs without valid IDs
+    const validJobs = response.jobs.filter((job) => {
+      const jobId = job.job_id || job.id;
+      return jobId && jobId.trim() !== "";
+    });
+
+    if (validJobs.length < response.jobs.length) {
+      console.warn(
+        `Filtered out ${response.jobs.length - validJobs.length} jobs without valid IDs`
+      );
+    }
+
+    return validJobs;
   } catch (error) {
     console.error("Error fetching jobs:", error);
-    throw error;
+    // Return empty array instead of throwing to prevent UI crashes
+    return [];
   }
 };
 
@@ -524,7 +543,7 @@ const JobsPage = () => {
           : [],
         jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
         isRemote: isRemoteParam === "true",
-        datePosted: datePostedParam || "week", // Default to week for active jobs
+        datePosted: datePostedParam || undefined, // Only use if explicitly set
         skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
       };
     }
@@ -535,13 +554,13 @@ const JobsPage = () => {
       return sessionData.filters as JobFilters;
     }
 
-    // Default values - default to "week" to show only active jobs
+    // Default values - no filters applied initially
     return {
       country: "Georgia",
       countries: [],
       jobTypes: [],
       isRemote: false,
-      datePosted: "week", // Default to last week for active jobs only (API doesn't support "month")
+      datePosted: undefined, // No default filter - only apply when user changes it
       skills: [],
     };
   });
@@ -579,6 +598,13 @@ const JobsPage = () => {
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
 
+  // Sync tempFilters with activeFilters when modal opens to reflect current search bar location
+  useEffect(() => {
+    if (isFilterModalOpen) {
+      setTempFilters(activeFilters);
+    }
+  }, [isFilterModalOpen, activeFilters]);
+
   // Ref to track if we're updating from URL (to prevent circular updates)
   const isUpdatingFromUrl = React.useRef(false);
 
@@ -600,7 +626,7 @@ const JobsPage = () => {
         : [],
       jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
       isRemote: isRemoteParam === "true",
-      datePosted: datePostedParam || "all",
+      datePosted: datePostedParam || undefined, // Only use if explicitly set
       skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
     };
 
@@ -986,7 +1012,12 @@ const JobsPage = () => {
   });
 
   const transformedJobs = React.useMemo(() => {
-    return (jobs || []).map((job: ApiJob): Job => {
+    if (!jobs || jobs.length === 0) {
+      return [];
+    }
+    
+    try {
+      return (jobs || []).map((job: ApiJob): Job | null => {
       // Handle nested company object if it exists
       const companyObj =
         job.company && typeof job.company === "object"
@@ -995,6 +1026,13 @@ const JobsPage = () => {
 
       // Extract fields with fallbacks for different API formats
       const jobId = job.job_id || job.id || "";
+      
+      // Skip jobs without valid IDs - they can't be opened
+      if (!jobId || jobId.trim() === "") {
+        console.warn("Skipping job without valid ID:", job);
+        return null;
+      }
+      
       const jobTitle =
         job.job_title || job.title || job.position || "Untitled Position";
       const companyName =
@@ -1060,7 +1098,20 @@ const JobsPage = () => {
           companyLogo = employerObj.employer_logo as string;
       }
 
-      // If no logo found, the UI will handle fallback to Clearbit API or default icon
+      // Validate logo URL if found - check if it's a valid URL format
+      if (companyLogo) {
+        try {
+          // Check if it's a valid URL
+          const url = new URL(companyLogo);
+          // Only allow http/https protocols
+          if (!url.protocol.startsWith('http')) {
+            companyLogo = undefined;
+          }
+        } catch {
+          // Invalid URL, remove it
+          companyLogo = undefined;
+        }
+      }
 
       // Format salary - handle both numeric and string formats
       let salary = "By agreement";
@@ -1137,7 +1188,13 @@ const JobsPage = () => {
         employment_type: employmentType,
         work_arrangement: workArrangement,
       };
-    });
+    })
+    .filter((job): job is Job => job !== null); // Filter out null jobs
+    } catch (error) {
+      console.error("Error transforming jobs:", error);
+      // Return empty array on error to prevent crashes
+      return [];
+    }
   }, [jobs, savedJobs]);
 
   // Handle work types change
@@ -1260,7 +1317,7 @@ const JobsPage = () => {
       countries: [],
       jobTypes: [],
       isRemote: false,
-      datePosted: "week", // Default to last week for active jobs only (API doesn't support "month")
+      datePosted: undefined, // No default filter - only apply when user changes it
       skills: [],
     };
     const newPage = 1;
@@ -1594,16 +1651,14 @@ const JobsPage = () => {
                     ) : null}
 
                     {/* Fallback 1: Clearbit logo API - shown if no API logo and company name exists */}
-                    {job.company ? (
+                    {job.company && !job.company_logo ? (
                       <img
                         src={`https://logo.clearbit.com/${encodeURIComponent(
                           job.company
                         )}`}
                         alt={`${job.company} logo`}
-                        className={`w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo ${
-                          job.company_logo ? "hidden" : "block"
-                        }`}
-                        style={{ zIndex: job.company_logo ? 0 : 10 }}
+                        className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
+                        style={{ zIndex: 10 }}
                         loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -1625,10 +1680,10 @@ const JobsPage = () => {
                     {/* Fallback 2: Default icon - always present, shown when all logos fail or no company name */}
                     <div
                       className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                        job.company_logo || job.company ? "hidden" : "flex"
+                        (job.company_logo || (job.company && !job.company_logo)) ? "hidden" : "flex"
                       }`}
                       style={{
-                        zIndex: job.company_logo || job.company ? 0 : 10,
+                        zIndex: (job.company_logo || (job.company && !job.company_logo)) ? 0 : 10,
                       }}
                     >
                       <Briefcase className="h-6 w-6 text-white" />
@@ -1685,8 +1740,18 @@ const JobsPage = () => {
                 {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
                 <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
                   <Button
-                    onClick={() => navigate(`/jobs/${job.id}`)}
+                    onClick={() => {
+                      if (!job.id || job.id.trim() === "") {
+                        toast.error("Cannot open job: Invalid job ID");
+                        console.error("Attempted to navigate to job with invalid ID:", job);
+                        return;
+                      }
+                      // Encode the job ID to handle special characters
+                      const encodedId = encodeURIComponent(job.id);
+                      navigate(`/jobs/${encodedId}`);
+                    }}
                     className="flex-1 bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-900 dark:hover:bg-gray-600 rounded-lg"
+                    disabled={!job.id || job.id.trim() === ""}
                   >
                     View
                   </Button>

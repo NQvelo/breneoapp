@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ import {
   Play,
   ClipboardCheck,
   Target,
+  DollarSign,
+  Briefcase,
+  Tag,
+  MapPin,
 } from "lucide-react";
 import {
   getUserTestAnswers,
@@ -26,18 +30,7 @@ import {
   getTopSkills,
 } from "@/utils/skillTestUtils";
 import apiClient from "@/api/auth/apiClient";
-
-// API Job structure from JSearch
-interface ApiJob {
-  job_id: string;
-  job_title: string;
-  employer_name: string;
-  job_city?: string;
-  job_state?: string;
-  job_country?: string;
-  job_apply_link?: string;
-  employer_logo?: string;
-}
+import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 
 // Transformed Job for UI
 interface Job {
@@ -47,7 +40,10 @@ interface Job {
   location: string;
   date: string;
   logo?: string;
+  company_logo?: string;
   salary?: string;
+  employment_type?: string;
+  work_arrangement?: string;
 }
 
 interface Course {
@@ -69,10 +65,9 @@ interface Webinar {
   logo?: string;
 }
 
-const JSEARCH_API_KEY = "329754c88fmsh45bf2cd651b0e37p1ad384jsnab7fd582cddb";
-
-// Fetch jobs from JSearch API with skill-based filtering
+// Fetch jobs from job service API with skill-based filtering
 const fetchJobs = async (topSkills: string[] = []) => {
+  try {
   // Build query based on top skills
   let query = "developer"; // Default fallback
   if (topSkills.length > 0) {
@@ -81,36 +76,68 @@ const fetchJobs = async (topSkills: string[] = []) => {
     query = skillsQuery;
   }
 
-  const params = new URLSearchParams({
-    query: query,
-    page: "1",
-    num_pages: "1",
-  });
+    // Create filters with user's skills
+    const filters: JobFilters = {
+      country: "United States", // Default to US
+      countries: ["us"], // Default to US
+      jobTypes: [], // No specific job type filter
+      isRemote: false, // Show both remote and on-site
+      datePosted: undefined, // Show all jobs regardless of date
+      skills: topSkills, // Filter by user's top skills
+    };
 
-  const API_ENDPOINT = `https://jsearch.p.rapidapi.com/search?${params.toString()}`;
+    // Fetch jobs using the job service
+    const response = await jobService.fetchActiveJobs({
+      query,
+      filters,
+      page: 1,
+      pageSize: 20, // Get more jobs to have better selection
+    });
 
-  const response = await fetch(API_ENDPOINT, {
-    method: "GET",
-    headers: {
-      "X-Rapidapi-Key": JSEARCH_API_KEY,
-      "X-Rapidapi-Host": "jsearch.p.rapidapi.com",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch jobs");
+    return response.jobs || [];
+  } catch (error) {
+    console.error("Error fetching jobs:", error);
+    throw error;
   }
-
-  const result = await response.json();
-  return result.data || [];
 };
 
 const UserHome = () => {
-  const { user } = useAuth();
-  const [currentJobPage, setCurrentJobPage] = useState(0);
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
+
+  // Show loading state if auth is still loading
+  if (authLoading) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // If user is not available, show a message (shouldn't happen due to ProtectedRoute, but safety check)
+  if (!user) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-gray-600">Please wait while we load your dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // Fetch user's top skills from skill test results
   useEffect(() => {
@@ -254,44 +281,270 @@ const UserHome = () => {
   ];
 
   // Transform jobs - handle empty or undefined arrays
-  const transformedJobs: Job[] = (jobs || []).slice(0, 6).map((job: ApiJob) => {
-    const location = [job.job_city, job.job_state, job.job_country]
-      .filter(Boolean)
-      .join(", ") || "Location not specified";
+  const transformedJobs: Job[] = (jobs || [])
+    .slice(0, 6)
+    .map((job: ApiJob) => {
+      // Extract job ID - check all possible fields
+      const jobId = job.job_id || job.id || "";
+      if (!jobId) {
+        console.warn("Skipping job without valid ID:", job);
+        return null;
+      }
+
+      // Extract job title - check all possible fields
+      const jobTitle =
+        job.job_title ||
+        job.title ||
+        job.position ||
+        "Untitled Position";
+
+      // Extract company name - check all possible fields
+      const companyName =
+        job.employer_name ||
+        job.company_name ||
+        (typeof job.company === "string" ? job.company : null) ||
+        "Unknown Company";
+
+      // Extract location - check all possible fields
+      const jobCity = job.job_city || job.city || "";
+      const jobState = job.job_state || job.state || "";
+      const jobCountry = job.job_country || job.country || "";
+      const location =
+        job.job_location ||
+        job.location ||
+        [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+        "Location not specified";
+
+      // Extract logo - check all possible fields
+      const logo =
+        job.employer_logo ||
+        job.company_logo ||
+        job.logo_url ||
+        (typeof job.company === "object" && job.company
+          ? (job.company as { logo?: string; company_logo?: string })
+              .logo ||
+            (job.company as { company_logo?: string }).company_logo
+          : undefined);
+
+      // Extract date posted
+      const postedDate =
+        job.date_posted ||
+        job.posted_date ||
+        job.job_posted_at_datetime_utc ||
+        undefined;
+
+      // Format salary
+      let salary = "By agreement";
+      const minSalary = job.job_min_salary || job.min_salary;
+      const maxSalary = job.job_max_salary || job.max_salary;
+      const salaryCurrency =
+        job.job_salary_currency || job.salary_currency || "$";
+      const salaryPeriod =
+        job.job_salary_period || job.salary_period || "yearly";
+
+      if (
+        minSalary &&
+        maxSalary &&
+        typeof minSalary === "number" &&
+        typeof maxSalary === "number"
+      ) {
+        const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+        const minSalaryFormatted = minSalary.toLocaleString();
+        const maxSalaryFormatted = maxSalary.toLocaleString();
+        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+        const isCurrencyBefore = currencySymbols.some((sym) =>
+          salaryCurrency.includes(sym)
+        );
+        if (isCurrencyBefore) {
+          salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+            periodLabel ? `/${periodLabel}` : ""
+          }`;
+        } else {
+          salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+            periodLabel ? `/${periodLabel}` : ""
+          }`;
+        }
+      } else if (minSalary && typeof minSalary === "number") {
+        const minSalaryFormatted = minSalary.toLocaleString();
+        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+        const isCurrencyBefore = currencySymbols.some((sym) =>
+          salaryCurrency.includes(sym)
+        );
+        salary = isCurrencyBefore
+          ? `${salaryCurrency}${minSalaryFormatted}+`
+          : `${minSalaryFormatted}+ ${salaryCurrency}`;
+      } else if (job.salary && typeof job.salary === "string") {
+        salary = job.salary;
+      }
+
+      // Format employment type
+      const employmentTypeRaw =
+        job.job_employment_type ||
+        job.employment_type ||
+        job.type ||
+        "FULLTIME";
+      const jobTypeLabels: Record<string, string> = {
+        FULLTIME: "Full time",
+        PARTTIME: "Part time",
+        CONTRACTOR: "Contract",
+        INTERN: "Internship",
+      };
+      const employmentType =
+        jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+
+      // Determine work arrangement
+      let workArrangement = "On-site";
+      const isRemote =
+        job.job_is_remote || job.is_remote || job.remote === true;
+      if (isRemote) {
+        workArrangement = "Remote";
+      } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+        workArrangement = "Hybrid";
+      }
 
     return {
-      id: job.job_id || `job-${Math.random()}`,
-      title: job.job_title || "Untitled Position",
-      company: job.employer_name || "Unknown Company",
+        id: jobId,
+        title: jobTitle,
+        company: companyName,
       location,
-      logo: job.employer_logo,
-      date: new Date().toLocaleDateString("en-GB", {
+        logo,
+        company_logo: logo,
+        salary,
+        employment_type: employmentType,
+        work_arrangement: workArrangement,
+        date: postedDate
+          ? new Date(postedDate).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : new Date().toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       }),
     };
+    })
+    .filter((job): job is Job => job !== null); // Filter out null jobs
+
+  // Show all jobs in horizontal scroll (limit to 10 for performance)
+  const displayJobs = transformedJobs.slice(0, 10);
+
+  // Debug logging
+  console.log("🏠 UserHome render:", {
+    user: !!user,
+    userId: user?.id,
+    loadingSkills,
+    hasCompletedTest,
+    jobsCount: displayJobs.length,
+    coursesCount: courses.length,
   });
-
-  // Get current page jobs (3 per page)
-  const currentJobs = transformedJobs.slice(
-    currentJobPage * 3,
-    currentJobPage * 3 + 3
-  );
-
-  const canGoNext = currentJobPage < Math.ceil(transformedJobs.length / 3) - 1;
-  const canGoPrev = currentJobPage > 0;
 
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Top Jobs and Courses */}
-          <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
+        <div className="space-y-6">
+          {/* Top Section - Widgets */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
+            {!hasCompletedTest && !loadingSkills && (
+              <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
+                <CardContent className="p-4">
+                  <Link to="/skill-test" className="block cursor-pointer group">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-breneo-blue/10 flex items-center justify-center">
+                        <ClipboardCheck className="h-6 w-6 text-breneo-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-gray-900 mb-1 group-hover:text-breneo-blue transition-colors">
+                          Discover Your Skills
+                        </h3>
+                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                          Take our skill assessment to unlock personalized recommendations.
+                        </p>
+                        <Button size="sm" className="bg-breneo-blue hover:bg-breneo-blue/90 text-xs h-7 px-3">
+                          <Play className="h-3 w-3 mr-1" />
+                          Start Test
+                        </Button>
+                      </div>
+                    </div>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Skill Path CTA Widget - Only show if user has completed the test */}
+            {hasCompletedTest && !loadingSkills && (
+              <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
+                <CardContent className="p-4">
+                  <Link to="/skill-path" className="block cursor-pointer group">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-breneo-blue/10 flex items-center justify-center">
+                        <Target className="h-6 w-6 text-breneo-blue" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm text-gray-900 mb-1 group-hover:text-breneo-blue transition-colors">
+                          Your Skill Path
+                        </h3>
+                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                          Explore your personalized career path with recommendations.
+                        </p>
+                        <Button size="sm" className="bg-breneo-blue hover:bg-breneo-blue/90 text-xs h-7 px-3">
+                          <Target className="h-3 w-3 mr-1" />
+                          View Path
+                        </Button>
+                      </div>
+                    </div>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Webinars Widget */}
+            <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
+                    <Clock className="h-4 w-4 text-breneo-blue" />
+                  </div>
+                  <h3 className="font-semibold text-sm text-gray-900">
+                    Webinars
+                  </h3>
+                </div>
+
+                {/* Webinar List - Compact */}
+                <div className="space-y-2">
+                  {mockWebinars.slice(0, 2).map((webinar) => (
+                    <div
+                      key={webinar.id}
+                      className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-breneo-blue font-semibold text-xs">
+                          {webinar.company.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-xs text-gray-900 line-clamp-1">
+                          {webinar.title}
+                        </h4>
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <Clock className="h-2.5 w-2.5" />
+                          <span>{webinar.time}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content - Top Jobs and Courses */}
+          <div className="space-y-6">
             {/* Top Job Picks Section */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex-1">
+              <div className="mb-4">
                   <h2 className="text-2xl font-bold text-gray-900 mb-1">
                     Top job picks for you
                   </h2>
@@ -303,29 +556,12 @@ const UserHome = () => {
                       </span>
                     </p>
                   )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentJobPage((p) => Math.max(0, p - 1))}
-                    disabled={!canGoPrev}
-                    className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button
-                    onClick={() => setCurrentJobPage((p) => p + 1)}
-                    disabled={!canGoNext}
-                    className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
               </div>
 
               {jobsLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                   {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="relative">
+                    <Card key={i} className="relative flex-shrink-0 w-72">
                       <CardContent className="p-4">
                         <Skeleton className="h-4 w-20 mb-2" />
                         <Skeleton className="h-6 w-3/4 mb-4" />
@@ -345,7 +581,7 @@ const UserHome = () => {
                     </p>
                   </CardContent>
                 </Card>
-              ) : currentJobs.length === 0 ? (
+              ) : displayJobs.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center">
                     <p className="text-gray-500">
@@ -354,54 +590,160 @@ const UserHome = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {currentJobs.map((job) => (
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+                  {displayJobs.map((job) => (
                     <Card
                       key={job.id}
-                      className="relative hover:shadow-lg transition-shadow"
+                      className="group flex flex-col hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden flex-shrink-0 w-72 cursor-pointer"
+                      onClick={() => {
+                        if (job.id) {
+                          navigate(`/jobs/${encodeURIComponent(job.id)}`);
+                        }
+                      }}
                     >
-                      <CardContent className="p-4">
-                        <div className="absolute top-4 left-4">
-                          <Bookmark className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <div className="absolute top-4 right-4">
-                          <MoreVertical className="h-5 w-5 text-gray-400" />
-                        </div>
+                      <CardContent className="p-4 flex flex-col flex-grow relative">
+                        {/* Company Logo and Info */}
+                        <div className="flex items-start gap-2 mb-3">
+                          <div className="flex-shrink-0 relative w-10 h-10">
+                            {/* Primary: Logo from API */}
+                            {job.company_logo ? (
+                              <img
+                                src={job.company_logo}
+                                alt={`${job.company} logo`}
+                                className="w-10 h-10 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                                loading="lazy"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.style.display = "none";
+                                  const clearbitLogo =
+                                    target.parentElement?.querySelector(
+                                      ".clearbit-logo"
+                                    ) as HTMLImageElement;
+                                  if (clearbitLogo) {
+                                    clearbitLogo.style.display = "block";
+                                    clearbitLogo.style.zIndex = "10";
+                                  } else {
+                                    const iconFallback =
+                                      target.parentElement?.querySelector(
+                                        ".logo-fallback"
+                                      ) as HTMLElement;
+                                    if (iconFallback) {
+                                      iconFallback.style.display = "flex";
+                                      iconFallback.style.zIndex = "10";
+                                    }
+                                  }
+                                }}
+                              />
+                            ) : null}
 
-                        <div className="mt-8 mb-3">
-                          <h3 className="font-semibold text-lg mb-1 line-clamp-2">
-                            {job.title}
+                            {/* Fallback 1: Clearbit logo API */}
+                            {job.company && !job.company_logo ? (
+                              <img
+                                src={`https://logo.clearbit.com/${encodeURIComponent(
+                                  job.company
+                                )}`}
+                                alt={`${job.company} logo`}
+                                className="w-10 h-10 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
+                                style={{ zIndex: 10 }}
+                                loading="lazy"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.style.display = "none";
+                                  const iconFallback =
+                                    target.parentElement?.querySelector(
+                                      ".logo-fallback"
+                                    ) as HTMLElement;
+                                  if (iconFallback) {
+                                    iconFallback.style.display = "flex";
+                                    iconFallback.style.zIndex = "10";
+                                  }
+                                }}
+                              />
+                            ) : null}
+
+                            {/* Fallback 2: Default icon */}
+                            <div
+                              className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
+                                job.company_logo ||
+                                (job.company && !job.company_logo)
+                                  ? "hidden"
+                                  : "flex"
+                              }`}
+                              style={{
+                                zIndex:
+                                  job.company_logo ||
+                                  (job.company && !job.company_logo)
+                                    ? 0
+                                    : 10,
+                              }}
+                            >
+                              <Briefcase className="h-5 w-5 text-white" />
+                        </div>
+                        </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-sm mb-0.5 truncate">
+                              {job.company}
                           </h3>
-                          <p className="text-gray-600 text-sm mb-3">
-                            ${Math.floor(Math.random() * 200 + 200)}/hr
+                            <p className="text-xs text-gray-500 truncate flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {job.location}
                           </p>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mb-3">
-                          {job.logo ? (
-                            <img
-                              src={job.logo}
-                              alt={job.company}
-                              className="w-8 h-8 rounded-full object-contain"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-breneo-blue/10 flex items-center justify-center">
-                              <span className="text-breneo-blue font-semibold text-xs">
-                                {job.company.charAt(0)}
+                        {/* Job Title */}
+                        <h4 className="font-bold text-base mb-3 line-clamp-2">
+                          {job.title}
+                        </h4>
+
+                        {/* Job Details */}
+                        <div className="space-y-1.5 mb-3 flex-grow">
+                          {/* Salary */}
+                          {job.salary && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <DollarSign className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-gray-700 truncate">
+                                {job.salary}
                               </span>
                             </div>
                           )}
-                          <span className="text-sm text-gray-600">
-                            {job.company}
+
+                          {/* Employment Type */}
+                          {job.employment_type && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-gray-700">
+                                {job.employment_type}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Work Arrangement */}
+                          {job.work_arrangement && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Briefcase className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-gray-700">
+                                {job.work_arrangement}
                           </span>
+                            </div>
+                          )}
                         </div>
 
-                        <p className="text-xs text-gray-500 mb-3">{job.date}</p>
-
-                        <div className="flex justify-end mt-4">
-                          <button className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                            <ChevronRight className="h-4 w-4 text-gray-600" />
-                          </button>
+                        {/* Action Button - Slide up on hover */}
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (job.id) {
+                                navigate(`/jobs/${encodeURIComponent(job.id)}`);
+                              }
+                            }}
+                            className="flex-1 bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-900 dark:hover:bg-gray-600 rounded-lg text-xs py-1.5 h-auto"
+                          >
+                            View Details
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -534,155 +876,6 @@ const UserHome = () => {
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Right Column - Skill Test CTA and Webinars */}
-          <div className="lg:col-span-1 order-1 lg:order-2">
-            <div className="sticky top-24 space-y-6">
-              {/* Skill Test CTA Section - Only show if user hasn't completed the test */}
-              {!hasCompletedTest && !loadingSkills && (
-                <Card className="bg-white">
-                  <CardContent className="p-6">
-                    <Link to="/skill-test" className="block cursor-pointer group">
-                      <div className="flex flex-col items-center gap-4">
-                        {/* Illustration */}
-                        <div className="w-full relative max-h-40 flex items-center justify-center">
-                          <img
-                            src="/lovable-uploads/Bring-Solutions-To-Problems--Streamline-New-York (1).png"
-                            alt="Discover Your Skills"
-                            className="w-auto h-40 object-contain"
-                            onError={(e) => {
-                              // Fallback to placeholder if image doesn't exist yet
-                              (e.target as HTMLImageElement).src = "/placeholder.svg";
-                            }}
-                          />
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="flex-1 text-center w-full">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <ClipboardCheck className="h-5 w-5 text-breneo-blue" />
-                            <h2 className="text-xl font-bold text-gray-900">
-                              Discover Your Skills
-                            </h2>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Take our comprehensive skill assessment to unlock personalized job recommendations and course suggestions tailored to your strengths.
-                          </p>
-                          <div className="flex items-center justify-center">
-                            <Button className="bg-breneo-blue hover:bg-breneo-blue/90">
-                              <Play className="h-5 w-5" />
-                              Start Skill Test
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Skill Path CTA Section - Only show if user has completed the test */}
-              {hasCompletedTest && !loadingSkills && (
-                <Card className="bg-white">
-                  <CardContent className="p-6">
-                    <Link to="/skill-path" className="block cursor-pointer group">
-                      <div className="flex flex-col items-center gap-4">
-                        {/* Illustration */}
-                        <div className="w-full relative max-h-40 flex items-center justify-center">
-                          <img
-                            src="/lovable-uploads/Bring-Solutions-To-Problems--Streamline-New-York (1).png"
-                            alt="Your Skill Path"
-                            className="w-auto h-40 object-contain"
-                            onError={(e) => {
-                              // Fallback to placeholder if image doesn't exist yet
-                              (e.target as HTMLImageElement).src = "/placeholder.svg";
-                            }}
-                          />
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="flex-1 text-center w-full">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Target className="h-5 w-5 text-breneo-blue" />
-                            <h2 className="text-xl font-bold text-gray-900">
-                              Your Skill Path
-                            </h2>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Explore your personalized career path with job recommendations, course suggestions, and skill development insights based on your assessment.
-                          </p>
-                          <div className="flex items-center justify-center">
-                            <Button className="bg-breneo-blue hover:bg-breneo-blue/90">
-                              <Target className="h-5 w-5 mr-2" />
-                              View Skill Path
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Webinars Section */}
-              <Card className="bg-white">
-                <CardContent className="p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                    Webinars
-                  </h2>
-
-                  {/* Calendar/Date Picker */}
-                  <div className="flex gap-1 mb-6 overflow-x-auto pb-2">
-                    {[
-                      { day: "Sun", date: "01" },
-                      { day: "Mon", date: "02" },
-                      { day: "Tue", date: "03" },
-                      { day: "Wed", date: "04" },
-                      { day: "Thu", date: "05" },
-                      { day: "Fri", date: "06" },
-                    ].map((item, idx) => (
-                      <button
-                        key={idx}
-                        className={`flex flex-col items-center justify-center w-12 h-14 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                          idx === 0
-                            ? "bg-breneo-blue text-white"
-                            : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                        }`}
-                      >
-                        <span>{item.day}</span>
-                        <span className="text-sm mt-1">{item.date}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Webinar List */}
-                  <div className="space-y-4">
-                    {mockWebinars.map((webinar) => (
-                      <div
-                        key={webinar.id}
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-breneo-blue font-semibold text-sm">
-                            {webinar.company.charAt(0)}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm mb-1 line-clamp-2">
-                            {webinar.title}
-                          </h4>
-                          <div className="flex items-center gap-1 text-xs text-gray-500">
-                            <Clock className="h-3 w-3" />
-                            <span>{webinar.time}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>

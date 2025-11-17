@@ -20,6 +20,7 @@ import { countries } from "@/data/countries";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronLeft, Search as SearchIcon } from "lucide-react";
+import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 
 interface CourseFilterModalProps {
   isOpen: boolean;
@@ -192,8 +193,26 @@ const FilterForm: React.FC<FilterFormProps> = ({
     );
   }
 
+  const handleLocationChange = (countryCodes: string[]) => {
+    onFiltersChange({
+      ...filters,
+      countries: countryCodes,
+      skills: filters.skills || [],
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Location Filter - Desktop */}
+      <div className="space-y-3">
+        <Label className="text-base font-medium dark:text-gray-100">{COUNTRY_LABEL_KA}</Label>
+        <LocationDropdown
+          selectedLocations={filters.countries || []}
+          onLocationsChange={handleLocationChange}
+          placeholder={CHOOSE_LABEL_KA}
+        />
+      </div>
+
       {/* Skills/Interests Filter - Desktop */}
       {userTopSkills.length > 0 && (
         <div className="space-y-3">

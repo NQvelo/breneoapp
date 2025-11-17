@@ -28,6 +28,8 @@ import { useMobile } from "@/hooks/use-mobile";
 import { countries, Country } from "@/data/countries";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, Search as SearchIcon } from "lucide-react";
+import { LocationDropdown } from "@/components/jobs/LocationDropdown";
+import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 
 const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
 
@@ -97,7 +99,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
       ...filters, 
       jobTypes: newJobTypes,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
       skills: filters.skills || [],
     });
   };
@@ -109,7 +111,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
     onFiltersChange({ 
       ...filters, 
       countries: newCountries,
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
       skills: filters.skills || [],
     });
   };
@@ -147,7 +149,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
       ...filters,
       skills: newSkills,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
     });
   };
 
@@ -160,7 +162,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
         ...filters,
         skills: [],
         countries: filters.countries || [],
-        datePosted: filters.datePosted || "week",
+        datePosted: filters.datePosted,
       });
     } else {
       // Select all
@@ -168,7 +170,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
         ...filters,
         skills: userTopSkills,
         countries: filters.countries || [],
-        datePosted: filters.datePosted || "week",
+        datePosted: filters.datePosted,
       });
     }
   };
@@ -247,8 +249,59 @@ const FilterForm: React.FC<FilterFormProps> = ({
     );
   }
 
+  const handleLocationChange = (countryCodes: string[]) => {
+    onFiltersChange({
+      ...filters,
+      countries: countryCodes,
+      datePosted: filters.datePosted,
+      skills: filters.skills || [],
+    });
+  };
+
+  const handleWorkTypeChange = (workTypes: string[]) => {
+    onFiltersChange({
+      ...filters,
+      jobTypes: workTypes,
+      countries: filters.countries || [],
+      datePosted: filters.datePosted,
+      skills: filters.skills || [],
+    });
+  };
+
+  const handleRemoteChange = (isRemote: boolean) => {
+    onFiltersChange({
+      ...filters,
+      isRemote: isRemote,
+      countries: filters.countries || [],
+      datePosted: filters.datePosted,
+      skills: filters.skills || [],
+    });
+  };
+
   return (
     <div className="space-y-6">
+      {/* Work Type Filter - Desktop */}
+      <div className="space-y-3">
+        <Label className="text-base font-medium dark:text-gray-100">{WORK_TYPE_LABEL_KA}</Label>
+        <WorkTypeDropdown
+          selectedWorkTypes={filters.jobTypes || []}
+          onWorkTypesChange={handleWorkTypeChange}
+          placeholder={CHOOSE_LABEL_KA}
+          isRemote={filters.isRemote || false}
+          onRemoteChange={handleRemoteChange}
+        />
+      </div>
+
+      {/* Location Filter - Desktop */}
+      <div className="space-y-3">
+        <Label className="text-base font-medium dark:text-gray-100">{COUNTRY_LABEL_KA}</Label>
+        <LocationDropdown
+          selectedLocations={filters.countries || []}
+          onLocationsChange={handleLocationChange}
+          placeholder={CHOOSE_LABEL_KA}
+        />
+      </div>
+
       {/* Skills/Interests Filter - Desktop */}
       {userTopSkills.length > 0 && (
         <div className="space-y-3">
@@ -322,7 +375,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       jobTypes: workTypes,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
       skills: filters.skills || [],
     });
   };
@@ -331,7 +384,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     onFiltersChange({
       ...filters,
       countries: countryCodes,
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
       skills: filters.skills || [],
     });
   };
@@ -341,7 +394,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       isRemote: isRemote,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
       skills: filters.skills || [],
     });
   };
@@ -351,7 +404,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       skills: skills,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "week",
+      datePosted: filters.datePosted,
     });
   };
 

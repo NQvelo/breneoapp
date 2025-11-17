@@ -1,5 +1,7 @@
 import React from "react"; // ⛔ Removed useEffect, useState
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { LocalizedLink } from "@/components/routing/LocalizedLink";
+import { removeLanguagePrefix } from "@/utils/localeUtils";
 import {
   LayoutDashboard,
   Briefcase,
@@ -12,10 +14,14 @@ import {
   Moon,
   Sun,
   LibraryBig,
+  Video,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -27,7 +33,13 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   // ✅ Get the user object directly from the context
   const { loading, user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
+
+  // Remove language prefix for pathname comparison
+  const currentPath = removeLanguagePrefix(location.pathname);
+  // Also check raw pathname for immediate active state detection
+  const rawPathname = location.pathname;
 
   // Determine if user is an academy
   // Check both user object and localStorage (in case user object isn't fully loaded)
@@ -80,14 +92,15 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
     ? [
         {
           icon: Home,
-          label: "Home",
+          label: t.nav.home,
           href: "/academy/home",
         },
       ]
     : [
-        { icon: Home, label: "Home", href: "/home" },
-        { icon: Briefcase, label: "Job Offers", href: "/jobs" },
-        { icon: LibraryBig, label: "Courses", href: "/courses" },
+        { icon: Home, label: t.nav.home, href: "/home" },
+        { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
+        { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
+        { icon: Video, label: t.nav.webinars, href: "/webinars" },
       ];
 
   const profilePath = isAcademy ? "/academy/profile" : "/profile";
@@ -97,7 +110,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   // Mobile navigation
   const mobileNavItems = [
     ...navItems,
-    { icon: CircleUserRound, label: "Profile", href: profilePath },
+    { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
   ];
 
   return (
@@ -105,13 +118,13 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] px-4 py-3">
         <div className="flex items-center justify-between">
-          <Link to={homePath} className="flex items-center">
+          <LocalizedLink to={homePath} className="flex items-center">
             <img
               src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
               alt="Breneo Logo"
               className="h-7"
             />
-          </Link>
+          </LocalizedLink>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -123,18 +136,18 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 <Sun size={20} />
               )}
             </button>
-            <Link
+            <LocalizedLink
               to="/notifications"
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <Bell size={20} />
-            </Link>
-            <Link
+            </LocalizedLink>
+            <LocalizedLink
               to={settingsPath}
               className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <Settings size={20} />
-            </Link>
+            </LocalizedLink>
           </div>
         </div>
       </div>
@@ -143,9 +156,30 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-t border-black/[0.03] dark:border-white/[0.03]">
         <nav className="flex justify-around items-center py-2">
           {mobileNavItems.map((item, index) => {
-            const isActive = location.pathname === item.href;
+            // Check if current path matches the item href
+            // Handle home/dashboard equivalence (both routes go to same page)
+            let isActive = currentPath === item.href;
+
+            // Special handling for home item - it should be active on both /home and /dashboard
+            if (item.href === "/home") {
+              isActive =
+                currentPath === "/home" ||
+                currentPath === "/dashboard" ||
+                rawPathname.includes("/home") ||
+                rawPathname.includes("/dashboard");
+            } else if (item.href === "/academy/home") {
+              isActive =
+                currentPath === "/academy/home" ||
+                currentPath === "/academy/dashboard" ||
+                rawPathname.includes("/academy/home") ||
+                rawPathname.includes("/academy/dashboard");
+            } else {
+              // For other items, check if pathname ends with the href (handles language prefixes)
+              isActive =
+                currentPath === item.href || rawPathname.endsWith(item.href);
+            }
             return (
-              <Link
+              <LocalizedLink
                 key={index}
                 to={item.href}
                 className={cn(
@@ -174,7 +208,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 >
                   {item.label}
                 </span>
-              </Link>
+              </LocalizedLink>
             );
           })}
         </nav>
@@ -190,13 +224,16 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
         {/* Header */}
         <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-border">
           {!collapsed ? (
-            <Link to={homePath} className="flex items-center space-x-2">
+            <LocalizedLink
+              to={homePath}
+              className="flex items-center space-x-2"
+            >
               <img
                 src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
                 alt="Breneo Logo"
                 className="h-8"
               />
-            </Link>
+            </LocalizedLink>
           ) : (
             <img
               src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
@@ -211,9 +248,31 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
           <div className="flex-1 overflow-y-auto pt-8">
             <nav className="space-y-2 px-4">
               {navItems.map((item, index) => {
-                const isActive = location.pathname === item.href;
+                // Check if current path matches the item href
+                // Handle home/dashboard equivalence (both routes go to same page)
+                let isActive = currentPath === item.href;
+
+                // Special handling for home item - it should be active on both /home and /dashboard
+                if (item.href === "/home") {
+                  isActive =
+                    currentPath === "/home" ||
+                    currentPath === "/dashboard" ||
+                    rawPathname.includes("/home") ||
+                    rawPathname.includes("/dashboard");
+                } else if (item.href === "/academy/home") {
+                  isActive =
+                    currentPath === "/academy/home" ||
+                    currentPath === "/academy/dashboard" ||
+                    rawPathname.includes("/academy/home") ||
+                    rawPathname.includes("/academy/dashboard");
+                } else {
+                  // For other items, check if pathname ends with the href (handles language prefixes)
+                  isActive =
+                    currentPath === item.href ||
+                    rawPathname.endsWith(item.href);
+                }
                 return (
-                  <Link
+                  <LocalizedLink
                     key={index}
                     to={item.href}
                     className={cn(
@@ -244,7 +303,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                         {item.label}
                       </span>
                     )}
-                  </Link>
+                  </LocalizedLink>
                 );
               })}
             </nav>
@@ -256,11 +315,11 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
             {/* Settings, Help Center, Theme Toggle grouped together */}
             <div className="space-y-2 mb-4">
-              <Link
+              <LocalizedLink
                 to={settingsPath}
                 className={cn(
                   "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
-                  location.pathname === settingsPath
+                  currentPath === settingsPath
                     ? "bg-breneo-blue/10 text-breneo-blue"
                     : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
                 )}
@@ -269,21 +328,23 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   size={22}
                   className={cn(
                     "flex-shrink-0 transition-colors duration-200",
-                    location.pathname === settingsPath
+                    currentPath === settingsPath
                       ? "text-breneo-blue"
                       : "text-gray-400 group-hover:text-breneo-blue"
                   )}
                 />
                 {!collapsed && (
-                  <span className="font-medium text-base">Settings</span>
+                  <span className="font-medium text-base">
+                    {t.nav.settings}
+                  </span>
                 )}
-              </Link>
+              </LocalizedLink>
 
-              <Link
+              <LocalizedLink
                 to="/help"
                 className={cn(
                   "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
-                  location.pathname === "/help"
+                  currentPath === "/help"
                     ? "bg-breneo-blue/10 text-breneo-blue"
                     : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
                 )}
@@ -292,46 +353,54 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   size={22}
                   className={cn(
                     "flex-shrink-0 transition-colors duration-200",
-                    location.pathname === "/help"
+                    currentPath === "/help"
                       ? "text-breneo-blue"
                       : "text-gray-400 group-hover:text-breneo-blue"
                   )}
                 />
                 {!collapsed && (
-                  <span className="font-medium text-base">Help Center</span>
+                  <span className="font-medium text-base">{t.nav.help}</span>
                 )}
-              </Link>
+              </LocalizedLink>
 
-              {/* Theme Toggle */}
-              <button
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className={cn(
-                  "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group w-full text-left",
-                  "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
-                )}
-              >
-                {theme === "dark" ? (
-                  <Moon
-                    size={22}
-                    className="text-gray-400 group-hover:text-breneo-blue transition-colors duration-200 flex-shrink-0"
-                  />
-                ) : (
-                  <Sun
-                    size={22}
-                    className="text-gray-400 group-hover:text-breneo-blue transition-colors duration-200 flex-shrink-0"
-                  />
-                )}
-                {!collapsed && (
-                  <span className="font-medium text-base transition-colors duration-200">
-                    {theme === "dark" ? "Dark Mode" : "Light Mode"}
-                  </span>
-                )}
-              </button>
+              {/* Breneo Pro Plan Widget - Desktop Only */}
+              {!isAcademy && (
+                <LocalizedLink
+                  to="/subscription"
+                  className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-md transition-all duration-200 group",
+                    "bg-gradient-to-r from-breneo-blue/10 to-purple-500/10 dark:from-breneo-blue/20 dark:to-purple-500/20",
+                    "border border-breneo-blue/20 dark:border-breneo-blue/30",
+                    "hover:from-breneo-blue/15 hover:to-purple-500/15 dark:hover:from-breneo-blue/25 dark:hover:to-purple-500/25",
+                    collapsed && "justify-center px-2"
+                  )}
+                >
+                  {!collapsed ? (
+                    <>
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <Sparkles
+                          size={14}
+                          className="text-breneo-blue flex-shrink-0"
+                        />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+                          {t.subscription.upgrade}
+                        </span>
+                      </div>
+                      <ChevronRight
+                        size={14}
+                        className="text-breneo-blue flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                      />
+                    </>
+                  ) : (
+                    <Sparkles size={14} className="text-breneo-blue" />
+                  )}
+                </LocalizedLink>
+              )}
             </div>
 
             {/* Profile */}
             <div className="border-t border-gray-200 dark:border-border mt-4 pt-4">
-              <Link
+              <LocalizedLink
                 to={profilePath}
                 className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all duration-200 group"
               >
@@ -366,7 +435,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     <p className="text-xs text-gray-400">{user?.email}</p>
                   </div>
                 )}
-              </Link>
+              </LocalizedLink>
             </div>
           </div>
         </div>

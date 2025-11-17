@@ -88,7 +88,7 @@ export function InterestsSelection() {
 
       toast.success("Interests saved! Your personalized experience is ready.");
       
-      navigate('/dashboard');
+      navigate('/home');
     } catch (error: any) {
       toast.error(`Failed to save interests: ${error.message}`);
     } finally {

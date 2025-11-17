@@ -1,11 +1,13 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { ImageIcon } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
+  const t = useTranslation();
 
   // Image loading states
   const [logoLoaded, setLogoLoaded] = useState(false);
@@ -119,9 +121,9 @@ const NotFound = () => {
           {/* 404 Content */}
           <div className="mb-8">
             <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
-            <h2 className="text-2xl font-semibold mb-2">Page Not Found</h2>
+            <h2 className="text-2xl font-semibold mb-2">{t.errors.pageNotFound}</h2>
             <p className="text-muted-foreground mb-6">
-              The page you're looking for doesn't exist or has been moved.
+              {t.errors.pageNotFoundDescription}
             </p>
           </div>
 
@@ -137,14 +139,14 @@ const NotFound = () => {
                 }
                 className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
               >
-                Go to Dashboard
+                {t.common.view} {t.nav.home}
               </Link>
             ) : (
               <Link
                 to="/auth/login"
                 className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
               >
-                Go to Login
+                {t.auth.login}
               </Link>
             )}
 
@@ -154,14 +156,14 @@ const NotFound = () => {
                   to="/auth/login"
                   className="hover:text-primary transition-colors"
                 >
-                  Sign In
+                  {t.auth.login}
                 </Link>
                 <span className="mx-2">•</span>
                 <Link
                   to="/auth/signup"
                   className="hover:text-primary transition-colors"
                 >
-                  Sign Up
+                  {t.auth.signup}
                 </Link>
               </div>
             )}

@@ -11,6 +11,7 @@
  * - Common routes: Available to all authenticated users (terms, help)
  */
 
+import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
@@ -48,8 +49,28 @@ import SubscriptionPage from "@/pages/SubscriptionPage";
 import NotFound from "@/pages/NotFound";
 
 /**
+ * Helper component to create routes with language prefixes
+ */
+const createLocalizedRoute = (path: string, element: React.ReactElement) => {
+  // Auth routes don't get language prefix
+  if (path.startsWith("/auth") || path === "/") {
+    return <Route key={path} path={path} element={element} />;
+  }
+  
+  // For other routes, create both /en and /ka versions
+  return (
+    <React.Fragment key={path}>
+      <Route path={`/en${path}`} element={element} />
+      <Route path={`/ka${path}`} element={element} />
+      <Route path={path} element={element} />
+    </React.Fragment>
+  );
+};
+
+/**
  * Main application routes component
  * Routes are completely separated by role to prevent mixing
+ * Supports language prefixes: /en and /ka
  */
 export const AppRoutes = () => {
   return (
@@ -68,139 +89,99 @@ export const AppRoutes = () => {
       {/* ==========================================
           USER-ONLY ROUTES - Require role "user"
           ========================================== */}
-      <Route
-        path="/home"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <UserDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <UserDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <UserProfile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <UserSettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <UserNotificationsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/interests"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <InterestsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/skill-test"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <SkillTestPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/skill-path"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <SkillPathPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/jobs"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <JobsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/jobs/:jobId"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <JobDetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/courses"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <CoursesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/course/:courseId"
-        element={
-          <ProtectedRoute requiredRole="user">
-            <CoursePage />
-          </ProtectedRoute>
-        }
-      />
+      {createLocalizedRoute("/home", (
+        <ProtectedRoute requiredRole="user">
+          <UserDashboard />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/dashboard", (
+        <ProtectedRoute requiredRole="user">
+          <UserDashboard />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/profile", (
+        <ProtectedRoute requiredRole="user">
+          <UserProfile />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/settings", (
+        <ProtectedRoute requiredRole="user">
+          <UserSettings />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/notifications", (
+        <ProtectedRoute requiredRole="user">
+          <UserNotificationsPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/interests", (
+        <ProtectedRoute requiredRole="user">
+          <InterestsPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/skill-test", (
+        <ProtectedRoute requiredRole="user">
+          <SkillTestPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/skill-path", (
+        <ProtectedRoute requiredRole="user">
+          <SkillPathPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/jobs", (
+        <ProtectedRoute requiredRole="user">
+          <JobsPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/jobs/:jobId", (
+        <ProtectedRoute requiredRole="user">
+          <JobDetailPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/courses", (
+        <ProtectedRoute requiredRole="user">
+          <CoursesPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/course/:courseId", (
+        <ProtectedRoute requiredRole="user">
+          <CoursePage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/webinars", (
+        <ProtectedRoute requiredRole="user">
+          <div className="p-6">
+            <h1 className="text-2xl font-bold mb-4">Webinars</h1>
+            <p>Webinars page coming soon...</p>
+          </div>
+        </ProtectedRoute>
+      ))}
 
       {/* ==========================================
           ACADEMY-ONLY ROUTES - Require role "academy"
           ========================================== */}
       <Route path="/academy/register" element={<AcademyRegistrationPage />} />
-      <Route
-        path="/academy/home"
-        element={
-          <ProtectedRoute requiredRole="academy">
-            <AcademyDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/academy/dashboard"
-        element={
-          <ProtectedRoute requiredRole="academy">
-            <AcademyDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/academy/profile"
-        element={
-          <ProtectedRoute requiredRole="academy">
-            <AcademyProfile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/academy/settings"
-        element={
-          <ProtectedRoute requiredRole="academy">
-            <AcademySettings />
-          </ProtectedRoute>
-        }
-      />
+      {createLocalizedRoute("/academy/home", (
+        <ProtectedRoute requiredRole="academy">
+          <AcademyDashboard />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/academy/dashboard", (
+        <ProtectedRoute requiredRole="academy">
+          <AcademyDashboard />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/academy/profile", (
+        <ProtectedRoute requiredRole="academy">
+          <AcademyProfile />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/academy/settings", (
+        <ProtectedRoute requiredRole="academy">
+          <AcademySettings />
+        </ProtectedRoute>
+      ))}
 
       {/* ==========================================
           COMMON ROUTES - Available to all authenticated users
@@ -208,38 +189,26 @@ export const AppRoutes = () => {
       {/* Academy public view page - accessible to all authenticated users
           Accepts academy_id (UUID) or slug as parameter
           Displays academy profile and courses from Supabase */}
-      <Route
-        path="/academy/:academySlug"
-        element={
-          <ProtectedRoute>
-            <AcademyPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/terms-of-use"
-        element={
-          <ProtectedRoute>
-            <TermsOfUse />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/help"
-        element={
-          <ProtectedRoute>
-            <HelpCenter />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/subscription"
-        element={
-          <ProtectedRoute>
-            <SubscriptionPage />
-          </ProtectedRoute>
-        }
-      />
+      {createLocalizedRoute("/academy/:academySlug", (
+        <ProtectedRoute>
+          <AcademyPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/terms-of-use", (
+        <ProtectedRoute>
+          <TermsOfUse />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/help", (
+        <ProtectedRoute>
+          <HelpCenter />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/subscription", (
+        <ProtectedRoute>
+          <SubscriptionPage />
+        </ProtectedRoute>
+      ))}
 
       {/* ==========================================
           404 - Not Found

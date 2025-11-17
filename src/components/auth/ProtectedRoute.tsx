@@ -9,6 +9,7 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRole, isRole } from "@/utils/getRole";
+import { getLocalizedPath, getLanguageFromPath } from "@/utils/localeUtils";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -52,11 +53,26 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   // ✅ FIX: Get auth context - it should always be available if component tree is correct
   const { user, loading } = useAuth();
+  const language =
+    getLanguageFromPath(window.location.pathname) ||
+    (localStorage.getItem("appLanguage") as "en" | "ka") ||
+    "en";
 
   const hasApiToken =
     typeof window !== "undefined" && !!localStorage.getItem("authToken");
 
+  // Debug logging
+  console.log("🔒 ProtectedRoute check:", {
+    loading,
+    hasUser: !!user,
+    hasApiToken,
+    requiredRole,
+    userRole: user?.user_type || localStorage.getItem("userRole"),
+  });
+
   // Show loading screen while checking authentication
+  // Only show loading if auth is actually loading, not if user is just null with a token
+  // (user might be null temporarily during session restoration, but loading flag handles that)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -81,10 +97,19 @@ export function ProtectedRoute({
     // 3. getRole() utility (checks token and localStorage)
     // This ensures we always have the correct role even during session restoration
     const userRole =
-      user?.user_type || localStorage.getItem("userRole") || getRole();
+      user?.user_type ||
+      localStorage.getItem("userRole") ||
+      getRole() ||
+      "user";
+
+    console.log("🔒 ProtectedRoute role check:", {
+      requiredRole,
+      userRole,
+      matches: userRole === requiredRole,
+    });
 
     // ✅ FIX: Direct comparison instead of isRole() to avoid double-calling getRole()
-    if (!userRole || userRole !== requiredRole) {
+    if (userRole !== requiredRole) {
       // User doesn't have required role - silently redirect to their dashboard
       // This is expected behavior, not an error
       if (userRole === "academy") {
@@ -92,23 +117,21 @@ export function ProtectedRoute({
         console.log(
           "🔄 ProtectedRoute: Academy user accessing user route, redirecting to /academy/dashboard"
         );
-        return <Navigate to="/academy/dashboard" replace />;
-      } else if (userRole === "user") {
-        // Regular user trying to access academy route - redirect to user dashboard
-        console.log(
-          "🔄 ProtectedRoute: User accessing academy route, redirecting to /dashboard"
-        );
-        return <Navigate to="/dashboard" replace />;
+        const academyPath = getLocalizedPath("/academy/dashboard", language);
+        return <Navigate to={academyPath} replace />;
       } else {
-        // Unknown role or no role - default to user dashboard
+        // Regular user trying to access academy route - redirect to user home
+        // Also handles unknown role by defaulting to user home
         console.log(
-          "🔄 ProtectedRoute: Unknown role, redirecting to /dashboard"
+          `🔄 ProtectedRoute: User role '${userRole}' doesn't match required '${requiredRole}', redirecting to /home`
         );
-        return <Navigate to="/dashboard" replace />;
+        const homePath = getLocalizedPath("/home", language);
+        return <Navigate to={homePath} replace />;
       }
     }
   }
 
   // User is authenticated and has required role (if specified)
+  console.log("✅ ProtectedRoute: Allowing access to route");
   return <>{children}</>;
 }
