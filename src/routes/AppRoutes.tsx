@@ -26,6 +26,7 @@ import UserDashboard from "@/pages/user/UserHome";
 import UserProfile from "@/pages/user/ProfilePage";
 import UserSettings from "@/pages/user/UserSettings";
 import JobsPage from "@/pages/user/JobsPage";
+import JobDetailPage from "@/pages/user/JobDetailPage";
 import CoursesPage from "@/pages/CoursesPage";
 import CoursePage from "@/pages/CoursePage";
 import SkillTestPage from "@/pages/user/SkillTestPage";
@@ -136,6 +137,14 @@ export const AppRoutes = () => {
         element={
           <ProtectedRoute requiredRole="user">
             <JobsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs/:jobId"
+        element={
+          <ProtectedRoute requiredRole="user">
+            <JobDetailPage />
           </ProtectedRoute>
         }
       />

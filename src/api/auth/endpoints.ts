@@ -30,4 +30,11 @@ export const API_ENDPOINTS = {
     COURSES: "/api/academy/courses/",
     STUDENTS: "/api/academy/students/",
   },
+  PAYMENTS: {
+    BOG_AUTH: "/api/payments/bog/auth/",
+    BOG_CREATE_ORDER: "/api/payments/bog/orders/",
+  },
+  JOBS: {
+    SAVE_JOB: "/api/save-job/", // Use with job_id: /api/save-job/<job_id>/
+  },
 } as const;

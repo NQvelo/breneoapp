@@ -6,17 +6,31 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { createAcademySlug } from "@/utils/academyUtils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
+import {
+  Bookmark,
+  BookmarkCheck,
+  Loader2,
+  Clock,
+  Diamond,
+  Languages,
+  Award,
+  Calendar,
+  Eye,
+} from "lucide-react";
 
 interface AcademyProfile {
   id: string;
   academy_name: string;
   slug?: string;
+  logo_url?: string | null;
+  profile_photo_url?: string | null;
+  description?: string | null;
 }
 
 const CoursePage = () => {
@@ -90,37 +104,80 @@ const CoursePage = () => {
       if (!course?.academy_id) return null;
 
       try {
-        // Try to fetch from API first
+        // Try to fetch from API first - use the detail endpoint
         const response = await apiClient.get(
-          `${API_ENDPOINTS.ACADEMY.PROFILE}${course.academy_id}/`
+          `/api/academy/${course.academy_id}/`
         );
 
         if (response.data) {
-          const data = response.data as Record<string, unknown>;
-          const getStringField = (field: string) => {
-            const value = data[field];
-            return typeof value === "string" ? value : undefined;
+          // Check if response has profile_data wrapper
+          const apiData = response.data.profile_data || response.data;
+          const data = apiData as Record<string, unknown>;
+          
+          const getStringField = (fields: string[]) => {
+            for (const field of fields) {
+              const value = data[field];
+              if (value !== null && value !== undefined && typeof value === "string") {
+                return value;
+              }
+            }
+            return undefined;
           };
 
           const academyName =
-            getStringField("academy_name") ||
-            getStringField("name") ||
-            getStringField("first_name") ||
-            getStringField("firstName") ||
+            getStringField(["academy_name", "name", "first_name", "firstName"]) ||
             course.provider ||
             "";
 
-          return {
+          const profilePhotoUrl = 
+            getStringField([
+              "profile_photo_url",
+              "profilePhotoUrl",
+              "profile_image_url",
+              "profileImageUrl",
+              "profile_photo",
+              "profilePhoto",
+            ]);
+
+          const logoUrl = 
+            getStringField([
+              "logo_url",
+              "logoUrl",
+              "logo",
+              "image",
+            ]);
+
+          const description = 
+            getStringField([
+              "description",
+              "desc",
+              "about",
+            ]);
+
+          const profile = {
             id: course.academy_id,
             academy_name: academyName,
             slug:
-              getStringField("slug") ||
+              getStringField(["slug"]) ||
               (academyName ? createAcademySlug(academyName) : undefined),
+            profile_photo_url: profilePhotoUrl && profilePhotoUrl.trim() !== "" ? profilePhotoUrl : null,
+            logo_url: logoUrl && logoUrl.trim() !== "" ? logoUrl : null,
+            description: description && description.trim() !== "" ? description : null,
           } as AcademyProfile;
+
+          console.log("🔍 Academy profile fetched from API:", {
+            academyId: course.academy_id,
+            rawData: data,
+            profileData: profile,
+            logoUrl: logoUrl,
+          });
+
+          return profile;
         }
       } catch (error) {
         console.debug(
-          "Could not fetch academy profile from API, trying Supabase"
+          "Could not fetch academy profile from API, trying Supabase",
+          error
         );
       }
 
@@ -128,21 +185,36 @@ const CoursePage = () => {
       try {
         const { data: supabaseData, error: supabaseError } = await supabase
           .from("academy_profiles")
-          .select("id, academy_name")
+          .select("id, academy_name, logo_url, description")
           .eq("id", course.academy_id)
           .single();
 
         if (!supabaseError && supabaseData) {
-          return {
+          const profile = {
             id: supabaseData.id,
             academy_name: supabaseData.academy_name || course.provider || "",
             slug: supabaseData.academy_name
               ? createAcademySlug(supabaseData.academy_name)
               : undefined,
+            profile_photo_url: null, // Supabase doesn't have this field separately
+            logo_url: supabaseData.logo_url && supabaseData.logo_url.trim() !== "" 
+              ? supabaseData.logo_url 
+              : null,
+            description: supabaseData.description && supabaseData.description.trim() !== ""
+              ? supabaseData.description
+              : null,
           } as AcademyProfile;
+
+          console.log("🔍 Academy profile fetched from Supabase:", {
+            academyId: course.academy_id,
+            supabaseData: supabaseData,
+            profile: profile,
+          });
+
+          return profile;
         }
       } catch (error) {
-        console.debug("Could not fetch academy profile from Supabase");
+        console.debug("Could not fetch academy profile from Supabase", error);
       }
 
       // Last resort: use provider name to create slug
@@ -150,6 +222,9 @@ const CoursePage = () => {
         id: course.academy_id,
         academy_name: course.provider || "",
         slug: course.provider ? createAcademySlug(course.provider) : undefined,
+        profile_photo_url: null,
+        logo_url: null,
+        description: null,
       } as AcademyProfile;
     },
     enabled: !!course?.academy_id,
@@ -281,84 +356,221 @@ const CoursePage = () => {
   const academyUrl = getAcademyUrl();
   const academyName = academyProfile?.academy_name || course.provider;
 
+  // Get the image URL (prefer profile_photo_url, fallback to logo_url)
+  const academyImageUrl = academyProfile?.profile_photo_url || academyProfile?.logo_url || null;
+
+  // Debug logging
+  console.log("🔍 CoursePage Debug:", {
+    courseId: courseId,
+    courseAcademyId: course?.academy_id,
+    academyProfile: academyProfile,
+    profilePhotoUrl: academyProfile?.profile_photo_url,
+    logoUrl: academyProfile?.logo_url,
+    academyImageUrl: academyImageUrl,
+    academyName: academyName,
+  });
+
+  // Extract duration in hours if possible, otherwise use duration as-is
+  const getDurationText = () => {
+    if (course.duration.toLowerCase().includes("hour")) {
+      return course.duration;
+    }
+    // Try to estimate hours (e.g., "4 weeks" -> "3 Hours Estimation")
+    return "3 Hours Estimation";
+  };
+
+  // Get first 3 topics/categories for tags
+  const displayTags = course.topics?.slice(0, 3) || course.required_skills?.slice(0, 3) || [];
+
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <Card>
-          <CardHeader>
-            <img
-              src={course.image}
-              alt={course.title}
-              className="w-full h-64 object-cover mb-4 rounded-md"
-            />
-            <CardTitle className="text-3xl font-bold">{course.title}</CardTitle>
-            <div className="flex items-center gap-4 text-md text-gray-600 pt-2">
-              <span>
-                Provider:{" "}
-                <Link
-                  to={academyUrl}
-                  className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                >
-                  {academyName}
-                </Link>
-              </span>
-              <span>Level: {course.level}</span>
-              <span>Duration: {course.duration}</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg mb-6">{course.description}</p>
-            {course.topics && course.topics.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-xl mb-2">Topics Covered</h3>
-                <div className="flex flex-wrap gap-2">
-                  {course.topics.map((topic) => (
-                    <Badge key={topic}>{topic}</Badge>
+      <div className="p-6 space-y-6">
+        {/* Top Section: Course Info and Image in One Card */}
+        <Card className="rounded-lg mb-6">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+              {/* Left Side: Course Information */}
+              <div className="flex flex-col h-full">
+                <CardTitle className="text-3xl font-bold mb-4 text-black">
+                  {course.title}
+                </CardTitle>
+                
+                {/* Tags - Small light gray placeholders */}
+                <div className="flex gap-2 mb-4">
+                  {displayTags.slice(0, 3).map((tag, index) => (
+                    <div
+                      key={index}
+                      className="h-5 bg-gray-200 rounded px-2 text-xs text-gray-500 flex items-center min-w-[60px]"
+                    >
+                      {tag}
+                    </div>
                   ))}
+                  {displayTags.length === 0 && (
+                    <>
+                      <div className="h-5 bg-gray-200 rounded px-2 w-16"></div>
+                      <div className="h-5 bg-gray-200 rounded px-2 w-16"></div>
+                      <div className="h-5 bg-gray-200 rounded px-2 w-16"></div>
+                    </>
+                  )}
+                </div>
+
+                {/* Academy Name with Logo */}
+                <div className="flex items-center gap-3 mb-4">
+                  <OptimizedAvatar
+                    src={academyImageUrl || undefined}
+                    alt={academyName}
+                    fallback={academyName ? academyName.charAt(0).toUpperCase() : "A"}
+                    size="sm"
+                    className="flex-shrink-0 !h-10 !w-10 !rounded-full"
+                  />
+                  <span className="text-gray-600 text-base font-medium">{academyName}</span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 mt-auto">
+                  <Button
+                    onClick={handleSaveCourse}
+                    disabled={isSaving || !user}
+                    variant={isSaved ? "outline" : "default"}
+                    className="flex items-center gap-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {isSaved ? "Unsaving..." : "Saving..."}
+                      </>
+                    ) : isSaved ? (
+                      <>
+                        <BookmarkCheck className="h-4 w-4" />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="h-4 w-4" />
+                        Save Course
+                      </>
+                    )}
+                  </Button>
+                  <Button>Enroll Now</Button>
                 </div>
               </div>
-            )}
-            {course.required_skills && course.required_skills.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-xl mb-2">Required Skills</h3>
-                <div className="flex flex-wrap gap-2">
-                  {course.required_skills.map((skill) => (
-                    <Badge variant="secondary" key={skill}>
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
+
+              {/* Right Side: Course Image */}
+              <div className="w-full h-[300px] flex items-center justify-center overflow-hidden rounded-lg">
+                <img
+                  src={course.image}
+                  alt={course.title}
+                  className="w-full h-[300px] object-cover rounded-lg"
+                />
               </div>
-            )}
-            <div className="flex gap-3 mt-6">
-              <Button
-                size="lg"
-                onClick={handleSaveCourse}
-                disabled={isSaving || !user}
-                variant={isSaved ? "outline" : "default"}
-                className="flex items-center gap-2"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {isSaved ? "Unsaving..." : "Saving..."}
-                  </>
-                ) : isSaved ? (
-                  <>
-                    <BookmarkCheck className="h-4 w-4" />
-                    Saved
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="h-4 w-4" />
-                    Save Course
-                  </>
-                )}
-              </Button>
-              <Button size="lg">Enroll Now</Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* Middle Section: Description and Details */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Description Section */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">Description</h2>
+            <p className="text-gray-700 leading-relaxed">
+              {course.description || "description here"}
+            </p>
+          </div>
+
+          {/* Details Content Card */}
+          <Card className="rounded-lg">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl font-semibold mb-4 text-gray-900">
+                Details content
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-gray-600 flex-shrink-0" />
+                <span className="text-gray-700">{getDurationText()}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Diamond className="h-5 w-5 text-gray-600 flex-shrink-0" />
+                <span className="text-gray-700">100 Points</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Languages className="h-5 w-5 text-gray-600 flex-shrink-0" />
+                <span className="text-gray-700">English</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Award className="h-5 w-5 text-gray-600 flex-shrink-0" />
+                <span className="text-gray-700">Certificate of Completion</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-gray-600 flex-shrink-0" />
+                <span className="text-gray-700">No due date for this content</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Bottom Section: Certificates */}
+        <Card className="rounded-lg mb-6">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold text-gray-900">
+              Obtain a career. Certificates
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600">
+              Complete this course to earn a certificate that demonstrates your skills and knowledge.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* About Academy Section */}
+        {academyProfile && (
+          <Card className="rounded-lg">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold text-gray-900 mb-4">
+                About Academy
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                {/* Academy Logo */}
+                <div className="flex-shrink-0">
+                  <OptimizedAvatar
+                    src={academyImageUrl || undefined}
+                    alt={academyName}
+                    fallback={academyName ? academyName.charAt(0).toUpperCase() : "A"}
+                    size="lg"
+                    className="!h-16 !w-16 !rounded-full"
+                  />
+                </div>
+
+                {/* Academy Info */}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {academyName}
+                  </h3>
+                  {academyProfile.description ? (
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      {academyProfile.description}
+                    </p>
+                  ) : (
+                    <p className="text-gray-500 italic mb-4">
+                      No description available.
+                    </p>
+                  )}
+
+                  {/* View Academy Button */}
+                  <Link to={academyUrl}>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      View Academy
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );

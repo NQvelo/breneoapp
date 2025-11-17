@@ -166,9 +166,8 @@ const CoursesPage = () => {
       if (filters.skills.length > 0) {
         params.set("skills", filters.skills.join(","));
       }
-      if (filters.country && filters.country !== "Georgia") {
-        params.set("country", filters.country);
-      }
+      // Don't add country param to URL - use countries array instead
+      // Country is kept in state for backward compatibility but not in URL
 
       // Update URL without page reload
       setSearchParams(params, { replace: true });
@@ -222,7 +221,19 @@ const CoursesPage = () => {
 
     return "";
   });
+
+  // Debounced search term for API calls (reduces unnecessary API requests)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
   const [tempFilters, setTempFilters] = useState<CourseFilters>(activeFilters);
+
+  // Create a stable serialized key for filters to optimize React Query caching
+  const filtersKey = React.useMemo(() => {
+    return JSON.stringify({
+      countries: activeFilters.countries.sort(),
+      skills: activeFilters.skills.sort(),
+    });
+  }, [activeFilters]);
 
   // Ref to track if we're updating from URL (to prevent circular updates)
   const isUpdatingFromUrl = React.useRef(false);
@@ -261,6 +272,21 @@ const CoursesPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Only depend on searchParams, not on state
+
+  // Clean up URL on initial load - remove country param if it exists
+  useEffect(() => {
+    const countryParam = searchParams.get("country");
+    const countriesParam = searchParams.get("countries");
+
+    // If country param exists but countries param doesn't, remove country from URL
+    // The country is stored in state but doesn't need to be in URL
+    if (countryParam && !countriesParam) {
+      const params = new URLSearchParams(searchParams);
+      params.delete("country");
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Fetch user's top skills from test results
   useEffect(() => {
@@ -482,14 +508,15 @@ const CoursesPage = () => {
   });
 
   const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ["courses", savedCourses, searchTerm, activeFilters],
+    // Use debounced search term and serialized filters for better caching
+    queryKey: ["courses", savedCourses, debouncedSearchTerm, filtersKey],
     queryFn: async () => {
       let query = supabase.from("courses").select("*");
 
-      // Apply search filter
-      if (searchTerm) {
+      // Apply search filter using debounced term
+      if (debouncedSearchTerm) {
         query = query.or(
-          `title.ilike.%${searchTerm}%,provider.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`
+          `title.ilike.%${debouncedSearchTerm}%,provider.ilike.%${debouncedSearchTerm}%,category.ilike.%${debouncedSearchTerm}%,description.ilike.%${debouncedSearchTerm}%`
         );
       }
 
@@ -748,6 +775,12 @@ const CoursesPage = () => {
       });
     },
     enabled: !!savedCourses,
+    // Optimize caching and refetching behavior
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: 3 * 60 * 1000, // Keep data fresh for 3 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   // Filter courses by country (if country filter is applied)
@@ -893,6 +926,7 @@ const CoursesPage = () => {
       countries: countryCodes,
     };
     setActiveFilters(newFilters);
+    setTempFilters(newFilters);
     updateUrlWithFilters(newFilters, searchTerm);
     queryClient.invalidateQueries({ queryKey: ["courses"] });
   };
@@ -923,13 +957,14 @@ const CoursesPage = () => {
     queryClient.invalidateQueries({ queryKey: ["courses"] });
   };
 
-  // Handle search
-  const handleSearch = () => {
+  // Immediate search (when user presses Enter or clicks Search button)
+  const handleSearch = useCallback(() => {
+    setDebouncedSearchTerm(searchTerm); // Update immediately
     updateUrlWithFilters(activeFilters, searchTerm);
     queryClient.invalidateQueries({ queryKey: ["courses"] });
-  };
+  }, [searchTerm, activeFilters, updateUrlWithFilters, queryClient]);
 
-  // Handle key press for search (Enter)
+  // Handle key press for search (Enter) - immediate search
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSearch();
@@ -939,9 +974,31 @@ const CoursesPage = () => {
   // Handle search term change
   const handleSearchTermChange = (value: string) => {
     setSearchTerm(value);
-    // Optionally update URL on each keystroke, or wait for Enter/search button
-    // For better UX, we'll update on Enter or search button click only
   };
+
+  // Debounce search term updates (300ms delay) - only for typing, not for Enter key
+  useEffect(() => {
+    // Skip debouncing if searchTerm matches debouncedSearchTerm (already synced)
+    if (searchTerm === debouncedSearchTerm) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      updateUrlWithFilters(activeFilters, searchTerm);
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    searchTerm,
+    activeFilters,
+    updateUrlWithFilters,
+    queryClient,
+    debouncedSearchTerm,
+  ]);
 
   const handleApplyFilters = () => {
     setActiveFilters(tempFilters);
@@ -952,13 +1009,28 @@ const CoursesPage = () => {
 
   const handleClearFilters = () => {
     const clearedFilters: CourseFilters = {
-      country: "Georgia",
+      country: "Georgia", // Default for internal state
       countries: [],
       skills: [],
     };
     setTempFilters(clearedFilters);
     setActiveFilters(clearedFilters);
-    updateUrlWithFilters(clearedFilters, searchTerm);
+
+    // Clear URL params completely when clearing filters
+    const params = new URLSearchParams();
+    if (searchTerm) {
+      params.set("search", searchTerm);
+    }
+    // Don't add any filter params - this clears them from URL
+    setSearchParams(params, { replace: true });
+
+    // Save cleared filters to session storage
+    saveFiltersToSession(
+      COURSES_FILTERS_STORAGE_KEY,
+      clearedFilters,
+      searchTerm
+    );
+
     setFilterModalOpen(false);
     queryClient.invalidateQueries({ queryKey: ["courses"] });
   };
@@ -1180,7 +1252,11 @@ const CoursesPage = () => {
 
         {!coursesLoading && filteredCourses.length === 0 && (
           <div className="text-center p-10 border border-dashed rounded-lg bg-gray-50 text-muted-foreground">
-            <AlertCircle className="mx-auto h-12 w-12 mb-4 text-gray-400" />
+            <img
+              src="/lovable-uploads/no-data-found.png"
+              alt="No data found"
+              className="mx-auto h-64 w-64 mb-4 object-contain"
+            />
             <h4 className="text-lg font-semibold">No Courses Found</h4>
             <p className="text-sm">
               Try adjusting your search terms or filters.

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +28,40 @@ import {
   Tag,
   Sun,
   X,
+  Code,
+  Database,
+  Globe,
+  Palette,
+  BarChart3,
+  Shield,
+  Zap,
+  Cpu,
+  Network,
+  Smartphone,
+  Cloud,
+  Settings,
+  Rocket,
+  Target,
+  Lightbulb,
+  Music,
+  Camera,
+  Video,
+  PenTool,
+  Gamepad2,
+  GraduationCap,
+  Languages,
+  MessageSquare,
+  ShoppingCart,
+  Factory,
+  Stethoscope,
+  Scale,
+  Car,
+  Plane,
+  Ship,
+  Coffee,
+  Utensils,
+  Hammer,
+  Paintbrush,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
@@ -36,11 +70,13 @@ import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { useMobile } from "@/hooks/use-mobile";
 import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
   getUserTestAnswers,
   calculateSkillScores,
   getTopSkills,
 } from "@/utils/skillTestUtils";
+import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 
 // Updated Job interface for the new API
 interface Job {
@@ -57,64 +93,6 @@ interface Job {
   benefits?: string;
 }
 
-// API response job structure - supports multiple API formats
-interface ApiJob {
-  // JSearch format
-  job_id?: string;
-  job_title?: string;
-  employer_name?: string;
-  job_city?: string;
-  job_state?: string;
-  job_country?: string;
-  job_apply_link?: string;
-  employer_logo?: string;
-  job_min_salary?: number;
-  job_max_salary?: number;
-  job_salary_currency?: string;
-  job_salary_period?: string;
-  job_employment_type?: string;
-  job_is_remote?: boolean;
-  job_required_experience?: string;
-  // Alternative formats (for different APIs)
-  id?: string;
-  title?: string;
-  company?: string;
-  company_name?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  location?: string;
-  apply_link?: string;
-  url?: string;
-  apply_url?: string;
-  logo?: string;
-  company_logo?: string;
-  min_salary?: number;
-  max_salary?: number;
-  salary?: string;
-  salary_currency?: string;
-  salary_period?: string;
-  employment_type?: string;
-  type?: string;
-  is_remote?: boolean;
-  remote?: boolean;
-  experience?: string;
-  required_experience?: string;
-  [key: string]: unknown; // Allow any other fields
-}
-
-// Filter state shape
-interface JobFilters {
-  country: string;
-  countries: string[]; // Array of country codes
-  jobTypes: string[];
-  isRemote: boolean;
-  datePosted?: string; // Add date_posted filter
-  skills: string[]; // User interests/skills from test results
-}
-
-const JSEARCH_API_KEY = "f438e914d7msh480f4890d34c417p1f564ajsnce17947c5ab2";
-
 const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
 
 const jobTypeLabels: Record<string, string> = {
@@ -124,132 +102,310 @@ const jobTypeLabels: Record<string, string> = {
   INTERN: "Intern",
 };
 
-// Job categories with icons and colors
-interface JobCategory {
-  id: string;
-  name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  vacancyCount: number;
-}
+// Skill icon mapping - maps skill names to appropriate icons
+const getSkillIcon = (
+  skill: string
+): React.ComponentType<{ className?: string }> => {
+  const skillLower = skill.toLowerCase();
 
-const jobCategories: JobCategory[] = [
-  {
-    id: "banking",
-    name: "Banking Sector",
-    icon: PiggyBank,
-    color: "text-blue-500",
-    vacancyCount: 411,
-  },
-  {
-    id: "sales",
-    name: "Sales / Trade",
-    icon: TrendingUp,
-    color: "text-breneo-accent",
-    vacancyCount: 111,
-  },
-  {
-    id: "service",
-    name: "Service Staff",
-    icon: Users,
-    color: "text-orange-500",
-    vacancyCount: 39,
-  },
-  {
-    id: "horeca",
-    name: "HoReCa",
-    icon: UtensilsCrossed,
-    color: "text-teal-500",
-    vacancyCount: 30,
-  },
-  {
-    id: "logistics",
-    name: "Logistics",
-    icon: Truck,
-    color: "text-blue-400",
-    vacancyCount: 27,
-  },
-];
+  // Programming & Tech
+  if (
+    skillLower.includes("javascript") ||
+    skillLower.includes("js") ||
+    skillLower.includes("react") ||
+    skillLower.includes("node")
+  )
+    return Code;
+  if (
+    skillLower.includes("python") ||
+    skillLower.includes("django") ||
+    skillLower.includes("flask")
+  )
+    return Code;
+  if (skillLower.includes("java") || skillLower.includes("kotlin")) return Code;
+  if (
+    skillLower.includes("c++") ||
+    skillLower.includes("c#") ||
+    skillLower.includes("csharp")
+  )
+    return Code;
+  if (
+    skillLower.includes("php") ||
+    skillLower.includes("ruby") ||
+    skillLower.includes("go") ||
+    skillLower.includes("rust")
+  )
+    return Code;
+  if (
+    skillLower.includes("database") ||
+    skillLower.includes("sql") ||
+    skillLower.includes("mysql") ||
+    skillLower.includes("postgresql") ||
+    skillLower.includes("mongodb")
+  )
+    return Database;
+  if (
+    skillLower.includes("cloud") ||
+    skillLower.includes("aws") ||
+    skillLower.includes("azure") ||
+    skillLower.includes("gcp")
+  )
+    return Cloud;
+  if (
+    skillLower.includes("network") ||
+    skillLower.includes("devops") ||
+    skillLower.includes("docker") ||
+    skillLower.includes("kubernetes")
+  )
+    return Network;
+  if (
+    skillLower.includes("mobile") ||
+    skillLower.includes("ios") ||
+    skillLower.includes("android") ||
+    skillLower.includes("flutter") ||
+    skillLower.includes("react native")
+  )
+    return Smartphone;
+  if (
+    skillLower.includes("web") ||
+    skillLower.includes("html") ||
+    skillLower.includes("css")
+  )
+    return Globe;
+  if (
+    skillLower.includes("security") ||
+    skillLower.includes("cyber") ||
+    skillLower.includes("encryption")
+  )
+    return Shield;
+  if (
+    skillLower.includes("ai") ||
+    skillLower.includes("machine learning") ||
+    skillLower.includes("data science") ||
+    skillLower.includes("analytics")
+  )
+    return Cpu;
+  if (
+    skillLower.includes("ui") ||
+    skillLower.includes("ux") ||
+    skillLower.includes("design") ||
+    skillLower.includes("figma") ||
+    skillLower.includes("sketch")
+  )
+    return Palette;
+  if (
+    skillLower.includes("graphic") ||
+    skillLower.includes("illustration") ||
+    skillLower.includes("photoshop") ||
+    skillLower.includes("illustrator")
+  )
+    return Paintbrush;
 
-// Updated fetchJobs to include filters and pagination
+  // Business & Management
+  if (
+    skillLower.includes("sales") ||
+    skillLower.includes("marketing") ||
+    skillLower.includes("business")
+  )
+    return TrendingUp;
+  if (
+    skillLower.includes("finance") ||
+    skillLower.includes("accounting") ||
+    skillLower.includes("banking")
+  )
+    return PiggyBank;
+  if (
+    skillLower.includes("management") ||
+    skillLower.includes("leadership") ||
+    skillLower.includes("project")
+  )
+    return BarChart3;
+  if (
+    skillLower.includes("communication") ||
+    skillLower.includes("presentation") ||
+    skillLower.includes("public speaking")
+  )
+    return MessageSquare;
+  if (skillLower.includes("customer service") || skillLower.includes("support"))
+    return Users;
+
+  // Creative & Arts
+  if (
+    skillLower.includes("music") ||
+    skillLower.includes("audio") ||
+    skillLower.includes("sound")
+  )
+    return Music;
+  if (
+    skillLower.includes("video") ||
+    skillLower.includes("editing") ||
+    skillLower.includes("film") ||
+    skillLower.includes("production")
+  )
+    return Video;
+  if (skillLower.includes("photography") || skillLower.includes("photo"))
+    return Camera;
+  if (
+    skillLower.includes("writing") ||
+    skillLower.includes("content") ||
+    skillLower.includes("copywriting")
+  )
+    return PenTool;
+  if (skillLower.includes("game") || skillLower.includes("gaming"))
+    return Gamepad2;
+
+  // Education & Training
+  if (
+    skillLower.includes("teaching") ||
+    skillLower.includes("education") ||
+    skillLower.includes("training") ||
+    skillLower.includes("tutor")
+  )
+    return GraduationCap;
+  if (
+    skillLower.includes("language") ||
+    skillLower.includes("translation") ||
+    skillLower.includes("interpreter")
+  )
+    return Languages;
+
+  // Healthcare & Service
+  if (
+    skillLower.includes("health") ||
+    skillLower.includes("medical") ||
+    skillLower.includes("nursing") ||
+    skillLower.includes("care")
+  )
+    return Stethoscope;
+  if (
+    skillLower.includes("legal") ||
+    skillLower.includes("law") ||
+    skillLower.includes("attorney")
+  )
+    return Scale;
+
+  // Hospitality & Food
+  if (
+    skillLower.includes("hospitality") ||
+    skillLower.includes("hotel") ||
+    skillLower.includes("restaurant") ||
+    skillLower.includes("cooking") ||
+    skillLower.includes("chef")
+  )
+    return Utensils;
+  if (skillLower.includes("coffee") || skillLower.includes("barista"))
+    return Coffee;
+
+  // Trade & Manual
+  if (
+    skillLower.includes("construction") ||
+    skillLower.includes("carpentry") ||
+    skillLower.includes("plumbing") ||
+    skillLower.includes("electrician")
+  )
+    return Hammer;
+  if (
+    skillLower.includes("automotive") ||
+    skillLower.includes("mechanic") ||
+    skillLower.includes("car")
+  )
+    return Car;
+  if (
+    skillLower.includes("logistics") ||
+    skillLower.includes("warehouse") ||
+    skillLower.includes("shipping")
+  )
+    return Truck;
+  if (
+    skillLower.includes("aviation") ||
+    skillLower.includes("pilot") ||
+    skillLower.includes("airline")
+  )
+    return Plane;
+  if (
+    skillLower.includes("maritime") ||
+    skillLower.includes("sailor") ||
+    skillLower.includes("ship")
+  )
+    return Ship;
+
+  // Retail & Commerce
+  if (
+    skillLower.includes("retail") ||
+    skillLower.includes("sales") ||
+    skillLower.includes("store")
+  )
+    return ShoppingCart;
+
+  // Manufacturing & Industry
+  if (
+    skillLower.includes("manufacturing") ||
+    skillLower.includes("production") ||
+    skillLower.includes("factory")
+  )
+    return Factory;
+  if (
+    skillLower.includes("engineering") ||
+    skillLower.includes("mechanical") ||
+    skillLower.includes("electrical")
+  )
+    return Settings;
+
+  // General
+  if (
+    skillLower.includes("problem solving") ||
+    skillLower.includes("analytical") ||
+    skillLower.includes("critical thinking")
+  )
+    return Lightbulb;
+  if (skillLower.includes("teamwork") || skillLower.includes("collaboration"))
+    return Users;
+  if (skillLower.includes("creativity") || skillLower.includes("innovation"))
+    return Rocket;
+  if (skillLower.includes("organization") || skillLower.includes("planning"))
+    return Target;
+  if (
+    skillLower.includes("time management") ||
+    skillLower.includes("efficiency")
+  )
+    return Zap;
+
+  // Default fallback icons
+  return Briefcase;
+};
+
+// Skill color mapping
+const getSkillColor = (skill: string, index: number): string => {
+  const colors = [
+    "text-blue-500",
+    "text-breneo-accent",
+    "text-orange-500",
+    "text-teal-500",
+    "text-purple-500",
+    "text-green-500",
+    "text-red-500",
+    "text-yellow-500",
+    "text-pink-500",
+    "text-indigo-500",
+  ];
+  return colors[index % colors.length];
+};
+
+// Updated fetchJobs to use the new job service
 const fetchJobs = async (
   searchTerm: string,
   filters: JobFilters,
   page: number
-) => {
-  const API_ENDPOINT = `https://internships-api.p.rapidapi.com/active-jb-7d`;
-  const API_HOST = "internships-api.p.rapidapi.com";
-
+): Promise<ApiJob[]> => {
   try {
-    const response = await fetch(API_ENDPOINT, {
-      method: "GET",
-      headers: {
-        "X-Rapidapi-Key": JSEARCH_API_KEY,
-        "X-Rapidapi-Host": API_HOST,
-      },
+    const response = await jobService.fetchActiveJobs({
+      query: searchTerm,
+      filters,
+      page,
+      pageSize: 20,
     });
 
-    if (response.status === 429) {
-      throw new Error(
-        "You have exceeded your API request limit. Please try again later."
-      );
-    }
-
-    if (!response.ok) {
-      let errorMessage = `Failed to fetch jobs: ${response.status} ${response.statusText}`;
-      try {
-        const errorBody = await response.text();
-        if (errorBody) {
-          try {
-            const errorJson = JSON.parse(errorBody);
-            errorMessage = errorJson.message || errorJson.error || errorMessage;
-          } catch (parseError) {
-            // If not JSON, use the text as error message
-            errorMessage = `${errorMessage} - ${errorBody}`;
-          }
-        }
-      } catch (e) {
-        // If we can't read the body, just use the status
-        console.error("Could not read error response body:", e);
-      }
-      throw new Error(errorMessage);
-    }
-
-    const result: unknown = await response.json();
-    console.log("API Response:", result);
-
-    // Handle different possible response structures
-    // The API might return data directly as an array, or in a data property, or in a results property
-    let jobsArray: ApiJob[] = [];
-
-    if (Array.isArray(result)) {
-      jobsArray = result as ApiJob[];
-    } else if (result && typeof result === "object") {
-      const resultObj = result as Record<string, unknown>;
-      if (Array.isArray(resultObj.data)) {
-        jobsArray = resultObj.data as ApiJob[];
-      } else if (Array.isArray(resultObj.results)) {
-        jobsArray = resultObj.results as ApiJob[];
-      } else if (Array.isArray(resultObj.jobs)) {
-        jobsArray = resultObj.jobs as ApiJob[];
-      } else if (Array.isArray(resultObj.items)) {
-        jobsArray = resultObj.items as ApiJob[];
-      } else {
-        console.warn("Unexpected API response structure:", result);
-        console.warn("Response keys:", Object.keys(resultObj));
-        return [];
-      }
-    } else {
-      console.warn("Unexpected API response type:", typeof result);
-      return [];
-    }
-
-    console.log(`Fetched ${jobsArray.length} jobs`);
-    if (jobsArray.length > 0) {
-      console.log("Sample job structure:", jobsArray[0]);
-    }
-
-    return jobsArray;
+    return response.jobs;
   } catch (error) {
     console.error("Error fetching jobs:", error);
     throw error;
@@ -291,6 +447,7 @@ const JobsPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useMobile();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
 
@@ -326,9 +483,8 @@ const JobsPage = () => {
       if (filters.datePosted && filters.datePosted !== "all") {
         params.set("datePosted", filters.datePosted);
       }
-      if (filters.country && filters.country !== "Georgia") {
-        params.set("country", filters.country);
-      }
+      // Don't add country param to URL - use countries array instead
+      // Country is kept in state for backward compatibility but not in URL
       if (pageNum > 1) {
         params.set("page", String(pageNum));
       }
@@ -368,7 +524,7 @@ const JobsPage = () => {
           : [],
         jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
         isRemote: isRemoteParam === "true",
-        datePosted: datePostedParam || "all",
+        datePosted: datePostedParam || "week", // Default to week for active jobs
         skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
       };
     }
@@ -379,13 +535,13 @@ const JobsPage = () => {
       return sessionData.filters as JobFilters;
     }
 
-    // Default values
+    // Default values - default to "week" to show only active jobs
     return {
       country: "Georgia",
       countries: [],
       jobTypes: [],
       isRemote: false,
-      datePosted: "all",
+      datePosted: "week", // Default to last week for active jobs only (API doesn't support "month")
       skills: [],
     };
   });
@@ -401,6 +557,20 @@ const JobsPage = () => {
 
     return "";
   });
+
+  // Debounced search term for API calls (reduces unnecessary API requests)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(searchTerm);
+
+  // Create a stable serialized key for filters to optimize React Query caching
+  const filtersKey = useMemo(() => {
+    return JSON.stringify({
+      countries: activeFilters.countries.sort(),
+      skills: activeFilters.skills.sort(),
+      jobTypes: activeFilters.jobTypes.sort(),
+      isRemote: activeFilters.isRemote,
+      datePosted: activeFilters.datePosted,
+    });
+  }, [activeFilters]);
 
   const [page, setPage] = useState(() => {
     const pageParam = searchParams.get("page");
@@ -459,6 +629,21 @@ const JobsPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Only depend on searchParams, not on state
+
+  // Clean up URL on initial load - remove country param if it exists
+  useEffect(() => {
+    const countryParam = searchParams.get("country");
+    const countriesParam = searchParams.get("countries");
+
+    // If country param exists but countries param doesn't, remove country from URL
+    // The country is stored in state but doesn't need to be in URL
+    if (countryParam && !countriesParam) {
+      const params = new URLSearchParams(searchParams);
+      params.delete("country");
+      setSearchParams(params, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Fetch user's top skills from test results
   useEffect(() => {
@@ -641,11 +826,12 @@ const JobsPage = () => {
     queryKey: ["savedJobs", user?.id],
     queryFn: async () => {
       if (!user) return [];
+      // saved_jobs table exists but is not in generated types
       const { data } = await supabase
-        .from("saved_jobs")
+        .from("saved_jobs" as never)
         .select("job_id")
         .eq("user_id", user.id);
-      return data?.map((item) => item.job_id) || [];
+      return data?.map((item: { job_id: string }) => item.job_id) || [];
     },
     enabled: !!user,
   });
@@ -655,31 +841,58 @@ const JobsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    // Add page to the query key so React Query refetches when page changes
-    queryKey: ["jobs", searchTerm, activeFilters, page],
-    // Pass the current page to the fetching function
-    queryFn: () => fetchJobs(searchTerm, activeFilters, page),
-    // Add these options to prevent excessive refetching
+    // Use debounced search term and serialized filters for better caching
+    queryKey: ["jobs", debouncedSearchTerm, filtersKey, page],
+    // Pass the debounced search term to the fetching function
+    queryFn: () => fetchJobs(debouncedSearchTerm, activeFilters, page),
+    // Optimize caching and refetching behavior
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes
+    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes (increased to reduce requests)
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    // Prevent duplicate requests
+    enabled: debouncedSearchTerm !== undefined && debouncedSearchTerm !== null, // Only fetch when search term is ready
+    retry: 1, // Only retry once on failure
+    retryDelay: 1000, // Wait 1 second before retry
   });
 
-  // Refetch when search term changes (user presses Enter or clicks a Search button)
-  const handleSearch = () => {
+  // Immediate search (when user presses Enter or clicks Search button)
+  const handleSearch = useCallback(() => {
     const newPage = 1;
     setPage(newPage);
+    setDebouncedSearchTerm(searchTerm); // Update immediately
     updateUrlWithFilters(activeFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
-  };
+    // Don't invalidate queries - React Query will refetch automatically when queryKey changes
+  }, [searchTerm, activeFilters, updateUrlWithFilters]);
+
+  // Debounce search term updates (500ms delay) - only for typing, not for Enter key
+  // Increased delay to reduce API calls
+  useEffect(() => {
+    // Skip debouncing if searchTerm matches debouncedSearchTerm (already synced)
+    if (searchTerm === debouncedSearchTerm) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      const newPage = 1;
+      setPage(newPage);
+      updateUrlWithFilters(activeFilters, searchTerm, newPage);
+      // Don't invalidate queries here - React Query will refetch automatically when queryKey changes
+    }, 500); // Increased from 300ms to 500ms to reduce requests
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchTerm, activeFilters, updateUrlWithFilters, debouncedSearchTerm]);
 
   // Handle search term change
   const handleSearchTermChange = (value: string) => {
     setSearchTerm(value);
   };
 
-  // Handle key press for search (Enter)
+  // Handle key press for search (Enter) - immediate search
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSearch();
@@ -689,44 +902,165 @@ const JobsPage = () => {
   const saveJobMutation = useMutation({
     mutationFn: async (job: Job) => {
       if (!user) throw new Error("User not logged in");
-      if (job.is_saved) {
-        await supabase
-          .from("saved_jobs")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("job_id", job.id);
+      if (!job.id) throw new Error("Job ID is required");
+
+      // Job IDs from external APIs are often base64 strings (e.g., "MTY3OTc3NDM5NS5SZXRybw==")
+      // The backend endpoint expects <int:job_id> but we have base64 strings
+      // Try to extract numeric ID or use the string as-is
+      const jobId = String(job.id);
+
+      // Try to parse as integer if it's numeric
+      const jobIdInt = parseInt(jobId, 10);
+      const isNumeric = !isNaN(jobIdInt) && jobIdInt.toString() === jobId;
+
+      // If it's a base64 string, try to decode it to see if there's a numeric ID inside
+      // Otherwise, we'll need to handle it as a string
+      let urlJobId: string | number = jobId;
+      if (isNumeric) {
+        urlJobId = jobIdInt;
       } else {
-        await supabase
-          .from("saved_jobs")
-          .insert({ user_id: user.id, job_id: job.id, job_data: job });
+        // For base64 strings, try URL-encoding it
+        // But Django <int:job_id> won't accept it, so we might need backend change
+        // For now, try sending as string parameter
+        urlJobId = encodeURIComponent(jobId);
+      }
+
+      // Try the endpoint with job_id in URL first (for numeric IDs)
+      // If that fails, the backend might need to accept strings
+      const endpointUrl = isNumeric
+        ? `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobIdInt}/`
+        : `${API_ENDPOINTS.JOBS.SAVE_JOB}${urlJobId}/`;
+
+      console.log("Saving job:", {
+        originalJobId: job.id,
+        jobId,
+        isNumeric,
+        urlJobId,
+        endpointUrl,
+        jobTitle: job.title,
+      });
+
+      // Call the API endpoint to save/unsave the job
+      // Send job_id in the request body for the saved_jobs table
+      // The backend should store the original job_id string in saved_jobs table
+      try {
+        await apiClient.post(endpointUrl, {
+          job_id: jobId, // Always send original job_id in body
+        });
+      } catch (error: unknown) {
+        // If 404 and it's a base64 string, try without job_id in URL
+        const axiosError = error as { response?: { status?: number } };
+        if (axiosError?.response?.status === 404 && !isNumeric) {
+          console.log("Retrying with job_id only in body (no URL param)");
+          await apiClient.post(API_ENDPOINTS.JOBS.SAVE_JOB, {
+            job_id: jobId,
+          });
+        } else {
+          throw error;
+        }
       }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
       toast.success(variables.is_saved ? "Job Unsaved" : "Job Saved");
     },
+    onError: (
+      error: Error & {
+        response?: { data?: { message?: string }; status?: number };
+        config?: { url?: string };
+      }
+    ) => {
+      console.error("Error saving job:", {
+        error,
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        url: error?.config?.url,
+      });
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to save job";
+      toast.error(errorMessage);
+    },
   });
 
   const transformedJobs = React.useMemo(() => {
     return (jobs || []).map((job: ApiJob): Job => {
+      // Handle nested company object if it exists
+      const companyObj =
+        job.company && typeof job.company === "object"
+          ? (job.company as Record<string, unknown>)
+          : null;
+
       // Extract fields with fallbacks for different API formats
       const jobId = job.job_id || job.id || "";
-      const jobTitle = job.job_title || job.title || "Untitled Position";
+      const jobTitle =
+        job.job_title || job.title || job.position || "Untitled Position";
       const companyName =
+        (companyObj?.name as string) ||
+        (companyObj?.company_name as string) ||
+        job.companyName || // LinkedIn API field
         job.employer_name ||
         job.company_name ||
-        job.company ||
+        (typeof job.company === "string" ? job.company : null) ||
         "Unknown Company";
-      const jobCity = job.job_city || job.city || "";
-      const jobState = job.job_state || job.state || "";
-      const jobCountry = job.job_country || job.country || "";
+      const jobCity =
+        job.job_city || job.city || (companyObj?.city as string) || "";
+      const jobState =
+        job.job_state || job.state || (companyObj?.state as string) || "";
+      const jobCountry =
+        job.job_country || job.country || (companyObj?.country as string) || "";
       const locationString =
+        job.jobLocation || // LinkedIn API field
         job.location ||
+        (companyObj?.location as string) ||
         [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
         "Location not specified";
       const applyLink =
-        job.job_apply_link || job.apply_link || job.url || job.apply_url || "";
-      const companyLogo = job.employer_logo || job.company_logo || job.logo;
+        job.applyUrl || // LinkedIn API field
+        job.jobUrl || // LinkedIn API field
+        job.job_apply_link ||
+        job.apply_link ||
+        job.url ||
+        job.apply_url ||
+        job.company_url ||
+        (companyObj?.url as string) ||
+        "";
+      // Extract company logo - check all possible fields
+      let companyLogo: string | undefined = undefined;
+
+      // Check root level fields first
+      if (job.companyLogo) companyLogo = job.companyLogo; // LinkedIn API field
+      if (!companyLogo && job.employer_logo) companyLogo = job.employer_logo;
+      if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
+      if (!companyLogo && job.logo) companyLogo = job.logo;
+      if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
+
+      // Check nested company object
+      if (!companyLogo && companyObj) {
+        if (companyObj.logo) companyLogo = companyObj.logo as string;
+        if (!companyLogo && companyObj.logo_url)
+          companyLogo = companyObj.logo_url as string;
+        if (!companyLogo && companyObj.company_logo)
+          companyLogo = companyObj.company_logo as string;
+        if (!companyLogo && companyObj.employer_logo)
+          companyLogo = companyObj.employer_logo as string;
+      }
+
+      // Check employer object if it exists separately
+      if (!companyLogo && job.employer && typeof job.employer === "object") {
+        const employerObj = job.employer as Record<string, unknown>;
+        if (employerObj.logo) companyLogo = employerObj.logo as string;
+        if (!companyLogo && employerObj.logo_url)
+          companyLogo = employerObj.logo_url as string;
+        if (!companyLogo && employerObj.company_logo)
+          companyLogo = employerObj.company_logo as string;
+        if (!companyLogo && employerObj.employer_logo)
+          companyLogo = employerObj.employer_logo as string;
+      }
+
+      // If no logo found, the UI will handle fallback to Clearbit API or default icon
 
       // Format salary - handle both numeric and string formats
       let salary = "By agreement";
@@ -814,9 +1148,10 @@ const JobsPage = () => {
     };
     const newPage = 1;
     setActiveFilters(newFilters);
+    setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // Handle remote change
@@ -827,9 +1162,10 @@ const JobsPage = () => {
     };
     const newPage = 1;
     setActiveFilters(newFilters);
+    setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // Handle countries change
@@ -840,9 +1176,10 @@ const JobsPage = () => {
     };
     const newPage = 1;
     setActiveFilters(newFilters);
+    setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // Handle removing a skill filter
@@ -856,7 +1193,7 @@ const JobsPage = () => {
     setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // Handle removing a country filter
@@ -872,7 +1209,7 @@ const JobsPage = () => {
     setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // Handle removing job type filter
@@ -889,7 +1226,7 @@ const JobsPage = () => {
     setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // Handle removing remote filter
@@ -903,7 +1240,7 @@ const JobsPage = () => {
     setTempFilters(newFilters);
     setPage(newPage);
     updateUrlWithFilters(newFilters, searchTerm, newPage);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   // No need to sync selectedJobType anymore as we use WorkTypeDropdown directly
@@ -914,25 +1251,36 @@ const JobsPage = () => {
     setPage(newPage);
     updateUrlWithFilters(tempFilters, searchTerm, newPage);
     setFilterModalOpen(false);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   const handleClearFilters = () => {
     const clearedFilters: JobFilters = {
-      country: "Georgia",
+      country: "Georgia", // Default for internal state
       countries: [],
       jobTypes: [],
       isRemote: false,
-      datePosted: "all",
+      datePosted: "week", // Default to last week for active jobs only (API doesn't support "month")
       skills: [],
     };
     const newPage = 1;
     setTempFilters(clearedFilters);
     setActiveFilters(clearedFilters);
     setPage(newPage);
-    updateUrlWithFilters(clearedFilters, searchTerm, newPage);
+
+    // Clear URL params completely when clearing filters
+    const params = new URLSearchParams();
+    if (searchTerm) {
+      params.set("search", searchTerm);
+    }
+    // Don't add any filter params - this clears them from URL
+    setSearchParams(params, { replace: true });
+
+    // Save cleared filters to session storage
+    saveFiltersToSession(JOBS_FILTERS_STORAGE_KEY, clearedFilters, searchTerm);
+
     setFilterModalOpen(false);
-    queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    // React Query will automatically refetch when filtersKey changes
   };
 
   const handleNextPage = () => {
@@ -941,6 +1289,7 @@ const JobsPage = () => {
     updateUrlWithFilters(activeFilters, searchTerm, newPage);
     // Automatically scroll to the top of the job list on page change
     window.scrollTo({ top: 0, behavior: "smooth" });
+    // React Query will automatically refetch when page changes
   };
 
   const handlePrevPage = () => {
@@ -949,7 +1298,46 @@ const JobsPage = () => {
     updateUrlWithFilters(activeFilters, searchTerm, newPage);
     // Automatically scroll to the top of the job list on page change
     window.scrollTo({ top: 0, behavior: "smooth" });
+    // React Query will automatically refetch when page changes
   };
+
+  // Function to fetch job count for a specific skill
+  const fetchJobCountForSkill = async (skill: string): Promise<number> => {
+    try {
+      const response = await jobService.fetchActiveJobs({
+        query: skill,
+        filters: {
+          ...activeFilters,
+          skills: [skill], // Filter by this skill only
+        },
+        page: 1,
+        pageSize: 20, // Fetch up to 20 jobs to get a better count
+      });
+      // Return the count (if we get 20, there might be more, but we'll show 20+)
+      return response.jobs.length;
+    } catch (error) {
+      console.error(`Error fetching job count for skill ${skill}:`, error);
+      return 0;
+    }
+  };
+
+  // Fetch job counts for each skill using React Query
+  const skillJobCounts = useQuery<Record<string, number>>({
+    queryKey: ["skillJobCounts", userTopSkills.join(","), filtersKey],
+    queryFn: async () => {
+      const counts: Record<string, number> = {};
+      // Fetch counts for all skills in parallel
+      await Promise.all(
+        userTopSkills.map(async (skill) => {
+          counts[skill] = await fetchJobCountForSkill(skill);
+        })
+      );
+      return counts;
+    },
+    enabled: userTopSkills.length > 0 && !loadingSkills,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+  });
 
   // Determine if there are enough jobs to assume a next page might exist
   // JSearch API returns a max of 20 results per page, so if we get exactly 20, we assume there's a next page.
@@ -1024,32 +1412,75 @@ const JobsPage = () => {
           </div>
         </div>
 
-        {/* Job Categories Section */}
-        <div className="mb-8">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {jobCategories.map((category) => {
-              const IconComponent = category.icon;
-              return (
-                <Card
-                  key={category.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow duration-200 border border-gray-200"
-                >
+        {/* User Skills Section */}
+        {loadingSkills ? (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">Your Skills</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {[...Array(5)].map((_, i) => (
+                <Card key={i} className="border border-gray-200">
                   <CardContent className="p-4 flex flex-col items-start">
-                    <IconComponent
-                      className={`h-8 w-8 ${category.color} mb-3`}
-                    />
-                    <h3 className="font-semibold text-sm mb-1">
-                      {category.name}
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      {category.vacancyCount} Vacancy
-                    </p>
+                    <Skeleton className="h-8 w-8 mb-3 rounded" />
+                    <Skeleton className="h-4 w-24 mb-1" />
+                    <Skeleton className="h-3 w-16" />
                   </CardContent>
                 </Card>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        ) : userTopSkills.length > 0 ? (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">Your Skills</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {userTopSkills.map((skill, index) => {
+                const IconComponent = getSkillIcon(skill);
+                const color = getSkillColor(skill, index);
+                const jobCount =
+                  skillJobCounts.data?.[skill] !== undefined
+                    ? skillJobCounts.data[skill]
+                    : null;
+                const isLoadingCount = skillJobCounts.isLoading;
+
+                return (
+                  <Card
+                    key={skill}
+                    className="cursor-pointer hover:shadow-md transition-shadow duration-200 border border-gray-200"
+                    onClick={() => {
+                      // Add skill to filters if not already present
+                      if (!activeFilters.skills.includes(skill)) {
+                        const newFilters = {
+                          ...activeFilters,
+                          skills: [...activeFilters.skills, skill],
+                        };
+                        const newPage = 1;
+                        setActiveFilters(newFilters);
+                        setTempFilters(newFilters);
+                        setPage(newPage);
+                        updateUrlWithFilters(newFilters, searchTerm, newPage);
+                      }
+                    }}
+                  >
+                    <CardContent className="p-4 flex flex-col items-start">
+                      <IconComponent className={`h-8 w-8 ${color} mb-3`} />
+                      <h3 className="font-semibold text-sm mb-1 line-clamp-2">
+                        {skill}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {isLoadingCount
+                          ? "Loading..."
+                          : jobCount !== null
+                          ? `${jobCount}${jobCount >= 20 ? "+" : ""} Job${
+                              jobCount !== 1 ? "s" : ""
+                            }`
+                          : "Click to filter"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {/* Latest Vacancies Header */}
         <div className="flex items-center justify-between mb-6">
@@ -1104,8 +1535,12 @@ const JobsPage = () => {
         )}
 
         {!isLoading && transformedJobs.length === 0 && (
-          <div className="text-center p-10 border border-dashed rounded-lg bg-gray-50 text-muted-foreground">
-            <AlertCircle className="mx-auto h-12 w-12 mb-4 text-gray-400" />
+          <div className="text-center p-10 border border-dashed rounded-lg text-muted-foreground">
+            <img
+              src="/lovable-uploads/no-data-found.png"
+              alt="No data found"
+              className="mx-auto h-64 w-64 mb-4 object-contain"
+            />
             <h4 className="text-lg font-semibold">No Jobs Found</h4>
             <p className="text-sm">
               Try adjusting your search terms or filters.
@@ -1118,34 +1553,86 @@ const JobsPage = () => {
           {transformedJobs.map((job) => (
             <Card
               key={job.id}
-              className="flex flex-col hover:shadow-lg transition-shadow duration-200 border border-gray-200"
+              className="group flex flex-col hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden"
             >
-              <CardContent className="p-5 flex flex-col flex-grow">
+              <CardContent className="p-5 flex flex-col flex-grow relative">
                 {/* Company Logo and Info */}
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 relative w-12 h-12">
+                    {/* Primary: Logo from API - shown first if available */}
                     {job.company_logo ? (
                       <img
                         src={job.company_logo}
                         alt={`${job.company} logo`}
-                        className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                        className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                        loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.onerror = null;
                           target.style.display = "none";
-                          if (target.nextElementSibling) {
-                            (
-                              target.nextElementSibling as HTMLElement
-                            ).style.display = "flex";
+                          // Show Clearbit logo fallback
+                          const clearbitLogo =
+                            target.parentElement?.querySelector(
+                              ".clearbit-logo"
+                            ) as HTMLImageElement;
+                          if (clearbitLogo) {
+                            clearbitLogo.style.display = "block";
+                            clearbitLogo.style.zIndex = "10";
+                          } else {
+                            // Show default icon
+                            const iconFallback =
+                              target.parentElement?.querySelector(
+                                ".logo-fallback"
+                              ) as HTMLElement;
+                            if (iconFallback) {
+                              iconFallback.style.display = "flex";
+                              iconFallback.style.zIndex = "10";
+                            }
                           }
                         }}
                       />
                     ) : null}
-                    {!job.company_logo && (
-                      <div className="w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center">
-                        <Briefcase className="h-6 w-6 text-white" />
-                      </div>
-                    )}
+
+                    {/* Fallback 1: Clearbit logo API - shown if no API logo and company name exists */}
+                    {job.company ? (
+                      <img
+                        src={`https://logo.clearbit.com/${encodeURIComponent(
+                          job.company
+                        )}`}
+                        alt={`${job.company} logo`}
+                        className={`w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo ${
+                          job.company_logo ? "hidden" : "block"
+                        }`}
+                        style={{ zIndex: job.company_logo ? 0 : 10 }}
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.style.display = "none";
+                          // Show default icon fallback
+                          const iconFallback =
+                            target.parentElement?.querySelector(
+                              ".logo-fallback"
+                            ) as HTMLElement;
+                          if (iconFallback) {
+                            iconFallback.style.display = "flex";
+                            iconFallback.style.zIndex = "10";
+                          }
+                        }}
+                      />
+                    ) : null}
+
+                    {/* Fallback 2: Default icon - always present, shown when all logos fail or no company name */}
+                    <div
+                      className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
+                        job.company_logo || job.company ? "hidden" : "flex"
+                      }`}
+                      style={{
+                        zIndex: job.company_logo || job.company ? 0 : 10,
+                      }}
+                    >
+                      <Briefcase className="h-6 w-6 text-white" />
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-base mb-1 truncate">
@@ -1195,27 +1682,26 @@ const JobsPage = () => {
                   )}
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2 mt-auto pt-4 border-t border-gray-100">
+                {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
                   <Button
-                    onClick={() => window.open(job.url, "_blank")}
-                    disabled={!job.url}
-                    className="flex-1 bg-black text-white hover:bg-gray-800 rounded-lg"
+                    onClick={() => navigate(`/jobs/${job.id}`)}
+                    className="flex-1 bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-900 dark:hover:bg-gray-600 rounded-lg"
                   >
-                    Send
+                    View
                   </Button>
                   <Button
                     size="icon"
                     variant="outline"
-                    className="h-10 w-10 rounded-lg border-gray-300"
+                    className="h-10 w-10 rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-[#242424] hover:bg-gray-50 dark:hover:bg-gray-800"
                     onClick={() => saveJobMutation.mutate(job)}
                     aria-label={job.is_saved ? "Unsave job" : "Save job"}
                   >
                     <Bookmark
                       className={`h-5 w-5 transition-colors ${
                         job.is_saved
-                          ? "fill-black text-black"
-                          : "text-gray-400 hover:text-black"
+                          ? "fill-black dark:fill-white text-black dark:text-white"
+                          : "text-gray-400 dark:text-gray-500"
                       }`}
                     />
                   </Button>

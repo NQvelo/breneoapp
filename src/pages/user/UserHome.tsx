@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -12,7 +14,18 @@ import {
   ChevronRight,
   Clock,
   ChevronLeft,
+  GraduationCap,
+  Award,
+  Play,
+  ClipboardCheck,
+  Target,
 } from "lucide-react";
+import {
+  getUserTestAnswers,
+  calculateSkillScores,
+  getTopSkills,
+} from "@/utils/skillTestUtils";
+import apiClient from "@/api/auth/apiClient";
 
 // API Job structure from JSearch
 interface ApiJob {
@@ -56,12 +69,20 @@ interface Webinar {
   logo?: string;
 }
 
-const JSEARCH_API_KEY = "f438e914d7msh480f4890d34c417p1f564ajsnce17947c5ab2";
+const JSEARCH_API_KEY = "329754c88fmsh45bf2cd651b0e37p1ad384jsnab7fd582cddb";
 
-// Fetch jobs from JSearch API
-const fetchJobs = async () => {
+// Fetch jobs from JSearch API with skill-based filtering
+const fetchJobs = async (topSkills: string[] = []) => {
+  // Build query based on top skills
+  let query = "developer"; // Default fallback
+  if (topSkills.length > 0) {
+    // Use top 3 skills for the query
+    const skillsQuery = topSkills.slice(0, 3).join(" ");
+    query = skillsQuery;
+  }
+
   const params = new URLSearchParams({
-    query: "developer",
+    query: query,
     page: "1",
     num_pages: "1",
   });
@@ -87,13 +108,105 @@ const fetchJobs = async () => {
 const UserHome = () => {
   const { user } = useAuth();
   const [currentJobPage, setCurrentJobPage] = useState(0);
+  const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(true);
+  const [hasCompletedTest, setHasCompletedTest] = useState(false);
 
-  // Fetch jobs
-  const { data: jobs = [], isLoading: jobsLoading } = useQuery({
-    queryKey: ["home-jobs"],
-    queryFn: fetchJobs,
-    enabled: !!user,
+  // Fetch user's top skills from skill test results
+  useEffect(() => {
+    const fetchUserSkills = async () => {
+      if (!user) {
+        setLoadingSkills(false);
+        setHasCompletedTest(false);
+        return;
+      }
+
+      try {
+        setLoadingSkills(true);
+        
+        // Method 1: Try Django backend skill test results API (same as ProfilePage)
+        try {
+          const response = await apiClient.get(`/api/skilltest/results/?user=${user.id}`);
+          console.log("🔍 Checking Django API skill test results:", response.data);
+          
+          let skillTestData = null;
+          if (Array.isArray(response.data) && response.data.length > 0) {
+            skillTestData = response.data[0];
+          } else if (response.data && typeof response.data === "object") {
+            skillTestData = response.data;
+          }
+          
+          if (skillTestData && (skillTestData.final_role || skillTestData.skills_json)) {
+            console.log("✅ Found skill test results from Django API");
+            setHasCompletedTest(true);
+            
+            // Extract skills from skills_json
+            const skillsJson = skillTestData.skills_json || {};
+            const techSkills = Object.keys(skillsJson.tech || {});
+            const softSkills = Object.keys(skillsJson.soft || {});
+            const allSkills = [...techSkills, ...softSkills].slice(0, 5);
+            setUserTopSkills(allSkills);
+            setLoadingSkills(false);
+            return;
+          }
+        } catch (apiError) {
+          console.log("Django API endpoint not available, trying other methods...");
+        }
+        
+        // Method 2: Try user skills API endpoint
+        try {
+          const response = await apiClient.get(`/api/user/${user.id}/skills`);
+          if (response.data && response.data.skills) {
+            const topSkills = response.data.skills.slice(0, 5);
+            setUserTopSkills(topSkills);
+            setHasCompletedTest(topSkills.length > 0);
+            setLoadingSkills(false);
+            return;
+          }
+        } catch (apiError) {
+          console.log("User skills API endpoint not available, trying Supabase...");
+        }
+
+        // Method 3: Fallback to Supabase: fetch from usertestanswers
+        const answers = await getUserTestAnswers(String(user.id));
+        console.log("🔍 Checking test completion:", {
+          userId: user.id,
+          answersCount: answers?.length || 0,
+          hasAnswers: answers && answers.length > 0
+        });
+        
+        if (answers && answers.length > 0) {
+          console.log("✅ User has completed skill test (from Supabase)");
+          setHasCompletedTest(true);
+          const skillScores = calculateSkillScores(answers);
+          const topSkillsData = getTopSkills(skillScores, 5);
+          const topSkills = topSkillsData.map((s) => s.skill);
+          setUserTopSkills(topSkills);
+        } else {
+          console.log("❌ User has not completed skill test");
+          setHasCompletedTest(false);
+        }
+      } catch (error) {
+        console.error("Error fetching user skills:", error);
+        setHasCompletedTest(false);
+      } finally {
+        setLoadingSkills(false);
+      }
+    };
+
+    fetchUserSkills();
+  }, [user]);
+
+  // Fetch jobs based on user's top skills
+  const { data: jobs = [], isLoading: jobsLoading, error: jobsError } = useQuery({
+    queryKey: ["home-jobs", userTopSkills.join(",")],
+    queryFn: () => fetchJobs(userTopSkills),
+    enabled: !!user && !loadingSkills,
     staleTime: 5 * 60 * 1000,
+    retry: 1,
+    onError: (error) => {
+      console.error("Error fetching jobs:", error);
+    },
   });
 
   // Fetch courses
@@ -140,16 +253,16 @@ const UserHome = () => {
     },
   ];
 
-  // Transform jobs
-  const transformedJobs: Job[] = jobs.slice(0, 6).map((job: ApiJob) => {
+  // Transform jobs - handle empty or undefined arrays
+  const transformedJobs: Job[] = (jobs || []).slice(0, 6).map((job: ApiJob) => {
     const location = [job.job_city, job.job_state, job.job_country]
       .filter(Boolean)
-      .join(", ");
+      .join(", ") || "Location not specified";
 
     return {
-      id: job.job_id,
-      title: job.job_title,
-      company: job.employer_name,
+      id: job.job_id || `job-${Math.random()}`,
+      title: job.job_title || "Untitled Position",
+      company: job.employer_name || "Unknown Company",
       location,
       logo: job.employer_logo,
       date: new Date().toLocaleDateString("en-GB", {
@@ -171,16 +284,26 @@ const UserHome = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Top Jobs and Courses */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 order-2 lg:order-1">
             {/* Top Job Picks Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Top job picks for you
-                </h2>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                    Top job picks for you
+                  </h2>
+                  {userTopSkills.length > 0 && (
+                    <p className="text-sm text-gray-500">
+                      Matched based on your skills:{" "}
+                      <span className="font-medium text-breneo-blue">
+                        {userTopSkills.slice(0, 3).join(", ")}
+                      </span>
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentJobPage((p) => Math.max(0, p - 1))}
@@ -211,6 +334,25 @@ const UserHome = () => {
                     </Card>
                   ))}
                 </div>
+              ) : jobsError ? (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-gray-500 mb-2">
+                      Unable to load jobs at the moment.
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Please try again later.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : currentJobs.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-gray-500">
+                      No jobs found. Try adjusting your search criteria.
+                    </p>
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {currentJobs.map((job) => (
@@ -270,60 +412,119 @@ const UserHome = () => {
 
             {/* Top Courses Section */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Top courses picked for you
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-6 w-6 text-breneo-blue" />
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Top courses picked for you
+                  </h2>
+                </div>
+                {userTopSkills.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">Based on:</span>
+                    <div className="flex gap-1">
+                      {userTopSkills.slice(0, 2).map((skill) => (
+                        <Badge
+                          key={skill}
+                          variant="secondary"
+                          className="text-xs bg-breneo-blue/10 text-breneo-blue border-0"
+                        >
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {coursesLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {[...Array(3)].map((_, i) => (
                     <Card key={i} className="relative">
-                      <CardContent className="p-4">
-                        <Skeleton className="h-32 w-full mb-3" />
-                        <Skeleton className="h-4 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/2" />
+                      <CardContent className="p-0">
+                        <Skeleton className="h-40 w-full rounded-t-lg" />
+                        <div className="p-4">
+                          <Skeleton className="h-5 w-3/4 mb-2" />
+                          <Skeleton className="h-4 w-1/2 mb-3" />
+                          <Skeleton className="h-3 w-full" />
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
+              ) : courses.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500">No courses available at the moment.</p>
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {courses.slice(0, 3).map((course) => (
                     <Link key={course.id} to={`/course/${course.id}`}>
-                      <Card className="relative hover:shadow-lg transition-shadow cursor-pointer">
-                        <CardContent className="p-0">
+                      <Card className="relative hover:shadow-lg transition-all duration-200 cursor-pointer group border border-gray-200 hover:border-breneo-blue/30">
+                        <CardContent className="p-0 overflow-hidden">
                           <div className="relative">
                             <img
-                              src={course.image}
+                              src={course.image || "/placeholder.svg"}
                               alt={course.title}
-                              className="w-full h-32 object-cover rounded-t-lg"
+                              className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-200"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/placeholder.svg";
+                              }}
                             />
                             <div className="absolute top-4 right-4">
-                              <Bookmark className="h-5 w-5 text-white drop-shadow-md" />
+                              <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5">
+                                <Bookmark className="h-4 w-4 text-gray-600" />
+                              </div>
                             </div>
+                            {course.category && (
+                              <div className="absolute top-4 left-4">
+                                <Badge className="bg-breneo-blue text-white text-xs">
+                                  {course.category}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                           <div className="p-4">
-                            <div className="absolute top-4 right-4 opacity-0 pointer-events-none">
-                              <MoreVertical className="h-5 w-5 text-gray-400" />
-                            </div>
-
-                            <h3 className="font-semibold text-base mb-2 line-clamp-2">
+                            <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
                               {course.title}
                             </h3>
 
                             <div className="flex items-center gap-2 mb-3">
-                              <span className="text-xs text-gray-500">
-                                {course.provider}
+                              <div className="w-6 h-6 rounded-full bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
+                                <GraduationCap className="h-3 w-3 text-breneo-blue" />
+                              </div>
+                              <span className="text-xs text-gray-600 font-medium">
+                                {course.provider || "Breneo Academy"}
                               </span>
                             </div>
 
-                            <p className="text-xs text-gray-500 mb-3">
-                              {course.duration} · {course.level}
-                            </p>
+                            <div className="flex items-center gap-3 mb-3 flex-wrap">
+                              {course.duration && (
+                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{course.duration}</span>
+                                </div>
+                              )}
+                              {course.level && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs border-gray-300"
+                                >
+                                  <Award className="h-3 w-3 mr-1" />
+                                  {course.level}
+                                </Badge>
+                              )}
+                            </div>
 
-                            <div className="flex justify-end mt-4">
-                              <button className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                                <ChevronRight className="h-4 w-4 text-gray-600" />
+                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+                              <span className="text-xs text-gray-500">
+                                View details
+                              </span>
+                              <button className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-breneo-blue group-hover:text-white flex items-center justify-center transition-colors">
+                                <ChevronRight className="h-4 w-4 text-gray-600 group-hover:text-white transition-colors" />
                               </button>
                             </div>
                           </div>
@@ -336,9 +537,96 @@ const UserHome = () => {
             </div>
           </div>
 
-          {/* Right Column - Webinars */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-24">
+          {/* Right Column - Skill Test CTA and Webinars */}
+          <div className="lg:col-span-1 order-1 lg:order-2">
+            <div className="sticky top-24 space-y-6">
+              {/* Skill Test CTA Section - Only show if user hasn't completed the test */}
+              {!hasCompletedTest && !loadingSkills && (
+                <Card className="bg-white">
+                  <CardContent className="p-6">
+                    <Link to="/skill-test" className="block cursor-pointer group">
+                      <div className="flex flex-col items-center gap-4">
+                        {/* Illustration */}
+                        <div className="w-full relative max-h-40 flex items-center justify-center">
+                          <img
+                            src="/lovable-uploads/Bring-Solutions-To-Problems--Streamline-New-York (1).png"
+                            alt="Discover Your Skills"
+                            className="w-auto h-40 object-contain"
+                            onError={(e) => {
+                              // Fallback to placeholder if image doesn't exist yet
+                              (e.target as HTMLImageElement).src = "/placeholder.svg";
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 text-center w-full">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <ClipboardCheck className="h-5 w-5 text-breneo-blue" />
+                            <h2 className="text-xl font-bold text-gray-900">
+                              Discover Your Skills
+                            </h2>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4">
+                            Take our comprehensive skill assessment to unlock personalized job recommendations and course suggestions tailored to your strengths.
+                          </p>
+                          <div className="flex items-center justify-center">
+                            <Button className="bg-breneo-blue hover:bg-breneo-blue/90">
+                              <Play className="h-5 w-5" />
+                              Start Skill Test
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Skill Path CTA Section - Only show if user has completed the test */}
+              {hasCompletedTest && !loadingSkills && (
+                <Card className="bg-white">
+                  <CardContent className="p-6">
+                    <Link to="/skill-path" className="block cursor-pointer group">
+                      <div className="flex flex-col items-center gap-4">
+                        {/* Illustration */}
+                        <div className="w-full relative max-h-40 flex items-center justify-center">
+                          <img
+                            src="/lovable-uploads/Bring-Solutions-To-Problems--Streamline-New-York (1).png"
+                            alt="Your Skill Path"
+                            className="w-auto h-40 object-contain"
+                            onError={(e) => {
+                              // Fallback to placeholder if image doesn't exist yet
+                              (e.target as HTMLImageElement).src = "/placeholder.svg";
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 text-center w-full">
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <Target className="h-5 w-5 text-breneo-blue" />
+                            <h2 className="text-xl font-bold text-gray-900">
+                              Your Skill Path
+                            </h2>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4">
+                            Explore your personalized career path with job recommendations, course suggestions, and skill development insights based on your assessment.
+                          </p>
+                          <div className="flex items-center justify-center">
+                            <Button className="bg-breneo-blue hover:bg-breneo-blue/90">
+                              <Target className="h-5 w-5 mr-2" />
+                              View Skill Path
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Webinars Section */}
               <Card className="bg-white">
                 <CardContent className="p-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">

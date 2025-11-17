@@ -30,19 +30,76 @@ export interface UserTestResult {
 }
 
 // Fetch all user answers for analysis
-export const getUserTestAnswers = async (userId: string) => {
-  const { data, error } = await supabase
-    .from("usertestanswers")
-    .select("*")
-    .eq("userid", numericIdToUuid(userId))
-    .order("answeredat", { ascending: true });
+export const getUserTestAnswers = async (userId: string | number) => {
+  const userIdStr = String(userId);
+  
+  // Try multiple user ID formats to handle different storage methods
+  const userIdVariants = [
+    numericIdToUuid(userIdStr), // Converted UUID format
+    userIdStr, // Direct user ID (might already be UUID or string)
+  ];
 
-  if (error) {
-    console.error("Error fetching user answers:", error);
-    throw error;
+  // If userId is numeric, also try the numeric version
+  const numericId = parseInt(userIdStr, 10);
+  if (!isNaN(numericId) && numericId.toString() === userIdStr) {
+    userIdVariants.push(numericIdToUuid(numericId));
   }
 
-  return data;
+  console.log("🔍 getUserTestAnswers - Trying variants:", {
+    originalUserId: userId,
+    userIdStr,
+    variants: userIdVariants
+  });
+
+  // Try each variant
+  for (const userIdVariant of userIdVariants) {
+    try {
+      const { data, error } = await supabase
+        .from("usertestanswers")
+        .select("*")
+        .eq("userid", userIdVariant)
+        .order("answeredat", { ascending: true });
+
+      if (error) {
+        console.warn(`⚠️ Error fetching with variant ${userIdVariant}:`, error.message);
+        // Continue to next variant
+        continue;
+      }
+
+      if (data && data.length > 0) {
+        console.log(`✅ Found ${data.length} test answers for user ${userIdVariant}`);
+        return data;
+      } else {
+        console.log(`ℹ️ No answers found for variant ${userIdVariant}`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Exception with variant ${userIdVariant}:`, err);
+      continue;
+    }
+  }
+
+  // Last resort: try to get current user's answers using auth context
+  try {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      console.log("🔍 Trying with auth user ID:", authUser.id);
+      const { data, error } = await supabase
+        .from("usertestanswers")
+        .select("*")
+        .eq("userid", authUser.id)
+        .order("answeredat", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        console.log(`✅ Found ${data.length} test answers using auth user ID`);
+        return data;
+      }
+    }
+  } catch (authErr) {
+    console.warn("⚠️ Could not get auth user:", authErr);
+  }
+
+  console.log("❌ No test answers found with any variant");
+  return [];
 };
 
 // Calculate skill scores from user answers

@@ -13,3 +13,7 @@ export { TokenManager } from './auth/tokenManager';
 // Re-export for backward compatibility
 export { TokenManager as defaultTokenManager } from './auth/tokenManager';
 
+// Jobs API
+export * from './jobs';
+export { default as jobService } from './jobs/jobService';
+

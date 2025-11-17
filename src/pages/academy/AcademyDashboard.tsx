@@ -103,12 +103,14 @@ const CourseForm = ({
   handleImageChange,
   imagePreview,
   className,
+  fileInputRef,
 }: {
   courseForm: any;
   setCourseForm: any;
   handleImageChange: any;
   imagePreview: string | null;
   className?: string;
+  fileInputRef: React.RefObject<HTMLInputElement>;
 }) => (
   <div className={className}>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
@@ -228,6 +230,7 @@ const CourseForm = ({
                     >
                       <span>Upload a file</span>
                       <input
+                        ref={fileInputRef}
                         id="file-upload"
                         name="file-upload"
                         type="file"
@@ -301,6 +304,7 @@ const AcademyDashboard = () => {
   const [open, setOpen] = useState(false);
   const isMobile = useMobile();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetForm = () => {
     setEditingCourse(null);
@@ -315,6 +319,10 @@ const AcademyDashboard = () => {
     });
     setCourseImage(null);
     setImagePreview(null);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleModalOpenChange = (isOpen: boolean) => {
@@ -429,11 +437,37 @@ const AcademyDashboard = () => {
   const handleImageChange = (files: FileList | null) => {
     if (files && files[0]) {
       const file = files[0];
+      
+      // Validate file size (10MB limit)
+      const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+      if (file.size > maxSize) {
+        toast.error("Image size must be less than 10MB");
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select a valid image file");
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+      
       setCourseImage(file);
       setImagePreview(URL.createObjectURL(file));
     } else {
       setCourseImage(null);
       setImagePreview(null);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -472,28 +506,58 @@ const AcademyDashboard = () => {
       let imageUrl = "/lovable-uploads/no_photo.png"; // Default placeholder
 
       if (courseImage) {
-        // Upload image to Supabase storage
-        const fileExt = courseImage.name.split(".").pop();
-        const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
+        try {
+          // Upload image to Supabase storage
+          const fileExt = courseImage.name.split(".").pop();
+          const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("course-images")
-          .upload(fileName, courseImage, {
-            cacheControl: "3600",
-            upsert: false,
+          console.log("📤 Uploading image to Supabase storage...", {
+            bucket: "course-images",
+            fileName,
+            fileSize: courseImage.size,
+            fileType: courseImage.type,
           });
 
-        if (uploadError) {
-          // If storage bucket doesn't exist or upload fails, use placeholder
-          console.warn("Image upload failed, using placeholder:", uploadError);
-          imageUrl = "/lovable-uploads/no_photo.png";
-        } else {
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("course-images")
+            .upload(fileName, courseImage, {
+              cacheControl: "3600",
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error("❌ Image upload error:", uploadError);
+            
+            // Check if bucket doesn't exist
+            if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("does not exist")) {
+              toast.error("Storage bucket 'course-images' not found. Please contact support to set it up.");
+              throw new Error("Storage bucket not configured");
+            }
+            
+            // Check for permission errors
+            if (uploadError.message?.includes("permission") || uploadError.message?.includes("policy") || uploadError.statusCode === 403) {
+              toast.error("Permission denied. Please check storage bucket policies.");
+              throw new Error("Storage permission denied");
+            }
+            
+            // Generic error
+            toast.error(`Failed to upload image: ${uploadError.message || "Unknown error"}`);
+            throw uploadError;
+          }
+
+          console.log("✅ Image uploaded successfully:", uploadData);
+
           // Get public URL for the uploaded image
           const { data: urlData } = supabase.storage
             .from("course-images")
             .getPublicUrl(fileName);
 
           imageUrl = urlData.publicUrl;
+          console.log("✅ Image URL:", imageUrl);
+        } catch (uploadErr: any) {
+          // Re-throw to prevent course creation with placeholder
+          console.error("❌ Image upload failed:", uploadErr);
+          throw uploadErr;
         }
       }
 
@@ -558,24 +622,58 @@ const AcademyDashboard = () => {
       let imageUrl = editingCourse.image; // Keep existing image by default
 
       if (courseImage) {
-        // Upload new image to Supabase storage
-        const fileExt = courseImage.name.split(".").pop();
-        const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
+        try {
+          // Upload new image to Supabase storage
+          const fileExt = courseImage.name.split(".").pop();
+          const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("course-images")
-          .upload(fileName, courseImage, {
-            cacheControl: "3600",
-            upsert: false,
+          console.log("📤 Uploading new image to Supabase storage...", {
+            bucket: "course-images",
+            fileName,
+            fileSize: courseImage.size,
+            fileType: courseImage.type,
           });
 
-        if (!uploadError) {
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("course-images")
+            .upload(fileName, courseImage, {
+              cacheControl: "3600",
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error("❌ Image upload error:", uploadError);
+            
+            // Check if bucket doesn't exist
+            if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("does not exist")) {
+              toast.error("Storage bucket 'course-images' not found. Please contact support to set it up.");
+              throw new Error("Storage bucket not configured");
+            }
+            
+            // Check for permission errors
+            if (uploadError.message?.includes("permission") || uploadError.message?.includes("policy") || uploadError.statusCode === 403) {
+              toast.error("Permission denied. Please check storage bucket policies.");
+              throw new Error("Storage permission denied");
+            }
+            
+            // Generic error
+            toast.error(`Failed to upload image: ${uploadError.message || "Unknown error"}`);
+            throw uploadError;
+          }
+
+          console.log("✅ Image uploaded successfully:", uploadData);
+
           // Get public URL for the uploaded image
           const { data: urlData } = supabase.storage
             .from("course-images")
             .getPublicUrl(fileName);
 
           imageUrl = urlData.publicUrl;
+          console.log("✅ Image URL:", imageUrl);
+        } catch (uploadErr: any) {
+          // Re-throw to prevent course update with old image
+          console.error("❌ Image upload failed:", uploadErr);
+          throw uploadErr;
         }
       }
 
@@ -699,6 +797,7 @@ const AcademyDashboard = () => {
                       handleImageChange={handleImageChange}
                       imagePreview={imagePreview}
                       className="px-4"
+                      fileInputRef={fileInputRef}
                     />
                   </ScrollArea>
                   <DrawerFooter className="pt-2 sticky bottom-0 bg-background shadow-lg flex-row space-x-2">
@@ -778,6 +877,7 @@ const AcademyDashboard = () => {
                     setCourseForm={setCourseForm}
                     handleImageChange={handleImageChange}
                     imagePreview={imagePreview}
+                    fileInputRef={fileInputRef}
                   />
                   <DialogFooter>
                     {editingCourse && (

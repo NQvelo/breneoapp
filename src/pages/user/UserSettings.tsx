@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Trash2,
   Download,
@@ -49,10 +50,17 @@ import {
   Link as LinkIcon,
   Eye,
   Globe,
+  AlertCircle,
+  Info,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import {
+  BogAccessTokenResponse,
+  requestBogAccessToken,
+  createBogOrder,
+} from "@/services/payments/bogAuth";
 
 type SettingsSection =
   | "account"
@@ -72,7 +80,7 @@ const settingsSections: Array<{ id: SettingsSection; label: string }> = [
 ];
 
 export default function SettingsPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { theme, setTheme } = useTheme();
   const isMobile = useMobile();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -104,6 +112,28 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
     getInitialSection()
   );
+
+  // Handle payment redirect status
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    if (paymentStatus === "success") {
+      toast.success(
+        "Payment successful! Your subscription has been activated."
+      );
+      // Clean up URL
+      setSearchParams((prev) => {
+        prev.delete("payment");
+        return prev;
+      });
+    } else if (paymentStatus === "failed") {
+      toast.error("Payment failed. Please try again.");
+      // Clean up URL
+      setSearchParams((prev) => {
+        prev.delete("payment");
+        return prev;
+      });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Scroll active button into view on mobile
   useEffect(() => {
@@ -142,6 +172,10 @@ export default function SettingsPage() {
   }, [activeSection, isMobile]);
 
   // Account Settings
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const isEditingRef = useRef(false);
   const [passwordStep, setPasswordStep] = useState(1);
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -162,6 +196,12 @@ export default function SettingsPage() {
   const [inAppProgress, setInAppProgress] = useState(true);
   const [newsletter, setNewsletter] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(false);
+
+  const [bogAuthLoading, setBogAuthLoading] = useState(false);
+  const [bogAuthError, setBogAuthError] = useState<string | null>(null);
+  const [bogTokenInfo, setBogTokenInfo] =
+    useState<BogAccessTokenResponse | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
 
   // Privacy & Security
   const [activityVisibility, setActivityVisibility] = useState<
@@ -192,6 +232,15 @@ export default function SettingsPage() {
   const handleSectionChange = (section: SettingsSection) => {
     setActiveSection(section);
   };
+
+  // Initialize name fields from user data (only when not actively editing)
+  useEffect(() => {
+    if (user && !isEditingRef.current) {
+      setFirstName(user.first_name || "");
+      setLastName(user.last_name || "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.first_name, user?.last_name]); // Update when user ID or name fields change
 
   // Load preferences from localStorage and set mounted
   useEffect(() => {
@@ -506,6 +555,123 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (!user) {
+      toast.error("User not found. Please log in again.");
+      return;
+    }
+
+    // Validate inputs
+    if (!firstName.trim() && !lastName.trim()) {
+      toast.error("Please enter at least a first name or last name");
+      return;
+    }
+
+    // Set editing flag to true to prevent useEffect from resetting inputs during save
+    isEditingRef.current = true;
+    setProfileLoading(true);
+
+    try {
+      const token = localStorage.getItem("authToken");
+
+      // Prepare update payload - only include fields that have values
+      const updateData: { first_name?: string; last_name?: string } = {};
+
+      if (firstName.trim()) {
+        updateData.first_name = firstName.trim();
+      }
+
+      if (lastName.trim()) {
+        updateData.last_name = lastName.trim();
+      }
+
+      console.log("📤 Updating profile with PATCH method:");
+      console.log("📝 Request payload:", updateData);
+
+      // Use the same pattern as phone_number and about_me updates
+      const response = await apiClient.patch(
+        API_ENDPOINTS.AUTH.PROFILE,
+        updateData,
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+
+      console.log("✅ Profile update response:", response.data);
+
+      // Refresh profile data (same pattern as phone_number/about_me)
+      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+
+      console.log("✅ Refreshed profile data:", profileResponse.data);
+
+      // Update local state with new values
+      if (profileResponse.data) {
+        const profileData = profileResponse.data as Record<string, unknown>;
+        const updatedFirstName =
+          profileData.first_name ||
+          (profileData.user as Record<string, unknown>)?.first_name ||
+          (profileData.profile as Record<string, unknown>)?.first_name;
+        const updatedLastName =
+          profileData.last_name ||
+          (profileData.user as Record<string, unknown>)?.last_name ||
+          (profileData.profile as Record<string, unknown>)?.last_name;
+
+        if (updatedFirstName !== undefined) {
+          setFirstName(String(updatedFirstName || ""));
+        }
+        if (updatedLastName !== undefined) {
+          setLastName(String(updatedLastName || ""));
+        }
+      }
+
+      toast.success("Profile updated successfully!");
+
+      // Reset editing flag
+      isEditingRef.current = false;
+
+      // Reload to update user context (same pattern as phone_number/about_me)
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (err: unknown) {
+      console.error("❌ Error updating profile:", err);
+      // Reset editing flag on error so user can try again
+      isEditingRef.current = false;
+
+      if (axios.isAxiosError(err)) {
+        const errorData = err.response?.data;
+        const errorMessage =
+          (typeof errorData === "object" && errorData !== null
+            ? (errorData as Record<string, unknown>).error ||
+              (errorData as Record<string, unknown>).message ||
+              (errorData as Record<string, unknown>).detail
+            : null) ||
+          err.message ||
+          "Failed to update profile";
+
+        console.error("❌ Error details:", {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: errorData,
+          message: err.message,
+        });
+
+        toast.error(String(errorMessage));
+      } else {
+        console.error("❌ Non-Axios error:", err);
+        toast.error("Failed to update profile. Please try again.");
+      }
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   const darkModeValue = theme === "dark" ? "ON" : "OFF";
 
   const renderContent = () => {
@@ -514,6 +680,58 @@ export default function SettingsPage() {
         return (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Account Settings</h1>
+
+            {/* Personal Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Personal Information</CardTitle>
+                <CardDescription>
+                  Update your name and contact information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSaveProfile();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={firstName}
+                      onChange={(e) => {
+                        isEditingRef.current = true;
+                        setFirstName(e.target.value);
+                      }}
+                      placeholder="Enter your first name"
+                      disabled={profileLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={lastName}
+                      onChange={(e) => {
+                        isEditingRef.current = true;
+                        setLastName(e.target.value);
+                      }}
+                      placeholder="Enter your last name"
+                      disabled={profileLoading}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <Button type="submit" disabled={profileLoading}>
+                    {profileLoading ? "Saving..." : "Save Changes"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
 
             {/* Email & Password */}
             <Card>
@@ -532,7 +750,7 @@ export default function SettingsPage() {
                     className="bg-muted/50"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Email cannot be changed. Contact support if you need to
+                    Email cannot be edited. Contact support if you need to
                     update it.
                   </p>
                 </div>
@@ -1014,6 +1232,165 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Pricing & Plans</CardTitle>
+                <CardDescription>
+                  Choose the plan that fits you and authenticate with Bank of
+                  Georgia to continue checkout.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 lg:grid-cols-3">
+                  {[
+                    {
+                      name: "Free",
+                      price: "₾0",
+                      period: "forever",
+                      features: [
+                        "Access to basic courses",
+                        "Limited skill tests",
+                        "Community support",
+                      ],
+                      cta: "Current Plan",
+                      disabled: true,
+                    },
+                    {
+                      name: "Pro",
+                      price: "₾26.99",
+                      period: "per month",
+                      features: [
+                        "Unlimited courses",
+                        "Advanced assessments",
+                        "Priority support",
+                      ],
+                      cta: "Subscribe",
+                    },
+                    {
+                      name: "Enterprise",
+                      price: "Contact",
+                      period: "for pricing",
+                      features: [
+                        "Team onboarding",
+                        "Dedicated success manager",
+                        "Custom integrations",
+                      ],
+                      cta: "Talk to Sales",
+                    },
+                  ].map((plan) => (
+                    <Card
+                      key={plan.name}
+                      className="border border-border shadow-sm"
+                    >
+                      <CardHeader>
+                        <CardTitle className="text-xl">{plan.name}</CardTitle>
+                        <CardDescription>
+                          <span className="text-3xl font-semibold">
+                            {plan.price}
+                          </span>
+                          {plan.period !== "forever" && (
+                            <span className="ml-2 text-muted-foreground text-sm">
+                              /{plan.period}
+                            </span>
+                          )}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <ul className="space-y-2">
+                          {plan.features.map((feature) => (
+                            <li
+                              key={feature}
+                              className="text-sm text-muted-foreground"
+                            >
+                              {feature}
+                            </li>
+                          ))}
+                        </ul>
+                        <Button
+                          className="w-full"
+                          disabled={
+                            plan.disabled ||
+                            bogAuthLoading ||
+                            plan.name === "Enterprise"
+                          }
+                          onClick={async () => {
+                            if (plan.name === "Enterprise") {
+                              toast.info(
+                                "Please contact sales for Enterprise pricing."
+                              );
+                              return;
+                            }
+
+                            setPendingPlan(plan.name);
+                            setBogAuthError(null);
+                            try {
+                              setBogAuthLoading(true);
+
+                              // Extract amount from price (remove currency symbol and parse)
+                              const amountStr = plan.price
+                                .replace(/[^\d.,]/g, "")
+                                .replace(",", ".");
+                              const amount = parseFloat(amountStr) || 0;
+
+                              if (amount <= 0) {
+                                throw new Error("Invalid plan price");
+                              }
+
+                              // Create order with BOG
+                              const order = await createBogOrder({
+                                plan_name: plan.name,
+                                amount: amount,
+                                currency: "GEL",
+                                external_order_id: `breneo-${plan.name.toLowerCase()}-${Date.now()}`,
+                              });
+
+                              // Redirect to BOG payment page
+                              if (order.redirect_url) {
+                                toast.success(
+                                  `Redirecting to payment page for ${plan.name} plan...`
+                                );
+                                // Store order info for callback handling
+                                localStorage.setItem(
+                                  `bog_order_${order.order_id}`,
+                                  JSON.stringify({
+                                    order_id: order.order_id,
+                                    plan_name: plan.name,
+                                    amount: amount,
+                                    created_at: new Date().toISOString(),
+                                  })
+                                );
+                                // Redirect to payment page
+                                window.location.href = order.redirect_url;
+                              } else {
+                                throw new Error(
+                                  "No redirect URL received from payment service"
+                                );
+                              }
+                            } catch (error) {
+                              const message =
+                                error instanceof Error
+                                  ? error.message
+                                  : "Failed to initiate payment.";
+                              setBogAuthError(message);
+                              toast.error(
+                                `Unable to process ${plan.name} subscription: ${message}`
+                              );
+                            } finally {
+                              setBogAuthLoading(false);
+                            }
+                          }}
+                        >
+                          {bogAuthLoading && pendingPlan === plan.name
+                            ? "Processing..."
+                            : plan.cta}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Current Plan</CardTitle>
                 <CardDescription>
                   Your current subscription plan
@@ -1040,10 +1417,112 @@ export default function SettingsPage() {
                 <CardDescription>Manage your payment methods</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  No payment methods on file
-                </p>
-                <Button variant="outline">Add Payment Method</Button>
+                <div className="space-y-3">
+                  {!bogTokenInfo && (
+                    <p className="text-sm text-muted-foreground">
+                      Authenticate with Bank of Georgia to add a payment method.
+                    </p>
+                  )}
+                  {bogTokenInfo && (
+                    <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-sm">
+                      <p className="font-medium text-primary">
+                        Bank of Georgia authorization ready
+                      </p>
+                      <p className="text-muted-foreground">
+                        Token type: {bogTokenInfo.token_type}
+                      </p>
+                      <p className="text-muted-foreground">
+                        Expires in: {bogTokenInfo.expires_in} seconds
+                      </p>
+                      <p className="text-muted-foreground break-all">
+                        Access token: {bogTokenInfo.access_token}
+                      </p>
+                    </div>
+                  )}
+                  {bogAuthError && (
+                    <Alert
+                      variant={
+                        bogAuthError.includes("not found") ||
+                        bogAuthError.includes("endpoint")
+                          ? "default"
+                          : "destructive"
+                      }
+                    >
+                      {bogAuthError.includes("not found") ||
+                      bogAuthError.includes("endpoint") ? (
+                        <Info className="h-4 w-4" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4" />
+                      )}
+                      <AlertTitle>
+                        {bogAuthError.includes("not found") ||
+                        bogAuthError.includes("endpoint")
+                          ? "Backend Setup Required"
+                          : "Payment Error"}
+                      </AlertTitle>
+                      <AlertDescription className="text-sm">
+                        {bogAuthError.includes("not found") ||
+                        bogAuthError.includes("endpoint") ? (
+                          <div className="space-y-2">
+                            <p>
+                              The payment backend endpoint is not yet
+                              implemented. To enable payments:
+                            </p>
+                            <ol className="list-decimal list-inside space-y-1 ml-2">
+                              <li>
+                                Implement{" "}
+                                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                                  POST /api/payments/bog/orders/
+                                </code>{" "}
+                                on your backend server
+                              </li>
+                              <li>
+                                See{" "}
+                                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                                  BACKEND_PAYMENT_SETUP.md
+                                </code>{" "}
+                                for implementation details
+                              </li>
+                            </ol>
+                          </div>
+                        ) : (
+                          bogAuthError
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      setPendingPlan(null);
+                      setBogAuthError(null);
+                      try {
+                        setBogAuthLoading(true);
+                        const token = await requestBogAccessToken();
+                        setBogTokenInfo(token);
+                        toast.success(
+                          "Bank of Georgia authentication successful."
+                        );
+                      } catch (error) {
+                        const message =
+                          error instanceof Error
+                            ? error.message
+                            : "Authentication failed with Bank of Georgia.";
+                        setBogAuthError(message);
+                        toast.error(
+                          "Unable to authenticate with Bank of Georgia."
+                        );
+                      } finally {
+                        setBogAuthLoading(false);
+                      }
+                    }}
+                    disabled={bogAuthLoading}
+                  >
+                    {bogAuthLoading && !pendingPlan
+                      ? "Authorizing..."
+                      : "Refresh Authorization"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 

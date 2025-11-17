@@ -97,7 +97,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
       ...filters, 
       jobTypes: newJobTypes,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
       skills: filters.skills || [],
     });
   };
@@ -109,7 +109,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
     onFiltersChange({ 
       ...filters, 
       countries: newCountries,
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
       skills: filters.skills || [],
     });
   };
@@ -147,7 +147,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
       ...filters,
       skills: newSkills,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
     });
   };
 
@@ -160,7 +160,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
         ...filters,
         skills: [],
         countries: filters.countries || [],
-        datePosted: filters.datePosted || "all",
+        datePosted: filters.datePosted || "week",
       });
     } else {
       // Select all
@@ -168,7 +168,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
         ...filters,
         skills: userTopSkills,
         countries: filters.countries || [],
-        datePosted: filters.datePosted || "all",
+        datePosted: filters.datePosted || "week",
       });
     }
   };
@@ -322,7 +322,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       jobTypes: workTypes,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
       skills: filters.skills || [],
     });
   };
@@ -331,7 +331,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     onFiltersChange({
       ...filters,
       countries: countryCodes,
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
       skills: filters.skills || [],
     });
   };
@@ -341,7 +341,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       isRemote: isRemote,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
       skills: filters.skills || [],
     });
   };
@@ -351,7 +351,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       ...filters,
       skills: skills,
       countries: filters.countries || [],
-      datePosted: filters.datePosted || "all",
+      datePosted: filters.datePosted || "week",
     });
   };
 
