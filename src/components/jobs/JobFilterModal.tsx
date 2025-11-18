@@ -31,6 +31,7 @@ import { ChevronLeft, ChevronRight, Search as SearchIcon } from "lucide-react";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
 
@@ -64,15 +65,9 @@ interface JobFilterModalProps {
   userTopSkills?: string[]; // User's top skills from test results
 }
 
-// Georgian translations
-const WORK_TYPE_LABEL_KA = "მუშაობის ტიპი";
-const COUNTRY_LABEL_KA = "ქვეყანა";
+// Legacy constants (kept for backward compatibility, but should use translations)
 const CHOOSE_LABEL_KA = "აირჩიე";
 const SEARCH_TITLE_KA = "მოძებნე";
-const SAVE_BUTTON_KA = "არჩევა";
-const CLEAR_BUTTON_KA = "გასუფთავება";
-const SKILLS_LABEL_KA = "ინტერესები";
-const INTERESTS_LABEL = "Interests / Skills";
 
 const workTypeLabels: Record<string, string> = {
   FULLTIME: "Full Time",
@@ -90,20 +85,21 @@ interface FilterFormProps {
   userTopSkills?: string[];
 }
 
-const FilterForm: React.FC<FilterFormProps> = ({ 
-  filters, 
-  onFiltersChange, 
+const FilterForm: React.FC<FilterFormProps> = ({
+  filters,
+  onFiltersChange,
   isMobile = false,
   onWorkTypeClick,
   onLocationClick,
   userTopSkills = [],
 }) => {
+  const { t } = useLanguage();
   const handleJobTypeChange = (type: string) => {
     const newJobTypes = filters.jobTypes.includes(type)
       ? filters.jobTypes.filter((t) => t !== type)
       : [...filters.jobTypes, type];
-    onFiltersChange({ 
-      ...filters, 
+    onFiltersChange({
+      ...filters,
       jobTypes: newJobTypes,
       countries: filters.countries || [],
       datePosted: filters.datePosted,
@@ -115,8 +111,8 @@ const FilterForm: React.FC<FilterFormProps> = ({
     const newCountries = filters.countries.includes(countryCode)
       ? filters.countries.filter((code) => code !== countryCode)
       : [...filters.countries, countryCode];
-    onFiltersChange({ 
-      ...filters, 
+    onFiltersChange({
+      ...filters,
       countries: newCountries,
       datePosted: filters.datePosted,
       skills: filters.skills || [],
@@ -137,7 +133,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   const getLocationDisplayText = () => {
     if (filters.countries.length === 0) return "Choose";
     if (filters.countries.length === 1) {
-      const country = countries.find(c => c.code === filters.countries[0]);
+      const country = countries.find((c) => c.code === filters.countries[0]);
       return country?.name || "Choose";
     }
     return `${filters.countries.length} selected`;
@@ -168,7 +164,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
   const handleSelectAllSkills = () => {
     if (userTopSkills.length === 0) return;
-    const allSelected = userTopSkills.every(skill => filters.skills.includes(skill));
+    const allSelected = userTopSkills.every((skill) =>
+      filters.skills.includes(skill)
+    );
     if (allSelected) {
       // Remove all
       onFiltersChange({
@@ -194,9 +192,15 @@ const FilterForm: React.FC<FilterFormProps> = ({
     }
   };
 
-  const isAllSkillsSelected = userTopSkills.length > 0 && userTopSkills.every(skill => filters.skills.includes(skill));
+  const isAllSkillsSelected =
+    userTopSkills.length > 0 &&
+    userTopSkills.every((skill) => filters.skills.includes(skill));
 
-  const handleSalaryChange = (min: number | undefined, max: number | undefined, byAgreement: boolean) => {
+  const handleSalaryChange = (
+    min: number | undefined,
+    max: number | undefined,
+    byAgreement: boolean
+  ) => {
     onFiltersChange({
       ...filters,
       salaryMin: min,
@@ -221,28 +225,36 @@ const FilterForm: React.FC<FilterFormProps> = ({
         </div>
 
         {/* Work Type Filter - Mobile Style */}
-        <div 
+        <div
           className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
           onClick={onWorkTypeClick}
         >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900">{WORK_TYPE_LABEL_KA}</span>
+            <span className="text-sm font-medium text-gray-900">
+              {t.jobs.workType}
+            </span>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{getWorkTypeDisplayText()}</span>
+              <span className="text-sm text-gray-600">
+                {getWorkTypeDisplayText()}
+              </span>
               <ChevronRight className="h-4 w-4 text-gray-400" />
             </div>
           </div>
         </div>
 
         {/* Location Filter - Mobile Style */}
-        <div 
+        <div
           className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
           onClick={onLocationClick}
         >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-900">{COUNTRY_LABEL_KA}</span>
+            <span className="text-sm font-medium text-gray-900">
+              {t.jobs.country}
+            </span>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">{getLocationDisplayText()}</span>
+              <span className="text-sm text-gray-600">
+                {getLocationDisplayText()}
+              </span>
               <ChevronRight className="h-4 w-4 text-gray-400" />
             </div>
           </div>
@@ -252,7 +264,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
         {userTopSkills.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">{SKILLS_LABEL_KA}</Label>
+              <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {t.jobs.interests}
+              </Label>
               <button
                 type="button"
                 onClick={handleSelectAllSkills}
@@ -343,7 +357,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
       {/* Work Type Filter - Desktop */}
       <div className="space-y-3">
-        <Label className="text-base font-medium dark:text-gray-100">{WORK_TYPE_LABEL_KA}</Label>
+        <Label className="text-base font-medium dark:text-gray-100">
+          {t.jobs.workType}
+        </Label>
         <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
           <WorkTypeDropdown
             selectedWorkTypes={filters.jobTypes || []}
@@ -357,7 +373,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
       {/* Location Filter - Desktop */}
       <div className="space-y-3">
-        <Label className="text-base font-medium dark:text-gray-100">{COUNTRY_LABEL_KA}</Label>
+        <Label className="text-base font-medium dark:text-gray-100">
+          {t.jobs.country}
+        </Label>
         <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
           <LocationDropdown
             selectedLocations={filters.countries || []}
@@ -371,7 +389,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
       {userTopSkills.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-base font-medium dark:text-gray-100">{INTERESTS_LABEL}</Label>
+            <Label className="text-base font-medium dark:text-gray-100">
+              {t.jobs.interests}
+            </Label>
             <button
               type="button"
               onClick={handleSelectAllSkills}
@@ -417,11 +437,12 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   onClear,
   userTopSkills = [],
 }) => {
+  const { t } = useLanguage();
   const isMobile = useMobile();
   const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
-  
+
   // Filter countries for mobile location picker
   const filteredCountriesMobile = React.useMemo(() => {
     if (!locationSearchQuery.trim()) {
@@ -485,7 +506,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     });
   };
 
-  const handleSalaryChange = (min: number | undefined, max: number | undefined, byAgreement: boolean) => {
+  const handleSalaryChange = (
+    min: number | undefined,
+    max: number | undefined,
+    byAgreement: boolean
+  ) => {
     onFiltersChange({
       ...filters,
       salaryMin: min,
@@ -506,12 +531,15 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     // Work Type Picker View
     if (showWorkTypePicker) {
       return (
-        <Drawer open={isOpen} onOpenChange={(open) => {
-          if (!open) {
-            setShowWorkTypePicker(false);
-            onClose();
-          }
-        }}>
+        <Drawer
+          open={isOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowWorkTypePicker(false);
+              onClose();
+            }
+          }}
+        >
           <DrawerContent className="max-h-[90vh] flex flex-col">
             <DrawerHeader className="border-b flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -523,7 +551,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                 >
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
-                <DrawerTitle>{WORK_TYPE_LABEL_KA}</DrawerTitle>
+                <DrawerTitle>{t.jobs.workType}</DrawerTitle>
               </div>
             </DrawerHeader>
             <div className="flex-1 min-h-0 overflow-y-auto -mx-4 px-4">
@@ -552,7 +580,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                     </Label>
                   );
                 })}
-                
+
                 {/* Remote Jobs Only - Separated with border */}
                 <div className="border-t border-gray-200 my-3" />
                 <Label
@@ -580,13 +608,16 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     // Location Picker View
     if (showLocationPicker) {
       return (
-        <Drawer open={isOpen} onOpenChange={(open) => {
-          if (!open) {
-            setShowLocationPicker(false);
-            setLocationSearchQuery("");
-            onClose();
-          }
-        }}>
+        <Drawer
+          open={isOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowLocationPicker(false);
+              setLocationSearchQuery("");
+              onClose();
+            }
+          }}
+        >
           <DrawerContent className="max-h-[90vh] flex flex-col">
             <DrawerHeader className="border-b flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -641,7 +672,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                           onCheckedChange={(checked) => {
                             const newCountries = checked
                               ? [...filters.countries, country.code]
-                              : filters.countries.filter((code) => code !== country.code);
+                              : filters.countries.filter(
+                                  (code) => code !== country.code
+                                );
                             handleLocationChange(newCountries);
                           }}
                         />
@@ -670,12 +703,14 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <DrawerTitle className="text-xl font-bold">{SEARCH_TITLE_KA}</DrawerTitle>
+              <DrawerTitle className="text-xl font-bold">
+                {SEARCH_TITLE_KA}
+              </DrawerTitle>
             </div>
           </DrawerHeader>
           <div className="px-4 py-6 flex-1 overflow-y-auto">
-            <FilterForm 
-              filters={filters} 
+            <FilterForm
+              filters={filters}
               onFiltersChange={onFiltersChange}
               isMobile={true}
               onWorkTypeClick={() => setShowWorkTypePicker(true)}
@@ -684,7 +719,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
             />
           </div>
           <DrawerFooter className="border-t pt-4 px-4 pb-6">
-            <div className="flex gap-3 w-full">
+            <div
+              className={`flex gap-3 w-full ${
+                onClear ? "justify-between" : "justify-end"
+              }`}
+            >
               {onClear && (
                 <Button
                   onClick={() => {
@@ -693,21 +732,21 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                     setShowLocationPicker(false);
                   }}
                   variant="ghost"
-                  className="flex-1 h-12 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0"
+                  className="w-auto h-12 px-4 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0"
                 >
-                  {CLEAR_BUTTON_KA}
+                  {t.common.clear}
                 </Button>
               )}
-            <Button 
-              onClick={() => {
-                onApply();
-                setShowWorkTypePicker(false);
-                setShowLocationPicker(false);
-              }}
-                className="flex-1 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-lg h-12 text-base font-medium"
-            >
-              {SAVE_BUTTON_KA}
-            </Button>
+              <Button
+                onClick={() => {
+                  onApply();
+                  setShowWorkTypePicker(false);
+                  setShowLocationPicker(false);
+                }}
+                className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-lg text-base font-medium"
+              >
+                {t.common.apply}
+              </Button>
             </div>
           </DrawerFooter>
         </DrawerContent>
@@ -722,29 +761,36 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
           <DialogTitle>Filter Jobs</DialogTitle>
         </DialogHeader>
         <div className="py-4">
-          <FilterForm 
-            filters={filters} 
+          <FilterForm
+            filters={filters}
             onFiltersChange={onFiltersChange}
             isMobile={false}
             userTopSkills={userTopSkills}
           />
         </div>
         <DialogFooter>
-          <div className="flex gap-3 w-full">
+          <div
+            className={`flex gap-3 w-full ${
+              onClear ? "justify-between" : "justify-end"
+            }`}
+          >
             {onClear && (
               <Button
                 onClick={() => {
                   onClear();
                 }}
                 variant="ghost"
-                className="flex-1 h-10 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0"
+                className="w-auto h-10 px-4 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0"
               >
-                {CLEAR_BUTTON_KA}
+                {t.common.clear}
               </Button>
             )}
-            <Button onClick={onApply} className="flex-1 bg-breneo-blue text-white hover:bg-breneo-blue/90">
-              Apply Filters
-          </Button>
+            <Button
+              onClick={onApply}
+              className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90"
+            >
+              {t.common.apply}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

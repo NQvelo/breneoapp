@@ -298,7 +298,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                         "transition-colors duration-200 flex-shrink-0",
                         isActive
                           ? "text-breneo-blue"
-                          : "text-gray-400 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300"
+                          : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue"
                       )}
                     />
                     {!collapsed && (
@@ -340,7 +340,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === settingsPath
                       ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300"
+                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue"
                   )}
                 />
                 {!collapsed && (
@@ -365,7 +365,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === "/help"
                       ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300"
+                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue"
                   )}
                 />
                 {!collapsed && (

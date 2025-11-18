@@ -1,7 +1,7 @@
-import * as React from "react"
-import * as SliderPrimitive from "@radix-ui/react-slider"
+import * as React from "react";
+import * as SliderPrimitive from "@radix-ui/react-slider";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
@@ -9,7 +9,7 @@ const Slider = React.forwardRef<
 >(({ className, ...props }, ref) => {
   const value = props.value || props.defaultValue || [0];
   const thumbCount = Array.isArray(value) ? value.length : 1;
-  
+
   return (
     <SliderPrimitive.Root
       ref={ref}
@@ -30,7 +30,7 @@ const Slider = React.forwardRef<
       ))}
     </SliderPrimitive.Root>
   );
-})
-Slider.displayName = SliderPrimitive.Root.displayName
+});
+Slider.displayName = SliderPrimitive.Root.displayName;
 
-export { Slider }
+export { Slider };

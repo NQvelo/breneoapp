@@ -3,6 +3,7 @@ import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface SalaryRangeFilterProps {
   minSalary: number;
@@ -37,6 +38,7 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
   salaryByAgreement = false,
   onSalaryChange,
 }) => {
+  const { t } = useLanguage();
   const [localMin, setLocalMin] = useState<number>(salaryMin ?? minSalary);
   const [localMax, setLocalMax] = useState<number>(salaryMax ?? maxSalary);
   const [localByAgreement, setLocalByAgreement] = useState<boolean>(salaryByAgreement);
@@ -79,8 +81,8 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
   return (
     <div className="space-y-4">
       {/* Title */}
-      <h3 className="text-base font-medium text-center text-gray-900 dark:text-gray-100">
-        ხელფასის დიაპაზონი
+      <h3 className="text-base font-medium text-left text-gray-900 dark:text-gray-100">
+        {t.jobs.salaryRange}
       </h3>
 
       {/* Histogram */}
@@ -94,7 +96,7 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
           return (
             <div
               key={index}
-              className="flex-1 bg-gray-900 dark:bg-gray-200 transition-opacity"
+              className="flex-1 bg-gray-900 dark:bg-gray-200 transition-opacity rounded-md"
               style={{
                 height: `${barHeight}%`,
                 minHeight: '4px',
@@ -121,7 +123,7 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
       <div className="flex items-end gap-3">
         <div className="flex-1">
           <Label htmlFor="salary-min" className="text-xs text-gray-600 dark:text-gray-300 mb-1 block">
-            მინიმუმი
+            {t.jobs.minimum}
           </Label>
           <Input
             id="salary-min"
@@ -138,7 +140,7 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
         </div>
         <div className="flex-1">
           <Label htmlFor="salary-max" className="text-xs text-gray-600 dark:text-gray-300 mb-1 block">
-            მაქსიმუმი
+            {t.jobs.maximum}
           </Label>
           <Input
             id="salary-max"
@@ -163,7 +165,7 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
           htmlFor="salary-by-agreement"
           className="text-sm font-normal cursor-pointer text-gray-900 dark:text-gray-100"
         >
-          შეთანხმებით
+          {t.jobs.byAgreement}
         </Label>
       </div>
     </div>
