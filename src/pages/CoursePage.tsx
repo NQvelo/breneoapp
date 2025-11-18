@@ -64,34 +64,15 @@ const CoursePage = () => {
       if (!user?.id || !courseId) return false;
 
       try {
-        // Try API first
-        const response = await apiClient.get(API_ENDPOINTS.USER.SAVED_COURSES);
-        const courses = Array.isArray(response.data)
-          ? response.data
-          : response.data?.results ||
-            response.data?.courses ||
-            response.data?.data ||
-            [];
-
-        return courses.some(
-          (c: { id?: string; course_id?: string }) =>
-            String(c.id) === String(courseId) ||
-            String(c.course_id) === String(courseId)
+        // Fetch from profile API
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedCoursesArray = profileResponse.data?.saved_courses || [];
+        return savedCoursesArray.some(
+          (id: string | number) => String(id) === String(courseId)
         );
       } catch (error) {
-        // Fallback to Supabase
-        try {
-          const { data, error: supabaseError } = await supabase
-            .from("saved_courses")
-            .select("course_id")
-            .eq("user_id", String(user.id))
-            .eq("course_id", String(courseId))
-            .single();
-
-          return !supabaseError && !!data;
-        } catch {
-          return false;
-        }
+        console.error("Error checking if course is saved:", error);
+        return false;
       }
     },
     enabled: !!user?.id && !!courseId,
@@ -113,11 +94,15 @@ const CoursePage = () => {
           // Check if response has profile_data wrapper
           const apiData = response.data.profile_data || response.data;
           const data = apiData as Record<string, unknown>;
-          
+
           const getStringField = (fields: string[]) => {
             for (const field of fields) {
               const value = data[field];
-              if (value !== null && value !== undefined && typeof value === "string") {
+              if (
+                value !== null &&
+                value !== undefined &&
+                typeof value === "string"
+              ) {
                 return value;
               }
             }
@@ -125,34 +110,32 @@ const CoursePage = () => {
           };
 
           const academyName =
-            getStringField(["academy_name", "name", "first_name", "firstName"]) ||
+            getStringField([
+              "academy_name",
+              "name",
+              "first_name",
+              "firstName",
+            ]) ||
             course.provider ||
             "";
 
-          const profilePhotoUrl = 
-            getStringField([
-              "profile_photo_url",
-              "profilePhotoUrl",
-              "profile_image_url",
-              "profileImageUrl",
-              "profile_photo",
-              "profilePhoto",
-            ]);
+          const profilePhotoUrl = getStringField([
+            "profile_photo_url",
+            "profilePhotoUrl",
+            "profile_image_url",
+            "profileImageUrl",
+            "profile_photo",
+            "profilePhoto",
+          ]);
 
-          const logoUrl = 
-            getStringField([
-              "logo_url",
-              "logoUrl",
-              "logo",
-              "image",
-            ]);
+          const logoUrl = getStringField([
+            "logo_url",
+            "logoUrl",
+            "logo",
+            "image",
+          ]);
 
-          const description = 
-            getStringField([
-              "description",
-              "desc",
-              "about",
-            ]);
+          const description = getStringField(["description", "desc", "about"]);
 
           const profile = {
             id: course.academy_id,
@@ -160,9 +143,13 @@ const CoursePage = () => {
             slug:
               getStringField(["slug"]) ||
               (academyName ? createAcademySlug(academyName) : undefined),
-            profile_photo_url: profilePhotoUrl && profilePhotoUrl.trim() !== "" ? profilePhotoUrl : null,
+            profile_photo_url:
+              profilePhotoUrl && profilePhotoUrl.trim() !== ""
+                ? profilePhotoUrl
+                : null,
             logo_url: logoUrl && logoUrl.trim() !== "" ? logoUrl : null,
-            description: description && description.trim() !== "" ? description : null,
+            description:
+              description && description.trim() !== "" ? description : null,
           } as AcademyProfile;
 
           console.log("🔍 Academy profile fetched from API:", {
@@ -197,12 +184,14 @@ const CoursePage = () => {
               ? createAcademySlug(supabaseData.academy_name)
               : undefined,
             profile_photo_url: null, // Supabase doesn't have this field separately
-            logo_url: supabaseData.logo_url && supabaseData.logo_url.trim() !== "" 
-              ? supabaseData.logo_url 
-              : null,
-            description: supabaseData.description && supabaseData.description.trim() !== ""
-              ? supabaseData.description
-              : null,
+            logo_url:
+              supabaseData.logo_url && supabaseData.logo_url.trim() !== ""
+                ? supabaseData.logo_url
+                : null,
+            description:
+              supabaseData.description && supabaseData.description.trim() !== ""
+                ? supabaseData.description
+                : null,
           } as AcademyProfile;
 
           console.log("🔍 Academy profile fetched from Supabase:", {
@@ -240,56 +229,168 @@ const CoursePage = () => {
       setIsSaving(true);
 
       try {
-        if (!shouldSave) {
-          // Unsave course - try API first
-          try {
-            await apiClient.delete(
-              `${API_ENDPOINTS.USER.SAVED_COURSES}${String(course.id)}/`
+        // Use the course ID (can be UUID or numeric string)
+        const courseIdStr = String(course.id);
+
+        console.log("💾 Saving course:", {
+          courseId: courseIdStr,
+          courseTitle: course.title,
+          shouldSave,
+          userId: user.id,
+        });
+
+        // Validate that course ID is not empty
+        if (!courseIdStr || courseIdStr.trim() === "") {
+          throw new Error("Course ID is required");
+        }
+
+        // Fetch current profile to get existing saved_courses array
+        console.log("📥 Fetching current profile...");
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+
+        console.log("📥 Profile response:", {
+          status: profileResponse.status,
+          dataKeys: Object.keys(profileResponse.data || {}),
+          fullData: profileResponse.data,
+        });
+
+        // Try to extract saved_courses from various possible locations
+        let currentSavedCourses: (string | number)[] = [];
+
+        if (profileResponse.data) {
+          const data = profileResponse.data as Record<string, unknown>;
+
+          // Check multiple possible locations
+          if (Array.isArray(data.saved_courses)) {
+            currentSavedCourses = data.saved_courses;
+            console.log(
+              "✅ Found saved_courses at data.saved_courses:",
+              currentSavedCourses
             );
-          } catch (apiError) {
-            // If API delete fails, try Supabase
-            const { error } = await supabase
-              .from("saved_courses")
-              .delete()
-              .eq("user_id", String(user.id))
-              .eq("course_id", String(course.id));
-
-            if (error) throw error;
-          }
-        } else {
-          // Save course - try API endpoint first, then profile endpoint as requested
-          const courseIdStr = String(course.id);
-          try {
-            await apiClient.post(API_ENDPOINTS.USER.SAVED_COURSES, {
-              course_id: courseIdStr,
-              course: courseIdStr,
-            });
-          } catch (apiError: unknown) {
-            // If API post fails, try saving via profile endpoint as requested
-            try {
-              await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-                saved_courses: [courseIdStr],
-              });
-            } catch (profileError) {
-              // If profile endpoint also fails, fallback to Supabase
-              const { error } = await supabase.from("saved_courses").insert({
-                user_id: String(user.id),
-                course_id: courseIdStr,
-              });
-
-              if (error) {
-                // Handle duplicate entry
-                if (error.code === "23505") {
-                  return; // Already saved
-                }
-                throw error;
-              }
+          } else if (data.profile && typeof data.profile === "object") {
+            const profile = data.profile as Record<string, unknown>;
+            if (Array.isArray(profile.saved_courses)) {
+              currentSavedCourses = profile.saved_courses;
+              console.log(
+                "✅ Found saved_courses at data.profile.saved_courses:",
+                currentSavedCourses
+              );
+            }
+          } else if (data.user && typeof data.user === "object") {
+            const userData = data.user as Record<string, unknown>;
+            if (Array.isArray(userData.saved_courses)) {
+              currentSavedCourses = userData.saved_courses;
+              console.log(
+                "✅ Found saved_courses at data.user.saved_courses:",
+                currentSavedCourses
+              );
             }
           }
         }
-      } catch (error) {
+
+        console.log("📋 Current saved courses:", currentSavedCourses);
+
+        // Normalize all IDs to strings for consistent comparison
+        const normalizedSavedCourses = currentSavedCourses.map(
+          (id: string | number) => String(id)
+        );
+        console.log("📋 Normalized saved courses:", normalizedSavedCourses);
+
+        let updatedSavedCourses: string[];
+
+        if (!shouldSave) {
+          // Unsave: Remove course ID from array
+          updatedSavedCourses = normalizedSavedCourses.filter(
+            (id: string) => id !== courseIdStr
+          );
+          console.log(
+            "🗑️ Unsaving course. Updated array:",
+            updatedSavedCourses
+          );
+        } else {
+          // Save: Add course ID to array if not already present
+          if (normalizedSavedCourses.some((id: string) => id === courseIdStr)) {
+            console.log("ℹ️ Course already saved, skipping");
+            // Already saved, treat as success
+            return;
+          }
+          updatedSavedCourses = [...normalizedSavedCourses, courseIdStr];
+          console.log("💾 Saving course. Updated array:", updatedSavedCourses);
+        }
+
+        // Update profile with new saved_courses array
+        console.log("📤 Sending PATCH request to update profile...");
+        console.log("📤 Payload:", { saved_courses: updatedSavedCourses });
+
+        const patchResponse = await apiClient.patch(
+          API_ENDPOINTS.AUTH.PROFILE,
+          {
+            saved_courses: updatedSavedCourses,
+          }
+        );
+
+        console.log("✅ PATCH response:", {
+          status: patchResponse.status,
+          data: patchResponse.data,
+        });
+
+        // Verify the update was successful
+        const verifyResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        let verifySavedCourses: (string | number)[] = [];
+
+        if (verifyResponse.data) {
+          const verifyData = verifyResponse.data as Record<string, unknown>;
+          if (Array.isArray(verifyData.saved_courses)) {
+            verifySavedCourses = verifyData.saved_courses;
+          } else if (
+            verifyData.profile &&
+            typeof verifyData.profile === "object"
+          ) {
+            const profile = verifyData.profile as Record<string, unknown>;
+            if (Array.isArray(profile.saved_courses)) {
+              verifySavedCourses = profile.saved_courses;
+            }
+          } else if (verifyData.user && typeof verifyData.user === "object") {
+            const userData = verifyData.user as Record<string, unknown>;
+            if (Array.isArray(userData.saved_courses)) {
+              verifySavedCourses = userData.saved_courses;
+            }
+          }
+        }
+
+        const normalizedVerify = verifySavedCourses.map((id: string | number) =>
+          String(id)
+        );
+        const wasSaved = normalizedVerify.includes(courseIdStr);
+
+        console.log(
+          "✅ Verification - saved_courses after update:",
+          verifySavedCourses
+        );
+        console.log("✅ Verification - course was saved:", wasSaved);
+
+        if (shouldSave && !wasSaved) {
+          console.warn(
+            "⚠️ Warning: Course was not found in saved_courses after update"
+          );
+        }
+      } catch (error: any) {
         console.error("Error saving course:", error);
-        throw error;
+
+        // Extract more detailed error message
+        let errorMessage = "Failed to save course. Please try again.";
+        if (error?.response?.data) {
+          const errorData = error.response.data;
+          errorMessage =
+            errorData.detail ||
+            errorData.message ||
+            errorData.error ||
+            errorMessage;
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+
+        throw new Error(errorMessage);
       } finally {
         setIsSaving(false);
       }
@@ -301,6 +402,7 @@ const CoursePage = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["savedCourses"] });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
 
       toast.success(
         `"${course?.title}" has been ${
@@ -308,12 +410,22 @@ const CoursePage = () => {
         } successfully.`
       );
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Error saving/unsaving course:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to save course. Please try again.";
+
+      // Extract more detailed error message
+      let errorMessage = "Failed to save course. Please try again.";
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        errorMessage =
+          errorData.detail ||
+          errorData.message ||
+          errorData.error ||
+          errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       toast.error(errorMessage);
     },
   });
@@ -357,7 +469,8 @@ const CoursePage = () => {
   const academyName = academyProfile?.academy_name || course.provider;
 
   // Get the image URL (prefer profile_photo_url, fallback to logo_url)
-  const academyImageUrl = academyProfile?.profile_photo_url || academyProfile?.logo_url || null;
+  const academyImageUrl =
+    academyProfile?.profile_photo_url || academyProfile?.logo_url || null;
 
   // Debug logging
   console.log("🔍 CoursePage Debug:", {
@@ -380,7 +493,8 @@ const CoursePage = () => {
   };
 
   // Get first 3 topics/categories for tags
-  const displayTags = course.topics?.slice(0, 3) || course.required_skills?.slice(0, 3) || [];
+  const displayTags =
+    course.topics?.slice(0, 3) || course.required_skills?.slice(0, 3) || [];
 
   return (
     <DashboardLayout>
@@ -394,7 +508,7 @@ const CoursePage = () => {
                 <CardTitle className="text-3xl font-bold mb-4 text-black">
                   {course.title}
                 </CardTitle>
-                
+
                 {/* Tags - Small light gray placeholders */}
                 <div className="flex gap-2 mb-4">
                   {displayTags.slice(0, 3).map((tag, index) => (
@@ -419,11 +533,15 @@ const CoursePage = () => {
                   <OptimizedAvatar
                     src={academyImageUrl || undefined}
                     alt={academyName}
-                    fallback={academyName ? academyName.charAt(0).toUpperCase() : "A"}
+                    fallback={
+                      academyName ? academyName.charAt(0).toUpperCase() : "A"
+                    }
                     size="sm"
                     className="flex-shrink-0 !h-10 !w-10 !rounded-full"
                   />
-                  <span className="text-gray-600 text-base font-medium">{academyName}</span>
+                  <span className="text-gray-600 text-base font-medium">
+                    {academyName}
+                  </span>
                 </div>
 
                 {/* Action Buttons */}
@@ -471,7 +589,9 @@ const CoursePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Description Section */}
           <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Description</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">
+              Description
+            </h2>
             <p className="text-gray-700 leading-relaxed">
               {course.description || "description here"}
             </p>
@@ -503,7 +623,9 @@ const CoursePage = () => {
               </div>
               <div className="flex items-center gap-3">
                 <Calendar className="h-5 w-5 text-gray-600 flex-shrink-0" />
-                <span className="text-gray-700">No due date for this content</span>
+                <span className="text-gray-700">
+                  No due date for this content
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -518,7 +640,8 @@ const CoursePage = () => {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600">
-              Complete this course to earn a certificate that demonstrates your skills and knowledge.
+              Complete this course to earn a certificate that demonstrates your
+              skills and knowledge.
             </p>
           </CardContent>
         </Card>
@@ -538,7 +661,9 @@ const CoursePage = () => {
                   <OptimizedAvatar
                     src={academyImageUrl || undefined}
                     alt={academyName}
-                    fallback={academyName ? academyName.charAt(0).toUpperCase() : "A"}
+                    fallback={
+                      academyName ? academyName.charAt(0).toUpperCase() : "A"
+                    }
                     size="lg"
                     className="!h-16 !w-16 !rounded-full"
                   />
@@ -561,7 +686,10 @@ const CoursePage = () => {
 
                   {/* View Academy Button */}
                   <Link to={academyUrl}>
-                    <Button variant="outline" className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                    >
                       <Eye className="h-4 w-4" />
                       View Academy
                     </Button>

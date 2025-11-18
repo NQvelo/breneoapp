@@ -2,17 +2,9 @@ import React from "react";
 import { useLocation } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
-import { Bell, Moon, Sun, Globe, ChevronUp } from "lucide-react";
+import { Bell, Moon, Sun, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
@@ -59,12 +51,11 @@ export function DashboardHeader({
   const { language, setLanguage } = useLanguage();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
-  const [languageMenuOpen, setLanguageMenuOpen] = React.useState(false);
   const username = user?.first_name || user?.email?.split("@")[0] || "User";
   const currentPath = removeLanguagePrefix(location.pathname);
   const pageTitle = getPageTitle(currentPath, username, t);
 
-  const currentLanguageText = language === "ka" ? "ქართული" : "English";
+  const currentLanguageText = language === "ka" ? "GEO" : "EN";
 
   React.useEffect(() => {
     setMounted(true);
@@ -93,44 +84,22 @@ export function DashboardHeader({
 
         {/* Right side icons - hidden on mobile */}
         <div className="hidden md:flex items-center gap-2">
-          <DropdownMenu open={languageMenuOpen} onOpenChange={setLanguageMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-10 px-3 rounded-xl border border-input bg-background shadow-sm
-                           text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80
-                           text-sm font-medium flex items-center gap-2"
-              >
-                <Globe className="h-4 w-4" />
-                <span>{currentLanguageText}</span>
-                <ChevronUp
-                  className={cn(
-                    "h-4 w-4 transition-transform duration-200",
-                    languageMenuOpen ? "rotate-0" : "rotate-180"
-                  )}
-                />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">
-                {t.settings.language}
-              </DropdownMenuLabel>
-              <DropdownMenuRadioGroup value={language} onValueChange={(value) => setLanguage(value as "en" | "ka")}>
-                <DropdownMenuRadioItem value="ka" className="cursor-pointer">
-                  ქართული
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="en" className="cursor-pointer">
-                  English
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            onClick={() => setLanguage(language === "en" ? "ka" : "en")}
+            className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                       text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
+                       text-sm font-medium flex items-center gap-2 transition-colors"
+          >
+            <Globe className="h-4 w-4" />
+            <span>{currentLanguageText}</span>
+          </Button>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="relative h-10 w-10 rounded-xl border border-input bg-background shadow-sm
-                       text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80"
+            className="relative h-10 w-10 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                       text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
             {mounted && theme === "dark" ? (
               <Moon className="h-5 w-5" />
@@ -141,10 +110,10 @@ export function DashboardHeader({
           </Button>
           <LocalizedLink to="/notifications">
             <Button
-              variant="ghost" // Start with ghost variant for base styling
+              variant="ghost"
               size="icon"
-              className="relative h-10 w-10 rounded-xl border border-input bg-background shadow-sm
-                         text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80"
+              className="relative h-10 w-10 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                         text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
             >
               <Bell className="h-5 w-5" />
               <span className="sr-only">Notifications</span>

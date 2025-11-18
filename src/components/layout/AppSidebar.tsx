@@ -17,11 +17,13 @@ import {
   Video,
   ChevronRight,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
-import { useTranslation } from "@/contexts/LanguageContext";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
+import { Button } from "@/components/ui/button";
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -33,11 +35,13 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   // ✅ Get the user object directly from the context
   const { loading, user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { language, setLanguage } = useLanguage();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
 
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
+  const currentLanguageText = language === "ka" ? "GEO" : "EN";
   // Also check raw pathname for immediate active state detection
   const rawPathname = location.pathname;
 
@@ -126,9 +130,20 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
             />
           </LocalizedLink>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setLanguage(language === "en" ? "ka" : "en")}
+              className="relative h-10 px-3 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 
+                         bg-black/[0.06] dark:bg-white/[0.03] hover:!bg-black/[0.08] dark:hover:!bg-white/[0.05] transition-colors
+                         text-sm font-medium flex items-center gap-2"
+            >
+              <Globe className="h-4 w-4" />
+              <span>{currentLanguageText}</span>
+            </Button>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
+                         bg-black/[0.06] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.05] transition-colors rounded-full"
             >
               {mounted && theme === "dark" ? (
                 <Moon size={20} />
@@ -138,15 +153,10 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
             </button>
             <LocalizedLink
               to="/notifications"
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
+                         bg-black/[0.06] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.05] transition-colors rounded-full"
             >
               <Bell size={20} />
-            </LocalizedLink>
-            <LocalizedLink
-              to={settingsPath}
-              className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <Settings size={20} />
             </LocalizedLink>
           </div>
         </div>
@@ -288,7 +298,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                         "transition-colors duration-200 flex-shrink-0",
                         isActive
                           ? "text-breneo-blue"
-                          : "text-gray-400 group-hover:text-breneo-blue"
+                          : "text-gray-400 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300"
                       )}
                     />
                     {!collapsed && (
@@ -330,7 +340,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === settingsPath
                       ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-breneo-blue"
+                      : "text-gray-400 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300"
                   )}
                 />
                 {!collapsed && (
@@ -355,7 +365,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === "/help"
                       ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-breneo-blue"
+                      : "text-gray-400 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300"
                   )}
                 />
                 {!collapsed && (

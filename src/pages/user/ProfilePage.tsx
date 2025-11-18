@@ -310,83 +310,53 @@ const ProfilePage = () => {
   const manualSocialLinkUpdateRef = useRef(false);
   const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch saved courses from API (with Supabase fallback)
+  // Fetch saved courses from API profile endpoint
   const { data: savedCourses = [], isLoading: loadingSavedCourses } = useQuery({
     queryKey: ["savedCourses", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      // Try API first
       try {
-        const response = await apiClient.get(API_ENDPOINTS.USER.SAVED_COURSES, {
-          params: { limit: 6 }, // Limit to 6 for display
-        });
+        // Fetch profile data from API
+        const response = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
-        // Handle different response structures
-        let courses: SavedCourse[] = [];
-        if (Array.isArray(response.data)) {
-          courses = response.data;
-        } else if (response.data && typeof response.data === "object") {
+        // Extract saved_courses array from profile response
+        let savedCourseIds: string[] = [];
+        
+        if (response.data && typeof response.data === "object") {
           const data = response.data as Record<string, unknown>;
-          if (Array.isArray(data.results)) {
-            courses = data.results as SavedCourse[];
-          } else if (Array.isArray(data.courses)) {
-            courses = data.courses as SavedCourse[];
-          } else if (Array.isArray(data.data)) {
-            courses = data.data as SavedCourse[];
+          
+          // Check for saved_courses in various possible locations
+          if (Array.isArray(data.saved_courses)) {
+            savedCourseIds = data.saved_courses as string[];
+          } else if (data.profile && typeof data.profile === "object") {
+            const profile = data.profile as Record<string, unknown>;
+            if (Array.isArray(profile.saved_courses)) {
+              savedCourseIds = profile.saved_courses as string[];
+            }
+          } else if (data.user && typeof data.user === "object") {
+            const userData = data.user as Record<string, unknown>;
+            if (Array.isArray(userData.saved_courses)) {
+              savedCourseIds = userData.saved_courses as string[];
+            }
           }
         }
 
-        if (courses.length > 0) {
-          return courses.map((course: unknown) => {
-            const c = course as Record<string, unknown>;
-            return {
-              id: (c.id as string) || (c.course_id as string) || "",
-              title: (c.title as string) || "",
-              provider: (c.provider as string) || "",
-              category: (c.category as string) || "",
-              level: (c.level as string) || "",
-              duration: (c.duration as string) || "",
-              image: (c.image as string) || "lovable-uploads/no_photo.png",
-              description: (c.description as string) || "",
-            } as SavedCourse;
-          });
-        }
-      } catch (error) {
-        console.warn(
-          "Error fetching saved courses from API, trying Supabase:",
-          error
-        );
-      }
-
-      // Fallback to Supabase: fetch saved course IDs and then get course details
-      try {
-        const { data: savedCourseIds, error: supabaseError } = await supabase
-          .from("saved_courses")
-          .select("course_id")
-          .eq("user_id", String(user.id))
-          .limit(6);
-
-        if (supabaseError) {
-          console.error(
-            "Error fetching saved courses from Supabase:",
-            supabaseError
-          );
-          return [];
-        }
-
+        // If no saved courses found, return empty array
         if (!savedCourseIds || savedCourseIds.length === 0) {
           return [];
         }
 
-        // Fetch course details from Supabase
-        const courseIds = savedCourseIds.map((item) => item.course_id);
+        // Limit to 6 for display
+        const limitedIds = savedCourseIds.slice(0, 6);
+
+        // Fetch course details from Supabase using the IDs from API
         const { data: coursesData, error: coursesError } = await supabase
           .from("courses")
           .select(
             "id, title, provider, category, level, duration, image, description"
           )
-          .in("id", courseIds);
+          .in("id", limitedIds);
 
         if (coursesError) {
           console.error(
@@ -407,7 +377,7 @@ const ProfilePage = () => {
           description: course.description || "",
         })) as SavedCourse[];
       } catch (error) {
-        console.error("Error in Supabase fallback:", error);
+        console.error("Error fetching saved courses from API profile:", error);
         return [];
       }
     },

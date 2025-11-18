@@ -27,6 +27,7 @@ import UserDashboard from "@/pages/user/UserHome";
 import UserProfile from "@/pages/user/ProfilePage";
 import UserSettings from "@/pages/user/UserSettings";
 import JobsPage from "@/pages/user/JobsPage";
+import JobSearchResultsPage from "@/pages/user/JobSearchResultsPage";
 import JobDetailPage from "@/pages/user/JobDetailPage";
 import CoursesPage from "@/pages/CoursesPage";
 import CoursePage from "@/pages/CoursePage";
@@ -132,6 +133,11 @@ export const AppRoutes = () => {
       {createLocalizedRoute("/jobs", (
         <ProtectedRoute requiredRole="user">
           <JobsPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/jobs/search", (
+        <ProtectedRoute requiredRole="user">
+          <JobSearchResultsPage />
         </ProtectedRoute>
       ))}
       {createLocalizedRoute("/jobs/:jobId", (

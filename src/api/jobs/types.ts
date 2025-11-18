@@ -1,6 +1,6 @@
 /**
  * Job API Types
- * 
+ *
  * Type definitions for job-related API responses and requests
  */
 
@@ -171,6 +171,9 @@ export interface JobFilters {
   isRemote: boolean;
   datePosted?: string; // Add date_posted filter
   skills: string[]; // User interests/skills from test results
+  salaryMin?: number; // Minimum salary
+  salaryMax?: number; // Maximum salary
+  salaryByAgreement?: boolean; // "By agreement" checkbox
 }
 
 // Job search parameters
@@ -210,4 +213,3 @@ export interface JobApiResponse {
   pageSize?: number;
   hasMore?: boolean;
 }
-

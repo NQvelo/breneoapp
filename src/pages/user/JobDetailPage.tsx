@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
   Bookmark,
   ArrowLeft,
@@ -88,13 +90,15 @@ const JobDetailPage = () => {
     queryKey: ["savedJobs", user?.id],
     queryFn: async () => {
       if (!user) return [];
-      // @ts-expect-error - saved_jobs table exists but is not in generated types
-      const { data } = await supabase
-        .from("saved_jobs")
-        .select("job_id")
-        .eq("user_id", user.id);
-      // @ts-expect-error - data type inference issue
-      return data?.map((item: { job_id: string }) => item.job_id) || [];
+      try {
+        // Fetch from profile API
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedJobsArray = profileResponse.data?.saved_jobs || [];
+        return savedJobsArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved jobs from profile API:", error);
+        return [];
+      }
     },
     enabled: !!user,
   });
@@ -108,65 +112,53 @@ const JobDetailPage = () => {
       if (!user) throw new Error("User not logged in");
       if (!jobDetail) throw new Error("Job details not available");
 
-      const jobData = {
-        id: jobIdForSave,
-        title: jobDetail.title || jobDetail.job_title || "Untitled Position",
-        company:
-          jobDetail.company ||
-          jobDetail.company_name ||
-          jobDetail.employer_name ||
-          "Unknown Company",
-        location:
-          jobDetail.location ||
-          jobDetail.job_location ||
-          `${jobDetail.city || ""} ${jobDetail.state || ""} ${
-            jobDetail.country || ""
-          }`.trim() ||
-          "Location not specified",
-        url:
-          jobDetail.apply_url ||
-          jobDetail.job_apply_link ||
-          jobDetail.url ||
-          "",
-        company_logo:
-          jobDetail.company_logo ||
-          jobDetail.employer_logo ||
-          jobDetail.logo_url ||
-          undefined,
-        is_saved: !isSaved,
-        salary: jobDetail.salary || "By agreement",
-        employment_type:
-          jobDetail.employment_type ||
-          jobDetail.job_employment_type ||
-          "Full Time",
-        work_arrangement: jobDetail.work_arrangement || "On-site",
-      };
+      try {
+        // Fetch current profile to get existing saved_jobs array
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const currentSavedJobs = profileResponse.data?.saved_jobs || [];
 
-      if (isSaved) {
-        // @ts-expect-error - saved_jobs table exists but is not in generated types
-        await supabase
-          .from("saved_jobs")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("job_id", jobIdForSave);
-      } else {
-        // @ts-expect-error - saved_jobs table exists but is not in generated types
-        await supabase
-          .from("saved_jobs")
-          // @ts-expect-error - insert type inference issue
-          .insert({
-            user_id: user.id,
-            job_id: jobIdForSave,
-            job_data: jobData,
-          });
+        let updatedSavedJobs: string[];
+
+        if (isSaved) {
+          // Unsave: Remove job ID from array
+          updatedSavedJobs = currentSavedJobs.filter(
+            (id: string | number) => String(id) !== jobIdForSave
+          );
+        } else {
+          // Save: Add job ID to array if not already present
+          if (
+            currentSavedJobs.some(
+              (id: string | number) => String(id) === jobIdForSave
+            )
+          ) {
+            // Already saved, treat as success
+            return;
+          }
+          updatedSavedJobs = [...currentSavedJobs, jobIdForSave];
+        }
+
+        // Update profile with new saved_jobs array
+        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+          saved_jobs: updatedSavedJobs,
+        });
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to save job. Please try again.";
+        throw new Error(errorMessage);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success(isSaved ? "Job Unsaved" : "Job Saved");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to save job");
+      console.error("Error saving job:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save job";
+      toast.error(errorMessage);
     },
   });
 
@@ -1027,8 +1019,9 @@ const JobDetailPage = () => {
                     <div className="flex flex-wrap gap-3">
                       {getApplyUrl() ? (
                         <Button
+                          variant="default"
                           onClick={() => window.open(getApplyUrl(), "_blank")}
-                          className="flex items-center gap-2 bg-breneo-accent hover:bg-breneo-accent/90 text-white"
+                          className="flex items-center gap-2"
                           size="lg"
                         >
                           Apply Now
@@ -1046,7 +1039,7 @@ const JobDetailPage = () => {
                       )}
                       {user && (
                         <Button
-                          variant="outline"
+                          variant="default"
                           onClick={() => saveJobMutation.mutate()}
                           disabled={saveJobMutation.isPending}
                           className="flex items-center gap-2"
@@ -1054,7 +1047,7 @@ const JobDetailPage = () => {
                         >
                           <Bookmark
                             className={`h-4 w-4 ${
-                              isSaved ? "fill-current" : ""
+                              isSaved ? "fill-white text-white" : "text-white"
                             }`}
                           />
                           {isSaved ? "Saved" : "Save Job"}

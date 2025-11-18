@@ -498,18 +498,16 @@ const CoursesPage = () => {
     queryFn: async () => {
       if (!userId || !canUseUserId) return [];
 
-      // Fetch from Supabase (source of truth for saving)
-      const { data, error } = await supabase
-        .from("saved_courses")
-        .select("course_id")
-        .eq("user_id", userId);
-
-      if (error) {
-        console.error("Error fetching saved courses from Supabase:", error);
+      try {
+        // Fetch from profile API
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedCoursesArray =
+          profileResponse.data?.saved_courses || [];
+        return savedCoursesArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved courses from profile API:", error);
         return [];
       }
-
-      return data.map((item) => item.course_id);
     },
     enabled: canUseUserId,
   });
@@ -879,49 +877,164 @@ const CoursesPage = () => {
     mutationFn: async (course: Course) => {
       if (!userId) throw new Error("User not logged in");
 
-      if (course.is_saved) {
-        // Unsave: Delete from Supabase
-        const { error } = await supabase
-          .from("saved_courses")
-          .delete()
-          .eq("user_id", userId)
-          .eq("course_id", course.id);
+      try {
+        const courseIdStr = String(course.id);
+        console.log("💾 Saving course:", {
+          courseId: courseIdStr,
+          courseTitle: course.title,
+          isCurrentlySaved: course.is_saved,
+          userId,
+        });
 
-        if (error) {
-          throw new Error(`Failed to unsave course: ${error.message}`);
+        // Fetch current profile to get existing saved_courses array
+        console.log("📥 Fetching current profile...");
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        
+        console.log("📥 Profile response:", {
+          status: profileResponse.status,
+          dataKeys: Object.keys(profileResponse.data || {}),
+          fullData: profileResponse.data,
+        });
+
+        // Try to extract saved_courses from various possible locations
+        let currentSavedCourses: (string | number)[] = [];
+        
+        if (profileResponse.data) {
+          const data = profileResponse.data as Record<string, unknown>;
+          
+          // Check multiple possible locations
+          if (Array.isArray(data.saved_courses)) {
+            currentSavedCourses = data.saved_courses;
+            console.log("✅ Found saved_courses at data.saved_courses:", currentSavedCourses);
+          } else if (data.profile && typeof data.profile === "object") {
+            const profile = data.profile as Record<string, unknown>;
+            if (Array.isArray(profile.saved_courses)) {
+              currentSavedCourses = profile.saved_courses;
+              console.log("✅ Found saved_courses at data.profile.saved_courses:", currentSavedCourses);
+            }
+          } else if (data.user && typeof data.user === "object") {
+            const userData = data.user as Record<string, unknown>;
+            if (Array.isArray(userData.saved_courses)) {
+              currentSavedCourses = userData.saved_courses;
+              console.log("✅ Found saved_courses at data.user.saved_courses:", currentSavedCourses);
+            }
+          }
         }
-      } else {
-        // Save: Insert into Supabase
-        const { error } = await supabase
-          .from("saved_courses")
-          .insert({ user_id: userId, course_id: course.id });
 
-        if (error) {
-          // Handle duplicate entry (course already saved)
-          if (error.code === "23505") {
-            // Course is already saved, treat as success
+        console.log("📋 Current saved courses:", currentSavedCourses);
+
+        // Normalize all IDs to strings for consistent comparison
+        const normalizedSavedCourses = currentSavedCourses.map((id: string | number) => String(id));
+        console.log("📋 Normalized saved courses:", normalizedSavedCourses);
+
+        let updatedSavedCourses: string[];
+
+        if (course.is_saved) {
+          // Unsave: Remove course ID from array
+          updatedSavedCourses = normalizedSavedCourses.filter(
+            (id: string) => id !== courseIdStr
+          );
+          console.log("🗑️ Unsaving course. Updated array:", updatedSavedCourses);
+        } else {
+          // Save: Add course ID to array if not already present
+          if (normalizedSavedCourses.some((id: string) => id === courseIdStr)) {
+            console.log("ℹ️ Course already saved, skipping");
+            // Already saved, treat as success
             return;
           }
-          throw new Error(`Failed to save course: ${error.message}`);
+          updatedSavedCourses = [...normalizedSavedCourses, courseIdStr];
+          console.log("💾 Saving course. Updated array:", updatedSavedCourses);
         }
+
+        // Update profile with new saved_courses array
+        console.log("📤 Sending PATCH request to update profile...");
+        console.log("📤 Payload:", { saved_courses: updatedSavedCourses });
+        
+        const patchResponse = await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+          saved_courses: updatedSavedCourses,
+        });
+        
+        console.log("✅ PATCH response:", {
+          status: patchResponse.status,
+          data: patchResponse.data,
+        });
+        
+        // Verify the update was successful
+        const verifyResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        let verifySavedCourses: (string | number)[] = [];
+        
+        if (verifyResponse.data) {
+          const verifyData = verifyResponse.data as Record<string, unknown>;
+          if (Array.isArray(verifyData.saved_courses)) {
+            verifySavedCourses = verifyData.saved_courses;
+          } else if (verifyData.profile && typeof verifyData.profile === "object") {
+            const profile = verifyData.profile as Record<string, unknown>;
+            if (Array.isArray(profile.saved_courses)) {
+              verifySavedCourses = profile.saved_courses;
+            }
+          } else if (verifyData.user && typeof verifyData.user === "object") {
+            const userData = verifyData.user as Record<string, unknown>;
+            if (Array.isArray(userData.saved_courses)) {
+              verifySavedCourses = userData.saved_courses;
+            }
+          }
+        }
+        
+        const normalizedVerify = verifySavedCourses.map((id: string | number) => String(id));
+        const wasSaved = normalizedVerify.includes(courseIdStr);
+        
+        console.log("✅ Verification - saved_courses after update:", verifySavedCourses);
+        console.log("✅ Verification - course was saved:", wasSaved);
+        
+        if (!course.is_saved && !wasSaved) {
+          console.warn("⚠️ Warning: Course was not found in saved_courses after update");
+        }
+      } catch (error: any) {
+        console.error("Error saving course:", error);
+        
+        // Extract more detailed error message
+        let errorMessage = "Failed to save course. Please try again.";
+        if (error?.response?.data) {
+          const errorData = error.response.data;
+          errorMessage = 
+            errorData.detail || 
+            errorData.message || 
+            errorData.error || 
+            errorMessage;
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        
+        throw new Error(errorMessage);
       }
     },
     onSuccess: (_, variables) => {
       // Invalidate queries to refresh the UI in both CoursesPage and ProfilePage
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["savedCourses"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success(
         `"${variables.title}" has been ${
           variables.is_saved ? "unsaved" : "saved"
         } successfully.`
       );
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Error saving/unsaving course:", error);
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to save course. Please try again.";
+      
+      // Extract more detailed error message
+      let errorMessage = "Failed to save course. Please try again.";
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        errorMessage = 
+          errorData.detail || 
+          errorData.message || 
+          errorData.error || 
+          errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       toast.error(errorMessage);
     },
   });
@@ -1057,7 +1170,7 @@ const CoursesPage = () => {
       >
         <CardContent className="p-5 flex flex-col flex-grow">
           {/* Course Image */}
-          <div className="relative h-48 overflow-hidden rounded-lg mb-4 bg-gradient-to-br from-gray-100 to-gray-200">
+          <div className="relative h-40 overflow-hidden rounded-lg mb-4 bg-gradient-to-br from-gray-100 to-gray-200">
             <img
               src={course.image || "lovable-uploads/no_photo.png"}
               alt={course.title}
@@ -1243,9 +1356,9 @@ const CoursesPage = () => {
         </div>
 
         {coursesLoading && !shouldShowSavedCourses && (
-          <div className="flex gap-6 overflow-x-auto scrollbar-hide -mx-2 px-2 pb-32 md:pb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
             {[...Array(6)].map((_, i) => (
-              <Card key={i} className="flex-shrink-0 w-80">
+              <Card key={i} className="w-full">
                 <CardContent className="p-5">
                   <Skeleton className="h-48 w-full mb-4" />
                   <Skeleton className="h-6 w-full mb-2" />
@@ -1273,9 +1386,9 @@ const CoursesPage = () => {
         {/* Course Cards Grid */}
         {(shouldShowSavedCourses ||
           (!coursesLoading && coursesToDisplay.length > 0)) && (
-          <div className="flex gap-6 overflow-x-auto scrollbar-hide -mx-2 px-2 pb-32 md:pb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
             {coursesToDisplay.map((course) => (
-              <div key={course.id} className="flex-shrink-0 w-80">
+              <div key={course.id} className="w-full">
                 {renderCourseCard(course)}
               </div>
             ))}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Users, X } from "lucide-react";
+import { Network, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
@@ -95,9 +95,9 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
   };
 
   return (
-    <div className="relative flex-1 min-w-0" ref={dropdownRef}>
+    <div className="relative w-full" ref={dropdownRef}>
       {/* Work Type Input Field */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex items-center gap-2 w-full">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
@@ -109,7 +109,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
               : "text-gray-900 dark:text-gray-100"
           )}
         >
-          <Users className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
+          <Network className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
           {selectedWorkTypes.length === 0 ? (
             <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>
           ) : selectedWorkTypes.length === 1 ? (

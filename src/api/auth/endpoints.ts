@@ -21,7 +21,6 @@ export const API_ENDPOINTS = {
     PROFILE: "/api/user/profile/",
     SKILLS: "/api/user/skills/",
     TESTS: "/api/user/tests/",
-    SAVED_COURSES: "/api/user/saved-courses/",
     SAVED_JOBS: "/api/user/saved-jobs/",
   },
   ACADEMY: {

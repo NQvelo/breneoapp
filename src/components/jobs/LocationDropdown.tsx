@@ -96,20 +96,20 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
   };
 
   return (
-    <div className="relative flex-1 min-w-0" ref={dropdownRef}>
+    <div className="relative w-full" ref={dropdownRef}>
       {/* Location Input Field */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
+      <div className="flex items-center gap-2 w-full">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
             "flex items-center flex-1 min-w-0 h-auto py-0 px-0 text-sm text-left bg-transparent border-0 focus:outline-none focus:ring-0",
-          "transition-colors cursor-pointer hover:opacity-80",
-          isPlaceholder 
-            ? "text-gray-400 dark:text-gray-500" 
-            : "text-gray-900 dark:text-gray-100"
-        )}
-      >
+            "transition-colors cursor-pointer hover:opacity-80",
+            isPlaceholder 
+              ? "text-gray-400 dark:text-gray-500" 
+              : "text-gray-900 dark:text-gray-100"
+          )}
+        >
         <MapPin className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2" />
           {selectedLocations.length === 0 ? (
             <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>

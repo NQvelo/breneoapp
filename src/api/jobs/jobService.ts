@@ -68,6 +68,8 @@ const fetchJobsFromJSearchAPI = async (
   const urlParams = new URLSearchParams();
 
   // Add query/search term (required)
+  // Query is already built in fetchActiveJobs (includes search term + skills)
+  // So we just use it here, or default to "developer"
   if (query && query.trim()) {
     urlParams.append("query", query.trim());
   } else {
@@ -75,21 +77,28 @@ const fetchJobsFromJSearchAPI = async (
   }
 
   // Add page and num_pages
-  urlParams.append("page", String(page));
-  urlParams.append("num_pages", "1");
+  // num_pages controls how many pages to fetch (each page typically has ~10 results)
+  // Set to 3 to fetch ~30 results per API call, then we'll show 12 items per page
+  // Calculate which API pages to fetch: page 1 fetches API pages 1-3, page 2 fetches API pages 4-6, etc.
+  const apiStartPage = (page - 1) * 3 + 1;
+  urlParams.append("page", String(apiStartPage));
+  urlParams.append("num_pages", "3");
 
   // Only add filters if they are explicitly set by the user (not defaults)
-  // Country filter - only add if countries are selected
+  // Country filter - add if countries are selected
   if (filters.countries.length > 0) {
-    // Use the first country code (JSearch uses 2-letter country codes)
+    // Use the first country code (JSearch uses 2-letter lowercase country codes)
     const countryCode = filters.countries[0].toLowerCase();
     urlParams.append("country", countryCode);
   }
 
-  // Date posted filter - only add if explicitly set
-  if (filters.datePosted) {
-    // JSearch accepts: "all", "day", "week", "month"
+  // Date posted filter - only add if explicitly set (not undefined)
+  // JSearch accepts: "all", "day", "week", "month"
+  if (filters.datePosted && filters.datePosted !== "all") {
     urlParams.append("date_posted", filters.datePosted);
+  } else {
+    // Default to "all" to show all jobs regardless of posting date
+    urlParams.append("date_posted", "all");
   }
 
   // Remote filter - only add if explicitly set to true
@@ -118,7 +127,19 @@ const fetchJobsFromJSearchAPI = async (
   const queryString = urlParams.toString();
   const API_ENDPOINT = `${JSEARCH_API_BASE}/search?${queryString}`;
 
-  console.log("JSearch API Request URL:", API_ENDPOINT);
+  // Debug logging for filters
+  console.log("🔍 JSearch API Request:", {
+    url: API_ENDPOINT,
+    filters: {
+      countries: filters.countries,
+      jobTypes: filters.jobTypes,
+      isRemote: filters.isRemote,
+      datePosted: filters.datePosted || "all",
+      skills: filters.skills,
+    },
+    query: query,
+    page: page,
+  });
 
   const response = await rateLimitedFetch(API_ENDPOINT, {
     method: "GET",
@@ -198,8 +219,8 @@ const fetchJobsFromJSearchAPI = async (
 export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   if (!jobId) throw new Error("Job ID is required");
 
-  // JSearch API uses job_id parameter for job details with country filter
-  const API_ENDPOINT = `${JSEARCH_API_BASE}/job-details?job_id=${encodeURIComponent(jobId)}&country=us`;
+  // JSearch API uses job_id parameter for job details (country filter removed)
+  const API_ENDPOINT = `${JSEARCH_API_BASE}/job-details?job_id=${encodeURIComponent(jobId)}`;
 
   const response = await rateLimitedFetch(API_ENDPOINT, {
     method: "GET",
@@ -547,7 +568,8 @@ export const fetchActiveJobs = async (
     // Build query parameter combining search term and skills
     const queryParts: string[] = [];
 
-    if (params.query.trim()) {
+    // Add search term if provided
+    if (params.query && params.query.trim()) {
       queryParts.push(params.query.trim());
     }
 
@@ -556,8 +578,8 @@ export const fetchActiveJobs = async (
       queryParts.push(...params.filters.skills);
     }
 
-    // Combine all query parts
-    const query = queryParts.length > 0 ? queryParts.join(" ") : "";
+    // Combine all query parts - if empty, use default
+    const query = queryParts.length > 0 ? queryParts.join(" ") : "developer";
 
     // Pass filters as-is - only add filters when user explicitly changes them
     // No default filters are applied here
@@ -595,19 +617,22 @@ export const fetchActiveJobs = async (
       }
     }
 
-    // Filter to only include active jobs
-    const activeJobs = uniqueJobs.filter(isJobActive);
-
-    console.log(`Fetched ${uniqueJobs.length} jobs, ${activeJobs.length} are active`);
-    if (activeJobs.length > 0) {
-      console.log("Sample active job structure:", activeJobs[0]);
+    // Return all unique jobs without filtering
+    console.log(`Fetched ${uniqueJobs.length} unique jobs`);
+    if (uniqueJobs.length > 0) {
+      console.log("Sample job structure:", uniqueJobs[0]);
     }
 
+    // Determine if there are more pages available
+    // If we got a full page of results (12), assume there might be more
+    const pageSize = params.pageSize || 12;
+    const hasMore = uniqueJobs.length >= pageSize;
+
     return {
-      jobs: activeJobs,
+      jobs: uniqueJobs,
       page: params.page || 1,
-      pageSize: params.pageSize || 20,
-      hasMore: activeJobs.length === (params.pageSize || 20),
+      pageSize: pageSize,
+      hasMore: hasMore,
     };
   } catch (error) {
     console.error("Error fetching jobs:", error);

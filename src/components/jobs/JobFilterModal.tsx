@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight, Search as SearchIcon } from "lucide-react";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
+import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
 
 const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
 
@@ -43,6 +44,9 @@ interface JobFilterModalProps {
     isRemote: boolean;
     datePosted?: string;
     skills: string[];
+    salaryMin?: number;
+    salaryMax?: number;
+    salaryByAgreement?: boolean;
   };
   onFiltersChange: (newFilters: {
     country: string;
@@ -51,6 +55,9 @@ interface JobFilterModalProps {
     isRemote: boolean;
     datePosted?: string;
     skills: string[];
+    salaryMin?: number;
+    salaryMax?: number;
+    salaryByAgreement?: boolean;
   }) => void;
   onApply: () => void;
   onClear?: () => void;
@@ -113,6 +120,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
       countries: newCountries,
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -150,6 +160,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
       skills: newSkills,
       countries: filters.countries || [],
       datePosted: filters.datePosted,
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -163,6 +176,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
         skills: [],
         countries: filters.countries || [],
         datePosted: filters.datePosted,
+        salaryMin: filters.salaryMin,
+        salaryMax: filters.salaryMax,
+        salaryByAgreement: filters.salaryByAgreement,
       });
     } else {
       // Select all
@@ -171,15 +187,39 @@ const FilterForm: React.FC<FilterFormProps> = ({
         skills: userTopSkills,
         countries: filters.countries || [],
         datePosted: filters.datePosted,
+        salaryMin: filters.salaryMin,
+        salaryMax: filters.salaryMax,
+        salaryByAgreement: filters.salaryByAgreement,
       });
     }
   };
 
   const isAllSkillsSelected = userTopSkills.length > 0 && userTopSkills.every(skill => filters.skills.includes(skill));
 
+  const handleSalaryChange = (min: number | undefined, max: number | undefined, byAgreement: boolean) => {
+    onFiltersChange({
+      ...filters,
+      salaryMin: min,
+      salaryMax: max,
+      salaryByAgreement: byAgreement,
+    });
+  };
+
   if (isMobile) {
     return (
       <div className="space-y-4">
+        {/* Salary Range Filter - Mobile Style */}
+        <div className="space-y-3">
+          <SalaryRangeFilter
+            minSalary={0}
+            maxSalary={20000}
+            salaryMin={filters.salaryMin}
+            salaryMax={filters.salaryMax}
+            salaryByAgreement={filters.salaryByAgreement}
+            onSalaryChange={handleSalaryChange}
+          />
+        </div>
+
         {/* Work Type Filter - Mobile Style */}
         <div 
           className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
@@ -255,6 +295,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
       countries: countryCodes,
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -265,6 +308,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
       countries: filters.countries || [],
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -275,31 +321,50 @@ const FilterForm: React.FC<FilterFormProps> = ({
       countries: filters.countries || [],
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
   return (
     <div className="space-y-6">
+      {/* Salary Range Filter - Desktop */}
+      <div className="space-y-3">
+        <SalaryRangeFilter
+          minSalary={0}
+          maxSalary={20000}
+          salaryMin={filters.salaryMin}
+          salaryMax={filters.salaryMax}
+          salaryByAgreement={filters.salaryByAgreement}
+          onSalaryChange={handleSalaryChange}
+        />
+      </div>
+
       {/* Work Type Filter - Desktop */}
       <div className="space-y-3">
         <Label className="text-base font-medium dark:text-gray-100">{WORK_TYPE_LABEL_KA}</Label>
-        <WorkTypeDropdown
-          selectedWorkTypes={filters.jobTypes || []}
-          onWorkTypesChange={handleWorkTypeChange}
-          placeholder={CHOOSE_LABEL_KA}
-          isRemote={filters.isRemote || false}
-          onRemoteChange={handleRemoteChange}
-        />
+        <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          <WorkTypeDropdown
+            selectedWorkTypes={filters.jobTypes || []}
+            onWorkTypesChange={handleWorkTypeChange}
+            placeholder={CHOOSE_LABEL_KA}
+            isRemote={filters.isRemote || false}
+            onRemoteChange={handleRemoteChange}
+          />
+        </div>
       </div>
 
       {/* Location Filter - Desktop */}
       <div className="space-y-3">
         <Label className="text-base font-medium dark:text-gray-100">{COUNTRY_LABEL_KA}</Label>
-        <LocationDropdown
-          selectedLocations={filters.countries || []}
-          onLocationsChange={handleLocationChange}
-          placeholder={CHOOSE_LABEL_KA}
-        />
+        <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          <LocationDropdown
+            selectedLocations={filters.countries || []}
+            onLocationsChange={handleLocationChange}
+            placeholder={CHOOSE_LABEL_KA}
+          />
+        </div>
       </div>
 
       {/* Skills/Interests Filter - Desktop */}
@@ -377,6 +442,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       countries: filters.countries || [],
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -386,6 +454,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       countries: countryCodes,
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -396,6 +467,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       countries: filters.countries || [],
       datePosted: filters.datePosted,
       skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
     });
   };
 
@@ -405,6 +479,18 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
       skills: skills,
       countries: filters.countries || [],
       datePosted: filters.datePosted,
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
+    });
+  };
+
+  const handleSalaryChange = (min: number | undefined, max: number | undefined, byAgreement: boolean) => {
+    onFiltersChange({
+      ...filters,
+      salaryMin: min,
+      salaryMax: max,
+      salaryByAgreement: byAgreement,
     });
   };
 
@@ -631,7 +717,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Filter Jobs</DialogTitle>
         </DialogHeader>

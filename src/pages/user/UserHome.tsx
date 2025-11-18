@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,7 +30,9 @@ import {
   getTopSkills,
 } from "@/utils/skillTestUtils";
 import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
+import { toast } from "sonner";
 
 // Transformed Job for UI
 interface Job {
@@ -44,6 +46,7 @@ interface Job {
   salary?: string;
   employment_type?: string;
   work_arrangement?: string;
+  is_saved: boolean;
 }
 
 interface Course {
@@ -65,33 +68,25 @@ interface Webinar {
   logo?: string;
 }
 
-// Fetch jobs from job service API with skill-based filtering
-const fetchJobs = async (topSkills: string[] = []) => {
+// Fetch jobs from job service API without any filters
+const fetchJobs = async () => {
   try {
-  // Build query based on top skills
-  let query = "developer"; // Default fallback
-  if (topSkills.length > 0) {
-    // Use top 3 skills for the query
-    const skillsQuery = topSkills.slice(0, 3).join(" ");
-    query = skillsQuery;
-  }
-
-    // Create filters with user's skills
+    // No filters - just fetch general jobs
     const filters: JobFilters = {
-      country: "United States", // Default to US
-      countries: ["us"], // Default to US
-      jobTypes: [], // No specific job type filter
-      isRemote: false, // Show both remote and on-site
-      datePosted: undefined, // Show all jobs regardless of date
-      skills: topSkills, // Filter by user's top skills
+      country: "",
+      countries: [], // No country filter
+      jobTypes: [], // No job type filter
+      isRemote: false, // No remote filter
+      datePosted: undefined, // No date filter
+      skills: [], // No skills filter
     };
 
     // Fetch jobs using the job service
     const response = await jobService.fetchActiveJobs({
-      query,
+      query: "developer", // Simple default query
       filters,
       page: 1,
-      pageSize: 20, // Get more jobs to have better selection
+      pageSize: 10, // Fetch exactly 10 jobs
     });
 
     return response.jobs || [];
@@ -104,6 +99,7 @@ const fetchJobs = async (topSkills: string[] = []) => {
 const UserHome = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
@@ -131,7 +127,9 @@ const UserHome = () => {
         <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <p className="text-gray-600">Please wait while we load your dashboard...</p>
+              <p className="text-gray-600">
+                Please wait while we load your dashboard...
+              </p>
             </div>
           </div>
         </div>
@@ -150,23 +148,31 @@ const UserHome = () => {
 
       try {
         setLoadingSkills(true);
-        
+
         // Method 1: Try Django backend skill test results API (same as ProfilePage)
         try {
-          const response = await apiClient.get(`/api/skilltest/results/?user=${user.id}`);
-          console.log("🔍 Checking Django API skill test results:", response.data);
-          
+          const response = await apiClient.get(
+            `/api/skilltest/results/?user=${user.id}`
+          );
+          console.log(
+            "🔍 Checking Django API skill test results:",
+            response.data
+          );
+
           let skillTestData = null;
           if (Array.isArray(response.data) && response.data.length > 0) {
             skillTestData = response.data[0];
           } else if (response.data && typeof response.data === "object") {
             skillTestData = response.data;
           }
-          
-          if (skillTestData && (skillTestData.final_role || skillTestData.skills_json)) {
+
+          if (
+            skillTestData &&
+            (skillTestData.final_role || skillTestData.skills_json)
+          ) {
             console.log("✅ Found skill test results from Django API");
             setHasCompletedTest(true);
-            
+
             // Extract skills from skills_json
             const skillsJson = skillTestData.skills_json || {};
             const techSkills = Object.keys(skillsJson.tech || {});
@@ -177,9 +183,11 @@ const UserHome = () => {
             return;
           }
         } catch (apiError) {
-          console.log("Django API endpoint not available, trying other methods...");
+          console.log(
+            "Django API endpoint not available, trying other methods..."
+          );
         }
-        
+
         // Method 2: Try user skills API endpoint
         try {
           const response = await apiClient.get(`/api/user/${user.id}/skills`);
@@ -191,7 +199,9 @@ const UserHome = () => {
             return;
           }
         } catch (apiError) {
-          console.log("User skills API endpoint not available, trying Supabase...");
+          console.log(
+            "User skills API endpoint not available, trying Supabase..."
+          );
         }
 
         // Method 3: Fallback to Supabase: fetch from usertestanswers
@@ -199,9 +209,9 @@ const UserHome = () => {
         console.log("🔍 Checking test completion:", {
           userId: user.id,
           answersCount: answers?.length || 0,
-          hasAnswers: answers && answers.length > 0
+          hasAnswers: answers && answers.length > 0,
         });
-        
+
         if (answers && answers.length > 0) {
           console.log("✅ User has completed skill test (from Supabase)");
           setHasCompletedTest(true);
@@ -224,15 +234,88 @@ const UserHome = () => {
     fetchUserSkills();
   }, [user]);
 
-  // Fetch jobs based on user's top skills
-  const { data: jobs = [], isLoading: jobsLoading, error: jobsError } = useQuery({
-    queryKey: ["home-jobs", userTopSkills.join(",")],
-    queryFn: () => fetchJobs(userTopSkills),
-    enabled: !!user && !loadingSkills,
+  // Fetch saved jobs
+  const { data: savedJobs = [] } = useQuery<string[]>({
+    queryKey: ["savedJobs", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedJobsArray = profileResponse.data?.saved_jobs || [];
+        return savedJobsArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved jobs:", error);
+        return [];
+      }
+    },
+    enabled: !!user,
+  });
+
+  // Fetch jobs without any filters
+  const {
+    data: jobs = [],
+    isLoading: jobsLoading,
+    error: jobsError,
+  } = useQuery({
+    queryKey: ["home-jobs"],
+    queryFn: () => fetchJobs(),
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 1,
     onError: (error) => {
       console.error("Error fetching jobs:", error);
+    },
+  });
+
+  // Save/unsave job mutation
+  const saveJobMutation = useMutation({
+    mutationFn: async (job: Job) => {
+      if (!user) throw new Error("User not logged in");
+      if (!job.id) throw new Error("Job ID is required");
+
+      const jobId = String(job.id);
+      const isSaved = job.is_saved;
+
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const currentSavedJobs = profileResponse.data?.saved_jobs || [];
+
+        let updatedSavedJobs: string[];
+
+        if (isSaved) {
+          updatedSavedJobs = currentSavedJobs.filter(
+            (id: string | number) => String(id) !== jobId
+          );
+        } else {
+          if (
+            currentSavedJobs.some((id: string | number) => String(id) === jobId)
+          ) {
+            return;
+          }
+          updatedSavedJobs = [...currentSavedJobs, jobId];
+        }
+
+        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+          saved_jobs: updatedSavedJobs,
+        });
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to save job. Please try again.";
+        throw new Error(errorMessage);
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success(variables.is_saved ? "Job Unsaved" : "Job Saved");
+    },
+    onError: (error: Error) => {
+      console.error("Error saving job:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save job";
+      toast.error(errorMessage);
     },
   });
 
@@ -281,154 +364,154 @@ const UserHome = () => {
   ];
 
   // Transform jobs - handle empty or undefined arrays
-  const transformedJobs: Job[] = (jobs || [])
-    .slice(0, 6)
-    .map((job: ApiJob) => {
-      // Extract job ID - check all possible fields
-      const jobId = job.job_id || job.id || "";
-      if (!jobId) {
-        console.warn("Skipping job without valid ID:", job);
-        return null;
-      }
-
-      // Extract job title - check all possible fields
-      const jobTitle =
-        job.job_title ||
-        job.title ||
-        job.position ||
-        "Untitled Position";
-
-      // Extract company name - check all possible fields
-      const companyName =
-        job.employer_name ||
-        job.company_name ||
-        (typeof job.company === "string" ? job.company : null) ||
-        "Unknown Company";
-
-      // Extract location - check all possible fields
-      const jobCity = job.job_city || job.city || "";
-      const jobState = job.job_state || job.state || "";
-      const jobCountry = job.job_country || job.country || "";
-      const location =
-        job.job_location ||
-        job.location ||
-        [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-        "Location not specified";
-
-      // Extract logo - check all possible fields
-      const logo =
-        job.employer_logo ||
-        job.company_logo ||
-        job.logo_url ||
-        (typeof job.company === "object" && job.company
-          ? (job.company as { logo?: string; company_logo?: string })
-              .logo ||
-            (job.company as { company_logo?: string }).company_logo
-          : undefined);
-
-      // Extract date posted
-      const postedDate =
-        job.date_posted ||
-        job.posted_date ||
-        job.job_posted_at_datetime_utc ||
-        undefined;
-
-      // Format salary
-      let salary = "By agreement";
-      const minSalary = job.job_min_salary || job.min_salary;
-      const maxSalary = job.job_max_salary || job.max_salary;
-      const salaryCurrency =
-        job.job_salary_currency || job.salary_currency || "$";
-      const salaryPeriod =
-        job.job_salary_period || job.salary_period || "yearly";
-
-      if (
-        minSalary &&
-        maxSalary &&
-        typeof minSalary === "number" &&
-        typeof maxSalary === "number"
-      ) {
-        const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-        const minSalaryFormatted = minSalary.toLocaleString();
-        const maxSalaryFormatted = maxSalary.toLocaleString();
-        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-        const isCurrencyBefore = currencySymbols.some((sym) =>
-          salaryCurrency.includes(sym)
-        );
-        if (isCurrencyBefore) {
-          salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-            periodLabel ? `/${periodLabel}` : ""
-          }`;
-        } else {
-          salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-            periodLabel ? `/${periodLabel}` : ""
-          }`;
+  // Transform all jobs first, then filter out nulls, then take up to 10
+  const transformedJobs: Job[] = useMemo(() => {
+    return (jobs || [])
+      .map((job: ApiJob) => {
+        // Extract job ID - check all possible fields
+        const jobId = job.job_id || job.id || "";
+        if (!jobId) {
+          console.warn("Skipping job without valid ID:", job);
+          return null;
         }
-      } else if (minSalary && typeof minSalary === "number") {
-        const minSalaryFormatted = minSalary.toLocaleString();
-        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-        const isCurrencyBefore = currencySymbols.some((sym) =>
-          salaryCurrency.includes(sym)
-        );
-        salary = isCurrencyBefore
-          ? `${salaryCurrency}${minSalaryFormatted}+`
-          : `${minSalaryFormatted}+ ${salaryCurrency}`;
-      } else if (job.salary && typeof job.salary === "string") {
-        salary = job.salary;
-      }
 
-      // Format employment type
-      const employmentTypeRaw =
-        job.job_employment_type ||
-        job.employment_type ||
-        job.type ||
-        "FULLTIME";
-      const jobTypeLabels: Record<string, string> = {
-        FULLTIME: "Full time",
-        PARTTIME: "Part time",
-        CONTRACTOR: "Contract",
-        INTERN: "Internship",
-      };
-      const employmentType =
-        jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+        // Extract job title - check all possible fields
+        const jobTitle =
+          job.job_title || job.title || job.position || "Untitled Position";
 
-      // Determine work arrangement
-      let workArrangement = "On-site";
-      const isRemote =
-        job.job_is_remote || job.is_remote || job.remote === true;
-      if (isRemote) {
-        workArrangement = "Remote";
-      } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-        workArrangement = "Hybrid";
-      }
+        // Extract company name - check all possible fields
+        const companyName =
+          job.employer_name ||
+          job.company_name ||
+          (typeof job.company === "string" ? job.company : null) ||
+          "Unknown Company";
 
-    return {
-        id: jobId,
-        title: jobTitle,
-        company: companyName,
-      location,
-        logo,
-        company_logo: logo,
-        salary,
-        employment_type: employmentType,
-        work_arrangement: workArrangement,
-        date: postedDate
-          ? new Date(postedDate).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
-          : new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-    };
-    })
-    .filter((job): job is Job => job !== null); // Filter out null jobs
+        // Extract location - check all possible fields
+        const jobCity = job.job_city || job.city || "";
+        const jobState = job.job_state || job.state || "";
+        const jobCountry = job.job_country || job.country || "";
+        const location =
+          job.job_location ||
+          job.location ||
+          [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+          "Location not specified";
 
-  // Show all jobs in horizontal scroll (limit to 10 for performance)
-  const displayJobs = transformedJobs.slice(0, 10);
+        // Extract logo - check all possible fields
+        const logo =
+          job.employer_logo ||
+          job.company_logo ||
+          job.logo_url ||
+          (typeof job.company === "object" && job.company
+            ? (job.company as { logo?: string; company_logo?: string }).logo ||
+              (job.company as { company_logo?: string }).company_logo
+            : undefined);
+
+        // Extract date posted
+        const postedDate =
+          job.date_posted ||
+          job.posted_date ||
+          job.job_posted_at_datetime_utc ||
+          undefined;
+
+        // Format salary
+        let salary = "By agreement";
+        const minSalary = job.job_min_salary || job.min_salary;
+        const maxSalary = job.job_max_salary || job.max_salary;
+        const salaryCurrency =
+          job.job_salary_currency || job.salary_currency || "$";
+        const salaryPeriod =
+          job.job_salary_period || job.salary_period || "yearly";
+
+        if (
+          minSalary &&
+          maxSalary &&
+          typeof minSalary === "number" &&
+          typeof maxSalary === "number"
+        ) {
+          const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+          const minSalaryFormatted = minSalary.toLocaleString();
+          const maxSalaryFormatted = maxSalary.toLocaleString();
+          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+          const isCurrencyBefore = currencySymbols.some((sym) =>
+            salaryCurrency.includes(sym)
+          );
+          if (isCurrencyBefore) {
+            salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+              periodLabel ? `/${periodLabel}` : ""
+            }`;
+          } else {
+            salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+              periodLabel ? `/${periodLabel}` : ""
+            }`;
+          }
+        } else if (minSalary && typeof minSalary === "number") {
+          const minSalaryFormatted = minSalary.toLocaleString();
+          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+          const isCurrencyBefore = currencySymbols.some((sym) =>
+            salaryCurrency.includes(sym)
+          );
+          salary = isCurrencyBefore
+            ? `${salaryCurrency}${minSalaryFormatted}+`
+            : `${minSalaryFormatted}+ ${salaryCurrency}`;
+        } else if (job.salary && typeof job.salary === "string") {
+          salary = job.salary;
+        }
+
+        // Format employment type
+        const employmentTypeRaw =
+          job.job_employment_type ||
+          job.employment_type ||
+          job.type ||
+          "FULLTIME";
+        const jobTypeLabels: Record<string, string> = {
+          FULLTIME: "Full time",
+          PARTTIME: "Part time",
+          CONTRACTOR: "Contract",
+          INTERN: "Internship",
+        };
+        const employmentType =
+          jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+
+        // Determine work arrangement
+        let workArrangement = "On-site";
+        const isRemote =
+          job.job_is_remote || job.is_remote || job.remote === true;
+        if (isRemote) {
+          workArrangement = "Remote";
+        } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+          workArrangement = "Hybrid";
+        }
+
+        return {
+          id: jobId,
+          title: jobTitle,
+          company: companyName,
+          location,
+          logo,
+          company_logo: logo,
+          salary,
+          employment_type: employmentType,
+          work_arrangement: workArrangement,
+          is_saved: savedJobs.includes(jobId),
+          date: postedDate
+            ? new Date(postedDate).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+            : new Date().toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }),
+        };
+      })
+      .filter((job): job is Job => job !== null) // Filter out null jobs
+      .slice(0, 10); // Take up to 10 jobs
+  }, [jobs, savedJobs]);
+
+  // Display up to 10 jobs
+  const displayJobs = transformedJobs;
 
   // Debug logging
   console.log("🏠 UserHome render:", {
@@ -445,7 +528,7 @@ const UserHome = () => {
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="space-y-6">
           {/* Top Section - Widgets */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex flex-col md:flex-row gap-4">
             {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
             {!hasCompletedTest && !loadingSkills && (
               <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
@@ -460,9 +543,14 @@ const UserHome = () => {
                           Discover Your Skills
                         </h3>
                         <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                          Take our skill assessment to unlock personalized recommendations.
+                          Take our skill assessment to unlock personalized
+                          recommendations.
                         </p>
-                        <Button size="sm" className="bg-breneo-blue hover:bg-breneo-blue/90 text-xs h-7 px-3">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="text-xs h-7 px-3"
+                        >
                           <Play className="h-3 w-3 mr-1" />
                           Start Test
                         </Button>
@@ -475,23 +563,46 @@ const UserHome = () => {
 
             {/* Skill Path CTA Widget - Only show if user has completed the test */}
             {hasCompletedTest && !loadingSkills && (
-              <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
-                <CardContent className="p-4">
+              <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200 w-auto flex-shrink-0 max-w-lg">
+                <CardContent className="p-4 md:p-5 min-h-[160px]">
                   <Link to="/skill-path" className="block cursor-pointer group">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-breneo-blue/10 flex items-center justify-center">
-                        <Target className="h-6 w-6 text-breneo-blue" />
+                    <div className="flex items-center gap-3 md:gap-6">
+                      {/* Left side - Illustration */}
+                      <div className="flex-shrink-0 w-24 h-24 md:w-40 md:h-40 flex items-center justify-center">
+                        <img
+                          src="/lovable-uploads/Coding-A-Website--Streamline-New-York.png"
+                          alt="Coding A Website"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display =
+                              "none";
+                          }}
+                        />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-gray-900 mb-1 group-hover:text-breneo-blue transition-colors">
-                          Your Skill Path
-                        </h3>
-                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                          Explore your personalized career path with recommendations.
-                        </p>
-                        <Button size="sm" className="bg-breneo-blue hover:bg-breneo-blue/90 text-xs h-7 px-3">
-                          <Target className="h-3 w-3 mr-1" />
-                          View Path
+
+                      {/* Right side - Content */}
+                      <div className="flex-1 flex flex-col justify-between gap-3 min-w-0">
+                        <div className="flex flex-col gap-2">
+                          <h3 className="font-bold text-base md:text-lg text-gray-900 group-hover:text-breneo-blue transition-colors">
+                            Your Skill Path
+                          </h3>
+                          <p className="text-xs md:text-sm text-gray-900">
+                            Explore your personalized career path with
+                            recommendations.
+                          </p>
+                        </div>
+
+                        {/* Button */}
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="text-xs md:text-sm h-8 md:h-9 px-3 md:px-4 w-fit rounded-md"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            navigate("/skill-path");
+                          }}
+                        >
+                          View Details
                         </Button>
                       </div>
                     </div>
@@ -501,7 +612,7 @@ const UserHome = () => {
             )}
 
             {/* Webinars Widget */}
-            <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
+            <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200 flex-1">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 rounded-lg bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
@@ -512,22 +623,28 @@ const UserHome = () => {
                   </h3>
                 </div>
 
-                {/* Webinar List - Compact */}
+                {/* Webinar List - Dates on left, webinars on right */}
                 <div className="space-y-2">
                   {mockWebinars.slice(0, 2).map((webinar) => (
                     <div
                       key={webinar.id}
-                      className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
+                      className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
                     >
-                      <div className="w-6 h-6 rounded-full bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-breneo-blue font-semibold text-xs">
-                          {webinar.company.charAt(0)}
-                        </span>
+                      {/* Left side - Date */}
+                      <div className="flex-shrink-0 text-center min-w-[50px]">
+                        <div className="text-xs font-semibold text-gray-900">
+                          {webinar.date}
+                        </div>
                       </div>
+
+                      {/* Right side - Webinar details */}
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-xs text-gray-900 line-clamp-1">
+                        <h4 className="font-medium text-xs text-gray-900 line-clamp-1 mb-1">
                           {webinar.title}
                         </h4>
+                        <div className="text-xs text-gray-500 mb-1">
+                          {webinar.company}
+                        </div>
                         <div className="flex items-center gap-1 text-xs text-gray-500">
                           <Clock className="h-2.5 w-2.5" />
                           <span>{webinar.time}</span>
@@ -545,17 +662,9 @@ const UserHome = () => {
             {/* Top Job Picks Section */}
             <div>
               <div className="mb-4">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    Top job picks for you
-                  </h2>
-                  {userTopSkills.length > 0 && (
-                    <p className="text-sm text-gray-500">
-                      Matched based on your skills:{" "}
-                      <span className="font-medium text-breneo-blue">
-                        {userTopSkills.slice(0, 3).join(", ")}
-                      </span>
-                    </p>
-                  )}
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                  Top job picks for you
+                </h2>
               </div>
 
               {jobsLoading ? (
@@ -680,16 +789,16 @@ const UserHome = () => {
                               }}
                             >
                               <Briefcase className="h-5 w-5 text-white" />
-                        </div>
-                        </div>
+                            </div>
+                          </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm mb-0.5 truncate">
                               {job.company}
-                          </h3>
+                            </h3>
                             <p className="text-xs text-gray-500 truncate flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
                               {job.location}
-                          </p>
+                            </p>
                           </div>
                         </div>
 
@@ -726,12 +835,12 @@ const UserHome = () => {
                               <Briefcase className="h-3 w-3 text-gray-400 flex-shrink-0" />
                               <span className="text-gray-700">
                                 {job.work_arrangement}
-                          </span>
+                              </span>
                             </div>
                           )}
                         </div>
 
-                        {/* Action Button - Slide up on hover */}
+                        {/* Action Buttons - Slide up on hover */}
                         <div className="absolute bottom-0 left-0 right-0 p-3 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
                           <Button
                             onClick={(e) => {
@@ -740,9 +849,31 @@ const UserHome = () => {
                                 navigate(`/jobs/${encodeURIComponent(job.id)}`);
                               }
                             }}
-                            className="flex-1 bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-900 dark:hover:bg-gray-600 rounded-lg text-xs py-1.5 h-auto"
+                            variant="default"
+                            size="xs"
+                            className="flex-1"
                           >
                             View Details
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              saveJobMutation.mutate(job);
+                            }}
+                            aria-label={
+                              job.is_saved ? "Unsave job" : "Save job"
+                            }
+                            className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90"
+                          >
+                            <Bookmark
+                              className={`h-4 w-4 transition-colors ${
+                                job.is_saved
+                                  ? "fill-black text-black"
+                                  : "text-black"
+                              }`}
+                            />
                           </Button>
                         </div>
                       </CardContent>
@@ -798,7 +929,9 @@ const UserHome = () => {
                 <Card>
                   <CardContent className="p-8 text-center">
                     <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <p className="text-gray-500">No courses available at the moment.</p>
+                    <p className="text-gray-500">
+                      No courses available at the moment.
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
@@ -813,7 +946,8 @@ const UserHome = () => {
                               alt={course.title}
                               className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-200"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = "/placeholder.svg";
+                                (e.target as HTMLImageElement).src =
+                                  "/placeholder.svg";
                               }}
                             />
                             <div className="absolute top-4 right-4">
