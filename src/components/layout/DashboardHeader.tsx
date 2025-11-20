@@ -17,25 +17,38 @@ interface DashboardHeaderProps {
 // Helper function to get the page title from the pathname
 const getPageTitle = (pathname: string, username?: string, t?: any) => {
   if (!t) return "Home";
-  
+
   if (pathname.startsWith("/home") || pathname.startsWith("/academy/home")) {
     return (
       <>
-        {t.dashboard.welcome}, <span className="font-bold">{username || "User"}</span>!
+        {t.dashboard.welcome},{" "}
+        <span className="font-bold">{username || "User"}</span>!
       </>
     );
   }
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/academy/dashboard")) {
+  if (
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/academy/dashboard")
+  ) {
     return (
       <>
-        {t.dashboard.welcome}, <span className="font-bold">{username || "User"}</span>!
+        {t.dashboard.welcome},{" "}
+        <span className="font-bold">{username || "User"}</span>!
       </>
     );
   }
   if (pathname.startsWith("/jobs")) return t.jobs.title;
   if (pathname.startsWith("/courses")) return t.courses.title;
-  if (pathname.startsWith("/settings") || pathname.startsWith("/academy/settings")) return t.settings.title;
-  if (pathname.startsWith("/profile") || pathname.startsWith("/academy/profile")) return t.profile.title;
+  if (
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/academy/settings")
+  )
+    return t.settings.title;
+  if (
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/academy/profile")
+  )
+    return t.profile.title;
   if (pathname.startsWith("/notifications")) return t.notifications.title;
   if (pathname.startsWith("/skill-test")) return t.skillTest.title;
   return t.nav.home;

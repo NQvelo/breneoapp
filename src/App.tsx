@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { FontSizeProvider } from "./contexts/FontSizeContext";
 import { AppRoutes } from "./routes/AppRoutes";
 
 const queryClient = new QueryClient();
@@ -30,11 +31,13 @@ const App = () => (
     <TooltipProvider>
       <Toaster position="top-right" richColors closeButton />
       <BrowserRouter>
-        <LanguageProvider>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </LanguageProvider>
+        <FontSizeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <AppRoutes />
+            </AuthProvider>
+          </LanguageProvider>
+        </FontSizeProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

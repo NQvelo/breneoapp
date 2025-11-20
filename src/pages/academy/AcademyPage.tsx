@@ -741,10 +741,18 @@ const AcademyPage = () => {
                               src={
                                 course.image
                                   ? course.image
-                                  : "lovable-uploads/no_photo.png"
+                                  : "/lovable-uploads/no_photo.png"
                               }
                               alt={course.title}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                // Prevent infinite loop - only set fallback if not already set
+                                if (!target.src.includes("/lovable-uploads/no_photo.png")) {
+                                  target.onerror = null; // Remove error handler to prevent loop
+                                  target.src = "/lovable-uploads/no_photo.png";
+                                }
+                              }}
                             />
                           </div>
                           <CardContent className="p-5">

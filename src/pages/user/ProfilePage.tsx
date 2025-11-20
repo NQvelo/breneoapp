@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +29,16 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { PieChart, Pie, Cell } from "recharts";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  LabelList,
+} from "recharts";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +72,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Briefcase, GraduationCap, ArrowRight, MapPin } from "lucide-react";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchJobDetail } from "@/api/jobs/jobService";
 
 interface SkillTestResult {
   final_role?: string;
@@ -109,6 +119,29 @@ interface SavedCourse {
   image: string;
   description: string;
 }
+
+/**
+ * Normalizes image paths to ensure they're absolute
+ * Prevents relative paths from being resolved relative to current route
+ */
+const normalizeImagePath = (imagePath: string | null | undefined): string => {
+  if (!imagePath) {
+    return "/lovable-uploads/no_photo.png";
+  }
+
+  // If it's already an absolute URL (http/https), return as-is
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+    return imagePath;
+  }
+
+  // If it's already an absolute path (starts with /), return as-is
+  if (imagePath.startsWith("/")) {
+    return imagePath;
+  }
+
+  // Otherwise, make it absolute by adding leading slash
+  return `/${imagePath}`;
+};
 
 interface SavedJob {
   id: string;
@@ -322,10 +355,10 @@ const ProfilePage = () => {
 
         // Extract saved_courses array from profile response
         let savedCourseIds: string[] = [];
-        
+
         if (response.data && typeof response.data === "object") {
           const data = response.data as Record<string, unknown>;
-          
+
           // Check for saved_courses in various possible locations
           if (Array.isArray(data.saved_courses)) {
             savedCourseIds = data.saved_courses as string[];
@@ -366,16 +399,18 @@ const ProfilePage = () => {
           return [];
         }
 
-        return (coursesData || []).map((course) => ({
-          id: course.id,
-          title: course.title || "",
-          provider: course.provider || "",
-          category: course.category || "",
-          level: course.level || "",
-          duration: course.duration || "",
-          image: course.image || "lovable-uploads/no_photo.png",
-          description: course.description || "",
-        })) as SavedCourse[];
+        return (coursesData || []).map((course) => {
+          return {
+            id: course.id,
+            title: course.title || "",
+            provider: course.provider || "",
+            category: course.category || "",
+            level: course.level || "",
+            duration: course.duration || "",
+            image: normalizeImagePath(course.image),
+            description: course.description || "",
+          } as SavedCourse;
+        });
       } catch (error) {
         console.error("Error fetching saved courses from API profile:", error);
         return [];
@@ -384,62 +419,106 @@ const ProfilePage = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch saved jobs from API
+  // Fetch saved jobs from API profile endpoint
   const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery({
     queryKey: ["savedJobs", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       try {
-        const response = await apiClient.get(API_ENDPOINTS.USER.SAVED_JOBS, {
-          params: { limit: 6 }, // Limit to 6 for display
-        });
+        // Fetch profile data from API
+        const response = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
-        // Handle different response structures
-        let jobs: SavedJob[] = [];
-        if (Array.isArray(response.data)) {
-          jobs = response.data;
-        } else if (response.data && typeof response.data === "object") {
+        // Extract saved_jobs array from profile response
+        let savedJobIds: string[] = [];
+
+        if (response.data && typeof response.data === "object") {
           const data = response.data as Record<string, unknown>;
-          if (Array.isArray(data.results)) {
-            jobs = data.results as SavedJob[];
-          } else if (Array.isArray(data.jobs)) {
-            jobs = data.jobs as SavedJob[];
-          } else if (Array.isArray(data.data)) {
-            jobs = data.data as SavedJob[];
+
+          // Check for saved_jobs in various possible locations
+          if (Array.isArray(data.saved_jobs)) {
+            savedJobIds = data.saved_jobs.map((id: string | number) =>
+              String(id)
+            );
+          } else if (data.profile && typeof data.profile === "object") {
+            const profile = data.profile as Record<string, unknown>;
+            if (Array.isArray(profile.saved_jobs)) {
+              savedJobIds = profile.saved_jobs.map((id: string | number) =>
+                String(id)
+              );
+            }
+          } else if (data.user && typeof data.user === "object") {
+            const userData = data.user as Record<string, unknown>;
+            if (Array.isArray(userData.saved_jobs)) {
+              savedJobIds = userData.saved_jobs.map((id: string | number) =>
+                String(id)
+              );
+            }
           }
         }
 
-        return jobs.map((job: unknown) => {
-          const j = job as Record<string, unknown>;
-          return {
-            id: (j.id as string) || (j.job_id as string) || "",
-            title: (j.title as string) || (j.job_title as string) || "",
-            company:
-              (j.company as string) ||
-              (j.employer_name as string) ||
-              (j.company_name as string) ||
-              "",
-            location: (j.location as string) || "",
-            url:
-              (j.url as string) ||
-              (j.job_apply_link as string) ||
-              (j.apply_link as string) ||
-              "",
-            company_logo:
-              (j.company_logo as string) ||
-              (j.employer_logo as string) ||
-              (j.logo as string) ||
-              undefined,
-            salary: (j.salary as string) || undefined,
-            employment_type:
-              (j.employment_type as string) ||
-              (j.job_employment_type as string) ||
-              undefined,
-            work_arrangement: (j.work_arrangement as string) || undefined,
-          } as SavedJob;
+        // If no saved jobs found, return empty array
+        if (!savedJobIds || savedJobIds.length === 0) {
+          return [];
+        }
+
+        // Limit to 6 for display
+        const limitedIds = savedJobIds.slice(0, 6);
+
+        // Fetch job details for each saved job ID
+        const jobPromises = limitedIds.map(async (jobId) => {
+          try {
+            const jobDetail = await fetchJobDetail(jobId);
+            return {
+              id: jobId,
+              title: (jobDetail.job_title || jobDetail.title || "") as string,
+              company: (jobDetail.company_name ||
+                jobDetail.employer_name ||
+                jobDetail.company ||
+                "") as string,
+              location: (jobDetail.location ||
+                jobDetail.job_location ||
+                [jobDetail.city, jobDetail.state, jobDetail.country]
+                  .filter(Boolean)
+                  .join(", ") ||
+                "") as string,
+              url: (jobDetail.job_apply_link ||
+                jobDetail.url ||
+                jobDetail.apply_url ||
+                "") as string,
+              company_logo: (jobDetail.company_logo ||
+                jobDetail.employer_logo ||
+                jobDetail.logo_url ||
+                undefined) as string | undefined,
+              salary: (jobDetail.min_salary && jobDetail.max_salary
+                ? `${jobDetail.min_salary}-${jobDetail.max_salary} ${
+                    jobDetail.salary_currency || ""
+                  }`
+                : jobDetail.salary || undefined) as string | undefined,
+              employment_type: (jobDetail.employment_type ||
+                jobDetail.job_employment_type ||
+                undefined) as string | undefined,
+              work_arrangement: (jobDetail.is_remote ? "Remote" : undefined) as
+                | string
+                | undefined,
+            } as SavedJob;
+          } catch (error) {
+            console.error(`Error fetching job detail for ID ${jobId}:`, error);
+            // Return a placeholder job if fetch fails
+            return {
+              id: jobId,
+              title: "Job not found",
+              company: "",
+              location: "",
+              url: "",
+            } as SavedJob;
+          }
         });
+
+        const jobs = await Promise.all(jobPromises);
+        // Filter out placeholder jobs if needed
+        return jobs.filter((job) => job.title !== "Job not found");
       } catch (error) {
-        console.error("Error fetching saved jobs from API:", error);
+        console.error("Error fetching saved jobs from API profile:", error);
         return [];
       }
     },
@@ -1842,6 +1921,289 @@ const ProfilePage = () => {
     light: "#e5e7eb", // gray-200
   };
 
+  // Render skills as a modern vertical bar chart with primary color and opacity
+  const renderSkillsChart = (skills: Record<string, string>, title: string) => {
+    const primaryColor = "#19B5FE"; // breneo-blue (primary color)
+
+    const chartData = Object.entries(skills)
+      .filter(([_, pct]) => parseFloat(String(pct).replace("%", "")) > 0)
+      .map(([skill, pct]) => {
+        const percentage = parseFloat(String(pct).replace("%", ""));
+
+        // Calculate opacity based on percentage
+        // If >= 40%, use full opacity (1.0) to make results more visible
+        // Otherwise, scale opacity from 0.3 to 1.0 based on percentage
+        let opacity: number;
+        if (percentage >= 40) {
+          opacity = 1.0; // Full opacity for bars 40% and higher
+        } else {
+          // Scale from 0% to 40%: opacity ranges from 0.3 to 1.0
+          // Formula: opacity = 0.3 + (percentage / 40) * 0.7
+          opacity = 0.3 + (percentage / 40) * 0.7;
+        }
+
+        // Create unique gradient ID for each opacity level
+        const gradientId = `gradient-primary-${Math.round(opacity * 100)}`;
+
+        return {
+          skill,
+          percentage,
+          displayPct: pct,
+          fill: primaryColor,
+          opacity,
+          gradientId,
+        };
+      })
+      .sort((a, b) => b.percentage - a.percentage); // Sort by percentage descending
+
+    if (chartData.length === 0) {
+      return (
+        <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+          No skills data available
+        </div>
+      );
+    }
+
+    const chartConfig = {
+      percentage: {
+        label: "Percentage",
+      },
+    };
+
+    // Custom label component to show skill name at bottom of chart (below bars)
+    const CustomInsideLabel = (props: {
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+      payload?: { skill?: string };
+      value?: string;
+    }) => {
+      const { x, y, width, height, payload, value } = props;
+      const skillName = payload?.skill || value || "";
+
+      if (!x || !y || !width || !height || !skillName) {
+        return null;
+      }
+
+      const centerX = x + width / 2;
+      // Position skill name at fixed bottom position of chart
+      // Chart height is 250px, bottom margin is 80px, so bottom is at ~170px
+      // Use a fixed Y position that's always at the bottom regardless of bar height
+      // Added more space between bars and skill names
+      const chartHeight = 250;
+      const bottomMargin = 80;
+      const skillY = chartHeight - bottomMargin + 25; // Fixed position at bottom with more space
+
+      // Split long skill names into multiple lines
+      // Max characters per line based on bar width (approximately 8-10 chars per 50px width)
+      const maxCharsPerLine = Math.max(8, Math.floor(width / 6));
+      const words = skillName.split(" ");
+      const lines: string[] = [];
+      let currentLine = "";
+
+      // Try to split by words first, then by characters if needed
+      for (const word of words) {
+        if (word.length > maxCharsPerLine) {
+          // If a single word is too long, split it by characters
+          if (currentLine) {
+            lines.push(currentLine);
+            currentLine = "";
+          }
+          // Split the long word into chunks
+          for (let i = 0; i < word.length; i += maxCharsPerLine) {
+            lines.push(word.slice(i, i + maxCharsPerLine));
+          }
+        } else if ((currentLine + " " + word).length <= maxCharsPerLine) {
+          currentLine = currentLine ? currentLine + " " + word : word;
+        } else {
+          if (currentLine) {
+            lines.push(currentLine);
+          }
+          currentLine = word;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      // If still too long, split by characters
+      if (
+        lines.length === 0 ||
+        (lines.length === 1 && lines[0].length > maxCharsPerLine * 1.5)
+      ) {
+        lines.length = 0;
+        for (let i = 0; i < skillName.length; i += maxCharsPerLine) {
+          lines.push(skillName.slice(i, i + maxCharsPerLine));
+        }
+      }
+
+      // Limit to 2 lines max
+      const displayLines = lines.slice(0, 2);
+      const lineHeight = 14;
+      const startY = skillY - (displayLines.length - 1) * (lineHeight / 2);
+
+      return (
+        <text
+          x={centerX}
+          y={startY}
+          fill="#374151"
+          textAnchor="middle"
+          fontSize={12}
+          fontWeight={600}
+          className="dark:fill-gray-200"
+        >
+          {displayLines.map((line, index) => (
+            <tspan key={index} x={centerX} dy={index === 0 ? 0 : lineHeight}>
+              {line}
+            </tspan>
+          ))}
+        </text>
+      );
+    };
+
+    // Custom label component to show percentage at bottom of chart (below bars)
+    const CustomBottomLabel = (props: {
+      x?: number;
+      y?: number;
+      width?: number;
+      height?: number;
+      value?: number;
+      payload?: { skill?: string };
+    }) => {
+      const { x, y, width, height, value, payload } = props;
+      const percentage = value || 0;
+      const skillName = payload?.skill || "";
+
+      if (!x || !y || !width || !height) {
+        return null;
+      }
+
+      const centerX = x + width / 2;
+      // Position percentage at fixed bottom position of chart
+      // Chart height is 250px, bottom margin is 80px, so bottom is at ~170px
+      // Adjust position based on whether skill name is wrapped to 2 lines
+      // Added more space between skill name and percentage
+      const chartHeight = 250;
+      const bottomMargin = 80;
+      const maxCharsPerLine = Math.max(8, Math.floor(width / 6));
+      const isLongName = skillName.length > maxCharsPerLine * 1.2;
+      // If skill name is wrapped, move percentage down a bit more
+      const percentY = chartHeight - bottomMargin + (isLongName ? 70 : 60);
+
+      return (
+        <text
+          x={centerX}
+          y={percentY}
+          fill="#374151"
+          textAnchor="middle"
+          fontSize={13}
+          fontWeight={700}
+          className="dark:fill-gray-200"
+        >
+          {`${percentage.toFixed(0)}%`}
+        </text>
+      );
+    };
+
+    return (
+      <div className="w-full -mb-4">
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+          <BarChart
+            data={chartData}
+            margin={{ top: 20, right: 10, left: 10, bottom: 80 }}
+            barCategoryGap="25%"
+          >
+            <defs>
+              {chartData.map((entry) => {
+                // Create darker shade for gradient bottom
+                const darkerShade = "#0EA5E9"; // Slightly darker blue
+                return (
+                  <linearGradient
+                    key={entry.gradientId}
+                    id={entry.gradientId}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={entry.fill}
+                      stopOpacity={entry.opacity}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={darkerShade}
+                      stopOpacity={entry.opacity}
+                    />
+                  </linearGradient>
+                );
+              })}
+            </defs>
+            <XAxis dataKey="skill" hide={true} />
+            <YAxis type="number" domain={[0, 100]} hide={true} />
+            <ChartTooltip
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
+                      <div className="flex flex-col gap-2">
+                        <span className="font-semibold text-base text-gray-900 dark:text-gray-100">
+                          {data.skill}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{
+                              backgroundColor: primaryColor,
+                              opacity: data.opacity,
+                            }}
+                          />
+                          <span
+                            className="font-bold text-lg"
+                            style={{
+                              color: primaryColor,
+                              opacity: data.opacity,
+                            }}
+                          >
+                            {data.percentage.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Bar
+              dataKey="percentage"
+              radius={[8, 8, 8, 8]}
+              animationDuration={1000}
+              animationEasing="ease-out"
+            >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={`url(#${entry.gradientId})`}
+                  style={{
+                    transition: "all 0.3s ease",
+                  }}
+                />
+              ))}
+              {/* Skill name at bottom inside bar */}
+              <LabelList content={CustomInsideLabel} dataKey="skill" />
+              {/* Percentage at bottom inside bar */}
+              <LabelList content={CustomBottomLabel} dataKey="percentage" />
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
@@ -2217,105 +2579,50 @@ const ProfilePage = () => {
                     </div>
                   )}
 
-                  {/* Skills with Pie Charts */}
-                  {getAllSkills().length > 0 && (
+                  {/* Skills with Charts */}
+                  {skillResults?.skills_json && (
                     <div>
                       <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
                         Top Skills
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {getAllSkills().map((skill) => {
-                          const isStrong = skill.percentage >= 70;
-                          const pieData = prepareSkillPieData(skill);
-                          const chartConfig = {
-                            [skill.name]: {
-                              label: skill.name,
-                              color: isStrong ? COLORS.strong : COLORS.moderate,
-                            },
-                            Remaining: {
-                              label: "Remaining",
-                              color: COLORS.light,
-                            },
-                          };
+                        {/* Technical Skills */}
+                        {skillResults.skills_json.tech &&
+                          Object.keys(skillResults.skills_json.tech).length >
+                            0 && (
+                            <Card>
+                              <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                  Technical Skills
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-2 pt-0 pb-4">
+                                {renderSkillsChart(
+                                  skillResults.skills_json.tech,
+                                  "Technical Skills"
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
 
-                          return (
-                            <div
-                              key={skill.name}
-                              className="group relative p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-breneo-blue dark:hover:border-breneo-blue transition-all duration-300 bg-white dark:bg-gray-800/50"
-                            >
-                              <div className="flex flex-col items-center space-y-3">
-                                {/* Pie Chart */}
-                                <div className="relative w-24 h-24">
-                                  <ChartContainer
-                                    config={chartConfig}
-                                    className="h-full w-full [&>div]:aspect-square"
-                                  >
-                                    <PieChart>
-                                      <Pie
-                                        data={pieData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={28}
-                                        outerRadius={40}
-                                        paddingAngle={2}
-                                        dataKey="value"
-                                        startAngle={90}
-                                        endAngle={-270}
-                                      >
-                                        {pieData.map((entry, index) => (
-                                          <Cell
-                                            key={`cell-${index}`}
-                                            fill={entry.fill}
-                                            stroke="none"
-                                          />
-                                        ))}
-                                      </Pie>
-                                      <ChartTooltip
-                                        content={
-                                          <ChartTooltipContent
-                                            formatter={(value) => [
-                                              `${value}%`,
-                                              "",
-                                            ]}
-                                          />
-                                        }
-                                      />
-                                    </PieChart>
-                                  </ChartContainer>
-                                  {/* Center percentage */}
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="text-center">
-                                      <div
-                                        className={`text-lg font-bold ${
-                                          isStrong
-                                            ? "text-green-600 dark:text-green-400"
-                                            : "text-amber-600 dark:text-amber-400"
-                                        }`}
-                                      >
-                                        {skill.percentage.toFixed(0)}%
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                                {/* Skill Name */}
-                                <div className="text-center">
-                                  <h5 className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                                    {skill.name}
-                                  </h5>
-                                  <div
-                                    className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                      isStrong
-                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
-                                    }`}
-                                  >
-                                    {isStrong ? "Strong" : "Moderate"}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                        {/* Soft Skills */}
+                        {skillResults.skills_json.soft &&
+                          Object.keys(skillResults.skills_json.soft).length >
+                            0 && (
+                            <Card>
+                              <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                  Soft Skills
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-2 pt-0 pb-4">
+                                {renderSkillsChart(
+                                  skillResults.skills_json.soft,
+                                  "Soft Skills"
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
                       </div>
                     </div>
                   )}
@@ -2372,12 +2679,12 @@ const ProfilePage = () => {
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0">
                           <img
-                            src={course.image || "lovable-uploads/no_photo.png"}
+                            src={normalizeImagePath(course.image)}
                             alt={course.title}
                             className="w-12 h-12 rounded-lg object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              target.src = "lovable-uploads/no_photo.png";
+                              target.src = "/lovable-uploads/no_photo.png";
                             }}
                           />
                         </div>

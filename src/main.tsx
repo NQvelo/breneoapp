@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <ThemeProvider
       attribute="class"
       defaultTheme="light"
-      enableSystem={false}
+      enableSystem={true}
       disableTransitionOnChange
     >
       <div suppressHydrationWarning>

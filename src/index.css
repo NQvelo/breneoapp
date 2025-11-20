@@ -72,6 +72,8 @@
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 222.2 84% 4.9%;
+    /* Font size accessibility - defaults to medium (1rem = 16px) */
+    --font-size-base: 1rem;
   }
 
   .dark {
@@ -127,6 +129,10 @@
 @layer base {
   * {
     @apply border-border;
+  }
+  html {
+    /* Set root font size for accessibility - all rem-based sizes will scale */
+    font-size: var(--font-size-base);
   }
   body {
     @apply bg-background text-foreground;

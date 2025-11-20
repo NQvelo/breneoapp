@@ -21,11 +21,16 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
+import { useFontSize } from "@/contexts/FontSizeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { jobService, ApiJob } from "@/api/jobs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +57,10 @@ import {
   Globe,
   AlertCircle,
   Info,
+  Briefcase,
+  GraduationCap,
+  BookmarkCheck,
+  ExternalLink,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 import { useMobile } from "@/hooks/use-mobile";
@@ -68,7 +77,8 @@ type SettingsSection =
   | "privacy"
   | "subscription"
   | "learning"
-  | "accessibility";
+  | "accessibility"
+  | "saved";
 
 const settingsSections: Array<{ id: SettingsSection; label: string }> = [
   { id: "account", label: "Account Settings" },
@@ -77,13 +87,20 @@ const settingsSections: Array<{ id: SettingsSection; label: string }> = [
   { id: "subscription", label: "Subscription & Billing" },
   { id: "learning", label: "Learning Preferences" },
   { id: "accessibility", label: "Theme & Accessibility" },
+  { id: "saved", label: "Saved Jobs & Courses" },
 ];
 
 export default function SettingsPage() {
   const { user, logout, refreshUser } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { fontSize: contextFontSize, setFontSize: setContextFontSize } =
+    useFontSize();
+  const { language: contextLanguage, setLanguage: setContextLanguage } =
+    useLanguage();
   const isMobile = useMobile();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeButtonRef = useRef<HTMLButtonElement>(null);
@@ -97,6 +114,7 @@ export default function SettingsPage() {
       "subscription",
       "learning",
       "accessibility",
+      "saved",
     ];
     try {
       const sectionFromUrl = searchParams.get("section") as SettingsSection;
@@ -223,10 +241,10 @@ export default function SettingsPage() {
   >("weekly");
 
   // Accessibility
-  const [fontSize, setFontSize] = useState<"small" | "medium" | "large">(
-    "medium"
+  const [fontSize, setFontSize] = useState<"small" | "medium" | "big">(
+    contextFontSize
   );
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState<"en" | "ka">(contextLanguage);
 
   // Handler to change section
   const handleSectionChange = (section: SettingsSection) => {
@@ -241,6 +259,15 @@ export default function SettingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.first_name, user?.last_name]); // Update when user ID or name fields change
+
+  // Sync fontSize and language with context
+  useEffect(() => {
+    setFontSize(contextFontSize);
+  }, [contextFontSize]);
+
+  useEffect(() => {
+    setLanguage(contextLanguage);
+  }, [contextLanguage]);
 
   // Load preferences from localStorage and set mounted
   useEffect(() => {
@@ -296,8 +323,25 @@ export default function SettingsPage() {
     setAiRecommendationFrequency(
       loadPreference("ai_recommendation_frequency", "weekly")
     );
-    setFontSize(loadPreference("accessibility_font_size", "medium"));
-    setLanguage(loadPreference("accessibility_language", "en"));
+    // Font size is now managed by FontSizeContext, but we keep local state for UI
+    const savedFontSize = loadPreference(
+      "breneo-font-size",
+      contextFontSize
+    ) as string;
+    // Map "large" to "big" if needed for backward compatibility
+    const mappedFontSize = savedFontSize === "large" ? "big" : savedFontSize;
+    if (["small", "medium", "big"].includes(mappedFontSize)) {
+      setFontSize(mappedFontSize as "small" | "medium" | "big");
+      setContextFontSize(mappedFontSize as "small" | "medium" | "big");
+    }
+    const savedLanguage = loadPreference("accessibility_language", "en");
+    // Ensure only valid language codes are used
+    if (savedLanguage === "en" || savedLanguage === "ka") {
+      setLanguage(savedLanguage);
+    } else {
+      setLanguage("en");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update URL when section changes (only after component is mounted)
@@ -404,16 +448,213 @@ export default function SettingsPage() {
       );
     }
   }, [aiRecommendationFrequency, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("accessibility_font_size", JSON.stringify(fontSize));
-    }
-  }, [fontSize, mounted]);
+  // Handle font size change - apply immediately
+  const handleFontSizeChange = (value: "small" | "medium" | "big") => {
+    setFontSize(value);
+    setContextFontSize(value);
+  };
+
+  // Handle language change - apply immediately
+  const handleLanguageChange = (value: "en" | "ka") => {
+    setLanguage(value);
+    setContextLanguage(value);
+    localStorage.setItem("accessibility_language", JSON.stringify(value));
+  };
+
+  // Handle theme change - apply immediately
+  const handleThemeChange = (value: "light" | "dark" | "system") => {
+    setTheme(value);
+    localStorage.setItem("theme", value);
+  };
   useEffect(() => {
     if (mounted) {
       localStorage.setItem("accessibility_language", JSON.stringify(language));
     }
   }, [language, mounted]);
+
+  // Fetch saved jobs
+  const { data: savedJobIds = [], isLoading: loadingSavedJobs } = useQuery<
+    string[]
+  >({
+    queryKey: ["savedJobs", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedJobsArray = profileResponse.data?.saved_jobs || [];
+        return savedJobsArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved jobs:", error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch saved courses
+  const { data: savedCourseIds = [], isLoading: loadingSavedCourses } =
+    useQuery<string[]>({
+      queryKey: ["savedCourses", user?.id],
+      queryFn: async () => {
+        if (!user?.id) return [];
+        try {
+          const profileResponse = await apiClient.get(
+            API_ENDPOINTS.AUTH.PROFILE
+          );
+          const savedCoursesArray = profileResponse.data?.saved_courses || [];
+          return savedCoursesArray.map((id: string | number) => String(id));
+        } catch (error) {
+          console.error("Error fetching saved courses:", error);
+          return [];
+        }
+      },
+      enabled: !!user?.id,
+    });
+
+  // Fetch job details for saved jobs
+  // Note: We'll fetch a batch of jobs and filter by saved IDs
+  const { data: savedJobs = [], isLoading: loadingJobDetails } = useQuery({
+    queryKey: ["savedJobDetails", savedJobIds],
+    queryFn: async () => {
+      if (!savedJobIds || savedJobIds.length === 0) return [];
+      try {
+        // Fetch jobs using the job service with a general query
+        // We'll filter the results to match saved job IDs
+        const response = await jobService.fetchActiveJobs({
+          query: "",
+          filters: {
+            country: "Georgia",
+            countries: [],
+            jobTypes: [],
+            isRemote: false,
+            skills: [],
+          },
+          pageSize: 100, // Fetch a larger batch to find saved jobs
+        });
+
+        // Filter to only include saved jobs
+        const jobs = (response.jobs || [])
+          .filter((job) => {
+            const jobId = job.job_id || job.id || "";
+            return savedJobIds.includes(String(jobId));
+          })
+          .map((job) => {
+            const jobId = String(job.job_id || job.id || "");
+            return {
+              id: jobId,
+              title: (job.job_title || job.title || "Unknown Job") as string,
+              company: (job.company_name ||
+                job.employer_name ||
+                job.company ||
+                "Unknown Company") as string,
+              location: (job.location ||
+                [job.job_city, job.job_state, job.job_country]
+                  .filter(Boolean)
+                  .join(", ") ||
+                "Unknown Location") as string,
+              url: (job.job_apply_link ||
+                job.url ||
+                job.apply_url ||
+                "") as string,
+            };
+          });
+
+        return jobs;
+      } catch (error) {
+        console.error("Error fetching saved job details:", error);
+        return [];
+      }
+    },
+    enabled: savedJobIds.length > 0,
+  });
+
+  // Fetch course details for saved courses
+  const { data: savedCourses = [], isLoading: loadingCourseDetails } = useQuery(
+    {
+      queryKey: ["savedCourseDetails", savedCourseIds],
+      queryFn: async () => {
+        if (!savedCourseIds || savedCourseIds.length === 0) return [];
+        try {
+          const { data, error } = await supabase
+            .from("courses")
+            .select("id, title, provider, category, level, duration")
+            .in("id", savedCourseIds);
+
+          if (error) {
+            console.error("Error fetching saved course details:", error);
+            return [];
+          }
+
+          return (data || []).map((course) => ({
+            id: course.id,
+            title: course.title,
+            provider: course.provider,
+            category: course.category,
+            level: course.level,
+            duration: course.duration,
+          }));
+        } catch (error) {
+          console.error("Error fetching saved course details:", error);
+          return [];
+        }
+      },
+      enabled: savedCourseIds.length > 0,
+    }
+  );
+
+  // Mutation to unsave a job
+  const unsaveJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      if (!user?.id) throw new Error("User not logged in");
+
+      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+      const currentSavedJobs = profileResponse.data?.saved_jobs || [];
+
+      const updatedSavedJobs = currentSavedJobs.filter(
+        (id: string | number) => String(id) !== jobId
+      );
+
+      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+        saved_jobs: updatedSavedJobs,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["savedJobDetails"] });
+      toast.success("Job unsaved successfully");
+    },
+    onError: (error: Error) => {
+      console.error("Error unsaving job:", error);
+      toast.error("Failed to unsave job. Please try again.");
+    },
+  });
+
+  // Mutation to unsave a course
+  const unsaveCourseMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      if (!user?.id) throw new Error("User not logged in");
+
+      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+      const currentSavedCourses = profileResponse.data?.saved_courses || [];
+
+      const updatedSavedCourses = currentSavedCourses.filter(
+        (id: string | number) => String(id) !== courseId
+      );
+
+      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+        saved_courses: updatedSavedCourses,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["savedCourseDetails"] });
+      toast.success("Course unsaved successfully");
+    },
+    onError: (error: Error) => {
+      console.error("Error unsaving course:", error);
+      toast.error("Failed to unsave course. Please try again.");
+    },
+  });
 
   // Password Reset Functions
   const handleSendCode = async (e: React.FormEvent) => {
@@ -672,7 +913,8 @@ export default function SettingsPage() {
     }
   };
 
-  const darkModeValue = theme === "dark" ? "ON" : "OFF";
+  const darkModeValue =
+    theme === "dark" ? "ON" : theme === "system" ? "AUTO" : "OFF";
 
   const renderContent = () => {
     switch (activeSection) {
@@ -1655,19 +1897,20 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>Dark Mode</Label>
+                  <Label>Theme</Label>
                   <Select
                     value={theme || "light"}
                     onValueChange={(value) =>
-                      setTheme(value as "light" | "dark")
+                      handleThemeChange(value as "light" | "dark" | "system")
                     }
                   >
                     <SelectTrigger className="w-32">
                       <SelectValue>{darkModeValue}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="light">OFF</SelectItem>
-                      <SelectItem value="dark">ON</SelectItem>
+                      <SelectItem value="light">Light</SelectItem>
+                      <SelectItem value="dark">Dark</SelectItem>
+                      <SelectItem value="system">Auto</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1684,36 +1927,235 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Font Size</Label>
-                  <Select
-                    value={fontSize}
-                    onValueChange={(value: "small" | "medium" | "large") =>
-                      setFontSize(value)
-                    }
-                  >
+                  <Select value={fontSize} onValueChange={handleFontSizeChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="small">Small</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="large">Large</SelectItem>
+                      <SelectItem value="big">Big</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Language</Label>
-                  <Select value={language} onValueChange={setLanguage}>
+                  <Select value={language} onValueChange={handleLanguageChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                      <SelectItem value="de">German</SelectItem>
+                      <SelectItem value="ka">Georgian (ქართული)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case "saved":
+        return (
+          <div className="space-y-8">
+            <h1 className="text-3xl font-bold">Saved Jobs & Courses</h1>
+
+            {/* Saved Jobs */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5" />
+                  Saved Jobs
+                </CardTitle>
+                <CardDescription>
+                  Manage your saved job listings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingSavedJobs || loadingJobDetails ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-16 bg-muted animate-pulse rounded-lg"
+                      />
+                    ))}
+                  </div>
+                ) : savedJobIds.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No saved jobs yet.</p>
+                    <p className="text-sm mt-2">
+                      Start saving jobs from the{" "}
+                      <Link to="/jobs" className="text-primary hover:underline">
+                        jobs page
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                ) : savedJobs.length === 0 && savedJobIds.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      {savedJobIds.length} saved job
+                      {savedJobIds.length !== 1 ? "s" : ""} (details loading...)
+                    </div>
+                    {savedJobIds.map((jobId) => (
+                      <div
+                        key={jobId}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-mono text-muted-foreground truncate">
+                            Job ID: {jobId}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              navigate(`/jobs/${encodeURIComponent(jobId)}`)
+                            }
+                            className="flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => unsaveJobMutation.mutate(jobId)}
+                            disabled={unsaveJobMutation.isPending}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <BookmarkCheck className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {savedJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">
+                            {job.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {job.company} • {job.location}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              navigate(`/jobs/${encodeURIComponent(job.id)}`)
+                            }
+                            className="flex items-center gap-1"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => unsaveJobMutation.mutate(job.id)}
+                            disabled={unsaveJobMutation.isPending}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <BookmarkCheck className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Saved Courses */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5" />
+                  Saved Courses
+                </CardTitle>
+                <CardDescription>
+                  Manage your saved course listings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingSavedCourses || loadingCourseDetails ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-16 bg-muted animate-pulse rounded-lg"
+                      />
+                    ))}
+                  </div>
+                ) : savedCourses.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No saved courses yet.</p>
+                    <p className="text-sm mt-2">
+                      Start saving courses from the{" "}
+                      <Link
+                        to="/courses"
+                        className="text-primary hover:underline"
+                      >
+                        courses page
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {savedCourses.map((course) => (
+                      <div
+                        key={course.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">
+                            {course.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {course.provider} • {course.category} •{" "}
+                            {course.level} • {course.duration}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/course/${course.id}`)}
+                            className="flex items-center gap-1"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              unsaveCourseMutation.mutate(course.id)
+                            }
+                            disabled={unsaveCourseMutation.isPending}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <BookmarkCheck className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

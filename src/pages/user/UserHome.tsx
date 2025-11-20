@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Bookmark,
@@ -59,14 +60,6 @@ interface Course {
   image: string;
 }
 
-interface Webinar {
-  id: string;
-  title: string;
-  company: string;
-  time: string;
-  date: string;
-  logo?: string;
-}
 
 // Fetch jobs from job service API without any filters
 const fetchJobs = async () => {
@@ -100,6 +93,7 @@ const UserHome = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useMobile();
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
@@ -338,30 +332,6 @@ const UserHome = () => {
     enabled: !!user,
   });
 
-  // Mock webinars data (since we don't have a webinars table yet)
-  const mockWebinars: Webinar[] = [
-    {
-      id: "1",
-      title: "Career Growth Strategies",
-      company: "Breneo Academy",
-      time: "14:00 - 15:00",
-      date: "15 Dec",
-    },
-    {
-      id: "2",
-      title: "Tech Skills Workshop",
-      company: "Tech Experts",
-      time: "16:00 - 17:00",
-      date: "15 Dec",
-    },
-    {
-      id: "3",
-      title: "Digital Marketing Bootcamp",
-      company: "Marketing Pro",
-      time: "18:00 - 19:00",
-      date: "15 Dec",
-    },
-  ];
 
   // Transform jobs - handle empty or undefined arrays
   // Transform all jobs first, then filter out nulls, then take up to 10
@@ -525,6 +495,18 @@ const UserHome = () => {
 
   return (
     <DashboardLayout>
+      {/* Mobile Welcome Message */}
+      {isMobile && (
+        <div className="mb-4 px-4 md:hidden">
+          <h1 className="text-2xl font-semibold text-foreground">
+            Welcome,{" "}
+            <span className="font-bold">
+              {user?.first_name || user?.email?.split("@")[0] || "User"}
+            </span>
+            !
+          </h1>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="space-y-6">
           {/* Top Section - Widgets */}
@@ -611,50 +593,6 @@ const UserHome = () => {
               </Card>
             )}
 
-            {/* Webinars Widget */}
-            <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200 flex-1">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
-                    <Clock className="h-4 w-4 text-breneo-blue" />
-                  </div>
-                  <h3 className="font-semibold text-sm text-gray-900">
-                    Webinars
-                  </h3>
-                </div>
-
-                {/* Webinar List - Dates on left, webinars on right */}
-                <div className="space-y-2">
-                  {mockWebinars.slice(0, 2).map((webinar) => (
-                    <div
-                      key={webinar.id}
-                      className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-50 transition-colors cursor-pointer"
-                    >
-                      {/* Left side - Date */}
-                      <div className="flex-shrink-0 text-center min-w-[50px]">
-                        <div className="text-xs font-semibold text-gray-900">
-                          {webinar.date}
-                        </div>
-                      </div>
-
-                      {/* Right side - Webinar details */}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-xs text-gray-900 line-clamp-1 mb-1">
-                          {webinar.title}
-                        </h4>
-                        <div className="text-xs text-gray-500 mb-1">
-                          {webinar.company}
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <Clock className="h-2.5 w-2.5" />
-                          <span>{webinar.time}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Main Content - Top Jobs and Courses */}
