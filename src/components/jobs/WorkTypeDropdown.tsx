@@ -79,7 +79,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
     ? placeholder 
     : selectedWorkTypes.length === 1
     ? workTypes.find((t) => t.id === selectedWorkTypes[0])?.label || placeholder
-    : `${selectedWorkTypes.length} selected`;
+    : selectedWorkTypes.map((id) => workTypes.find((t) => t.id === id)?.label || id).join(", ");
 
   const isPlaceholder = selectedWorkTypes.length === 0;
 
@@ -112,34 +112,27 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
           <Network className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
           {selectedWorkTypes.length === 0 ? (
             <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>
-          ) : selectedWorkTypes.length === 1 ? (
-            <span className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="truncate text-sm">
-                {workTypes.find((t) => t.id === selectedWorkTypes[0])?.label || placeholder}
-          </span>
-                  <button
-                    type="button"
-                onClick={(e) => handleRemoveWorkType(e, selectedWorkTypes[0])}
-                className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                aria-label="Remove work type"
-                  >
-                <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
-                  </button>
-            </span>
           ) : (
-            <span className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="truncate text-sm">{displayText}</span>
-            <button
-              type="button"
-                onClick={(e) => handleRemoveAll(e)}
-                className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                aria-label="Remove all work types"
-            >
-                <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
-            </button>
-            </span>
-        )}
+            <span className="flex-1 min-w-0 truncate text-sm">{displayText}</span>
+          )}
         </button>
+        {selectedWorkTypes.length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedWorkTypes.length === 1) {
+                handleRemoveWorkType(e, selectedWorkTypes[0]);
+              } else {
+                handleRemoveAll(e);
+              }
+            }}
+            className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ml-1 transition-all duration-200 animate-in fade-in-0 zoom-in-95"
+            aria-label={selectedWorkTypes.length === 1 ? "Remove work type" : "Remove all work types"}
+          >
+            <X className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 hover:scale-110" />
+          </button>
+        )}
       </div>
 
       {/* Dropdown Panel */}

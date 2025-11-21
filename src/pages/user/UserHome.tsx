@@ -60,7 +60,6 @@ interface Course {
   image: string;
 }
 
-
 // Fetch jobs from job service API without any filters
 const fetchJobs = async () => {
   try {
@@ -332,7 +331,6 @@ const UserHome = () => {
     enabled: !!user,
   });
 
-
   // Transform jobs - handle empty or undefined arrays
   // Transform all jobs first, then filter out nulls, then take up to 10
   const transformedJobs: Job[] = useMemo(() => {
@@ -498,7 +496,7 @@ const UserHome = () => {
       {/* Mobile Welcome Message */}
       {isMobile && (
         <div className="mb-4 px-4 md:hidden">
-          <h1 className="text-2xl font-semibold text-foreground">
+          <h1 className="text-lg font-semibold text-foreground">
             Welcome,{" "}
             <span className="font-bold">
               {user?.first_name || user?.email?.split("@")[0] || "User"}
@@ -513,7 +511,7 @@ const UserHome = () => {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
             {!hasCompletedTest && !loadingSkills && (
-              <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200">
+              <Card className="bg-white transition-all border border-gray-200 hover:border-gray-400 rounded-2xl">
                 <CardContent className="p-4">
                   <Link to="/skill-test" className="block cursor-pointer group">
                     <div className="flex items-start gap-3">
@@ -545,7 +543,7 @@ const UserHome = () => {
 
             {/* Skill Path CTA Widget - Only show if user has completed the test */}
             {hasCompletedTest && !loadingSkills && (
-              <Card className="bg-white hover:shadow-md transition-shadow border border-gray-200 w-auto flex-shrink-0 max-w-lg">
+              <Card className="bg-white transition-all border border-gray-200 hover:border-gray-400 w-auto flex-shrink-0 max-w-lg rounded-2xl">
                 <CardContent className="p-4 md:p-5 min-h-[160px]">
                   <Link to="/skill-path" className="block cursor-pointer group">
                     <div className="flex items-center gap-3 md:gap-6">
@@ -592,7 +590,6 @@ const UserHome = () => {
                 </CardContent>
               </Card>
             )}
-
           </div>
 
           {/* Main Content - Top Jobs and Courses */}
@@ -600,7 +597,7 @@ const UserHome = () => {
             {/* Top Job Picks Section */}
             <div>
               <div className="mb-4">
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">
                   Top job picks for you
                 </h2>
               </div>
@@ -641,7 +638,7 @@ const UserHome = () => {
                   {displayJobs.map((job) => (
                     <Card
                       key={job.id}
-                      className="group flex flex-col hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden flex-shrink-0 w-72 cursor-pointer"
+                      className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden flex-shrink-0 w-72 cursor-pointer rounded-2xl"
                       onClick={() => {
                         if (job.id) {
                           navigate(`/jobs/${encodeURIComponent(job.id)}`);
@@ -826,7 +823,7 @@ const UserHome = () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <GraduationCap className="h-6 w-6 text-breneo-blue" />
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-lg font-bold text-gray-900">
                     Top courses picked for you
                   </h2>
                 </div>
@@ -876,7 +873,7 @@ const UserHome = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {courses.slice(0, 3).map((course) => (
                     <Link key={course.id} to={`/course/${course.id}`}>
-                      <Card className="relative hover:shadow-lg transition-all duration-200 cursor-pointer group border border-gray-200 hover:border-breneo-blue/30">
+                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 hover:border-gray-400 rounded-2xl">
                         <CardContent className="p-0 overflow-hidden">
                           <div className="relative">
                             <img

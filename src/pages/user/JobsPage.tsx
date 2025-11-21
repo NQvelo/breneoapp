@@ -102,6 +102,7 @@ const jobTypeLabels: Record<string, string> = {
   PARTTIME: "Part Time",
   CONTRACTOR: "Contractor",
   INTERN: "Intern",
+  INTERNSHIP: "Internship",
 };
 
 // Function to extract skills from job data
@@ -501,24 +502,26 @@ const getSkillColor = (skill: string, index: number): string => {
   return colors[index % colors.length];
 };
 
-// Fetch latest jobs matched to user's skills (no country filter)
-// Returns latest jobs (up to 20 to ensure we get 6 regular + 6 intern)
-const fetchLatestJobs = async (userSkills: string[]): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
+// Fetch all internship jobs without any filtering
+const fetchInternshipJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
   try {
-    console.log("🚀 fetchLatestJobs called with user skills:", userSkills);
+    console.log("🚀 fetchInternshipJobs called - fetching all internship jobs without filters");
     
     const response = await jobService.fetchActiveJobs({
-      query: "", // No search term
+      query: "intern intern internship", // Search term for internships
       filters: {
-        country: "Georgia", // Keep for internal state but don't filter by it
+        country: undefined,
         countries: [], // No country filtering
-        jobTypes: [],
-        isRemote: false,
+        jobTypes: ["INTERN"], // Filter for internship jobs only
+        isRemote: undefined,
         datePosted: undefined,
-        skills: userSkills.length > 0 ? userSkills : [], // Filter by user's skills
+        skills: [], // No skill filtering
+        salaryMin: undefined,
+        salaryMax: undefined,
+        salaryByAgreement: undefined,
       },
       page: 1,
-      pageSize: 20, // Fetch more to ensure we get enough regular and intern jobs
+      pageSize: 100, // Fetch more to get all internship jobs
     });
 
     // Validate that we got jobs back
@@ -533,7 +536,53 @@ const fetchLatestJobs = async (userSkills: string[]): Promise<{ jobs: ApiJob[]; 
       return jobId && jobId.trim() !== "";
     });
 
-    // Return all valid jobs - we'll limit to 6 regular + 6 intern in the component
+    // Return all valid internship jobs - display all of them
+    return {
+      jobs: validJobs,
+      hasMore: response.hasMore ?? false,
+      total: validJobs.length,
+    };
+  } catch (error) {
+    console.error("Error fetching internship jobs:", error);
+    return { jobs: [], hasMore: false, total: 0 };
+  }
+};
+
+// Fetch latest regular jobs without any filtering
+const fetchLatestJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
+  try {
+    console.log("🚀 fetchLatestJobs called - fetching all regular jobs without filters");
+    
+    const response = await jobService.fetchActiveJobs({
+      query: "", // No search term
+      filters: {
+        country: undefined,
+        countries: [], // No country filtering
+        jobTypes: [], // No job type filtering (will exclude interns client-side)
+        isRemote: undefined,
+        datePosted: undefined,
+        skills: [], // No skill filtering
+        salaryMin: undefined,
+        salaryMax: undefined,
+        salaryByAgreement: undefined,
+      },
+      page: 1,
+      pageSize: 20, // Fetch more to ensure we get enough regular jobs
+    });
+
+    // Validate that we got jobs back
+    if (!response || !Array.isArray(response.jobs)) {
+      console.warn("Invalid response format from job service:", response);
+      return { jobs: [], hasMore: false, total: 0 };
+    }
+
+    // Filter out jobs without valid IDs
+    const validJobs = response.jobs.filter((job) => {
+      const jobId = job.job_id || job.id;
+      return jobId && jobId.trim() !== "";
+    });
+
+    // Return all valid jobs - we'll limit to 6 regular in the component
     return {
       jobs: validJobs,
       hasMore: false, // No pagination for latest jobs
@@ -766,14 +815,14 @@ const JobsPage = () => {
     enabled: !!user,
   });
 
-  // Fetch latest jobs matched to user's skills (no country filter)
+  // Fetch latest regular jobs without any filtering
   const {
     data: jobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["latestJobs", userTopSkills.join(",")], // Include user skills in query key
-    queryFn: () => fetchLatestJobs(userTopSkills),
+    queryKey: ["latestJobs"], // No dependencies - fetch all jobs
+    queryFn: () => fetchLatestJobs(),
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -781,19 +830,38 @@ const JobsPage = () => {
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     retry: 1,
     retryDelay: 1000,
-    enabled: !loadingSkills, // Fetch when skills loading is complete (even if no skills)
+    enabled: true, // Always fetch jobs
   });
 
-  // Extract jobs from the response
+  // Fetch all internship jobs without any filtering
+  const {
+    data: internshipJobsData = { jobs: [], hasMore: false, total: 0 },
+    isLoading: isLoadingInternships,
+    error: internshipError,
+  } = useQuery({
+    queryKey: ["internshipJobs"], // Separate query for internships
+    queryFn: () => fetchInternshipJobs(),
+    refetchOnWindowFocus: false,
+    refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
+    refetchOnReconnect: false,
+    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    retry: 1,
+    retryDelay: 1000,
+    enabled: true, // Always fetch jobs
+  });
+
+  // Extract jobs from the responses
   const jobs = jobsData.jobs || [];
+  const internshipJobsRaw = internshipJobsData.jobs || [];
 
   // Immediate search (when user presses Enter or clicks Search button)
   const handleSearch = useCallback(() => {
-    if (!searchTerm.trim()) return; // Don't redirect if search is empty
-    
-    // Redirect to search results page with filters
+    // Always redirect to search results page with filters
     const params = new URLSearchParams();
-    params.set("search", searchTerm.trim());
+    if (searchTerm.trim()) {
+      params.set("search", searchTerm.trim());
+    }
     if (activeFilters.countries.length > 0) {
       params.set("countries", activeFilters.countries.join(","));
     }
@@ -1043,8 +1111,13 @@ const JobsPage = () => {
         job.employment_type ||
         job.type ||
         "FULLTIME";
+      // Handle case-insensitive matching
+      const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
       const employmentType =
-        jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+        jobTypeLabels[employmentTypeRawUpper] || 
+        jobTypeLabels[employmentTypeRaw] || 
+        employmentTypeRaw || 
+        "Full time";
 
       // Determine work arrangement
       let workArrangement = "On-site";
@@ -1092,26 +1165,202 @@ const JobsPage = () => {
       .slice(0, 6); // Limit to 6 latest regular jobs
   }, [transformedJobs]);
 
+  // Transform internship jobs separately - same transformation logic as regular jobs
+  const transformedInternshipJobs = React.useMemo(() => {
+    if (!internshipJobsRaw || internshipJobsRaw.length === 0) {
+      return [];
+    }
+    
+    try {
+      return (internshipJobsRaw || []).map((job: ApiJob): Job | null => {
+        // Use the same transformation logic as regular jobs
+        // Handle nested company object if it exists
+        const companyObj =
+          job.company && typeof job.company === "object"
+            ? (job.company as Record<string, unknown>)
+            : null;
+
+        // Extract fields with fallbacks for different API formats
+        const jobId = job.job_id || job.id || "";
+        
+        // Skip jobs without valid IDs - they can't be opened
+        if (!jobId || jobId.trim() === "") {
+          console.warn("Skipping internship job without valid ID:", job);
+          return null;
+        }
+        
+        const jobTitle =
+          job.job_title || job.title || job.position || "Untitled Position";
+        const companyName =
+          (companyObj?.name as string) ||
+          (companyObj?.company_name as string) ||
+          job.companyName ||
+          job.employer_name ||
+          job.company_name ||
+          (typeof job.company === "string" ? job.company : null) ||
+          "Unknown Company";
+        const jobCity =
+          job.job_city || job.city || (companyObj?.city as string) || "";
+        const jobState =
+          job.job_state || job.state || (companyObj?.state as string) || "";
+        const jobCountry =
+          job.job_country || job.country || (companyObj?.country as string) || "";
+        const locationString =
+          job.jobLocation ||
+          job.location ||
+          (companyObj?.location as string) ||
+          [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+          "Location not specified";
+        const applyLink =
+          job.applyUrl ||
+          job.jobUrl ||
+          job.job_apply_link ||
+          job.apply_link ||
+          job.url ||
+          job.apply_url ||
+          job.company_url ||
+          (companyObj?.url as string) ||
+          "";
+        
+        // Extract company logo (same logic as regular jobs)
+        let companyLogo: string | undefined = undefined;
+        if (job.companyLogo) companyLogo = job.companyLogo;
+        if (!companyLogo && job.employer_logo) companyLogo = job.employer_logo;
+        if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
+        if (!companyLogo && job.logo) companyLogo = job.logo;
+        if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
+        if (!companyLogo && companyObj) {
+          if (companyObj.logo) companyLogo = companyObj.logo as string;
+          if (!companyLogo && companyObj.logo_url)
+            companyLogo = companyObj.logo_url as string;
+          if (!companyLogo && companyObj.company_logo)
+            companyLogo = companyObj.company_logo as string;
+          if (!companyLogo && companyObj.employer_logo)
+            companyLogo = companyObj.employer_logo as string;
+        }
+        if (companyLogo) {
+          try {
+            const url = new URL(companyLogo);
+            if (!url.protocol.startsWith('http')) {
+              companyLogo = undefined;
+            }
+          } catch {
+            companyLogo = undefined;
+          }
+        }
+
+        // Format salary (same logic as regular jobs)
+        let salary = "By agreement";
+        const minSalary = job.job_min_salary || job.min_salary;
+        const maxSalary = job.job_max_salary || job.max_salary;
+        const salaryCurrency =
+          job.job_salary_currency || job.salary_currency || "$";
+        const salaryPeriod =
+          job.job_salary_period || job.salary_period || "yearly";
+
+        if (
+          minSalary &&
+          maxSalary &&
+          typeof minSalary === "number" &&
+          typeof maxSalary === "number"
+        ) {
+          const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+          const minSalaryFormatted = minSalary.toLocaleString();
+          const maxSalaryFormatted = maxSalary.toLocaleString();
+          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+          const isCurrencyBefore = currencySymbols.some((sym) =>
+            salaryCurrency.includes(sym)
+          );
+          if (isCurrencyBefore) {
+            salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+              periodLabel ? `/${periodLabel}` : ""
+            }`;
+          } else {
+            salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+              periodLabel ? `/${periodLabel}` : ""
+            }`;
+          }
+        } else if (minSalary && typeof minSalary === "number") {
+          const minSalaryFormatted = minSalary.toLocaleString();
+          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+          const isCurrencyBefore = currencySymbols.some((sym) =>
+            salaryCurrency.includes(sym)
+          );
+          salary = isCurrencyBefore
+            ? `${salaryCurrency}${minSalaryFormatted}+`
+            : `${minSalaryFormatted}+ ${salaryCurrency}`;
+        } else if (job.salary && typeof job.salary === "string") {
+          salary = job.salary;
+        }
+
+        // Format employment type
+        const employmentTypeRaw =
+          job.job_employment_type ||
+          job.employment_type ||
+          job.type ||
+          "INTERN";
+        const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
+        const employmentType =
+          jobTypeLabels[employmentTypeRawUpper] || 
+          jobTypeLabels[employmentTypeRaw] || 
+          employmentTypeRaw || 
+          "Intern";
+
+        // Determine work arrangement
+        let workArrangement = "On-site";
+        const isRemote =
+          job.job_is_remote || job.is_remote || job.remote === true;
+        if (isRemote) {
+          workArrangement = "Remote";
+        } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+          workArrangement = "Hybrid";
+        }
+
+        // Calculate match percentage
+        const jobSkills = extractJobSkills(job);
+        const matchPercentage = calculateMatchPercentage(userTopSkills, jobSkills);
+
+        return {
+          id: jobId,
+          title: jobTitle,
+          company: companyName,
+          location: locationString,
+          url: applyLink,
+          company_logo: companyLogo,
+          is_saved: savedJobs.includes(jobId),
+          salary,
+          employment_type: employmentType,
+          work_arrangement: workArrangement,
+          matchPercentage,
+        };
+      })
+      .filter((job): job is Job => job !== null);
+    } catch (error) {
+      console.error("Error transforming internship jobs:", error);
+      return [];
+    }
+  }, [internshipJobsRaw, savedJobs, userTopSkills]);
+
+  // All internship jobs without any limit
   const internJobs = useMemo(() => {
-    return transformedJobs
-      .filter(
-        (job) => job.employment_type?.toLowerCase() === "intern" || 
-                 job.employment_type?.toLowerCase() === "internship"
-      )
-      .slice(0, 6); // Limit to 6 latest intern jobs
-  }, [transformedJobs]);
+    return transformedInternshipJobs; // Return all internship jobs, no limit
+  }, [transformedInternshipJobs]);
 
   // Debug logging
   useEffect(() => {
     console.log("📊 JobsPage State:", {
       isLoading,
+      isLoadingInternships,
       error: error?.message,
+      internshipError: internshipError?.message,
       jobsCount: jobs.length,
+      internshipJobsRawCount: internshipJobsRaw.length,
       transformedJobsCount: transformedJobs.length,
+      transformedInternshipJobsCount: transformedInternshipJobs.length,
       regularJobsCount: regularJobs.length,
       internJobsCount: internJobs.length,
     });
-  }, [isLoading, error, jobs.length, transformedJobs.length, regularJobs.length, internJobs.length]);
+  }, [isLoading, isLoadingInternships, error, internshipError, jobs.length, internshipJobsRaw.length, transformedJobs.length, transformedInternshipJobs.length, regularJobs.length, internJobs.length]);
 
   // Helper function to redirect to search results with filters
   const redirectToSearchResults = useCallback((filters: JobFilters, search: string) => {
@@ -1137,7 +1386,7 @@ const JobsPage = () => {
     navigate(`/jobs/search?${params.toString()}`);
   }, [navigate]);
 
-  // Handle work types change - redirect to search results
+  // Handle work types change - only update filters, don't redirect until search button is clicked
   const handleWorkTypesChange = (workTypes: string[]) => {
     const newFilters = {
       ...activeFilters,
@@ -1145,11 +1394,10 @@ const JobsPage = () => {
     };
     setActiveFilters(newFilters);
     setTempFilters(newFilters);
-    // Redirect to search results page when filters change
-    redirectToSearchResults(newFilters, searchTerm);
+    // Don't redirect - wait for user to click search button
   };
 
-  // Handle remote change - redirect to search results
+  // Handle remote change - only update filters, don't redirect until search button is clicked
   const handleRemoteChange = (isRemote: boolean) => {
     const newFilters = {
       ...activeFilters,
@@ -1157,8 +1405,7 @@ const JobsPage = () => {
     };
     setActiveFilters(newFilters);
     setTempFilters(newFilters);
-    // Redirect to search results page when filters change
-    redirectToSearchResults(newFilters, searchTerm);
+    // Don't redirect - wait for user to click search button
   };
 
   // Handle countries change - redirect to search results
@@ -1297,11 +1544,11 @@ const JobsPage = () => {
     <DashboardLayout>
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
-        <div className="mb-8 relative max-w-4xl mx-auto">
-          <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-lg pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible">
+        <div className="mb-8 relative max-w-6xl mx-auto">
+          <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-lg pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
             {/* Briefcase Icon - At the start */}
             <Briefcase
-              className="h-4 w-4 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
+              className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
               strokeWidth={2}
             />
 
@@ -1317,7 +1564,7 @@ const JobsPage = () => {
             {/* Work Types Field - Hidden on mobile, shown on desktop */}
             {!isMobile && (
               <>
-                <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                <div className="h-5 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0 self-stretch" />
                 <div className="flex items-center flex-1 min-w-0 relative">
                   <WorkTypeDropdown
                     selectedWorkTypes={activeFilters.jobTypes}
@@ -1331,25 +1578,22 @@ const JobsPage = () => {
             )}
 
             {/* Filter Button - Inside search bar */}
-            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
             <Button
               variant="outline"
               size="icon"
               onClick={() => setFilterModalOpen(true)}
-              className="h-9 w-9 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600"
+              className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md ml-2"
               aria-label="Filter jobs"
             >
               <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
             </Button>
 
             {/* Search Button - Circular purple button with white magnifying glass */}
-            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
             <Button
               variant="default"
               size="icon"
               onClick={handleSearch}
-              className="h-10 w-10 flex-shrink-0 bg-breneo-blue hover:bg-breneo-blue/90"
-              disabled={!searchTerm.trim()}
+              className="h-10 w-10 flex-shrink-0 bg-breneo-blue hover:bg-breneo-blue/90 rounded-md ml-2"
               aria-label="Search"
             >
               <Search className="h-5 w-5 text-white" />
@@ -1360,7 +1604,7 @@ const JobsPage = () => {
         {/* User Skills Section */}
         {loadingSkills ? (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">Your Skills</h2>
+            <h2 className="text-lg font-bold mb-4">Your Skills</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {[...Array(5)].map((_, i) => (
                 <Card key={i} className="border border-gray-200">
@@ -1375,7 +1619,7 @@ const JobsPage = () => {
           </div>
         ) : userTopSkills.length > 0 ? (
           <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-4">Your Skills</h2>
+            <h2 className="text-lg font-bold mb-4">Your Skills</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {userTopSkills.map((skill, index) => {
                 const IconComponent = getSkillIcon(skill);
@@ -1389,7 +1633,7 @@ const JobsPage = () => {
                 return (
                   <Card
                     key={skill}
-                    className="cursor-pointer hover:shadow-md transition-shadow duration-200 border border-gray-200"
+                    className="cursor-pointer transition-all duration-200 border border-gray-200 hover:border-gray-400 rounded-2xl"
                     onClick={() => {
                       // Add skill to filters if not already present
                       if (!activeFilters.skills.includes(skill)) {
@@ -1430,20 +1674,20 @@ const JobsPage = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Sun className="h-6 w-6 text-yellow-500" />
-            <h2 className="text-2xl font-bold">Latest Vacancies</h2>
+            <h2 className="text-lg font-bold">Latest Vacancies</h2>
           </div>
         </div>
 
-        {error && (
+        {(error || internshipError) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
             <AlertCircle className="h-5 w-5" />
             <p>
-              <strong>Error:</strong> {(error as Error).message}
+              <strong>Error:</strong> {(error as Error)?.message || (internshipError as Error)?.message}
             </p>
           </div>
         )}
 
-        {isLoading && (
+        {(isLoading || isLoadingInternships) && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
@@ -1455,7 +1699,7 @@ const JobsPage = () => {
           </div>
         )}
 
-        {!isLoading && regularJobs.length === 0 && internJobs.length === 0 && (
+        {!isLoading && !isLoadingInternships && regularJobs.length === 0 && internJobs.length === 0 && (
           <div className="text-center p-10 border border-dashed rounded-lg text-muted-foreground">
             <img
               src="/lovable-uploads/no-data-found.png"
@@ -1475,7 +1719,7 @@ const JobsPage = () => {
             {regularJobs.map((job) => (
             <Card
               key={job.id}
-              className="group flex flex-col hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden"
+              className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-2xl"
             >
               <CardContent className="p-5 flex flex-col flex-grow relative">
                 {/* Company Logo and Info */}
@@ -1654,17 +1898,17 @@ const JobsPage = () => {
         )}
 
         {/* Intern Jobs Section */}
-        {!isLoading && internJobs.length > 0 && (
+        {!isLoadingInternships && internJobs.length > 0 && (
           <>
             <div className="flex items-center gap-3 mb-6 mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
               <GraduationCap className="h-6 w-6 text-breneo-blue" />
-              <h2 className="text-2xl font-bold">Internship Opportunities</h2>
+              <h2 className="text-lg font-bold">Internship Opportunities</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
               {internJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden"
+                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-2xl"
                 >
                   <CardContent className="p-5 flex flex-col flex-grow relative">
                     {/* Company Logo and Info */}

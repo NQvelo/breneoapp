@@ -758,7 +758,7 @@ const SkillPathPage = () => {
           <Card>
             <CardContent className="text-center py-12">
               <Brain className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <h2 className="text-2xl font-bold mb-2">
+              <h2 className="text-lg font-bold mb-2">
                 Complete Your Skill Assessment
               </h2>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">

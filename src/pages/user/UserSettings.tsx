@@ -511,6 +511,14 @@ export default function SettingsPage() {
       enabled: !!user?.id,
     });
 
+  useEffect(() => {
+    if (savedCourseIds && savedCourseIds.length > 0) {
+      console.log("📚 Saved course IDs:", savedCourseIds);
+    } else if (savedCourseIds) {
+      console.log("📚 Saved course IDs: none");
+    }
+  }, [savedCourseIds]);
+
   // Fetch job details for saved jobs
   // Note: We'll fetch a batch of jobs and filter by saved IDs
   const { data: savedJobs = [], isLoading: loadingJobDetails } = useQuery({

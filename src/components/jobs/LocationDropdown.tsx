@@ -81,7 +81,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
     ? placeholder 
     : selectedLocations.length === 1
     ? countries.find((c) => c.code === selectedLocations[0])?.name || placeholder
-    : `${selectedLocations.length} selected`;
+    : selectedLocations.map((code) => countries.find((c) => c.code === code)?.name || code).join(", ");
 
   const isPlaceholder = selectedLocations.length === 0;
 
@@ -105,42 +105,35 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
           className={cn(
             "flex items-center flex-1 min-w-0 h-auto py-0 px-0 text-sm text-left bg-transparent border-0 focus:outline-none focus:ring-0",
             "transition-colors cursor-pointer hover:opacity-80",
-            isPlaceholder 
+            isPlaceholder
               ? "text-gray-400 dark:text-gray-500" 
               : "text-gray-900 dark:text-gray-100"
           )}
         >
-        <MapPin className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2" />
+          <MapPin className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2" />
           {selectedLocations.length === 0 ? (
             <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>
-          ) : selectedLocations.length === 1 ? (
-            <span className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="truncate text-sm">
-                {countries.find((c) => c.code === selectedLocations[0])?.name || placeholder}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => handleRemoveCountry(e, selectedLocations[0])}
-                className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                aria-label="Remove location"
-              >
-                <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
-              </button>
-            </span>
           ) : (
-            <span className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="truncate text-sm">{displayText}</span>
-              <button
-                type="button"
-                onClick={(e) => handleRemoveAll(e)}
-                className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
-                aria-label="Remove all locations"
-              >
-                <X className="h-3.5 w-3.5 text-gray-600 dark:text-gray-400" />
-              </button>
-            </span>
+            <span className="flex-1 min-w-0 truncate text-sm">{displayText}</span>
           )}
-      </button>
+        </button>
+        {selectedLocations.length > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedLocations.length === 1) {
+                handleRemoveCountry(e, selectedLocations[0]);
+              } else {
+                handleRemoveAll(e);
+              }
+            }}
+            className="flex-shrink-0 p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded ml-1 transition-all duration-200 animate-in fade-in-0 zoom-in-95"
+            aria-label={selectedLocations.length === 1 ? "Remove location" : "Remove all locations"}
+          >
+            <X className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 hover:scale-110" />
+          </button>
+        )}
       </div>
 
       {/* Dropdown Panel */}

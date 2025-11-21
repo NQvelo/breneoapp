@@ -85,7 +85,7 @@ export function DashboardHeader({
         isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
     >
-      <div className="flex items-center justify-between px-6 pt-6 pb-4">
+      <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">
         <div className="hidden md:flex items-center space-x-3">
           <h1 className="text-2xl font-semibold text-foreground">
             {pageTitle}

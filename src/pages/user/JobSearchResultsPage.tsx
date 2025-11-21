@@ -18,11 +18,9 @@ import {
   Tag,
   ChevronLeft,
   ChevronRight,
-  GraduationCap,
-  Grid3x3,
-  List,
-  LayoutGrid,
   ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
@@ -37,6 +35,7 @@ import {
   getTopSkills,
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface Job {
   id: string;
@@ -51,6 +50,7 @@ interface Job {
   work_arrangement?: string;
   benefits?: string;
   matchPercentage?: number;
+  datePosted?: string;
 }
 
 const jobTypeLabels: Record<string, string> = {
@@ -153,6 +153,25 @@ const calculateMatchPercentage = (
   return Math.min(matchPercentage, 100);
 };
 
+// Helper function to format date from API
+const formatJobDate = (dateString: string | undefined): string => {
+  if (!dateString) {
+    return new Date().toLocaleDateString("ka-GE");
+  }
+
+  try {
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return new Date().toLocaleDateString("ka-GE");
+    }
+    return date.toLocaleDateString("ka-GE");
+  } catch (error) {
+    console.warn("Error parsing date:", dateString, error);
+    return new Date().toLocaleDateString("ka-GE");
+  }
+};
+
 const JobSearchResultsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -161,6 +180,8 @@ const JobSearchResultsPage = () => {
   const isMobile = useMobile();
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
+  const [dateSortOrder, setDateSortOrder] = useState<"desc" | "asc">("desc");
+  const t = useTranslation();
 
   // Get search term and filters from URL
   const searchTerm = searchParams.get("search") || "";
@@ -432,6 +453,25 @@ const JobSearchResultsPage = () => {
         const jobSkills = extractJobSkills(job);
         const matchPercentage = calculateMatchPercentage(userTopSkills, jobSkills);
 
+        // Extract date posted - try all possible date fields from API
+        // JSearch API typically uses: job_posted_at_datetime_utc, date_posted, or posted_date
+        const datePosted =
+          job.job_posted_at_datetime_utc || // JSearch API primary field
+          job.date_posted ||
+          job.posted_date ||
+          job.postedAt ||
+          job.job_posted_at ||
+          (job as any).job_publish_timestamp ||
+          (job as any).publish_time ||
+          job.created_at ||
+          job.published_at ||
+          undefined;
+        
+        // Debug: Log if we found a date (only in development)
+        if (process.env.NODE_ENV === 'development' && datePosted) {
+          console.log('Job date found:', { jobId: jobId, datePosted, title: jobTitle });
+        }
+
         return {
           id: jobId,
           title: jobTitle,
@@ -444,26 +484,34 @@ const JobSearchResultsPage = () => {
           employment_type: employmentType,
           work_arrangement: workArrangement,
           matchPercentage,
+          datePosted,
         };
       })
       .filter((job): job is Job => job !== null);
   }, [jobs, savedJobs, userTopSkills]);
 
+  // Sort jobs by date
   const regularJobs = useMemo(() => {
-    return transformedJobs.filter(
-      (job) =>
-        job.employment_type?.toLowerCase() !== "intern" &&
-        job.employment_type?.toLowerCase() !== "internship"
-    );
-  }, [transformedJobs]);
+    const sorted = [...transformedJobs].sort((a, b) => {
+      // If no date, put at the end
+      if (!a.datePosted && !b.datePosted) return 0;
+      if (!a.datePosted) return 1;
+      if (!b.datePosted) return -1;
 
-  const internJobs = useMemo(() => {
-    return transformedJobs.filter(
-      (job) =>
-        job.employment_type?.toLowerCase() === "intern" ||
-        job.employment_type?.toLowerCase() === "internship"
-    );
-  }, [transformedJobs]);
+      const dateA = new Date(a.datePosted).getTime();
+      const dateB = new Date(b.datePosted).getTime();
+
+      if (dateSortOrder === "desc") {
+        // Newest first (descending)
+        return dateB - dateA;
+      } else {
+        // Oldest first (ascending)
+        return dateA - dateB;
+      }
+    });
+
+    return sorted;
+  }, [transformedJobs, dateSortOrder]);
 
   // Save job mutation
   const saveJobMutation = useMutation({
@@ -626,15 +674,15 @@ const JobSearchResultsPage = () => {
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-blue dark:border-breneo-blue-dark rounded-lg pl-3 md:pl-4 pr-2.5 md:pr-3 py-[1rem] overflow-visible flex-1">
               <Search
-                className="h-4 w-4 text-breneo-blue dark:text-breneo-blue-dark flex-shrink-0"
+                className="h-5 w-5 text-breneo-blue dark:text-breneo-blue-dark flex-shrink-0 mr-3"
                 strokeWidth={2}
               />
               <Input
                 type="text"
-                placeholder="ძებნა"
+                placeholder={t.jobs.searchPlaceholder}
                 value={searchTerm}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
+                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0 rounded-none"
               />
               {!isMobile && (
                 <>
@@ -673,7 +721,7 @@ const JobSearchResultsPage = () => {
             >
               <Filter className="h-4 w-4" strokeWidth={2} />
               <span className="hidden md:inline text-sm font-medium">
-                ფილტრები
+                {t.jobs.filters}
               </span>
             </Button>
           </div>
@@ -682,26 +730,35 @@ const JobSearchResultsPage = () => {
         {/* Results Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 w-9 p-0 border-breneo-blue bg-breneo-blue/10"
-              >
-                <List className="h-4 w-4 text-breneo-blue" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-9 w-9 p-0">
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {totalJobs > 0 ? `${totalJobs} ვაკანსია` : `${transformedJobs.length} ვაკანსია`}
+              {totalJobs > 0 
+                ? `${totalJobs} ${t.jobs.vacancies}` 
+                : `${transformedJobs.length} ${t.jobs.vacancies}`}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-9 px-3">
-              <span className="text-sm">თარიღი კლებადი</span>
-              <ArrowUpDown className="h-4 w-4 ml-2" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 px-2 md:px-3"
+              onClick={() => {
+                setDateSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+              }}
+            >
+              <span className="text-xs md:text-sm whitespace-nowrap">
+                {isMobile
+                  ? dateSortOrder === "desc"
+                    ? t.jobs.dateDescending
+                    : t.jobs.dateAscending
+                  : dateSortOrder === "desc"
+                  ? t.jobs.dateDescendingFull
+                  : t.jobs.dateAscendingFull}
+              </span>
+              {dateSortOrder === "desc" ? (
+                <ArrowDown className="h-4 w-4 ml-1 md:ml-2" />
+              ) : (
+                <ArrowUp className="h-4 w-4 ml-1 md:ml-2" />
+              )}
             </Button>
           </div>
         </div>
@@ -724,7 +781,7 @@ const JobSearchResultsPage = () => {
         ) : error ? (
           <Card className="border border-red-200">
             <CardContent className="p-6 text-center">
-              <p className="text-red-600">Error loading jobs. Please try again.</p>
+              <p className="text-red-600">{t.jobs.errorLoading}</p>
             </CardContent>
           </Card>
         ) : transformedJobs.length === 0 ? (
@@ -734,50 +791,68 @@ const JobSearchResultsPage = () => {
               alt="No data found"
               className="mx-auto h-64 w-64 mb-4 object-contain"
             />
-            <h4 className="text-lg font-semibold mb-2">No Jobs Found</h4>
+            <h4 className="text-lg font-semibold mb-2">{t.jobs.noJobs}</h4>
             <p className="text-sm">
-              Try adjusting your search terms or filters
+              {t.jobs.tryAdjustingFilters}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
             {regularJobs.map((job) => (
-              <Card
+              <div
                 key={job.id}
-                className="group border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                className={`group cursor-pointer ${
+                  job.matchPercentage !== undefined && job.matchPercentage > 0
+                    ? "p-[2px] rounded-lg bg-gradient-to-r from-breneo-blue via-breneo-accent to-breneo-blue"
+                    : ""
+                }`}
                 onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
               >
+                <Card
+                  className={`border ${
+                    job.matchPercentage !== undefined && job.matchPercentage > 0
+                      ? "border-transparent rounded-lg"
+                      : "border-gray-200"
+                  } hover:shadow-md transition-shadow`}
+                >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     {/* Company Logo */}
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 relative w-12 h-12">
                       {job.company_logo ? (
                         <img
                           src={job.company_logo}
                           alt={job.company}
-                          className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                          className="w-12 h-12 rounded-full object-cover border border-gray-300 absolute inset-0 z-10"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = "none";
+                            const fallback = target.parentElement?.querySelector(".logo-fallback") as HTMLElement;
+                            if (fallback) {
+                              fallback.style.display = "flex";
+                              fallback.style.zIndex = "10";
+                            }
                           }}
                         />
-                      ) : (
-                        <div className="w-16 h-16 rounded-lg bg-breneo-blue/10 flex items-center justify-center border border-gray-200">
-                          <Briefcase className="h-8 w-8 text-breneo-blue" />
-                        </div>
-                      )}
+                      ) : null}
+                      <div 
+                        className={`w-12 h-12 rounded-full bg-breneo-blue/10 flex items-center justify-center border border-gray-300 logo-fallback absolute inset-0 ${job.company_logo ? "z-0" : "z-10"}`}
+                        style={{ display: job.company_logo ? "none" : "flex" }}
+                      >
+                        <Briefcase className="h-6 w-6 text-breneo-blue" />
+                      </div>
                     </div>
 
                     {/* Job Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4 mb-2">
+                      <div className="flex items-start justify-between gap-4 mb-1 md:mb-2">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg mb-1 line-clamp-2">
-                            {job.title}
-                          </h3>
-                          <p className="text-sm font-medium text-gray-700 mb-2">
+                          <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
                             {job.company}
-                          </p>
+                          </h3>
+                          <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
+                            {job.title}
+                          </h4>
                         </div>
                         {job.matchPercentage !== undefined && (
                           <Badge className="bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 flex-shrink-0">
@@ -786,100 +861,37 @@ const JobSearchResultsPage = () => {
                         )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="h-4 w-4" />
-                          <span>{job.location}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-4 w-4" />
-                          <span>{job.employment_type}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Briefcase className="h-4 w-4" />
-                          <span>{job.work_arrangement}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <DollarSign className="h-4 w-4" />
-                          <span>{job.salary}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          {new Date().toLocaleDateString("ka-GE")}
-                        </span>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            saveJobMutation.mutate(job);
-                          }}
-                          className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-9 w-9 p-0"
-                        >
-                          <Bookmark
-                            className={`h-4 w-4 ${
-                              job.is_saved ? "fill-black text-black" : "text-black"
-                            }`}
-                          />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {/* Intern Jobs Section */}
-            {internJobs.length > 0 && (
-              <>
-                <div className="flex items-center gap-3 mt-8 pt-6 border-t border-gray-200">
-                  <GraduationCap className="h-6 w-6 text-breneo-blue" />
-                  <h2 className="text-xl font-bold">Internship Opportunities</h2>
-                </div>
-                {internJobs.map((job) => (
-                  <Card
-                    key={job.id}
-                    className="group border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0">
-                          {job.company_logo ? (
-                            <img
-                              src={job.company_logo}
-                              alt={job.company}
-                              className="w-16 h-16 rounded-lg object-cover border border-gray-200"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-16 h-16 rounded-lg bg-breneo-blue/10 flex items-center justify-center border border-gray-200">
-                              <Briefcase className="h-8 w-8 text-breneo-blue" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-4 mb-2">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-lg mb-1 line-clamp-2">
-                                {job.title}
-                              </h3>
-                              <p className="text-sm font-medium text-gray-700 mb-2">
-                                {job.company}
-                              </p>
-                            </div>
-                            {job.matchPercentage !== undefined && (
-                              <Badge className="bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 flex-shrink-0">
-                                {job.matchPercentage}% Match
-                              </Badge>
-                            )}
+                      {/* Mobile: Location, Date, and Save button */}
+                      {isMobile ? (
+                        <div className="flex items-start justify-between gap-4 mt-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm text-gray-600">
+                              {job.location}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {formatJobDate(job.datePosted)}
+                            </span>
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              saveJobMutation.mutate(job);
+                            }}
+                            className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-9 w-9 p-0 rounded-full flex-shrink-0"
+                          >
+                            <Bookmark
+                              className={`h-4 w-4 ${
+                                job.is_saved ? "fill-black text-black" : "text-black"
+                              }`}
+                            />
+                          </Button>
+                        </div>
+                      ) : (
+                        /* Desktop: All details in one row */
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                             <div className="flex items-center gap-1.5">
                               <MapPin className="h-4 w-4" />
                               <span>{job.location}</span>
@@ -892,14 +904,10 @@ const JobSearchResultsPage = () => {
                               <Briefcase className="h-4 w-4" />
                               <span>{job.work_arrangement}</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <DollarSign className="h-4 w-4" />
-                              <span>{job.salary}</span>
-                            </div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-500">
-                              {new Date().toLocaleDateString("ka-GE")}
+                          <div className="flex items-center flex-shrink-0 ml-auto relative h-9">
+                            <span className="text-xs text-gray-500 group-hover:opacity-0 transition-opacity duration-200 flex items-center h-9">
+                              {formatJobDate(job.datePosted)}
                             </span>
                             <Button
                               variant="secondary"
@@ -908,7 +916,7 @@ const JobSearchResultsPage = () => {
                                 e.stopPropagation();
                                 saveJobMutation.mutate(job);
                               }}
-                              className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-9 w-9 p-0"
+                              className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-9 w-9 p-0 absolute right-0 rounded-full"
                             >
                               <Bookmark
                                 className={`h-4 w-4 ${
@@ -918,12 +926,13 @@ const JobSearchResultsPage = () => {
                             </Button>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </>
-            )}
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              </div>
+            ))}
           </div>
         )}
 
@@ -933,10 +942,10 @@ const JobSearchResultsPage = () => {
             <div className="text-sm text-gray-600">
               {totalJobs > 0 ? (
                 <>
-                  Showing {startIndex}-{Math.min(endIndex, totalJobs)} of {totalJobs} vacancies
+                  {t.jobs.showing} {startIndex}-{Math.min(endIndex, totalJobs)} {t.jobs.of} {totalJobs} {t.jobs.vacancies}
                 </>
               ) : (
-                <>Showing {transformedJobs.length} vacancies</>
+                <>{t.jobs.showing} {transformedJobs.length} {t.jobs.vacancies}</>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -948,10 +957,10 @@ const JobSearchResultsPage = () => {
                 disabled={!isPrevPagePossible || isLoading}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
+                {t.jobs.previous}
               </Button>
               <div className="flex items-center gap-1 px-2">
-                <span className="text-sm text-gray-600 font-medium">Page {page}</span>
+                <span className="text-sm text-gray-600 font-medium">{t.jobs.page} {page}</span>
                 {estimatedTotalPages && (
                   <span className="text-sm text-gray-400">/ {estimatedTotalPages}</span>
                 )}
@@ -963,7 +972,7 @@ const JobSearchResultsPage = () => {
                 onClick={handleNextPage}
                 disabled={!isNextPagePossible || isLoading}
               >
-                Next
+                {t.jobs.next}
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>

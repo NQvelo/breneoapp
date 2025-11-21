@@ -127,7 +127,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
     if (filters.jobTypes.length === 1) {
       return workTypeLabels[filters.jobTypes[0]] || filters.jobTypes[0];
     }
-    return `${filters.jobTypes.length} selected`;
+    return filters.jobTypes.map((type) => workTypeLabels[type] || type).join(", ");
   };
 
   const getLocationDisplayText = () => {
@@ -136,7 +136,10 @@ const FilterForm: React.FC<FilterFormProps> = ({
       const country = countries.find((c) => c.code === filters.countries[0]);
       return country?.name || "Choose";
     }
-    return `${filters.countries.length} selected`;
+    return filters.countries.map((code) => {
+      const country = countries.find((c) => c.code === code);
+      return country?.name || code;
+    }).join(", ");
   };
 
   const getSkillsDisplayText = () => {
@@ -144,7 +147,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
     if (filters.skills.length === 1) {
       return filters.skills[0];
     }
-    return `${filters.skills.length} selected`;
+    return filters.skills.join(", ");
   };
 
   const handleSkillToggle = (skill: string) => {

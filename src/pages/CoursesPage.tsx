@@ -502,11 +502,13 @@ const CoursesPage = () => {
 
       try {
         // Fetch from profile API
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
-          timeout: 30000, // 30 seconds timeout
-        });
-        const savedCoursesArray =
-          profileResponse.data?.saved_courses || [];
+        const profileResponse = await apiClient.get(
+          API_ENDPOINTS.AUTH.PROFILE,
+          {
+            timeout: 30000, // 30 seconds timeout
+          }
+        );
+        const savedCoursesArray = profileResponse.data?.saved_courses || [];
         return savedCoursesArray.map((id: string | number) => String(id));
       } catch (error) {
         console.error("Error fetching saved courses from profile API:", error);
@@ -541,7 +543,11 @@ const CoursesPage = () => {
       const coursesWithSaved = (data?.map((course) => {
         // Normalize image path to ensure it's absolute
         let imagePath = course.image || "/lovable-uploads/no_photo.png";
-        if (imagePath && !imagePath.startsWith("/") && !imagePath.startsWith("http")) {
+        if (
+          imagePath &&
+          !imagePath.startsWith("/") &&
+          !imagePath.startsWith("http")
+        ) {
           imagePath = `/${imagePath}`;
         }
         return {
@@ -550,7 +556,7 @@ const CoursesPage = () => {
           match: 0,
           topics: course.topics || [],
           required_skills: course.required_skills || [],
-          is_saved: savedCourses.includes(course.id),
+          is_saved: savedCourses.includes(String(course.id)),
         };
       }) || []) as Course[];
 
@@ -580,7 +586,6 @@ const CoursesPage = () => {
         // Endpoint: /api/academy/<academy_id>/
         await Promise.all(
           uniqueAcademyIds.map(async (academyId) => {
-
             try {
               // Use the academy detail endpoint: /api/academy/<academy_id>/
               const response = await apiClient.get(
@@ -702,8 +707,7 @@ const CoursesPage = () => {
                   profile_photo_url: profilePhotoFromApi,
                   profile_image_url: profileImageFromApi || profilePhotoFromApi,
                   slug:
-                    slugFromApi ||
-                    createAcademySlug(academyNameFromApi || ""),
+                    slugFromApi || createAcademySlug(academyNameFromApi || ""),
                 });
               }
             } catch (error) {
@@ -836,551 +840,101 @@ const CoursesPage = () => {
     setSessionFilteredCourses(filteredCourses);
   }, [filteredCourses, coursesLoading]);
 
-  const saveCourseMutation = useMutation({
-    mutationFn: async (course: Course) => {
-      // Comprehensive validation and logging
-      console.log("═══════════════════════════════════════════════════════");
-      console.log("🔍 PRE-FLIGHT CHECKS");
-      console.log("═══════════════════════════════════════════════════════");
-      console.log("👤 User object:", user);
-      console.log("👤 User ID:", user?.id);
-      console.log("👤 User ID type:", typeof user?.id);
-      console.log("👤 userId variable:", userId);
-      console.log("👤 userId type:", typeof userId);
-      console.log("👤 canUseUserId:", canUseUserId);
-      console.log("📚 Course object:", course);
-      console.log("📚 Course ID:", course.id);
-      console.log("📚 Course ID type:", typeof course.id);
-      
-      if (!user) {
-        console.error("❌ User is null/undefined");
-        throw new Error("User not logged in - user object is null");
-      }
-      
-      if (!userId) {
-        console.error("❌ userId is null/undefined");
-        console.error("❌ This could mean:");
-        console.error("   - user.id is not a string");
-        console.error("   - user.id is undefined");
-        console.error("   - user object exists but id field is missing");
-        throw new Error("User not logged in - userId is null");
-      }
-      
-      if (!canUseUserId) {
-        console.error("❌ userId is invalid or empty");
-        console.error("❌ userId value:", userId);
-        console.error("❌ userId type:", typeof userId);
-        throw new Error("Invalid user ID - userId is null or empty");
-      }
-      
-      console.log("✅ User ID validation passed:", userId);
-      
-      if (!course || !course.id) {
-        console.error("❌ Course or course.id is missing");
-        throw new Error("Invalid course data");
-      }
+  const SaveCourseButton = ({ course }: { course: Course }) => {
+    const queryClient = useQueryClient();
+    const saveCourseMutation = useMutation({
+      mutationFn: async () => {
+        if (!userId) {
+          throw new Error("Please log in to save courses.");
+        }
 
-      console.log("═══════════════════════════════════════════════════════");
-      console.log("🔵 SAVE COURSE BUTTON CLICKED");
-      console.log("═══════════════════════════════════════════════════════");
+        const normalizedCourseId = String(course.id);
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
-      try {
-        const courseIdStr = String(course.id);
-        console.log("📋 Course Details:", {
-          courseId: courseIdStr,
-          courseTitle: course.title,
-          courseProvider: course.provider,
-          courseCategory: course.category,
-          isCurrentlySaved: course.is_saved,
-          userId,
-        });
-
-        // Fetch current profile to get existing saved_courses array
-        console.log("📥 STEP 1: Fetching current profile from:", API_ENDPOINTS.AUTH.PROFILE);
-        // Increase timeout for profile fetch (backend might be slow)
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
-          timeout: 30000, // 30 seconds timeout
-        });
-        
-        console.log("📥 Profile response received:", {
-          status: profileResponse.status,
-          statusText: profileResponse.statusText,
-          dataKeys: Object.keys(profileResponse.data || {}),
-          fullData: profileResponse.data,
-        });
-
-        // Try to extract saved_courses from various possible locations
         let currentSavedCourses: (string | number)[] = [];
-        
-        if (profileResponse.data) {
-          const data = profileResponse.data as Record<string, unknown>;
-          
-          // Check multiple possible locations
-          if (Array.isArray(data.saved_courses)) {
-            currentSavedCourses = data.saved_courses;
-            console.log("✅ Found saved_courses at data.saved_courses:", currentSavedCourses);
-          } else if (data.profile && typeof data.profile === "object") {
-            const profile = data.profile as Record<string, unknown>;
-            if (Array.isArray(profile.saved_courses)) {
-              currentSavedCourses = profile.saved_courses;
-              console.log("✅ Found saved_courses at data.profile.saved_courses:", currentSavedCourses);
-            }
-          } else if (data.user && typeof data.user === "object") {
-            const userData = data.user as Record<string, unknown>;
-            if (Array.isArray(userData.saved_courses)) {
-              currentSavedCourses = userData.saved_courses;
-              console.log("✅ Found saved_courses at data.user.saved_courses:", currentSavedCourses);
-            }
+        const profileData = profileResponse.data as Record<string, unknown>;
+
+        if (Array.isArray(profileData?.saved_courses)) {
+          currentSavedCourses = profileData.saved_courses as (
+            | string
+            | number
+          )[];
+        } else if (
+          profileData?.profile &&
+          typeof profileData.profile === "object"
+        ) {
+          const nestedProfile = profileData.profile as Record<string, unknown>;
+          if (Array.isArray(nestedProfile.saved_courses)) {
+            currentSavedCourses = nestedProfile.saved_courses as (
+              | string
+              | number
+            )[];
+          }
+        } else if (profileData?.user && typeof profileData.user === "object") {
+          const nestedUser = profileData.user as Record<string, unknown>;
+          if (Array.isArray(nestedUser.saved_courses)) {
+            currentSavedCourses = nestedUser.saved_courses as (
+              | string
+              | number
+            )[];
           }
         }
 
-        console.log("📋 Current saved courses:", currentSavedCourses);
-
-        // Normalize all IDs to strings for consistent comparison
-        const normalizedSavedCourses = currentSavedCourses.map((id: string | number) => String(id));
-        console.log("📋 Normalized saved courses:", normalizedSavedCourses);
-        console.log("📋 Course ID to check:", courseIdStr);
-        console.log("📋 Course ID type:", typeof courseIdStr);
-
-        // Check if course ID already exists in saved_courses
-        const courseExists = normalizedSavedCourses.some((id: string) => {
-          const normalizedId = String(id).trim();
-          const normalizedCourseId = String(courseIdStr).trim();
-          const exists = normalizedId === normalizedCourseId;
-          if (exists) {
-            console.log("✅ Course ID found in saved_courses:", {
-              savedId: normalizedId,
-              courseId: normalizedCourseId,
-              match: exists,
-            });
-          }
-          return exists;
-        });
-
-        console.log("🔍 Course exists in saved_courses:", courseExists);
-
-        let updatedSavedCourses: string[];
-
-        if (course.is_saved) {
-          // Unsave: Remove course ID from array
-          if (!courseExists) {
-            console.log("ℹ️ Course not in saved_courses, nothing to unsave");
-            // Course not saved, treat as success (already unsaved)
-            return;
-          }
-          updatedSavedCourses = normalizedSavedCourses.filter(
-            (id: string) => String(id).trim() !== String(courseIdStr).trim()
-          );
-          console.log("🗑️ Unsaving course. Updated array:", updatedSavedCourses);
-        } else {
-          // Save: Add course ID to array ONLY if not already present
-          if (courseExists) {
-            console.log("ℹ️ Course already exists in saved_courses, skipping insertion");
-            console.log("✅ Course is already saved, no action needed");
-            // Already saved, treat as success
-            return;
-          }
-          // Course ID NOT found, so we need to INSERT it
-          console.log("💾 Course ID NOT found in saved_courses, INSERTING it now...");
-          updatedSavedCourses = [...normalizedSavedCourses, courseIdStr];
-          console.log("💾 Updated saved_courses array (after insertion):", updatedSavedCourses);
-          console.log("💾 Array length before:", normalizedSavedCourses.length);
-          console.log("💾 Array length after:", updatedSavedCourses.length);
-        }
-
-        // Update profile with new saved_courses array
-        console.log("═══════════════════════════════════════════════════════");
-        console.log("📤 STEP 2: Inserting/Updating course in saved_courses");
-        console.log("═══════════════════════════════════════════════════════");
-        console.log("📍 API Endpoint:", API_ENDPOINTS.AUTH.PROFILE);
-        console.log("📍 Method: PATCH");
-        console.log("📦 Payload being sent:", { 
-          saved_courses: updatedSavedCourses,
-          saved_courses_count: updatedSavedCourses.length,
-          course_id_being_added: course.is_saved ? "REMOVING" : courseIdStr,
-          action: course.is_saved ? "UNSAVE" : "SAVE"
-        });
-        
-        // Increase timeout for profile update (backend might be slow)
-        console.log("📤 Sending PATCH request with payload:", JSON.stringify({
-          saved_courses: updatedSavedCourses,
-        }, null, 2));
-        
-        // Validate the payload before sending
-        console.log("🔍 Pre-flight validation:");
-        console.log("  - updatedSavedCourses is array:", Array.isArray(updatedSavedCourses));
-        console.log("  - updatedSavedCourses length:", updatedSavedCourses.length);
-        console.log("  - courseIdStr to insert:", courseIdStr);
-        console.log("  - courseIdStr type:", typeof courseIdStr);
-        console.log("  - courseIdStr is in array:", updatedSavedCourses.includes(courseIdStr));
-        
-        // Ensure all IDs are strings and valid
-        const validatedSavedCourses = updatedSavedCourses
-          .map(id => String(id).trim())
-          .filter(id => id.length > 0); // Remove empty strings
-        
-        console.log("🔍 Validated saved_courses:", validatedSavedCourses);
-        
-        if (validatedSavedCourses.length !== updatedSavedCourses.length) {
-          console.warn("⚠️ Some course IDs were filtered out during validation!");
-        }
-        
-        let patchResponse;
-        try {
-          patchResponse = await apiClient.patch(
-            API_ENDPOINTS.AUTH.PROFILE,
-            {
-              saved_courses: validatedSavedCourses, // Use validated array
-            },
-            {
-              timeout: 30000, // 30 seconds timeout for profile updates
-            }
-          );
-          
-          // Check if response status indicates success
-          if (patchResponse.status < 200 || patchResponse.status >= 300) {
-            console.error("❌ PATCH request returned non-success status:", patchResponse.status);
-            throw new Error(`PATCH request failed with status ${patchResponse.status}`);
-          }
-        } catch (patchError: any) {
-          console.error("❌ PATCH request failed:", patchError);
-          console.error("❌ PATCH error response:", patchError?.response?.data);
-          console.error("❌ PATCH error status:", patchError?.response?.status);
-          console.error("❌ PATCH error statusText:", patchError?.response?.statusText);
-          console.error("❌ PATCH error headers:", patchError?.response?.headers);
-          console.error("❌ PATCH error message:", patchError?.message);
-          console.error("❌ PATCH error code:", patchError?.code);
-          
-          // Check for specific error types
-          if (patchError?.response?.data) {
-            const errorData = patchError.response.data;
-            console.error("❌ Error details:", {
-              detail: errorData.detail,
-              message: errorData.message,
-              error: errorData.error,
-              saved_courses: errorData.saved_courses,
-              non_field_errors: errorData.non_field_errors,
-            });
-            
-            // Check if backend is rejecting the course ID
-            if (errorData.saved_courses) {
-              console.error("❌ Backend validation error for saved_courses field:", errorData.saved_courses);
-            }
-          }
-          
-          throw patchError;
-        }
-        
-        console.log("✅ PATCH Response received:", {
-          status: patchResponse.status,
-          statusText: patchResponse.statusText,
-          responseData: patchResponse.data,
-          responseDataKeys: Object.keys(patchResponse.data || {}),
-          fullResponseString: JSON.stringify(patchResponse.data, null, 2),
-        });
-        
-        // Check if course was inserted in the response
-        let insertedInResponse = false;
-        let responseSavedCourses: (string | number)[] = [];
-        
-        if (patchResponse.data) {
-          const responseData = patchResponse.data as Record<string, unknown>;
-          
-          console.log("🔍 Checking PATCH response structure...");
-          console.log("🔍 responseData type:", typeof responseData);
-          console.log("🔍 responseData keys:", Object.keys(responseData));
-          console.log("🔍 responseData.saved_courses:", responseData.saved_courses);
-          console.log("🔍 responseData.saved_courses type:", typeof responseData.saved_courses);
-          console.log("🔍 responseData.saved_courses isArray:", Array.isArray(responseData.saved_courses));
-          
-          // Check multiple possible locations
-          if (Array.isArray(responseData.saved_courses)) {
-            responseSavedCourses = responseData.saved_courses;
-            console.log("✅ Found saved_courses at responseData.saved_courses:", responseSavedCourses);
-          } else if (responseData.profile && typeof responseData.profile === "object") {
-            const profile = responseData.profile as Record<string, unknown>;
-            console.log("🔍 Checking responseData.profile...");
-            console.log("🔍 profile keys:", Object.keys(profile));
-            console.log("🔍 profile.saved_courses:", profile.saved_courses);
-            if (Array.isArray(profile.saved_courses)) {
-              responseSavedCourses = profile.saved_courses;
-              console.log("✅ Found saved_courses at responseData.profile.saved_courses:", responseSavedCourses);
-            }
-          } else if (responseData.user && typeof responseData.user === "object") {
-            const userData = responseData.user as Record<string, unknown>;
-            console.log("🔍 Checking responseData.user...");
-            console.log("🔍 userData keys:", Object.keys(userData));
-            console.log("🔍 userData.saved_courses:", userData.saved_courses);
-            if (Array.isArray(userData.saved_courses)) {
-              responseSavedCourses = userData.saved_courses;
-              console.log("✅ Found saved_courses at responseData.user.saved_courses:", responseSavedCourses);
-            }
-          } else {
-            console.warn("⚠️ saved_courses not found in any expected location in PATCH response");
-            console.warn("⚠️ Full response structure:", JSON.stringify(responseData, null, 2));
-          }
-          
-          const normalizedResponse = responseSavedCourses.map((id: string | number) => String(id));
-          insertedInResponse = normalizedResponse.includes(courseIdStr);
-          
-          console.log("🔍 Course found in PATCH response:", insertedInResponse);
-          console.log("🔍 saved_courses in PATCH response:", normalizedResponse);
-          console.log("🔍 Course ID we're looking for:", courseIdStr);
-          
-          if (!insertedInResponse && responseSavedCourses.length > 0) {
-            console.warn("⚠️ Course ID mismatch!");
-            console.warn("⚠️ Expected:", courseIdStr);
-            console.warn("⚠️ Found in array:", normalizedResponse);
-            console.warn("⚠️ Type comparison:", {
-              courseIdStr_type: typeof courseIdStr,
-              courseIdStr_value: courseIdStr,
-              array_item_types: normalizedResponse.map(id => ({ id, type: typeof id })),
-            });
-          }
-        } else {
-          console.warn("⚠️ PATCH response has no data!");
-        }
-        
-        // Verify the update was successful
-        console.log("═══════════════════════════════════════════════════════");
-        console.log("🔍 STEP 3: Verifying course was inserted/removed");
-        console.log("═══════════════════════════════════════════════════════");
-        console.log("📥 Fetching profile again to verify:", API_ENDPOINTS.AUTH.PROFILE);
-        
-        // Retry verification up to 3 times with exponential backoff
-        let verifyResponse;
-        let verifySavedCourses: (string | number)[] = [];
-        let wasSaved = false;
-        const maxRetries = 3;
-        
-        for (let retry = 0; retry < maxRetries; retry++) {
-          if (retry > 0) {
-            const delay = Math.min(1000 * Math.pow(2, retry - 1), 5000); // Exponential backoff, max 5s
-            console.log(`⏳ Retry ${retry}/${maxRetries - 1}: Waiting ${delay}ms for backend to process...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          } else {
-            console.log("⏳ Waiting 500ms for backend to process...");
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-          
-          // Increase timeout for verification request
-          verifyResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
-            timeout: 30000, // 30 seconds timeout
-          });
-        
-          console.log(`📥 Verification response (attempt ${retry + 1}/${maxRetries}):`, {
-            status: verifyResponse.status,
-            statusText: verifyResponse.statusText,
-            dataKeys: Object.keys(verifyResponse.data || {}),
-            fullData: JSON.stringify(verifyResponse.data, null, 2),
-          });
-          
-          verifySavedCourses = [];
-          
-          if (verifyResponse.data) {
-            const verifyData = verifyResponse.data as Record<string, unknown>;
-            
-            console.log("🔍 Checking verification response structure...");
-            console.log("🔍 verifyData type:", typeof verifyData);
-            console.log("🔍 verifyData keys:", Object.keys(verifyData));
-            console.log("🔍 verifyData.saved_courses:", verifyData.saved_courses);
-            console.log("🔍 verifyData.saved_courses type:", typeof verifyData.saved_courses);
-            console.log("🔍 verifyData.saved_courses isArray:", Array.isArray(verifyData.saved_courses));
-            
-            if (Array.isArray(verifyData.saved_courses)) {
-              verifySavedCourses = verifyData.saved_courses;
-              console.log("✅ Found saved_courses at verifyData.saved_courses:", verifySavedCourses);
-            } else if (verifyData.profile && typeof verifyData.profile === "object") {
-              const profile = verifyData.profile as Record<string, unknown>;
-              console.log("🔍 Checking verifyData.profile...");
-              console.log("🔍 profile keys:", Object.keys(profile));
-              console.log("🔍 profile.saved_courses:", profile.saved_courses);
-              if (Array.isArray(profile.saved_courses)) {
-                verifySavedCourses = profile.saved_courses;
-                console.log("✅ Found saved_courses at verifyData.profile.saved_courses:", verifySavedCourses);
-              }
-            } else if (verifyData.user && typeof verifyData.user === "object") {
-              const userData = verifyData.user as Record<string, unknown>;
-              console.log("🔍 Checking verifyData.user...");
-              console.log("🔍 userData keys:", Object.keys(userData));
-              console.log("🔍 userData.saved_courses:", userData.saved_courses);
-              if (Array.isArray(userData.saved_courses)) {
-                verifySavedCourses = userData.saved_courses;
-                console.log("✅ Found saved_courses at verifyData.user.saved_courses:", verifySavedCourses);
-              }
-            } else {
-              console.warn("⚠️ saved_courses not found in verification response");
-              console.warn("⚠️ Full verification response structure:", JSON.stringify(verifyData, null, 2));
-            }
-          } else {
-            console.warn("⚠️ Verification response has no data!");
-          }
-          
-          const normalizedVerify = verifySavedCourses.map((id: string | number) => String(id));
-          wasSaved = normalizedVerify.includes(courseIdStr);
-          
-          console.log(`🔍 Verification attempt ${retry + 1}/${maxRetries}:`, {
-            savedCoursesFound: normalizedVerify.length,
-            courseFound: wasSaved,
-            courseId: courseIdStr,
-            savedCourses: normalizedVerify,
-          });
-          
-          // If we found the course (for SAVE) or didn't find it (for UNSAVE), we're done
-          if ((!course.is_saved && wasSaved) || (course.is_saved && !wasSaved)) {
-            console.log("✅ Verification successful on attempt", retry + 1);
-            break;
-          }
-          
-          if (retry < maxRetries - 1) {
-            console.log(`⚠️ Verification failed on attempt ${retry + 1}, will retry...`);
-          }
-        }
-        
-        // Final check with the last verification result
-        const normalizedVerify = verifySavedCourses.map((id: string | number) => String(id));
-        wasSaved = normalizedVerify.includes(courseIdStr);
-        
-        console.log("═══════════════════════════════════════════════════════");
-        console.log("📊 VERIFICATION RESULTS");
-        console.log("═══════════════════════════════════════════════════════");
-        console.log("📋 All saved_courses after update:", normalizedVerify);
-        console.log("📋 Total saved courses:", normalizedVerify.length);
-        console.log("🎯 Course ID being checked:", courseIdStr);
-        console.log("✅ Course found in saved_courses:", wasSaved);
-        console.log("🔄 Action performed:", course.is_saved ? "UNSAVE" : "SAVE");
-        console.log("✅ Expected result:", course.is_saved ? "NOT in array" : "IN array");
-        console.log("✅ Actual result:", wasSaved ? "IN array" : "NOT in array");
-        console.log("✅ Insertion/Removal successful:", 
-          course.is_saved ? !wasSaved : wasSaved
+        const normalizedSavedCourses = currentSavedCourses.map((id) =>
+          String(id)
         );
-        
-        if (!course.is_saved && !wasSaved) {
-          console.warn("⚠️ WARNING: Course was NOT found in saved_courses after SAVE operation");
-          console.warn("⚠️ This indicates the course was NOT successfully inserted");
-        } else if (course.is_saved && wasSaved) {
-          console.warn("⚠️ WARNING: Course was still found in saved_courses after UNSAVE operation");
-          console.warn("⚠️ This indicates the course was NOT successfully removed");
-        } else {
-          console.log("✅ SUCCESS: Course insertion/removal verified correctly!");
+        const isCurrentlySaved =
+          normalizedSavedCourses.includes(normalizedCourseId);
+
+        const updatedSavedCourses = isCurrentlySaved
+          ? normalizedSavedCourses.filter((id) => id !== normalizedCourseId)
+          : [...normalizedSavedCourses, normalizedCourseId];
+
+        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
+          saved_courses: updatedSavedCourses,
+        });
+
+        return { updatedSavedCourses, isCurrentlySaved };
+      },
+      onSuccess: ({ updatedSavedCourses, isCurrentlySaved }) => {
+        if (userId) {
+          queryClient.setQueryData(
+            ["savedCourses", userId],
+            updatedSavedCourses
+          );
+          queryClient.invalidateQueries({ queryKey: ["savedCourses", userId] });
         }
-        
-        console.log("═══════════════════════════════════════════════════════");
-      } catch (error: any) {
-        console.log("═══════════════════════════════════════════════════════");
-        console.error("❌ ERROR: Course save/unsave operation FAILED");
-        console.log("═══════════════════════════════════════════════════════");
-        console.error("❌ Error object:", error);
-        console.error("❌ Error message:", error?.message);
-        console.error("❌ Error stack:", error?.stack);
-        
-        if (error?.response) {
-          console.error("❌ Response status:", error.response.status);
-          console.error("❌ Response statusText:", error.response.statusText);
-          console.error("❌ Response data:", error.response.data);
-          console.error("❌ Response headers:", error.response.headers);
-        } else if (error?.request) {
-          console.error("❌ Request was made but no response received");
-          console.error("❌ Request:", error.request);
-        } else {
-          console.error("❌ Error setting up request:", error.message);
-        }
-        
-        // Extract more detailed error message
-        let errorMessage = "Failed to save course. Please try again.";
-        if (error?.response?.data) {
-          const errorData = error.response.data;
-          errorMessage = 
-            errorData.detail || 
-            errorData.message || 
-            errorData.error || 
-            errorMessage;
-          console.error("❌ Extracted error message:", errorMessage);
-        }
-        
-        console.log("═══════════════════════════════════════════════════════");
-        
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-        
-        throw new Error(errorMessage);
-      }
-    },
-    onSuccess: (_, variables) => {
-      // Invalidate queries to refresh the UI in both CoursesPage and ProfilePage
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      queryClient.invalidateQueries({ queryKey: ["savedCourses"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      toast.success(
-        `"${variables.title}" has been ${
-          variables.is_saved ? "unsaved" : "saved"
-        } successfully.`
-      );
-    },
-    onError: (error: any) => {
-      console.log("═══════════════════════════════════════════════════════");
-      console.error("❌ MUTATION ERROR CALLBACK TRIGGERED");
-      console.log("═══════════════════════════════════════════════════════");
-      console.error("❌ Error object:", error);
-      console.error("❌ Error message:", error?.message);
-      console.error("❌ Error name:", error?.name);
-      
-      // Extract more detailed error message
-      let errorMessage = "Failed to save course. Please try again.";
-      let errorDetails = "";
-      
-      if (error?.response) {
-        console.error("❌ HTTP Error Response:");
-        console.error("   Status:", error.response.status);
-        console.error("   Status Text:", error.response.statusText);
-        console.error("   Response Data:", JSON.stringify(error.response.data, null, 2));
-        console.error("   Response Headers:", error.response.headers);
-        
-        const errorData = error.response.data;
-        errorMessage = 
-          errorData.detail || 
-          errorData.message || 
-          errorData.error || 
-          errorMessage;
-        
-        // Check for common backend validation errors
-        if (error.response.status === 400) {
-          errorDetails = "Bad Request - The backend rejected the data format";
-          console.error("❌ Likely cause: Backend validation failed");
-          console.error("❌ Check if saved_courses field format is correct");
-        } else if (error.response.status === 401) {
-          errorDetails = "Unauthorized - Authentication failed";
-          console.error("❌ Likely cause: Token expired or invalid");
-        } else if (error.response.status === 403) {
-          errorDetails = "Forbidden - User doesn't have permission";
-          console.error("❌ Likely cause: User role doesn't allow saving courses");
-        } else if (error.response.status === 404) {
-          errorDetails = "Not Found - Profile endpoint doesn't exist";
-          console.error("❌ Likely cause: API endpoint path is incorrect");
-        } else if (error.response.status === 500) {
-          errorDetails = "Server Error - Backend processing failed";
-          console.error("❌ Likely cause: Backend database or processing error");
-        }
-      } else if (error?.request) {
-        console.error("❌ Network Error - No response received");
-        console.error("❌ Request:", error.request);
-        errorDetails = "Network error - Could not reach the server";
-      } else if (error instanceof Error) {
-        console.error("❌ JavaScript Error:", error.message);
-        errorMessage = error.message;
-        errorDetails = "Client-side error occurred";
-      }
-      
-      console.error("❌ Final error message:", errorMessage);
-      if (errorDetails) {
-        console.error("❌ Error details:", errorDetails);
-      }
-      console.log("═══════════════════════════════════════════════════════");
-      
-      toast.error(errorMessage);
-    },
-  });
+        queryClient.invalidateQueries({ queryKey: ["courses"] });
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
+        toast.success(
+          isCurrentlySaved
+            ? "Removed from saved courses."
+            : "Course saved to your profile."
+        );
+      },
+      onError: (error) => {
+        console.error("Error updating saved courses:", error);
+        toast.error("Failed to update saved courses. Please try again.");
+      },
+    });
+
+    return (
+      <Button
+        size="icon"
+        variant="outline"
+        className="h-10 w-10 rounded-lg border-gray-300"
+        onClick={() => saveCourseMutation.mutate()}
+        disabled={saveCourseMutation.isPending}
+        aria-label={course.is_saved ? "Unsave course" : "Save course"}
+      >
+        {course.is_saved ? (
+          <BookmarkCheck className="h-5 w-5 fill-black text-black" />
+        ) : (
+          <Bookmark className="h-5 w-5 text-gray-400 hover:text-black transition-colors" />
+        )}
+      </Button>
+    );
+  };
 
   // Handle countries change
   const handleCountriesChange = (countryCodes: string[]) => {
@@ -1508,15 +1062,15 @@ const CoursesPage = () => {
       : `/academy/${createAcademySlug(academyName)}`;
 
     return (
-      <Card
-        className="flex flex-col hover:shadow-lg transition-shadow duration-200 border border-gray-200 h-full"
-      >
+      <Card className="flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 h-full rounded-2xl">
         <CardContent className="p-5 flex flex-col flex-grow">
           {/* Course Image */}
           <div className="relative h-40 overflow-hidden rounded-lg mb-4 bg-gradient-to-br from-gray-100 to-gray-200">
             <img
               src={
-                course.image && !course.image.startsWith("http") && !course.image.startsWith("/")
+                course.image &&
+                !course.image.startsWith("http") &&
+                !course.image.startsWith("/")
                   ? `/${course.image}`
                   : course.image || "/lovable-uploads/no_photo.png"
               }
@@ -1614,19 +1168,7 @@ const CoursesPage = () => {
             >
               View Course
             </Button>
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-10 w-10 rounded-lg border-gray-300"
-              onClick={() => saveCourseMutation.mutate(course)}
-              aria-label={course.is_saved ? "Unsave course" : "Save course"}
-            >
-              {course.is_saved ? (
-                <BookmarkCheck className="h-5 w-5 fill-black text-black" />
-              ) : (
-                <Bookmark className="h-5 w-5 text-gray-400 hover:text-black transition-colors" />
-              )}
-            </Button>
+            <SaveCourseButton course={course} />
           </div>
         </CardContent>
       </Card>
@@ -1698,7 +1240,7 @@ const CoursesPage = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <GraduationCap className="h-6 w-6 text-breneo-accent" />
-            <h2 className="text-2xl font-bold">Latest Courses</h2>
+            <h2 className="text-lg font-bold">Latest Courses</h2>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">
