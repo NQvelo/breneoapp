@@ -1,8 +1,8 @@
 import React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
-import { Bell, Moon, Sun, Globe } from "lucide-react";
+import { Bell, Moon, Sun, Globe, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,9 +14,26 @@ interface DashboardHeaderProps {
   isVisible: boolean; // Prop for visibility
 }
 
+// Helper function to check if current path is a job detail page
+const isJobDetailPage = (pathname: string): boolean => {
+  // Match patterns like /jobs/:jobId, /en/jobs/:jobId, /ka/jobs/:jobId
+  const jobDetailPattern = /^(\/(en|ka))?\/jobs\/[^/]+$/;
+  return jobDetailPattern.test(pathname);
+};
+
+// Helper function to check if current path is a course detail page
+const isCourseDetailPage = (pathname: string): boolean => {
+  // Match patterns like /course/:courseId, /en/course/:courseId, /ka/course/:courseId
+  const courseDetailPattern = /^(\/(en|ka))?\/course\/[^/]+$/;
+  return courseDetailPattern.test(pathname);
+};
+
 // Helper function to get the page title from the pathname
 const getPageTitle = (pathname: string, username?: string, t?: any) => {
   if (!t) return "Home";
+
+  // Don't show title for job detail pages or course detail pages
+  if (isJobDetailPage(pathname) || isCourseDetailPage(pathname)) return null;
 
   if (pathname.startsWith("/home") || pathname.startsWith("/academy/home")) {
     return (
@@ -59,6 +76,7 @@ export function DashboardHeader({
   isVisible,
 }: DashboardHeaderProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
@@ -67,6 +85,8 @@ export function DashboardHeader({
   const username = user?.first_name || user?.email?.split("@")[0] || "User";
   const currentPath = removeLanguagePrefix(location.pathname);
   const pageTitle = getPageTitle(currentPath, username, t);
+  const isJobDetail = isJobDetailPage(currentPath);
+  const isCourseDetail = isCourseDetailPage(currentPath);
 
   const currentLanguageText = language === "ka" ? "GEO" : "EN";
 
@@ -87,9 +107,24 @@ export function DashboardHeader({
     >
       <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">
         <div className="hidden md:flex items-center space-x-3">
-          <h1 className="text-2xl font-semibold text-foreground">
-            {pageTitle}
-          </h1>
+          {isJobDetail || isCourseDetail ? (
+            <Button
+              variant="ghost"
+              onClick={() => navigate(-1)}
+              className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                         text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
+                         text-sm font-medium flex items-center gap-2 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>{t.common.back}</span>
+            </Button>
+          ) : (
+            pageTitle && (
+              <h1 className="text-2xl font-semibold text-foreground">
+                {pageTitle}
+              </h1>
+            )
+          )}
         </div>
 
         {/* This div is a placeholder to balance the flex layout on mobile */}

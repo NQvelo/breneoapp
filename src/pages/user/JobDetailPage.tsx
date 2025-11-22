@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import {
   Briefcase,
   MapPin,
   DollarSign,
+  PiggyBank,
   Clock,
   Calendar,
   Calendar as CalendarIcon,
@@ -43,8 +44,19 @@ import {
   Stethoscope,
   Eye,
   TrendingUp,
+  Share2,
+  Copy,
+  Facebook,
+  Linkedin,
 } from "lucide-react";
 import { jobService, JobDetail, CompanyInfo } from "@/api/jobs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useMobile } from "@/hooks/use-mobile";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -53,6 +65,7 @@ const JobDetailPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const isMobile = useMobile();
 
   // Fetch job details using the job service
   const {
@@ -104,7 +117,7 @@ const JobDetailPage = () => {
   });
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
-  const isSaved = savedJobs.includes(jobIdForSave);
+  const isSaved = savedJobs?.includes(String(jobIdForSave));
 
   // Save/unsave job mutation
   const saveJobMutation = useMutation({
@@ -119,22 +132,23 @@ const JobDetailPage = () => {
 
         let updatedSavedJobs: string[];
 
+        const jobIdForSaveString = String(jobIdForSave);
         if (isSaved) {
           // Unsave: Remove job ID from array
           updatedSavedJobs = currentSavedJobs.filter(
-            (id: string | number) => String(id) !== jobIdForSave
+            (id: string | number) => String(id) !== jobIdForSaveString
           );
         } else {
           // Save: Add job ID to array if not already present
           if (
             currentSavedJobs.some(
-              (id: string | number) => String(id) === jobIdForSave
+              (id: string | number) => String(id) === jobIdForSaveString
             )
           ) {
             // Already saved, treat as success
             return;
           }
-          updatedSavedJobs = [...currentSavedJobs, jobIdForSave];
+          updatedSavedJobs = [...currentSavedJobs, jobIdForSaveString];
         }
 
         // Update profile with new saved_jobs array
@@ -839,19 +853,82 @@ const JobDetailPage = () => {
     );
   };
 
+  // Get current page URL for sharing
+  const getShareUrl = () => {
+    return window.location.href;
+  };
+
+  // Get share text
+  const getShareText = () => {
+    if (!jobDetail) return "Check out this job!";
+    const title = getJobTitle();
+    const company = getCompanyName();
+    return `Check out this ${title} position at ${company}!`;
+  };
+
+  // Handle native share (mobile)
+  const handleNativeShare = async () => {
+    if (!navigator.share) {
+      // Fallback to dropdown if native share is not available
+      return false;
+    }
+
+    try {
+      await navigator.share({
+        title: getJobTitle(),
+        text: getShareText(),
+        url: getShareUrl(),
+      });
+      toast.success("Shared successfully!");
+      return true;
+    } catch (error) {
+      // User cancelled or error occurred
+      if ((error as Error).name !== "AbortError") {
+        console.error("Error sharing:", error);
+      }
+      return false;
+    }
+  };
+
+  // Handle copy link
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(getShareUrl());
+      toast.success("Link copied to clipboard!");
+    } catch (error) {
+      console.error("Error copying link:", error);
+      toast.error("Failed to copy link");
+    }
+  };
+
+  // Handle Facebook share
+  const handleFacebookShare = () => {
+    const url = encodeURIComponent(getShareUrl());
+    const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+    window.open(facebookShareUrl, "_blank", "width=600,height=400");
+  };
+
+  // Handle LinkedIn share
+  const handleLinkedInShare = () => {
+    const url = encodeURIComponent(getShareUrl());
+    const title = encodeURIComponent(getJobTitle());
+    const summary = encodeURIComponent(getShareText());
+    const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${url}&title=${title}&summary=${summary}`;
+    window.open(linkedInShareUrl, "_blank", "width=600,height=400");
+  };
+
+  // Handle share button click (for mobile native share)
+  const handleShareClick = async () => {
+    if (navigator.share) {
+      const shared = await handleNativeShare();
+      // If native share failed or was cancelled, we could fallback to dropdown
+      // but for now, we'll just let it fail silently
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mb-6 flex items-center gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Jobs
-        </Button>
-
+      <div className="max-w-5xl mx-auto pt-8 pb-6 px-4 sm:px-6 lg:px-8">
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
             <CardContent className="p-6">
@@ -886,119 +963,44 @@ const JobDetailPage = () => {
         )}
 
         {!isLoading && jobDetail && (
-          <div className="space-y-6">
-            {/* Job Header Card */}
-            <Card>
-              <CardContent className="p-6">
+          <Card>
+            <CardContent className="p-6 space-y-8">
+              {/* Job Header */}
+              <div>
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
-                  {/* Company Logo */}
-                  <div className="flex-shrink-0">
-                    {getCompanyLogo() ? (
-                      <img
-                        src={getCompanyLogo()}
-                        alt={`${getCompanyName()} logo`}
-                        className="w-20 h-20 rounded-full object-cover border border-gray-200"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.style.display = "none";
-                          // Try Clearbit logo API as fallback
-                          const companyName = getCompanyName();
-                          if (companyName) {
-                            const clearbitLogo =
-                              target.nextElementSibling as HTMLImageElement;
-                            if (
-                              clearbitLogo &&
-                              clearbitLogo.tagName === "IMG"
-                            ) {
-                              clearbitLogo.style.display = "block";
-                            } else {
-                              const iconFallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback"
-                                ) as HTMLElement;
-                              if (iconFallback) {
-                                iconFallback.style.display = "flex";
-                              }
-                            }
-                          }
-                        }}
-                      />
-                    ) : null}
-                    {/* Fallback: Try Clearbit logo API if no logo from job API */}
-                    {!getCompanyLogo() && getCompanyName() && (
-                      <img
-                        src={`https://logo.clearbit.com/${encodeURIComponent(
-                          getCompanyName()
-                        )}`}
-                        alt={`${getCompanyName()} logo`}
-                        className="w-20 h-20 rounded-full object-cover border border-gray-200"
-                        loading="lazy"
-                        style={{ display: getCompanyLogo() ? "none" : "block" }}
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.style.display = "none";
-                          // Show default icon fallback
-                          const iconFallback =
-                            target.parentElement?.querySelector(
-                              ".logo-fallback"
-                            ) as HTMLElement;
-                          if (iconFallback) {
-                            iconFallback.style.display = "flex";
-                          }
-                        }}
-                      />
-                    )}
-                    {/* Default icon fallback */}
-                    <div
-                      className="w-20 h-20 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback"
-                      style={{ display: getCompanyLogo() ? "none" : "flex" }}
-                    >
-                      <Briefcase className="h-10 w-10 text-white" />
-                    </div>
-                  </div>
-
-                  {/* Job Info */}
+                  {/* Left Side: Job Info */}
                   <div className="flex-1 min-w-0">
-                    <h1 className="text-3xl font-bold mb-2">{getJobTitle()}</h1>
-                    <div className="flex flex-wrap items-center gap-4 mb-4">
+                    <div className="flex flex-col gap-1 mb-3">
                       {getCompanyName() && (
-                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                          <Building2 className="h-4 w-4" />
-                          <span>{getCompanyName()}</span>
-                        </div>
+                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+                          {getCompanyName()}
+                        </p>
                       )}
+                      <h1 className="text-lg md:text-2xl font-semibold text-gray-900 dark:text-white">
+                        {getJobTitle()}
+                      </h1>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4 mb-4">
                       <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                         <MapPin className="h-4 w-4" />
                         <span>{getLocation()}</span>
                       </div>
                     </div>
 
-                    {/* Badges */}
-                    <div className="flex flex-wrap gap-2 mb-6">
-                      <Badge
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        <DollarSign className="h-3 w-3" />
-                        {formatSalary()}
-                      </Badge>
-                      <Badge
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        <Clock className="h-3 w-3" />
-                        {getEmploymentType()}
-                      </Badge>
-                      <Badge
-                        variant="secondary"
-                        className="flex items-center gap-1"
-                      >
-                        <Briefcase className="h-3 w-3" />
-                        {getWorkArrangement()}
-                      </Badge>
+                    {/* Job Highlights */}
+                    <div className="flex flex-nowrap md:flex-wrap gap-2 md:gap-4 mb-6 text-sm md:text-base font-medium text-gray-700 dark:text-gray-200 overflow-x-auto">
+                      <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                        <PiggyBank className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                        <span>{formatSalary()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                        <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                        <span>{getEmploymentType()}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                        <Briefcase className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                        <span>{getWorkArrangement()}</span>
+                      </div>
                       {jobDetail.date_posted || jobDetail.posted_date ? (
                         <Badge
                           variant="secondary"
@@ -1014,167 +1016,118 @@ const JobDetailPage = () => {
                         </Badge>
                       ) : null}
                     </div>
+                  </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3">
-                      {getApplyUrl() ? (
-                        <Button
-                          variant="default"
-                          onClick={() => window.open(getApplyUrl(), "_blank")}
-                          className="flex items-center gap-2"
-                          size="lg"
-                        >
-                          Apply Now
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <Button
-                          disabled
-                          variant="outline"
-                          className="flex items-center gap-2"
-                          size="lg"
-                        >
-                          Apply Link Not Available
-                        </Button>
-                      )}
-                      {user && (
-                        <Button
-                          variant="default"
-                          onClick={() => saveJobMutation.mutate()}
-                          disabled={saveJobMutation.isPending}
-                          className="flex items-center gap-2"
-                          size="lg"
-                        >
-                          <Bookmark
-                            className={`h-4 w-4 ${
-                              isSaved ? "fill-white text-white" : "text-white"
-                            }`}
-                          />
-                          {isSaved ? "Saved" : "Save Job"}
-                        </Button>
-                      )}
-                    </div>
+                  {/* Right Side: Action Buttons - Aligned to Top */}
+                  <div className="flex flex-row items-start gap-2 md:pt-0">
+                    {getApplyUrl() ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => window.open(getApplyUrl(), "_blank")}
+                        className="flex items-center gap-2"
+                      >
+                        Apply Now
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        disabled
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        Apply Link Not Available
+                      </Button>
+                    )}
+                    {user && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={() => saveJobMutation.mutate()}
+                        disabled={saveJobMutation.isPending}
+                        aria-label={isSaved ? "Unsave job" : "Save job"}
+                        className="h-10 w-10 [&_svg]:size-4"
+                      >
+                        <Bookmark
+                          className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
+                        />
+                      </Button>
+                    )}
+                    {/* Share Button */}
+                    {isMobile && navigator.share ? (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={handleShareClick}
+                        aria-label="Share job"
+                        className="h-10 w-10 [&_svg]:size-4"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            aria-label="Share job"
+                            className="h-10 w-10 [&_svg]:size-4"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={handleCopyLink}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            <span>Copy Link</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleFacebookShare}>
+                            <Facebook className="mr-2 h-4 w-4" />
+                            <span>Share on Facebook</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleLinkedInShare}>
+                            <Linkedin className="mr-2 h-4 w-4" />
+                            <span>Share on LinkedIn</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Company Information Card */}
-            {(getCompanyName() ||
-              getCompanyWebsite() ||
-              getCompanyDescription() ||
-              getCompanySize() ||
-              getCompanyIndustry() ||
-              getCompanyFounded() ||
-              getCompanyHeadquarters()) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    {getCompanyName()
-                      ? `About ${getCompanyName()}`
-                      : "Company Information"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {getCompanyDescription() && (
-                    <div>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {getCompanyDescription()}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                    {getCompanyWebsite() && (
-                      <div className="flex items-start gap-3">
-                        <Globe className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Website
-                          </p>
-                          <a
-                            href={getCompanyWebsite() || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-breneo-accent hover:underline flex items-center gap-1"
-                          >
-                            {getCompanyWebsite() || ""}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
+              {/* Benefits & Perks - Moved to Top */}
+              {getBenefitsList().length > 0 && (
+                <div className="border-t pt-8">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
+                    <Sparkles className="h-5 w-5" />
+                    Benefits & Perks
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {getBenefitsList().map((benefit, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <div className="flex-shrink-0 text-breneo-accent">
+                          {getBenefitIcon(benefit)}
                         </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {formatBenefitName(benefit)}
+                        </span>
                       </div>
-                    )}
-
-                    {getCompanySize() && (
-                      <div className="flex items-start gap-3">
-                        <Users className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Company Size
-                          </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            {getCompanySize()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {getCompanyIndustry() && (
-                      <div className="flex items-start gap-3">
-                        <Factory className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Industry
-                          </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            {getCompanyIndustry()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {getCompanyFounded() && (
-                      <div className="flex items-start gap-3">
-                        <CalendarIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Founded
-                          </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            {getCompanyFounded()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {getCompanyHeadquarters() && (
-                      <div className="flex items-start gap-3">
-                        <Home className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Headquarters
-                          </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">
-                            {getCompanyHeadquarters()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
 
-            {/* Job Description Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              {/* Job Description */}
+              <div className="border-t pt-8">
+                <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                   <FileText className="h-5 w-5" />
                   Job Description
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </h2>
                 <div
                   className="prose prose-sm max-w-none dark:prose-invert"
                   dangerouslySetInnerHTML={{
@@ -1183,19 +1136,15 @@ const JobDetailPage = () => {
                       .replace(/\n/g, "<br />"),
                   }}
                 />
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Requirements & Qualifications */}
-            {getRequirements() && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              {/* Requirements & Qualifications */}
+              {getRequirements() && (
+                <div className="border-t pt-8">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <Target className="h-5 w-5" />
                     Requirements & Qualifications
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+                  </h2>
                   <div
                     className="prose prose-sm max-w-none dark:prose-invert"
                     dangerouslySetInnerHTML={{
@@ -1204,24 +1153,20 @@ const JobDetailPage = () => {
                         .replace(/\n/g, "<br />"),
                     }}
                   />
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
 
-            {/* Job Details Grid */}
-            {(getRequiredExperience() ||
-              getEducationRequired() ||
-              getRequiredSkills().length > 0 ||
-              getJobCategory() ||
-              getApplicationDeadline()) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              {/* Job Details Grid */}
+              {(getRequiredExperience() ||
+                getEducationRequired() ||
+                getRequiredSkills().length > 0 ||
+                getJobCategory() ||
+                getApplicationDeadline()) && (
+                <div className="border-t pt-8">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <CheckCircle2 className="h-5 w-5" />
                     Job Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
+                  </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {getRequiredExperience() && (
                       <div className="flex items-start gap-3">
@@ -1301,39 +1246,115 @@ const JobDetailPage = () => {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              )}
 
-            {/* Benefits & Perks */}
-            {getBenefitsList().length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5" />
-                    Benefits & Perks
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {getBenefitsList().map((benefit, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <div className="flex-shrink-0 text-breneo-accent">
-                          {getBenefitIcon(benefit)}
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {formatBenefitName(benefit)}
-                        </span>
+              {/* Company Information - Moved to Bottom */}
+              {(getCompanyName() ||
+                getCompanyWebsite() ||
+                getCompanyDescription() ||
+                getCompanySize() ||
+                getCompanyIndustry() ||
+                getCompanyFounded() ||
+                getCompanyHeadquarters()) && (
+                <div className="border-t pt-8">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
+                    <Building2 className="h-5 w-5" />
+                    {getCompanyName()
+                      ? `About ${getCompanyName()}`
+                      : "Company Information"}
+                  </h2>
+                  <div className="space-y-4">
+                    {getCompanyDescription() && (
+                      <div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                          {getCompanyDescription()}
+                        </p>
                       </div>
-                    ))}
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                      {getCompanyWebsite() && (
+                        <div className="flex items-start gap-3">
+                          <Globe className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Website
+                            </p>
+                            <a
+                              href={getCompanyWebsite() || "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-breneo-accent hover:underline flex items-center gap-1"
+                            >
+                              {getCompanyWebsite() || ""}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {getCompanySize() && (
+                        <div className="flex items-start gap-3">
+                          <Users className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Company Size
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              {getCompanySize()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {getCompanyIndustry() && (
+                        <div className="flex items-start gap-3">
+                          <Factory className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Industry
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              {getCompanyIndustry()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {getCompanyFounded() && (
+                        <div className="flex items-start gap-3">
+                          <CalendarIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Founded
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              {getCompanyFounded()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {getCompanyHeadquarters() && (
+                        <div className="flex items-start gap-3">
+                          <Home className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Headquarters
+                            </p>
+                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                              {getCompanyHeadquarters()}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {!isLoading && !jobDetail && !error && (

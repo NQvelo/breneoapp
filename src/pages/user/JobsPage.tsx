@@ -636,6 +636,7 @@ const JobsPage = () => {
   // State for user's top skills from test results
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
+  const skillsInitializedRef = React.useRef(false);
 
   // Helper function to update URL with current filters (used for redirecting to search results)
   const updateUrlWithFilters = useCallback(
@@ -768,7 +769,6 @@ const JobsPage = () => {
             // Get top 5 skills
             const topSkills = allSkills.slice(0, 5);
             setUserTopSkills(topSkills);
-            // Don't auto-populate filters - keep them cleared
             setLoadingSkills(false);
             return;
           }
@@ -784,7 +784,6 @@ const JobsPage = () => {
           const topSkills = topSkillsData.map((s) => s.skill);
 
           setUserTopSkills(topSkills);
-          // Don't auto-populate filters - keep them cleared
         }
       } catch (error) {
         console.error("Error fetching user skills:", error);
@@ -795,6 +794,27 @@ const JobsPage = () => {
 
     fetchUserSkills();
   }, [user]);
+
+  // Reset initialization flag when user changes
+  useEffect(() => {
+    skillsInitializedRef.current = false;
+  }, [user?.id]);
+
+  // Auto-populate default filters with user's top skills when they're loaded (only once per user)
+  useEffect(() => {
+    // Only populate on initial load when skills are loaded and haven't been initialized yet
+    if (!loadingSkills && userTopSkills.length > 0 && !skillsInitializedRef.current) {
+      setActiveFilters((prev) => ({
+        ...prev,
+        skills: [...userTopSkills], // Set all skills as default
+      }));
+      setTempFilters((prev) => ({
+        ...prev,
+        skills: [...userTopSkills], // Sync tempFilters too
+      }));
+      skillsInitializedRef.current = true; // Mark as initialized
+    }
+  }, [loadingSkills, userTopSkills, user?.id]);
 
   // Removed location detection - we don't filter by country
 
@@ -920,18 +940,19 @@ const JobsPage = () => {
 
         let updatedSavedJobs: string[];
 
+        const jobIdString = String(job.id);
         if (isSaved) {
           // Unsave: Remove job ID from array
           updatedSavedJobs = currentSavedJobs.filter(
-            (id: string | number) => String(id) !== jobId
+            (id: string | number) => String(id) !== jobIdString
           );
         } else {
           // Save: Add job ID to array if not already present
-          if (currentSavedJobs.some((id: string | number) => String(id) === jobId)) {
+          if (currentSavedJobs.some((id: string | number) => String(id) === jobIdString)) {
             // Already saved, treat as success
             return;
           }
-          updatedSavedJobs = [...currentSavedJobs, jobId];
+          updatedSavedJobs = [...currentSavedJobs, jobIdString];
         }
 
         // Update profile with new saved_jobs array
@@ -1140,7 +1161,7 @@ const JobsPage = () => {
         location: locationString,
         url: applyLink,
         company_logo: companyLogo,
-        is_saved: savedJobs.includes(jobId),
+        is_saved: savedJobs?.includes(String(jobId)),
         salary,
         employment_type: employmentType,
         work_arrangement: workArrangement,
@@ -1327,7 +1348,7 @@ const JobsPage = () => {
           location: locationString,
           url: applyLink,
           company_logo: companyLogo,
-          is_saved: savedJobs.includes(jobId),
+          is_saved: savedJobs?.includes(String(jobId)),
           salary,
           employment_type: employmentType,
           work_arrangement: workArrangement,

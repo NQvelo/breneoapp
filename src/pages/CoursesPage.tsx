@@ -556,7 +556,7 @@ const CoursesPage = () => {
           match: 0,
           topics: course.topics || [],
           required_skills: course.required_skills || [],
-          is_saved: savedCourses.includes(String(course.id)),
+          is_saved: savedCourses?.includes(String(course.id)),
         };
       }) || []) as Course[];
 
@@ -843,78 +843,63 @@ const CoursesPage = () => {
   const SaveCourseButton = ({ course }: { course: Course }) => {
     const queryClient = useQueryClient();
     const saveCourseMutation = useMutation({
-      mutationFn: async () => {
+      mutationFn: async (id: string) => {
         if (!userId) {
           throw new Error("Please log in to save courses.");
         }
 
-        const normalizedCourseId = String(course.id);
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-
-        let currentSavedCourses: (string | number)[] = [];
-        const profileData = profileResponse.data as Record<string, unknown>;
-
-        if (Array.isArray(profileData?.saved_courses)) {
-          currentSavedCourses = profileData.saved_courses as (
-            | string
-            | number
-          )[];
-        } else if (
-          profileData?.profile &&
-          typeof profileData.profile === "object"
-        ) {
-          const nestedProfile = profileData.profile as Record<string, unknown>;
-          if (Array.isArray(nestedProfile.saved_courses)) {
-            currentSavedCourses = nestedProfile.saved_courses as (
-              | string
-              | number
-            )[];
-          }
-        } else if (profileData?.user && typeof profileData.user === "object") {
-          const nestedUser = profileData.user as Record<string, unknown>;
-          if (Array.isArray(nestedUser.saved_courses)) {
-            currentSavedCourses = nestedUser.saved_courses as (
-              | string
-              | number
-            )[];
-          }
-        }
-
-        const normalizedSavedCourses = currentSavedCourses.map((id) =>
-          String(id)
-        );
-        const isCurrentlySaved =
-          normalizedSavedCourses.includes(normalizedCourseId);
-
-        const updatedSavedCourses = isCurrentlySaved
-          ? normalizedSavedCourses.filter((id) => id !== normalizedCourseId)
-          : [...normalizedSavedCourses, normalizedCourseId];
-
-        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-          saved_courses: updatedSavedCourses,
+        // Use the new API endpoint
+        await apiClient.post(`/save-course/${id}`);
+      },
+      onMutate: async (id: string) => {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({
+          queryKey: ["savedCourses", userId],
         });
 
-        return { updatedSavedCourses, isCurrentlySaved };
+        // Snapshot the previous value
+        const previousSavedCourses = queryClient.getQueryData<string[]>([
+          "savedCourses",
+          userId,
+        ]);
+
+        // Optimistically update to the new value
+        queryClient.setQueryData<string[]>(["savedCourses", userId], (prev) => {
+          if (!prev) return prev;
+          const idString = String(id);
+          return prev.includes(idString)
+            ? prev.filter((c) => c !== idString)
+            : [...prev, idString];
+        });
+
+        // Return a context object with the snapshotted value
+        return { previousSavedCourses };
       },
-      onSuccess: ({ updatedSavedCourses, isCurrentlySaved }) => {
-        if (userId) {
+      onError: (error, id, context) => {
+        // If the mutation fails, use the context returned from onMutate to roll back
+        if (context?.previousSavedCourses && userId) {
           queryClient.setQueryData(
             ["savedCourses", userId],
-            updatedSavedCourses
+            context.previousSavedCourses
           );
-          queryClient.invalidateQueries({ queryKey: ["savedCourses", userId] });
         }
+
+        console.error("Error updating saved courses:", error);
+        toast.error("Failed to update saved courses. Please try again.");
+      },
+      onSuccess: (_, id) => {
+        // Invalidate queries to ensure consistency
+        queryClient.invalidateQueries({ queryKey: ["savedCourses", userId] });
         queryClient.invalidateQueries({ queryKey: ["courses"] });
         queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+        const idString = String(id);
+        const isCurrentlySaved = savedCourses?.includes(idString);
         toast.success(
           isCurrentlySaved
             ? "Removed from saved courses."
             : "Course saved to your profile."
         );
-      },
-      onError: (error) => {
-        console.error("Error updating saved courses:", error);
-        toast.error("Failed to update saved courses. Please try again.");
       },
     });
 
@@ -923,7 +908,7 @@ const CoursesPage = () => {
         size="icon"
         variant="outline"
         className="h-10 w-10 rounded-lg border-gray-300"
-        onClick={() => saveCourseMutation.mutate()}
+        onClick={() => saveCourseMutation.mutate(String(course.id))}
         disabled={saveCourseMutation.isPending}
         aria-label={course.is_saved ? "Unsave course" : "Save course"}
       >

@@ -66,7 +66,7 @@ export const en = {
   },
   // Jobs
   jobs: {
-    title: "Job Offers",
+    title: "Vacancies",
     noJobs: "No jobs found",
     apply: "Apply",
     applied: "Applied",

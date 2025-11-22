@@ -637,30 +637,73 @@ export default function SettingsPage() {
     },
   });
 
-  // Mutation to unsave a course
+  // Mutation to toggle save/unsave a course
   const unsaveCourseMutation = useMutation({
     mutationFn: async (courseId: string) => {
       if (!user?.id) throw new Error("User not logged in");
 
-      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-      const currentSavedCourses = profileResponse.data?.saved_courses || [];
+      // Use the new API endpoint (toggles save/unsave)
+      await apiClient.post(`/save-course/${courseId}`);
+    },
+    onMutate: async (courseId: string) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["savedCourses", user?.id] });
+      await queryClient.cancelQueries({ queryKey: ["savedCourseDetails"] });
 
-      const updatedSavedCourses = currentSavedCourses.filter(
-        (id: string | number) => String(id) !== courseId
+      // Snapshot the previous values
+      const previousSavedCourses = queryClient.getQueryData<string[]>([
+        "savedCourses",
+        user?.id,
+      ]);
+      const previousSavedCourseDetails = queryClient.getQueryData([
+        "savedCourseDetails",
+      ]);
+
+      // Optimistically update savedCourses
+      queryClient.setQueryData<string[]>(["savedCourses", user?.id], (prev) => {
+        if (!prev) return prev;
+        const courseIdString = String(courseId);
+        return prev.includes(courseIdString)
+          ? prev.filter((c) => c !== courseIdString)
+          : [...prev, courseIdString];
+      });
+
+      // Optimistically update savedCourseDetails
+      queryClient.setQueryData(
+        ["savedCourseDetails"],
+        (prev: Course[] | undefined) => {
+          if (!prev) return prev;
+          const courseIdString = String(courseId);
+          return prev.filter((course) => String(course.id) !== courseIdString);
+        }
       );
 
-      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-        saved_courses: updatedSavedCourses,
-      });
+      // Return context for rollback
+      return { previousSavedCourses, previousSavedCourseDetails };
+    },
+    onError: (error: unknown, courseId: string, context) => {
+      // Rollback on error
+      if (context?.previousSavedCourses) {
+        queryClient.setQueryData(
+          ["savedCourses", user?.id],
+          context.previousSavedCourses
+        );
+      }
+      if (context?.previousSavedCourseDetails) {
+        queryClient.setQueryData(
+          ["savedCourseDetails"],
+          context.previousSavedCourseDetails
+        );
+      }
+
+      console.error("Error toggling course save:", error);
+      toast.error("Failed to update course. Please try again.");
     },
     onSuccess: () => {
+      // Invalidate queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["savedCourseDetails"] });
-      toast.success("Course unsaved successfully");
-    },
-    onError: (error: Error) => {
-      console.error("Error unsaving course:", error);
-      toast.error("Failed to unsave course. Please try again.");
+      toast.success("Course updated successfully");
     },
   });
 

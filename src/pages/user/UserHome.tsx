@@ -460,7 +460,7 @@ const UserHome = () => {
           salary,
           employment_type: employmentType,
           work_arrangement: workArrangement,
-          is_saved: savedJobs.includes(jobId),
+          is_saved: savedJobs?.includes(String(jobId)),
           date: postedDate
             ? new Date(postedDate).toLocaleDateString("en-GB", {
                 day: "2-digit",

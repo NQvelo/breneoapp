@@ -479,7 +479,7 @@ const JobSearchResultsPage = () => {
           location,
           url: applyLink,
           company_logo: companyLogo,
-          is_saved: savedJobs.includes(jobId),
+          is_saved: savedJobs?.includes(String(jobId)),
           salary,
           employment_type: employmentType,
           work_arrangement: workArrangement,
