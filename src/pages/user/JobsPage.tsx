@@ -63,6 +63,7 @@ import {
   Hammer,
   Paintbrush,
   SlidersHorizontal,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
@@ -119,7 +120,15 @@ const extractJobSkills = (job: ApiJob): string[] => {
 
   // Common tech skills keywords
   const skillKeywords: Record<string, string[]> = {
-    javascript: ["javascript", "js", "node.js", "nodejs", "react", "vue", "angular"],
+    javascript: [
+      "javascript",
+      "js",
+      "node.js",
+      "nodejs",
+      "react",
+      "vue",
+      "angular",
+    ],
     python: ["python", "django", "flask", "fastapi"],
     java: ["java", "spring", "spring boot"],
     "c++": ["c++", "cpp", "c plus plus"],
@@ -151,7 +160,12 @@ const extractJobSkills = (job: ApiJob): string[] => {
     azure: ["azure", "microsoft azure"],
     gcp: ["gcp", "google cloud", "google cloud platform"],
     linux: ["linux", "unix"],
-    "machine learning": ["machine learning", "ml", "deep learning", "neural network"],
+    "machine learning": [
+      "machine learning",
+      "ml",
+      "deep learning",
+      "neural network",
+    ],
     "data science": ["data science", "data analysis", "data analytics"],
     ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
     blockchain: ["blockchain", "ethereum", "solidity", "web3"],
@@ -199,7 +213,8 @@ const calculateMatchPercentage = (
       // Exact match
       if (userSkill === jobSkill) return true;
       // Partial match (one skill contains the other)
-      if (userSkill.includes(jobSkill) || jobSkill.includes(userSkill)) return true;
+      if (userSkill.includes(jobSkill) || jobSkill.includes(userSkill))
+        return true;
       return false;
     })
   );
@@ -503,10 +518,16 @@ const getSkillColor = (skill: string, index: number): string => {
 };
 
 // Fetch all internship jobs without any filtering
-const fetchInternshipJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
+const fetchInternshipJobs = async (page: number = 1): Promise<{
+  jobs: ApiJob[];
+  hasMore: boolean;
+  total: number;
+}> => {
   try {
-    console.log("🚀 fetchInternshipJobs called - fetching all internship jobs without filters");
-    
+    console.log(
+      `🚀 fetchInternshipJobs called - fetching internship jobs page ${page}`
+    );
+
     const response = await jobService.fetchActiveJobs({
       query: "intern intern internship", // Search term for internships
       filters: {
@@ -520,8 +541,8 @@ const fetchInternshipJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean
         salaryMax: undefined,
         salaryByAgreement: undefined,
       },
-      page: 1,
-      pageSize: 100, // Fetch more to get all internship jobs
+      page: page,
+      pageSize: 12, // Fetch 12 jobs per page
     });
 
     // Validate that we got jobs back
@@ -536,7 +557,7 @@ const fetchInternshipJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean
       return jobId && jobId.trim() !== "";
     });
 
-    // Return all valid internship jobs - display all of them
+    // Return valid internship jobs with pagination info
     return {
       jobs: validJobs,
       hasMore: response.hasMore ?? false,
@@ -549,10 +570,16 @@ const fetchInternshipJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean
 };
 
 // Fetch latest regular jobs without any filtering
-const fetchLatestJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
+const fetchLatestJobs = async (page: number = 1): Promise<{
+  jobs: ApiJob[];
+  hasMore: boolean;
+  total: number;
+}> => {
   try {
-    console.log("🚀 fetchLatestJobs called - fetching all regular jobs without filters");
-    
+    console.log(
+      `🚀 fetchLatestJobs called - fetching regular jobs page ${page}`
+    );
+
     const response = await jobService.fetchActiveJobs({
       query: "", // No search term
       filters: {
@@ -566,8 +593,8 @@ const fetchLatestJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean; to
         salaryMax: undefined,
         salaryByAgreement: undefined,
       },
-      page: 1,
-      pageSize: 20, // Fetch more to ensure we get enough regular jobs
+      page: page,
+      pageSize: 12, // Fetch 12 jobs per page
     });
 
     // Validate that we got jobs back
@@ -582,10 +609,10 @@ const fetchLatestJobs = async (): Promise<{ jobs: ApiJob[]; hasMore: boolean; to
       return jobId && jobId.trim() !== "";
     });
 
-    // Return all valid jobs - we'll limit to 6 regular in the component
+    // Return valid jobs with pagination info
     return {
       jobs: validJobs,
-      hasMore: false, // No pagination for latest jobs
+      hasMore: response.hasMore ?? false,
       total: validJobs.length,
     };
   } catch (error) {
@@ -637,6 +664,18 @@ const JobsPage = () => {
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const skillsInitializedRef = React.useRef(false);
+
+  // Pagination state for regular jobs
+  const [regularJobsPage, setRegularJobsPage] = useState(1);
+  const [allRegularJobs, setAllRegularJobs] = useState<ApiJob[]>([]);
+  const [hasMoreRegularJobs, setHasMoreRegularJobs] = useState(false);
+  const [isLoadingMoreRegular, setIsLoadingMoreRegular] = useState(false);
+
+  // Pagination state for internship jobs
+  const [internshipJobsPage, setInternshipJobsPage] = useState(1);
+  const [allInternshipJobs, setAllInternshipJobs] = useState<ApiJob[]>([]);
+  const [hasMoreInternshipJobs, setHasMoreInternshipJobs] = useState(false);
+  const [isLoadingMoreInternship, setIsLoadingMoreInternship] = useState(false);
 
   // Helper function to update URL with current filters (used for redirecting to search results)
   const updateUrlWithFilters = useCallback(
@@ -727,7 +766,7 @@ const JobsPage = () => {
     params.delete("isRemote");
     params.delete("datePosted");
     params.delete("page");
-    
+
     // Only update if we removed something
     if (params.toString() !== searchParams.toString()) {
       setSearchParams(params, { replace: true });
@@ -803,7 +842,11 @@ const JobsPage = () => {
   // Auto-populate default filters with user's top skills when they're loaded (only once per user)
   useEffect(() => {
     // Only populate on initial load when skills are loaded and haven't been initialized yet
-    if (!loadingSkills && userTopSkills.length > 0 && !skillsInitializedRef.current) {
+    if (
+      !loadingSkills &&
+      userTopSkills.length > 0 &&
+      !skillsInitializedRef.current
+    ) {
       setActiveFilters((prev) => ({
         ...prev,
         skills: [...userTopSkills], // Set all skills as default
@@ -841,8 +884,8 @@ const JobsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["latestJobs"], // No dependencies - fetch all jobs
-    queryFn: () => fetchLatestJobs(),
+    queryKey: ["latestJobs", regularJobsPage],
+    queryFn: () => fetchLatestJobs(regularJobsPage),
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -859,8 +902,8 @@ const JobsPage = () => {
     isLoading: isLoadingInternships,
     error: internshipError,
   } = useQuery({
-    queryKey: ["internshipJobs"], // Separate query for internships
-    queryFn: () => fetchInternshipJobs(),
+    queryKey: ["internshipJobs", internshipJobsPage],
+    queryFn: () => fetchInternshipJobs(internshipJobsPage),
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -871,9 +914,71 @@ const JobsPage = () => {
     enabled: true, // Always fetch jobs
   });
 
+  // Update all regular jobs when new data arrives
+  useEffect(() => {
+    if (jobsData.jobs && jobsData.jobs.length > 0) {
+      if (regularJobsPage === 1) {
+        // First page - replace all jobs
+        setAllRegularJobs(jobsData.jobs);
+      } else {
+        // Subsequent pages - append new jobs (avoid duplicates)
+        setAllRegularJobs((prev) => {
+          const existingIds = new Set(prev.map((j) => j.job_id || j.id));
+          const newJobs = jobsData.jobs.filter(
+            (j) => !existingIds.has(j.job_id || j.id)
+          );
+          return [...prev, ...newJobs];
+        });
+      }
+      setHasMoreRegularJobs(jobsData.hasMore);
+      setIsLoadingMoreRegular(false);
+    } else if (regularJobsPage === 1) {
+      // No jobs on first page
+      setAllRegularJobs([]);
+      setHasMoreRegularJobs(false);
+    }
+  }, [jobsData, regularJobsPage]);
+
+  // Update all internship jobs when new data arrives
+  useEffect(() => {
+    if (internshipJobsData.jobs && internshipJobsData.jobs.length > 0) {
+      if (internshipJobsPage === 1) {
+        // First page - replace all jobs
+        setAllInternshipJobs(internshipJobsData.jobs);
+      } else {
+        // Subsequent pages - append new jobs (avoid duplicates)
+        setAllInternshipJobs((prev) => {
+          const existingIds = new Set(prev.map((j) => j.job_id || j.id));
+          const newJobs = internshipJobsData.jobs.filter(
+            (j) => !existingIds.has(j.job_id || j.id)
+          );
+          return [...prev, ...newJobs];
+        });
+      }
+      setHasMoreInternshipJobs(internshipJobsData.hasMore);
+      setIsLoadingMoreInternship(false);
+    } else if (internshipJobsPage === 1) {
+      // No jobs on first page
+      setAllInternshipJobs([]);
+      setHasMoreInternshipJobs(false);
+    }
+  }, [internshipJobsData, internshipJobsPage]);
+
   // Extract jobs from the responses
-  const jobs = jobsData.jobs || [];
-  const internshipJobsRaw = internshipJobsData.jobs || [];
+  const jobs = allRegularJobs;
+  const internshipJobsRaw = allInternshipJobs;
+
+  // Load more regular jobs
+  const handleLoadMoreRegular = useCallback(() => {
+    setIsLoadingMoreRegular(true);
+    setRegularJobsPage((prev) => prev + 1);
+  }, []);
+
+  // Load more internship jobs
+  const handleLoadMoreInternship = useCallback(() => {
+    setIsLoadingMoreInternship(true);
+    setInternshipJobsPage((prev) => prev + 1);
+  }, []);
 
   // Immediate search (when user presses Enter or clicks Search button)
   const handleSearch = useCallback(() => {
@@ -906,7 +1011,7 @@ const JobsPage = () => {
     if (activeFilters.salaryByAgreement) {
       params.set("salaryByAgreement", "true");
     }
-    
+
     navigate(`/jobs/search?${params.toString()}`);
   }, [searchTerm, activeFilters, navigate]);
 
@@ -948,7 +1053,11 @@ const JobsPage = () => {
           );
         } else {
           // Save: Add job ID to array if not already present
-          if (currentSavedJobs.some((id: string | number) => String(id) === jobIdString)) {
+          if (
+            currentSavedJobs.some(
+              (id: string | number) => String(id) === jobIdString
+            )
+          ) {
             // Already saved, treat as success
             return;
           }
@@ -984,191 +1093,203 @@ const JobsPage = () => {
     if (!jobs || jobs.length === 0) {
       return [];
     }
-    
+
     try {
-      return (jobs || []).map((job: ApiJob): Job | null => {
-      // Handle nested company object if it exists
-      const companyObj =
-        job.company && typeof job.company === "object"
-          ? (job.company as Record<string, unknown>)
-          : null;
+      return (jobs || [])
+        .map((job: ApiJob): Job | null => {
+          // Handle nested company object if it exists
+          const companyObj =
+            job.company && typeof job.company === "object"
+              ? (job.company as Record<string, unknown>)
+              : null;
 
-      // Extract fields with fallbacks for different API formats
-      const jobId = job.job_id || job.id || "";
-      
-      // Skip jobs without valid IDs - they can't be opened
-      if (!jobId || jobId.trim() === "") {
-        console.warn("Skipping job without valid ID:", job);
-        return null;
-      }
-      
-      const jobTitle =
-        job.job_title || job.title || job.position || "Untitled Position";
-      const companyName =
-        (companyObj?.name as string) ||
-        (companyObj?.company_name as string) ||
-        job.companyName || // LinkedIn API field
-        job.employer_name ||
-        job.company_name ||
-        (typeof job.company === "string" ? job.company : null) ||
-        "Unknown Company";
-      const jobCity =
-        job.job_city || job.city || (companyObj?.city as string) || "";
-      const jobState =
-        job.job_state || job.state || (companyObj?.state as string) || "";
-      const jobCountry =
-        job.job_country || job.country || (companyObj?.country as string) || "";
-      const locationString =
-        job.jobLocation || // LinkedIn API field
-        job.location ||
-        (companyObj?.location as string) ||
-        [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-        "Location not specified";
-      const applyLink =
-        job.applyUrl || // LinkedIn API field
-        job.jobUrl || // LinkedIn API field
-        job.job_apply_link ||
-        job.apply_link ||
-        job.url ||
-        job.apply_url ||
-        job.company_url ||
-        (companyObj?.url as string) ||
-        "";
-      // Extract company logo - check all possible fields
-      let companyLogo: string | undefined = undefined;
+          // Extract fields with fallbacks for different API formats
+          const jobId = job.job_id || job.id || "";
 
-      // Check root level fields first
-      if (job.companyLogo) companyLogo = job.companyLogo; // LinkedIn API field
-      if (!companyLogo && job.employer_logo) companyLogo = job.employer_logo;
-      if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
-      if (!companyLogo && job.logo) companyLogo = job.logo;
-      if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
-
-      // Check nested company object
-      if (!companyLogo && companyObj) {
-        if (companyObj.logo) companyLogo = companyObj.logo as string;
-        if (!companyLogo && companyObj.logo_url)
-          companyLogo = companyObj.logo_url as string;
-        if (!companyLogo && companyObj.company_logo)
-          companyLogo = companyObj.company_logo as string;
-        if (!companyLogo && companyObj.employer_logo)
-          companyLogo = companyObj.employer_logo as string;
-      }
-
-      // Check employer object if it exists separately
-      if (!companyLogo && job.employer && typeof job.employer === "object") {
-        const employerObj = job.employer as Record<string, unknown>;
-        if (employerObj.logo) companyLogo = employerObj.logo as string;
-        if (!companyLogo && employerObj.logo_url)
-          companyLogo = employerObj.logo_url as string;
-        if (!companyLogo && employerObj.company_logo)
-          companyLogo = employerObj.company_logo as string;
-        if (!companyLogo && employerObj.employer_logo)
-          companyLogo = employerObj.employer_logo as string;
-      }
-
-      // Validate logo URL if found - check if it's a valid URL format
-      if (companyLogo) {
-        try {
-          // Check if it's a valid URL
-          const url = new URL(companyLogo);
-          // Only allow http/https protocols
-          if (!url.protocol.startsWith('http')) {
-            companyLogo = undefined;
+          // Skip jobs without valid IDs - they can't be opened
+          if (!jobId || jobId.trim() === "") {
+            console.warn("Skipping job without valid ID:", job);
+            return null;
           }
-        } catch {
-          // Invalid URL, remove it
-          companyLogo = undefined;
-        }
-      }
 
-      // Format salary - handle both numeric and string formats
-      let salary = "By agreement";
-      const minSalary = job.job_min_salary || job.min_salary;
-      const maxSalary = job.job_max_salary || job.max_salary;
-      const salaryCurrency =
-        job.job_salary_currency || job.salary_currency || "$";
-      const salaryPeriod =
-        job.job_salary_period || job.salary_period || "yearly";
+          const jobTitle =
+            job.job_title || job.title || job.position || "Untitled Position";
+          const companyName =
+            (companyObj?.name as string) ||
+            (companyObj?.company_name as string) ||
+            job.companyName || // LinkedIn API field
+            job.employer_name ||
+            job.company_name ||
+            (typeof job.company === "string" ? job.company : null) ||
+            "Unknown Company";
+          const jobCity =
+            job.job_city || job.city || (companyObj?.city as string) || "";
+          const jobState =
+            job.job_state || job.state || (companyObj?.state as string) || "";
+          const jobCountry =
+            job.job_country ||
+            job.country ||
+            (companyObj?.country as string) ||
+            "";
+          const locationString =
+            job.jobLocation || // LinkedIn API field
+            job.location ||
+            (companyObj?.location as string) ||
+            [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+            "Location not specified";
+          const applyLink =
+            job.applyUrl || // LinkedIn API field
+            job.jobUrl || // LinkedIn API field
+            job.job_apply_link ||
+            job.apply_link ||
+            job.url ||
+            job.apply_url ||
+            job.company_url ||
+            (companyObj?.url as string) ||
+            "";
+          // Extract company logo - check all possible fields
+          let companyLogo: string | undefined = undefined;
 
-      if (
-        minSalary &&
-        maxSalary &&
-        typeof minSalary === "number" &&
-        typeof maxSalary === "number"
-      ) {
-        const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-        const minSalaryFormatted = minSalary.toLocaleString();
-        const maxSalaryFormatted = maxSalary.toLocaleString();
-        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-        const isCurrencyBefore = currencySymbols.some((sym) =>
-          salaryCurrency.includes(sym)
-        );
-        if (isCurrencyBefore) {
-          salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-            periodLabel ? `/${periodLabel}` : ""
-          }`;
-        } else {
-          salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-            periodLabel ? `/${periodLabel}` : ""
-          }`;
-        }
-      } else if (minSalary && typeof minSalary === "number") {
-        const minSalaryFormatted = minSalary.toLocaleString();
-        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-        const isCurrencyBefore = currencySymbols.some((sym) =>
-          salaryCurrency.includes(sym)
-        );
-        salary = isCurrencyBefore
-          ? `${salaryCurrency}${minSalaryFormatted}+`
-          : `${minSalaryFormatted}+ ${salaryCurrency}`;
-      } else if (job.salary && typeof job.salary === "string") {
-        salary = job.salary;
-      }
+          // Check root level fields first
+          if (job.companyLogo) companyLogo = job.companyLogo; // LinkedIn API field
+          if (!companyLogo && job.employer_logo)
+            companyLogo = job.employer_logo;
+          if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
+          if (!companyLogo && job.logo) companyLogo = job.logo;
+          if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
 
-      // Format employment type
-      const employmentTypeRaw =
-        job.job_employment_type ||
-        job.employment_type ||
-        job.type ||
-        "FULLTIME";
-      // Handle case-insensitive matching
-      const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-      const employmentType =
-        jobTypeLabels[employmentTypeRawUpper] || 
-        jobTypeLabels[employmentTypeRaw] || 
-        employmentTypeRaw || 
-        "Full time";
+          // Check nested company object
+          if (!companyLogo && companyObj) {
+            if (companyObj.logo) companyLogo = companyObj.logo as string;
+            if (!companyLogo && companyObj.logo_url)
+              companyLogo = companyObj.logo_url as string;
+            if (!companyLogo && companyObj.company_logo)
+              companyLogo = companyObj.company_logo as string;
+            if (!companyLogo && companyObj.employer_logo)
+              companyLogo = companyObj.employer_logo as string;
+          }
 
-      // Determine work arrangement
-      let workArrangement = "On-site";
-      const isRemote =
-        job.job_is_remote || job.is_remote || job.remote === true;
-      if (isRemote) {
-        workArrangement = "Remote";
-      } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-        workArrangement = "Hybrid";
-      }
+          // Check employer object if it exists separately
+          if (
+            !companyLogo &&
+            job.employer &&
+            typeof job.employer === "object"
+          ) {
+            const employerObj = job.employer as Record<string, unknown>;
+            if (employerObj.logo) companyLogo = employerObj.logo as string;
+            if (!companyLogo && employerObj.logo_url)
+              companyLogo = employerObj.logo_url as string;
+            if (!companyLogo && employerObj.company_logo)
+              companyLogo = employerObj.company_logo as string;
+            if (!companyLogo && employerObj.employer_logo)
+              companyLogo = employerObj.employer_logo as string;
+          }
 
-      // Calculate match percentage
-      const jobSkills = extractJobSkills(job);
-      const matchPercentage = calculateMatchPercentage(userTopSkills, jobSkills);
+          // Validate logo URL if found - check if it's a valid URL format
+          if (companyLogo) {
+            try {
+              // Check if it's a valid URL
+              const url = new URL(companyLogo);
+              // Only allow http/https protocols
+              if (!url.protocol.startsWith("http")) {
+                companyLogo = undefined;
+              }
+            } catch {
+              // Invalid URL, remove it
+              companyLogo = undefined;
+            }
+          }
 
-      return {
-        id: jobId,
-        title: jobTitle,
-        company: companyName,
-        location: locationString,
-        url: applyLink,
-        company_logo: companyLogo,
-        is_saved: savedJobs?.includes(String(jobId)),
-        salary,
-        employment_type: employmentType,
-        work_arrangement: workArrangement,
-        matchPercentage,
-      };
-    })
-    .filter((job): job is Job => job !== null); // Filter out null jobs
+          // Format salary - handle both numeric and string formats
+          let salary = "By agreement";
+          const minSalary = job.job_min_salary || job.min_salary;
+          const maxSalary = job.job_max_salary || job.max_salary;
+          const salaryCurrency =
+            job.job_salary_currency || job.salary_currency || "$";
+          const salaryPeriod =
+            job.job_salary_period || job.salary_period || "yearly";
+
+          if (
+            minSalary &&
+            maxSalary &&
+            typeof minSalary === "number" &&
+            typeof maxSalary === "number"
+          ) {
+            const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+            const minSalaryFormatted = minSalary.toLocaleString();
+            const maxSalaryFormatted = maxSalary.toLocaleString();
+            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+            const isCurrencyBefore = currencySymbols.some((sym) =>
+              salaryCurrency.includes(sym)
+            );
+            if (isCurrencyBefore) {
+              salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+                periodLabel ? `/${periodLabel}` : ""
+              }`;
+            } else {
+              salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+                periodLabel ? `/${periodLabel}` : ""
+              }`;
+            }
+          } else if (minSalary && typeof minSalary === "number") {
+            const minSalaryFormatted = minSalary.toLocaleString();
+            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+            const isCurrencyBefore = currencySymbols.some((sym) =>
+              salaryCurrency.includes(sym)
+            );
+            salary = isCurrencyBefore
+              ? `${salaryCurrency}${minSalaryFormatted}+`
+              : `${minSalaryFormatted}+ ${salaryCurrency}`;
+          } else if (job.salary && typeof job.salary === "string") {
+            salary = job.salary;
+          }
+
+          // Format employment type
+          const employmentTypeRaw =
+            job.job_employment_type ||
+            job.employment_type ||
+            job.type ||
+            "FULLTIME";
+          // Handle case-insensitive matching
+          const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
+          const employmentType =
+            jobTypeLabels[employmentTypeRawUpper] ||
+            jobTypeLabels[employmentTypeRaw] ||
+            employmentTypeRaw ||
+            "Full time";
+
+          // Determine work arrangement
+          let workArrangement = "On-site";
+          const isRemote =
+            job.job_is_remote || job.is_remote || job.remote === true;
+          if (isRemote) {
+            workArrangement = "Remote";
+          } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+            workArrangement = "Hybrid";
+          }
+
+          // Calculate match percentage
+          const jobSkills = extractJobSkills(job);
+          const matchPercentage = calculateMatchPercentage(
+            userTopSkills,
+            jobSkills
+          );
+
+          return {
+            id: jobId,
+            title: jobTitle,
+            company: companyName,
+            location: locationString,
+            url: applyLink,
+            company_logo: companyLogo,
+            is_saved: savedJobs?.includes(String(jobId)),
+            salary,
+            employment_type: employmentType,
+            work_arrangement: workArrangement,
+            matchPercentage,
+          };
+        })
+        .filter((job): job is Job => job !== null); // Filter out null jobs
     } catch (error) {
       console.error("Error transforming jobs:", error);
       // Return empty array on error to prevent crashes
@@ -1176,14 +1297,13 @@ const JobsPage = () => {
     }
   }, [jobs, savedJobs, userTopSkills]);
 
-  // Separate regular jobs from intern jobs and limit to 6 each
+  // Separate regular jobs from intern jobs (no limit - show all loaded)
   const regularJobs = useMemo(() => {
-    return transformedJobs
-      .filter(
-        (job) => job.employment_type?.toLowerCase() !== "intern" && 
-                 job.employment_type?.toLowerCase() !== "internship"
-      )
-      .slice(0, 6); // Limit to 6 latest regular jobs
+    return transformedJobs.filter(
+        (job) =>
+          job.employment_type?.toLowerCase() !== "intern" &&
+          job.employment_type?.toLowerCase() !== "internship"
+    );
   }, [transformedJobs]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
@@ -1191,171 +1311,179 @@ const JobsPage = () => {
     if (!internshipJobsRaw || internshipJobsRaw.length === 0) {
       return [];
     }
-    
-    try {
-      return (internshipJobsRaw || []).map((job: ApiJob): Job | null => {
-        // Use the same transformation logic as regular jobs
-        // Handle nested company object if it exists
-        const companyObj =
-          job.company && typeof job.company === "object"
-            ? (job.company as Record<string, unknown>)
-            : null;
 
-        // Extract fields with fallbacks for different API formats
-        const jobId = job.job_id || job.id || "";
-        
-        // Skip jobs without valid IDs - they can't be opened
-        if (!jobId || jobId.trim() === "") {
-          console.warn("Skipping internship job without valid ID:", job);
-          return null;
-        }
-        
-        const jobTitle =
-          job.job_title || job.title || job.position || "Untitled Position";
-        const companyName =
-          (companyObj?.name as string) ||
-          (companyObj?.company_name as string) ||
-          job.companyName ||
-          job.employer_name ||
-          job.company_name ||
-          (typeof job.company === "string" ? job.company : null) ||
-          "Unknown Company";
-        const jobCity =
-          job.job_city || job.city || (companyObj?.city as string) || "";
-        const jobState =
-          job.job_state || job.state || (companyObj?.state as string) || "";
-        const jobCountry =
-          job.job_country || job.country || (companyObj?.country as string) || "";
-        const locationString =
-          job.jobLocation ||
-          job.location ||
-          (companyObj?.location as string) ||
-          [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-          "Location not specified";
-        const applyLink =
-          job.applyUrl ||
-          job.jobUrl ||
-          job.job_apply_link ||
-          job.apply_link ||
-          job.url ||
-          job.apply_url ||
-          job.company_url ||
-          (companyObj?.url as string) ||
-          "";
-        
-        // Extract company logo (same logic as regular jobs)
-        let companyLogo: string | undefined = undefined;
-        if (job.companyLogo) companyLogo = job.companyLogo;
-        if (!companyLogo && job.employer_logo) companyLogo = job.employer_logo;
-        if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
-        if (!companyLogo && job.logo) companyLogo = job.logo;
-        if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
-        if (!companyLogo && companyObj) {
-          if (companyObj.logo) companyLogo = companyObj.logo as string;
-          if (!companyLogo && companyObj.logo_url)
-            companyLogo = companyObj.logo_url as string;
-          if (!companyLogo && companyObj.company_logo)
-            companyLogo = companyObj.company_logo as string;
-          if (!companyLogo && companyObj.employer_logo)
-            companyLogo = companyObj.employer_logo as string;
-        }
-        if (companyLogo) {
-          try {
-            const url = new URL(companyLogo);
-            if (!url.protocol.startsWith('http')) {
+    try {
+      return (internshipJobsRaw || [])
+        .map((job: ApiJob): Job | null => {
+          // Use the same transformation logic as regular jobs
+          // Handle nested company object if it exists
+          const companyObj =
+            job.company && typeof job.company === "object"
+              ? (job.company as Record<string, unknown>)
+              : null;
+
+          // Extract fields with fallbacks for different API formats
+          const jobId = job.job_id || job.id || "";
+
+          // Skip jobs without valid IDs - they can't be opened
+          if (!jobId || jobId.trim() === "") {
+            console.warn("Skipping internship job without valid ID:", job);
+            return null;
+          }
+
+          const jobTitle =
+            job.job_title || job.title || job.position || "Untitled Position";
+          const companyName =
+            (companyObj?.name as string) ||
+            (companyObj?.company_name as string) ||
+            job.companyName ||
+            job.employer_name ||
+            job.company_name ||
+            (typeof job.company === "string" ? job.company : null) ||
+            "Unknown Company";
+          const jobCity =
+            job.job_city || job.city || (companyObj?.city as string) || "";
+          const jobState =
+            job.job_state || job.state || (companyObj?.state as string) || "";
+          const jobCountry =
+            job.job_country ||
+            job.country ||
+            (companyObj?.country as string) ||
+            "";
+          const locationString =
+            job.jobLocation || // LinkedIn API field
+            job.location ||
+            (companyObj?.location as string) ||
+            [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+            "Location not specified";
+          const applyLink =
+            job.applyUrl ||
+            job.jobUrl ||
+            job.job_apply_link ||
+            job.apply_link ||
+            job.url ||
+            job.apply_url ||
+            job.company_url ||
+            (companyObj?.url as string) ||
+            "";
+
+          // Extract company logo (same logic as regular jobs)
+          let companyLogo: string | undefined = undefined;
+          if (job.companyLogo) companyLogo = job.companyLogo;
+          if (!companyLogo && job.employer_logo)
+            companyLogo = job.employer_logo;
+          if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
+          if (!companyLogo && job.logo) companyLogo = job.logo;
+          if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
+          if (!companyLogo && companyObj) {
+            if (companyObj.logo) companyLogo = companyObj.logo as string;
+            if (!companyLogo && companyObj.logo_url)
+              companyLogo = companyObj.logo_url as string;
+            if (!companyLogo && companyObj.company_logo)
+              companyLogo = companyObj.company_logo as string;
+            if (!companyLogo && companyObj.employer_logo)
+              companyLogo = companyObj.employer_logo as string;
+          }
+          if (companyLogo) {
+            try {
+              const url = new URL(companyLogo);
+              if (!url.protocol.startsWith("http")) {
+                companyLogo = undefined;
+              }
+            } catch {
               companyLogo = undefined;
             }
-          } catch {
-            companyLogo = undefined;
           }
-        }
 
-        // Format salary (same logic as regular jobs)
-        let salary = "By agreement";
-        const minSalary = job.job_min_salary || job.min_salary;
-        const maxSalary = job.job_max_salary || job.max_salary;
-        const salaryCurrency =
-          job.job_salary_currency || job.salary_currency || "$";
-        const salaryPeriod =
-          job.job_salary_period || job.salary_period || "yearly";
+          // Format salary (same logic as regular jobs)
+          let salary = "By agreement";
+          const minSalary = job.job_min_salary || job.min_salary;
+          const maxSalary = job.job_max_salary || job.max_salary;
+          const salaryCurrency =
+            job.job_salary_currency || job.salary_currency || "$";
+          const salaryPeriod =
+            job.job_salary_period || job.salary_period || "yearly";
 
-        if (
-          minSalary &&
-          maxSalary &&
-          typeof minSalary === "number" &&
-          typeof maxSalary === "number"
-        ) {
-          const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const maxSalaryFormatted = maxSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
-          );
-          if (isCurrencyBefore) {
-            salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          } else {
-            salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
+          if (
+            minSalary &&
+            maxSalary &&
+            typeof minSalary === "number" &&
+            typeof maxSalary === "number"
+          ) {
+            const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+            const minSalaryFormatted = minSalary.toLocaleString();
+            const maxSalaryFormatted = maxSalary.toLocaleString();
+            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+            const isCurrencyBefore = currencySymbols.some((sym) =>
+              salaryCurrency.includes(sym)
+            );
+            if (isCurrencyBefore) {
+              salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+                periodLabel ? `/${periodLabel}` : ""
+              }`;
+            } else {
+              salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+                periodLabel ? `/${periodLabel}` : ""
+              }`;
+            }
+          } else if (minSalary && typeof minSalary === "number") {
+            const minSalaryFormatted = minSalary.toLocaleString();
+            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+            const isCurrencyBefore = currencySymbols.some((sym) =>
+              salaryCurrency.includes(sym)
+            );
+            salary = isCurrencyBefore
+              ? `${salaryCurrency}${minSalaryFormatted}+`
+              : `${minSalaryFormatted}+ ${salaryCurrency}`;
+          } else if (job.salary && typeof job.salary === "string") {
+            salary = job.salary;
           }
-        } else if (minSalary && typeof minSalary === "number") {
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+
+          // Format employment type
+          const employmentTypeRaw =
+            job.job_employment_type ||
+            job.employment_type ||
+            job.type ||
+            "INTERN";
+          const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
+          const employmentType =
+            jobTypeLabels[employmentTypeRawUpper] ||
+            jobTypeLabels[employmentTypeRaw] ||
+            employmentTypeRaw ||
+            "Intern";
+
+          // Determine work arrangement
+          let workArrangement = "On-site";
+          const isRemote =
+            job.job_is_remote || job.is_remote || job.remote === true;
+          if (isRemote) {
+            workArrangement = "Remote";
+          } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+            workArrangement = "Hybrid";
+          }
+
+          // Calculate match percentage
+          const jobSkills = extractJobSkills(job);
+          const matchPercentage = calculateMatchPercentage(
+            userTopSkills,
+            jobSkills
           );
-          salary = isCurrencyBefore
-            ? `${salaryCurrency}${minSalaryFormatted}+`
-            : `${minSalaryFormatted}+ ${salaryCurrency}`;
-        } else if (job.salary && typeof job.salary === "string") {
-          salary = job.salary;
-        }
 
-        // Format employment type
-        const employmentTypeRaw =
-          job.job_employment_type ||
-          job.employment_type ||
-          job.type ||
-          "INTERN";
-        const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-        const employmentType =
-          jobTypeLabels[employmentTypeRawUpper] || 
-          jobTypeLabels[employmentTypeRaw] || 
-          employmentTypeRaw || 
-          "Intern";
-
-        // Determine work arrangement
-        let workArrangement = "On-site";
-        const isRemote =
-          job.job_is_remote || job.is_remote || job.remote === true;
-        if (isRemote) {
-          workArrangement = "Remote";
-        } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-          workArrangement = "Hybrid";
-        }
-
-        // Calculate match percentage
-        const jobSkills = extractJobSkills(job);
-        const matchPercentage = calculateMatchPercentage(userTopSkills, jobSkills);
-
-        return {
-          id: jobId,
-          title: jobTitle,
-          company: companyName,
-          location: locationString,
-          url: applyLink,
-          company_logo: companyLogo,
-          is_saved: savedJobs?.includes(String(jobId)),
-          salary,
-          employment_type: employmentType,
-          work_arrangement: workArrangement,
-          matchPercentage,
-        };
-      })
-      .filter((job): job is Job => job !== null);
+          return {
+            id: jobId,
+            title: jobTitle,
+            company: companyName,
+            location: locationString,
+            url: applyLink,
+            company_logo: companyLogo,
+            is_saved: savedJobs?.includes(String(jobId)),
+            salary,
+            employment_type: employmentType,
+            work_arrangement: workArrangement,
+            matchPercentage,
+          };
+        })
+        .filter((job): job is Job => job !== null);
     } catch (error) {
       console.error("Error transforming internship jobs:", error);
       return [];
@@ -1380,32 +1508,58 @@ const JobsPage = () => {
       transformedInternshipJobsCount: transformedInternshipJobs.length,
       regularJobsCount: regularJobs.length,
       internJobsCount: internJobs.length,
+      regularJobsPage,
+      internshipJobsPage,
+      hasMoreRegularJobs,
+      hasMoreInternshipJobs,
+      isLoadingMoreRegular,
+      isLoadingMoreInternship,
     });
-  }, [isLoading, isLoadingInternships, error, internshipError, jobs.length, internshipJobsRaw.length, transformedJobs.length, transformedInternshipJobs.length, regularJobs.length, internJobs.length]);
+  }, [
+    isLoading,
+    isLoadingInternships,
+    error,
+    internshipError,
+    jobs.length,
+    internshipJobsRaw.length,
+    transformedJobs.length,
+    transformedInternshipJobs.length,
+    regularJobs.length,
+    internJobs.length,
+    regularJobsPage,
+    internshipJobsPage,
+    hasMoreRegularJobs,
+    hasMoreInternshipJobs,
+    isLoadingMoreRegular,
+    isLoadingMoreInternship,
+  ]);
 
   // Helper function to redirect to search results with filters
-  const redirectToSearchResults = useCallback((filters: JobFilters, search: string) => {
-    const params = new URLSearchParams();
-    if (search) {
-      params.set("search", search);
-    }
-    if (filters.countries.length > 0) {
-      params.set("countries", filters.countries.join(","));
-    }
-    if (filters.skills.length > 0) {
-      params.set("skills", filters.skills.join(","));
-    }
-    if (filters.jobTypes.length > 0) {
-      params.set("jobTypes", filters.jobTypes.join(","));
-    }
-    if (filters.isRemote) {
-      params.set("isRemote", "true");
-    }
-    if (filters.datePosted) {
-      params.set("datePosted", filters.datePosted);
-    }
-    navigate(`/jobs/search?${params.toString()}`);
-  }, [navigate]);
+  const redirectToSearchResults = useCallback(
+    (filters: JobFilters, search: string) => {
+      const params = new URLSearchParams();
+      if (search) {
+        params.set("search", search);
+      }
+      if (filters.countries.length > 0) {
+        params.set("countries", filters.countries.join(","));
+      }
+      if (filters.skills.length > 0) {
+        params.set("skills", filters.skills.join(","));
+      }
+      if (filters.jobTypes.length > 0) {
+        params.set("jobTypes", filters.jobTypes.join(","));
+      }
+      if (filters.isRemote) {
+        params.set("isRemote", "true");
+      }
+      if (filters.datePosted) {
+        params.set("datePosted", filters.datePosted);
+      }
+      navigate(`/jobs/search?${params.toString()}`);
+    },
+    [navigate]
+  );
 
   // Handle work types change - only update filters, don't redirect until search button is clicked
   const handleWorkTypesChange = (workTypes: string[]) => {
@@ -1560,7 +1714,6 @@ const JobsPage = () => {
     refetchOnWindowFocus: false,
   });
 
-
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
@@ -1703,7 +1856,8 @@ const JobsPage = () => {
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
             <AlertCircle className="h-5 w-5" />
             <p>
-              <strong>Error:</strong> {(error as Error)?.message || (internshipError as Error)?.message}
+              <strong>Error:</strong>{" "}
+              {(error as Error)?.message || (internshipError as Error)?.message}
             </p>
           </div>
         )}
@@ -1720,53 +1874,84 @@ const JobsPage = () => {
           </div>
         )}
 
-        {!isLoading && !isLoadingInternships && regularJobs.length === 0 && internJobs.length === 0 && (
-          <div className="text-center p-10 border border-dashed rounded-lg text-muted-foreground">
-            <img
-              src="/lovable-uploads/no-data-found.png"
-              alt="No data found"
-              className="mx-auto h-64 w-64 mb-4 object-contain"
-            />
-            <h4 className="text-lg font-semibold mb-2">No Jobs Found</h4>
-            <p className="text-sm">
-              Try adjusting your search terms or filters
-            </p>
-          </div>
-        )}
+        {!isLoading &&
+          !isLoadingInternships &&
+          regularJobs.length === 0 &&
+          internJobs.length === 0 && (
+            <div className="text-center p-10 border border-dashed rounded-lg text-muted-foreground">
+              <img
+                src="/lovable-uploads/no-data-found.png"
+                alt="No data found"
+                className="mx-auto h-64 w-64 mb-4 object-contain"
+              />
+              <h4 className="text-lg font-semibold mb-2">No Jobs Found</h4>
+              <p className="text-sm">
+                Try adjusting your search terms or filters
+              </p>
+            </div>
+          )}
 
         {/* Regular Job Cards Grid */}
         {regularJobs.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
             {regularJobs.map((job) => (
-            <Card
-              key={job.id}
-              className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-2xl"
-            >
-              <CardContent className="p-5 flex flex-col flex-grow relative">
-                {/* Company Logo and Info */}
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="flex-shrink-0 relative w-12 h-12">
-                    {/* Primary: Logo from API - shown first if available */}
-                    {job.company_logo ? (
-                      <img
-                        src={job.company_logo}
-                        alt={`${job.company} logo`}
-                        className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.style.display = "none";
-                          // Show Clearbit logo fallback
-                          const clearbitLogo =
-                            target.parentElement?.querySelector(
-                              ".clearbit-logo"
-                            ) as HTMLImageElement;
-                          if (clearbitLogo) {
-                            clearbitLogo.style.display = "block";
-                            clearbitLogo.style.zIndex = "10";
-                          } else {
-                            // Show default icon
+              <Card
+                key={job.id}
+                className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-2xl"
+              >
+                <CardContent className="p-5 flex flex-col flex-grow relative">
+                  {/* Company Logo and Info */}
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex-shrink-0 relative w-12 h-12">
+                      {/* Primary: Logo from API - shown first if available */}
+                      {job.company_logo ? (
+                        <img
+                          src={job.company_logo}
+                          alt={`${job.company} logo`}
+                          className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.style.display = "none";
+                            // Show Clearbit logo fallback
+                            const clearbitLogo =
+                              target.parentElement?.querySelector(
+                                ".clearbit-logo"
+                              ) as HTMLImageElement;
+                            if (clearbitLogo) {
+                              clearbitLogo.style.display = "block";
+                              clearbitLogo.style.zIndex = "10";
+                            } else {
+                              // Show default icon
+                              const iconFallback =
+                                target.parentElement?.querySelector(
+                                  ".logo-fallback"
+                                ) as HTMLElement;
+                              if (iconFallback) {
+                                iconFallback.style.display = "flex";
+                                iconFallback.style.zIndex = "10";
+                              }
+                            }
+                          }}
+                        />
+                      ) : null}
+
+                      {/* Fallback 1: Clearbit logo API - shown if no API logo and company name exists */}
+                      {job.company && !job.company_logo ? (
+                        <img
+                          src={`https://logo.clearbit.com/${encodeURIComponent(
+                            job.company
+                          )}`}
+                          alt={`${job.company} logo`}
+                          className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
+                          style={{ zIndex: 10 }}
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.onerror = null;
+                            target.style.display = "none";
+                            // Show default icon fallback
                             const iconFallback =
                               target.parentElement?.querySelector(
                                 ".logo-fallback"
@@ -1775,146 +1960,151 @@ const JobsPage = () => {
                               iconFallback.style.display = "flex";
                               iconFallback.style.zIndex = "10";
                             }
-                          }
-                        }}
-                      />
-                    ) : null}
+                          }}
+                        />
+                      ) : null}
 
-                    {/* Fallback 1: Clearbit logo API - shown if no API logo and company name exists */}
-                    {job.company && !job.company_logo ? (
-                      <img
-                        src={`https://logo.clearbit.com/${encodeURIComponent(
-                          job.company
-                        )}`}
-                        alt={`${job.company} logo`}
-                        className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
-                        style={{ zIndex: 10 }}
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.style.display = "none";
-                          // Show default icon fallback
-                          const iconFallback =
-                            target.parentElement?.querySelector(
-                              ".logo-fallback"
-                            ) as HTMLElement;
-                          if (iconFallback) {
-                            iconFallback.style.display = "flex";
-                            iconFallback.style.zIndex = "10";
-                          }
+                      {/* Fallback 2: Default icon - always present, shown when all logos fail or no company name */}
+                      <div
+                        className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
+                          job.company_logo || (job.company && !job.company_logo)
+                            ? "hidden"
+                            : "flex"
+                        }`}
+                        style={{
+                          zIndex:
+                            job.company_logo ||
+                            (job.company && !job.company_logo)
+                              ? 0
+                              : 10,
                         }}
-                      />
-                    ) : null}
-
-                    {/* Fallback 2: Default icon - always present, shown when all logos fail or no company name */}
-                    <div
-                      className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                        (job.company_logo || (job.company && !job.company_logo)) ? "hidden" : "flex"
-                      }`}
-                      style={{
-                        zIndex: (job.company_logo || (job.company && !job.company_logo)) ? 0 : 10,
-                      }}
-                    >
-                      <Briefcase className="h-6 w-6 text-white" />
+                      >
+                        <Briefcase className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h3 className="font-semibold text-base truncate">
+                          {job.company}
+                        </h3>
+                        {job.matchPercentage !== undefined && (
+                          <Badge
+                            variant="secondary"
+                            className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
+                          >
+                            {job.matchPercentage}% Match
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">
+                        {job.location}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <h3 className="font-semibold text-base truncate">
-                        {job.company}
-                      </h3>
-                      {job.matchPercentage !== undefined && (
-                        <Badge
-                          variant="secondary"
-                          className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
-                        >
-                          {job.matchPercentage}% Match
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 truncate">
-                      {job.location}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Job Title */}
-                <h4 className="font-bold text-lg mb-4 line-clamp-2">
-                  {job.title}
-                </h4>
+                  {/* Job Title */}
+                  <h4 className="font-bold text-lg mb-4 line-clamp-2">
+                    {job.title}
+                  </h4>
 
-                {/* Job Details */}
-                <div className="space-y-2 mb-4 flex-grow">
-                  {/* Salary */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-700">{job.salary}</span>
-                  </div>
-
-                  {/* Employment Type */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    <span className="text-gray-700">{job.employment_type}</span>
-                  </div>
-
-                  {/* Work Arrangement */}
-                  {job.work_arrangement && (
+                  {/* Job Details */}
+                  <div className="space-y-2 mb-4 flex-grow">
+                    {/* Salary */}
                     <div className="flex items-center gap-2 text-sm">
-                      <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="text-gray-700">{job.salary}</span>
+                    </div>
+
+                    {/* Employment Type */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
                       <span className="text-gray-700">
-                        {job.work_arrangement}
+                        {job.employment_type}
                       </span>
                     </div>
-                  )}
 
-                  {/* Benefits */}
-                  {job.benefits && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-700">{job.benefits}</span>
-                    </div>
-                  )}
-                </div>
+                    {/* Work Arrangement */}
+                    {job.work_arrangement && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-700">
+                          {job.work_arrangement}
+                        </span>
+                      </div>
+                    )}
 
-                {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
-                <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
-                  <Button
-                    variant="default"
-                    onClick={() => {
-                      if (!job.id || job.id.trim() === "") {
-                        toast.error("Cannot open job: Invalid job ID");
-                        console.error("Attempted to navigate to job with invalid ID:", job);
-                        return;
-                      }
-                      // Encode the job ID to handle special characters
-                      const encodedId = encodeURIComponent(job.id);
-                      navigate(`/jobs/${encodedId}`);
-                    }}
-                    className="flex-1"
-                    disabled={!job.id || job.id.trim() === ""}
-                  >
-                    View
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="icon"
-                    onClick={() => saveJobMutation.mutate(job)}
-                    aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                    className={job.is_saved ? "bg-primary/90" : ""}
-                  >
-                    <Bookmark
-                      className={`h-5 w-5 transition-colors ${
-                        job.is_saved
-                          ? "fill-white text-white"
-                          : "text-white"
-                      }`}
-                    />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                    {/* Benefits */}
+                    {job.benefits && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-gray-700">{job.benefits}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
+                  <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        if (!job.id || job.id.trim() === "") {
+                          toast.error("Cannot open job: Invalid job ID");
+                          console.error(
+                            "Attempted to navigate to job with invalid ID:",
+                            job
+                          );
+                          return;
+                        }
+                        // Encode the job ID to handle special characters
+                        const encodedId = encodeURIComponent(job.id);
+                        navigate(`/jobs/${encodedId}`);
+                      }}
+                      className="flex-1"
+                      disabled={!job.id || job.id.trim() === ""}
+                    >
+                      View
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="icon"
+                      onClick={() => saveJobMutation.mutate(job)}
+                      aria-label={job.is_saved ? "Unsave job" : "Save job"}
+                      className={job.is_saved ? "bg-primary/90" : ""}
+                    >
+                      <Bookmark
+                        className={`h-5 w-5 transition-colors ${
+                          job.is_saved ? "fill-white text-white" : "text-white"
+                        }`}
+                      />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
+          </div>
+        )}
+
+        {/* Load More Button for Regular Jobs */}
+        {!isLoading &&
+          !isLoadingInternships &&
+          regularJobs.length > 0 &&
+          hasMoreRegularJobs && (
+            <div className="flex justify-center mt-6 mb-8">
+              <Button
+                onClick={handleLoadMoreRegular}
+                disabled={isLoadingMoreRegular}
+                variant="outline"
+                className="min-w-[200px]"
+              >
+                {isLoadingMoreRegular ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Load More Jobs"
+                )}
+              </Button>
           </div>
         )}
 
@@ -1996,10 +2186,17 @@ const JobsPage = () => {
                         {/* Fallback 2: Default icon */}
                         <div
                           className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                            (job.company_logo || (job.company && !job.company_logo)) ? "hidden" : "flex"
+                            job.company_logo ||
+                            (job.company && !job.company_logo)
+                              ? "hidden"
+                              : "flex"
                           }`}
                           style={{
-                            zIndex: (job.company_logo || (job.company && !job.company_logo)) ? 0 : 10,
+                            zIndex:
+                              job.company_logo ||
+                              (job.company && !job.company_logo)
+                                ? 0
+                                : 10,
                           }}
                         >
                           <Briefcase className="h-6 w-6 text-white" />
@@ -2041,7 +2238,9 @@ const JobsPage = () => {
                       {/* Employment Type */}
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{job.employment_type}</span>
+                        <span className="text-gray-700">
+                          {job.employment_type}
+                        </span>
                       </div>
 
                       {/* Work Arrangement */}
@@ -2070,7 +2269,10 @@ const JobsPage = () => {
                         onClick={() => {
                           if (!job.id || job.id.trim() === "") {
                             toast.error("Cannot open job: Invalid job ID");
-                            console.error("Attempted to navigate to job with invalid ID:", job);
+                            console.error(
+                              "Attempted to navigate to job with invalid ID:",
+                              job
+                            );
                             return;
                           }
                           const encodedId = encodeURIComponent(job.id);
@@ -2101,9 +2303,29 @@ const JobsPage = () => {
                 </Card>
               ))}
             </div>
+
+            {/* Load More Button for Internship Jobs */}
+            {hasMoreInternshipJobs && (
+              <div className="flex justify-center mt-6 mb-8">
+                <Button
+                  onClick={handleLoadMoreInternship}
+                  disabled={isLoadingMoreInternship}
+                  variant="outline"
+                  className="min-w-[200px]"
+                >
+                  {isLoadingMoreInternship ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Load More Internships"
+                  )}
+                </Button>
+              </div>
+            )}
           </>
         )}
-
       </div>
 
       <JobFilterModal

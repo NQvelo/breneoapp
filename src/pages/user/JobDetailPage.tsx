@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -48,7 +48,9 @@ import {
   Copy,
   Facebook,
   Linkedin,
+  Loader2,
 } from "lucide-react";
+import { summarizeText } from "@/utils/aiSummarizer";
 import { jobService, JobDetail, CompanyInfo } from "@/api/jobs";
 import {
   DropdownMenu,
@@ -118,6 +120,82 @@ const JobDetailPage = () => {
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
+
+  // AI Summary state
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
+  const [showGradient, setShowGradient] = useState(false);
+  const [hideOriginal, setHideOriginal] = useState(false);
+
+  // Reset summary when job changes
+  useEffect(() => {
+    setAiSummary(null);
+    setSummaryError(null);
+    setShowSummary(false);
+    setIsSummarizing(false);
+    setShowGradient(false);
+    setHideOriginal(false);
+  }, [jobId]);
+
+  // Handle AI summarization
+  const handleSummarize = async () => {
+    // If summary is already shown, hide it
+    if (aiSummary && hideOriginal) {
+      setShowSummary(false);
+      setAiSummary(null);
+      setSummaryError(null);
+      setShowGradient(false);
+      setHideOriginal(false);
+      return;
+    }
+
+    if (isSummarizing) return;
+
+    if (!jobDetail) return;
+
+    const description = getDescription();
+    if (!description || description.length < 50) {
+      toast.error("Job description is too short to summarize");
+      return;
+    }
+
+    setIsSummarizing(true);
+    setSummaryError(null);
+    setShowSummary(true);
+    setShowGradient(true);
+    setHideOriginal(false);
+
+    try {
+      // Comprehensive, expanded summarization: longer, detailed, focused on what candidates need to know
+      const result = await summarizeText(description, 1200, 400);
+      if (result.error) {
+        setSummaryError(result.error);
+        setShowGradient(false);
+        setHideOriginal(false);
+        toast.error("Failed to generate summary: " + result.error);
+      } else if (result.summary) {
+        setAiSummary(result.summary);
+        setTimeout(() => {
+          setHideOriginal(true);
+          setShowGradient(false);
+        }, 300);
+        toast.success("Summary generated successfully!");
+      } else {
+        throw new Error("No summary generated");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to generate summary";
+      setSummaryError(errorMessage);
+      toast.error("Failed to generate summary");
+      setShowGradient(false);
+      setHideOriginal(false);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   // Save/unsave job mutation
   const saveJobMutation = useMutation({
@@ -928,7 +1006,7 @@ const JobDetailPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto pt-8 pb-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-5xl mx-auto pt-2 sm:pt-4 pb-20 sm:pb-12 md:pb-6 px-2 sm:px-4 md:px-6">
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
             <CardContent className="p-6">
@@ -1025,10 +1103,8 @@ const JobDetailPage = () => {
                         variant="default"
                         size="sm"
                         onClick={() => window.open(getApplyUrl(), "_blank")}
-                        className="flex items-center gap-2"
                       >
                         Apply Now
-                        <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                     ) : (
                       <Button
@@ -1040,66 +1116,68 @@ const JobDetailPage = () => {
                         Apply Link Not Available
                       </Button>
                     )}
-                    {user && (
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={() => saveJobMutation.mutate()}
-                        disabled={saveJobMutation.isPending}
-                        aria-label={isSaved ? "Unsave job" : "Save job"}
-                        className="h-10 w-10 [&_svg]:size-4"
-                      >
-                        <Bookmark
-                          className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
-                        />
-                      </Button>
-                    )}
-                    {/* Share Button */}
-                    {isMobile && navigator.share ? (
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={handleShareClick}
-                        aria-label="Share job"
-                        className="h-10 w-10 [&_svg]:size-4"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            aria-label="Share job"
-                            className="h-10 w-10 [&_svg]:size-4"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={handleCopyLink}>
-                            <Copy className="mr-2 h-4 w-4" />
-                            <span>Copy Link</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleFacebookShare}>
-                            <Facebook className="mr-2 h-4 w-4" />
-                            <span>Share on Facebook</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleLinkedInShare}>
-                            <Linkedin className="mr-2 h-4 w-4" />
-                            <span>Share on LinkedIn</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                    <div className="flex flex-row items-start gap-2 ml-auto">
+                      {user && (
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          onClick={() => saveJobMutation.mutate()}
+                          disabled={saveJobMutation.isPending}
+                          aria-label={isSaved ? "Unsave job" : "Save job"}
+                          className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                        >
+                          <Bookmark
+                            className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
+                          />
+                        </Button>
+                      )}
+                      {/* Share Button */}
+                      {isMobile && navigator.share ? (
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          onClick={handleShareClick}
+                          aria-label="Share job"
+                          className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              aria-label="Share job"
+                              className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleCopyLink}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              <span>Copy Link</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleFacebookShare}>
+                              <Facebook className="mr-2 h-4 w-4" />
+                              <span>Share on Facebook</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleLinkedInShare}>
+                              <Linkedin className="mr-2 h-4 w-4" />
+                              <span>Share on LinkedIn</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Benefits & Perks - Moved to Top */}
               {getBenefitsList().length > 0 && (
-                <div className="border-t pt-8">
+                <div className="pt-8">
                   <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <Sparkles className="h-5 w-5" />
                     Benefits & Perks
@@ -1123,13 +1201,196 @@ const JobDetailPage = () => {
               )}
 
               {/* Job Description */}
-              <div className="border-t pt-8">
-                <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-                  <FileText className="h-5 w-5" />
-                  Job Description
-                </h2>
+              <div className="pt-8">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <h2 className="text-lg font-semibold">
+                    Job Description
+                  </h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSummarize}
+                    disabled={isSummarizing || !jobDetail}
+                    className="flex items-center gap-2"
+                    aria-label={
+                      isSummarizing
+                        ? "Summarizing..."
+                        : aiSummary && hideOriginal
+                        ? "Hide Summary"
+                        : "Summarize"
+                    }
+                  >
+                    {isSummarizing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Summarizing...</span>
+                      </>
+                    ) : aiSummary && hideOriginal ? (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        <span>Hide Summary</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        <span>Summarize</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                  {showSummary && (
+                    <div
+                      className={`transition-all duration-700 ${
+                        isSummarizing ||
+                        summaryError ||
+                        (hideOriginal && aiSummary)
+                          ? "opacity-100 max-h-[2000px]"
+                          : "opacity-0 max-h-0 overflow-hidden"
+                      }`}
+                    >
+                      <Card className="border-breneo-accent/20 bg-gradient-to-br from-breneo-accent/5 to-transparent">
+                        <CardContent className="p-4">
+                          {isSummarizing ? (
+                            <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                              <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                              <p className="text-sm">
+                                AI is analyzing the job description...
+                              </p>
+                            </div>
+                          ) : summaryError ? (
+                            <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+                              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-sm font-medium mb-1">
+                                  Failed to generate summary
+                                </p>
+                                <p className="text-xs">{summaryError}</p>
+                              </div>
+                            </div>
+                          ) : aiSummary ? (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-breneo-accent mb-2">
+                                <Sparkles className="h-4 w-4" />
+                                <span className="text-xs font-semibold">
+                                  AI-Generated Summary
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
+                                {aiSummary
+                                  .split("\n\n")
+                                  .map((paragraph, index) => {
+                                    // Check if paragraph contains list items (lines starting with •, -, *, or numbers)
+                                    const lines = paragraph.split("\n");
+                                    const hasListItems = lines.some(
+                                      (line) =>
+                                        /^[\s]*[•\-*]\s/.test(line) ||
+                                        /^[\s]*\d+\.\s/.test(line)
+                                    );
+
+                                    if (hasListItems) {
+                                      return (
+                                        <div
+                                          key={index}
+                                          className="mb-3 last:mb-0"
+                                        >
+                                          {lines.map((line, lineIndex) => {
+                                            const trimmedLine = line.trim();
+                                            // Check if it's a list item
+                                            if (
+                                              /^[•\-*]\s/.test(trimmedLine) ||
+                                              /^\d+\.\s/.test(trimmedLine)
+                                            ) {
+                                              // If it's the first line and starts with bullet, ensure it's on new line
+                                              const isFirstLine =
+                                                lineIndex === 0;
+                                              return (
+                                                <div
+                                                  key={lineIndex}
+                                                  className={`ml-4 mb-1 last:mb-0 ${
+                                                    isFirstLine &&
+                                                    /^[•\-*]\s/.test(
+                                                      trimmedLine
+                                                    )
+                                                      ? "mt-2"
+                                                      : ""
+                                                  }`}
+                                                >
+                                                  {trimmedLine}
+                                                </div>
+                                              );
+                                            }
+                                            // Regular text line
+                                            if (trimmedLine) {
+                                              return (
+                                                <p
+                                                  key={lineIndex}
+                                                  className="mb-2 last:mb-0"
+                                                >
+                                                  {trimmedLine}
+                                                </p>
+                                              );
+                                            }
+                                            return null;
+                                          })}
+                                        </div>
+                                      );
+                                    }
+
+                                    // Check if paragraph starts with bullet point
+                                    const startsWithBullet = /^[•\-*]\s/.test(
+                                      paragraph.trim()
+                                    );
+                                    if (startsWithBullet) {
+                                      return (
+                                        <div
+                                          key={index}
+                                          className="mb-3 last:mb-0"
+                                        >
+                                          <div className="ml-4">
+                                            {paragraph.trim()}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
+                                    // Regular paragraph
+                                    return (
+                                      <p key={index} className="mb-3 last:mb-0">
+                                        {paragraph}
+                                      </p>
+                                    );
+                                  })}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setShowSummary(false);
+                                  setAiSummary(null);
+                                  setSummaryError(null);
+                                  setShowGradient(false);
+                                  setHideOriginal(false);
+                                }}
+                                className="mt-2 text-xs"
+                              >
+                                Hide Summary
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              Click "Summarize" to generate a concise summary of
+                              this job description.
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
                 <div
-                  className="prose prose-sm max-w-none dark:prose-invert"
+                  className={`prose prose-sm max-w-none dark:prose-invert transition-all duration-700 ${
+                    showGradient && !hideOriginal ? "animate-gradient-text" : ""
+                  } ${hideOriginal ? "opacity-0 max-h-0 overflow-hidden" : ""}`}
                   dangerouslySetInnerHTML={{
                     __html: getDescription()
                       .toString()
@@ -1140,7 +1401,7 @@ const JobDetailPage = () => {
 
               {/* Requirements & Qualifications */}
               {getRequirements() && (
-                <div className="border-t pt-8">
+                <div className="pt-8">
                   <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <Target className="h-5 w-5" />
                     Requirements & Qualifications
@@ -1162,7 +1423,7 @@ const JobDetailPage = () => {
                 getRequiredSkills().length > 0 ||
                 getJobCategory() ||
                 getApplicationDeadline()) && (
-                <div className="border-t pt-8">
+                <div className="pt-8">
                   <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <CheckCircle2 className="h-5 w-5" />
                     Job Details
@@ -1228,7 +1489,7 @@ const JobDetailPage = () => {
 
                   {/* Required Skills */}
                   {getRequiredSkills().length > 0 && (
-                    <div className="mt-6 pt-6 border-t">
+                    <div className="mt-6 pt-6">
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                         Required Skills
                       </p>
@@ -1246,111 +1507,6 @@ const JobDetailPage = () => {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* Company Information - Moved to Bottom */}
-              {(getCompanyName() ||
-                getCompanyWebsite() ||
-                getCompanyDescription() ||
-                getCompanySize() ||
-                getCompanyIndustry() ||
-                getCompanyFounded() ||
-                getCompanyHeadquarters()) && (
-                <div className="border-t pt-8">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-                    <Building2 className="h-5 w-5" />
-                    {getCompanyName()
-                      ? `About ${getCompanyName()}`
-                      : "Company Information"}
-                  </h2>
-                  <div className="space-y-4">
-                    {getCompanyDescription() && (
-                      <div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                          {getCompanyDescription()}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                      {getCompanyWebsite() && (
-                        <div className="flex items-start gap-3">
-                          <Globe className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                              Website
-                            </p>
-                            <a
-                              href={getCompanyWebsite() || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-breneo-accent hover:underline flex items-center gap-1"
-                            >
-                              {getCompanyWebsite() || ""}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        </div>
-                      )}
-
-                      {getCompanySize() && (
-                        <div className="flex items-start gap-3">
-                          <Users className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                              Company Size
-                            </p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                              {getCompanySize()}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {getCompanyIndustry() && (
-                        <div className="flex items-start gap-3">
-                          <Factory className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                              Industry
-                            </p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                              {getCompanyIndustry()}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {getCompanyFounded() && (
-                        <div className="flex items-start gap-3">
-                          <CalendarIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                              Founded
-                            </p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                              {getCompanyFounded()}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {getCompanyHeadquarters() && (
-                        <div className="flex items-start gap-3">
-                          <Home className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                              Headquarters
-                            </p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300">
-                              {getCompanyHeadquarters()}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
               )}
             </CardContent>

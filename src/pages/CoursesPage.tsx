@@ -715,7 +715,7 @@ const CoursesPage = () => {
                 `Could not fetch academy profile for ${academyId} from Django API`
               );
             }
-          })
+          }) 
         );
       }
 
