@@ -227,6 +227,14 @@ const CoursesPage = () => {
 
   const [tempFilters, setTempFilters] = useState<CourseFilters>(activeFilters);
 
+  // Helper function to count active filters
+  const countActiveFilters = (filters: CourseFilters): number => {
+    let count = 0;
+    if (filters.countries.length > 0) count += filters.countries.length;
+    if (filters.skills.length > 0) count += filters.skills.length;
+    return count;
+  };
+
   // Sync tempFilters with activeFilters when modal opens to reflect current search bar location
   useEffect(() => {
     if (isFilterModalOpen) {
@@ -715,7 +723,7 @@ const CoursesPage = () => {
                 `Could not fetch academy profile for ${academyId} from Django API`
               );
             }
-          }) 
+          })
         );
       }
 
@@ -907,7 +915,7 @@ const CoursesPage = () => {
       <Button
         size="icon"
         variant="outline"
-        className="h-10 w-10 rounded-lg border-gray-300"
+        className="h-10 w-10 rounded-3xl border-gray-300"
         onClick={() => saveCourseMutation.mutate(String(course.id))}
         disabled={saveCourseMutation.isPending}
         aria-label={course.is_saved ? "Unsave course" : "Save course"}
@@ -1047,10 +1055,10 @@ const CoursesPage = () => {
       : `/academy/${createAcademySlug(academyName)}`;
 
     return (
-      <Card className="flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 h-full rounded-2xl">
+      <Card className="flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 h-full rounded-3xl">
         <CardContent className="p-5 flex flex-col flex-grow">
           {/* Course Image */}
-          <div className="relative h-40 overflow-hidden rounded-lg mb-4 bg-gradient-to-br from-gray-100 to-gray-200">
+          <div className="relative h-40 overflow-hidden rounded-3xl mb-4 bg-gradient-to-br from-gray-100 to-gray-200">
             <img
               src={
                 course.image &&
@@ -1149,7 +1157,7 @@ const CoursesPage = () => {
           <div className="flex items-center gap-2 mt-auto pt-4 border-t border-gray-100">
             <Button
               onClick={() => navigate(`/course/${course.id}`)}
-              className="flex-1 bg-black text-white hover:bg-gray-800 rounded-lg"
+              className="flex-1 bg-black text-white hover:bg-gray-800 rounded-3xl"
             >
               View Course
             </Button>
@@ -1175,7 +1183,7 @@ const CoursesPage = () => {
         {/* Modern Search Bar */}
         <div className="mb-8 relative">
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-accent dark:border-gray-600 rounded-lg pl-3 md:pl-4 pr-2.5 md:pr-3 py-[1rem] overflow-visible flex-1">
+            <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-accent dark:border-gray-600 rounded-3xl pl-3 md:pl-4 pr-2.5 md:pr-3 py-[1rem] overflow-visible flex-1">
               {/* Search Icon - Purple outline */}
               <Search
                 className="h-4 w-4 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -1207,17 +1215,27 @@ const CoursesPage = () => {
             </div>
 
             {/* Filter Button - Outside search bar, on the right */}
-            <Button
-              variant="outline"
-              onClick={() => setFilterModalOpen(true)}
-              className="flex items-center gap-2 bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-[1rem] hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto"
-              aria-label="Filter courses"
-            >
-              <Filter className="h-4 w-4" strokeWidth={2} />
-              <span className="hidden md:inline text-sm font-medium">
-                ფილტრები
-              </span>
-            </Button>
+            {(() => {
+              const activeFilterCount = countActiveFilters(activeFilters);
+              return (
+                <Button
+                  variant="outline"
+                  onClick={() => setFilterModalOpen(true)}
+                  className="flex items-center gap-2 bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-3xl px-4 py-[1rem] hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative"
+                  aria-label="Filter courses"
+                >
+                  <Filter className="h-4 w-4" strokeWidth={2} />
+                  <span className="hidden md:inline text-sm font-medium">
+                    ფილტრები
+                  </span>
+                  {activeFilterCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-breneo-blue text-white text-xs rounded-full">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })()}
           </div>
         </div>
 
@@ -1250,11 +1268,11 @@ const CoursesPage = () => {
         )}
 
         {!coursesLoading && filteredCourses.length === 0 && (
-          <div className="text-center p-10 border border-dashed rounded-lg bg-gray-50 text-muted-foreground">
+          <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
             <img
-              src="/lovable-uploads/no-data-found.png"
+              src="/lovable-uploads/3dicons-puzzle-dynamic-color.png"
               alt="No data found"
-              className="mx-auto h-64 w-64 mb-4 object-contain"
+              className="mx-auto h-48 w-48 mb-4 object-contain"
             />
             <h4 className="text-lg font-semibold">No Courses Found</h4>
             <p className="text-sm">

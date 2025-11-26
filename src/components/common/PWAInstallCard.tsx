@@ -24,7 +24,9 @@ interface PWAInstallCardProps {
   compact?: boolean;
 }
 
-export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ compact = false }) => {
+export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({
+  compact = false,
+}) => {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [deferredPrompt, setDeferredPrompt] =
@@ -112,14 +114,14 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ compact = false 
   const MobileAppIllustration = () => {
     return (
       <img
-        src="/lovable-uploads/Bring-Solutions-To-Problems--Streamline-New-York (1).png"
+        src="/lovable-uploads/3dicons-rocket-front-color.png"
         alt="Install App Illustration"
         className={cn(
           "w-full h-auto object-contain",
           compact ? "max-h-24" : "max-h-40"
         )}
         onError={(e) => {
-          console.error('Image failed to load:', e);
+          console.error("Image failed to load:", e);
         }}
       />
     );
@@ -133,28 +135,39 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({ compact = false 
           Download our app for a better experience
         </CardDescription>
       </CardHeader>
-      <CardContent className={cn("space-y-4", compact && "space-y-3 px-4 pb-4")}>
+      <CardContent
+        className={cn("space-y-4", compact && "space-y-3 px-4 pb-4")}
+      >
         {/* Illustration */}
         <MobileAppIllustration />
 
         {/* Features List */}
         <div className={cn("space-y-2", compact && "space-y-1.5")}>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")} />
+            <CheckCircle2
+              className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")}
+            />
             <span>Works offline</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")} />
+            <CheckCircle2
+              className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")}
+            />
             <span>Faster loading</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")} />
+            <CheckCircle2
+              className={cn("h-4 w-4 text-primary", compact && "h-3.5 w-3.5")}
+            />
             <span>Home screen access</span>
           </div>
         </div>
 
         {/* Download/Install Button */}
-        <Button onClick={handleInstall} className={cn("w-full", compact && "h-9")}>
+        <Button
+          onClick={handleInstall}
+          className={cn("w-full", compact && "h-9")}
+        >
           <Download className={cn("mr-2 h-4 w-4", compact && "h-3.5 w-3.5")} />
           {deferredPrompt ? "Download & Install Now" : "Download App"}
         </Button>

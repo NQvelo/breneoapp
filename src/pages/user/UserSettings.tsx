@@ -31,30 +31,14 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { jobService, ApiJob } from "@/api/jobs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  Trash2,
   Download,
-  LogOut,
   Mail,
   Bell,
-  Shield,
   CreditCard,
   BookOpen,
-  Link as LinkIcon,
   Eye,
-  Globe,
   AlertCircle,
   Info,
   Briefcase,
@@ -199,12 +183,6 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [connectedAccounts, setConnectedAccounts] = useState({
-    google: false,
-    linkedin: false,
-    github: false,
-  });
 
   // Notifications
   const [emailJobMatches, setEmailJobMatches] = useState(true);
@@ -222,20 +200,11 @@ export default function SettingsPage() {
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
 
   // Privacy & Security
-  const [activityVisibility, setActivityVisibility] = useState<
-    "public" | "employers" | "academies" | "private"
-  >("private");
   const [showSkills, setShowSkills] = useState(true);
   const [showTestResults, setShowTestResults] = useState(true);
   const [showCompletedCourses, setShowCompletedCourses] = useState(true);
 
   // Learning Preferences
-  const [learningGoal, setLearningGoal] = useState<
-    "job" | "skills" | "career_change"
-  >("job");
-  const [learningStyle, setLearningStyle] = useState<
-    "video" | "reading" | "interactive"
-  >("interactive");
   const [aiRecommendationFrequency, setAiRecommendationFrequency] = useState<
     "daily" | "weekly" | "monthly"
   >("weekly");
@@ -289,23 +258,6 @@ export default function SettingsPage() {
       return defaultValue;
     };
 
-    // Validate activityVisibility value
-    const activityVisibilityValue = loadPreference(
-      "privacy_activity_visibility",
-      "private"
-    );
-    const validVisibilityValues = [
-      "public",
-      "employers",
-      "academies",
-      "private",
-    ];
-    if (validVisibilityValues.includes(activityVisibilityValue)) {
-      setActivityVisibility(activityVisibilityValue);
-    } else {
-      setActivityVisibility("private");
-    }
-
     setEmailJobMatches(loadPreference("notif_email_job_matches", true));
     setEmailNewCourses(loadPreference("notif_email_new_courses", true));
     setEmailSkillUpdates(loadPreference("notif_email_skill_updates", true));
@@ -318,8 +270,6 @@ export default function SettingsPage() {
     setShowCompletedCourses(
       loadPreference("privacy_show_completed_courses", true)
     );
-    setLearningGoal(loadPreference("learning_goal", "job"));
-    setLearningStyle(loadPreference("learning_style", "interactive"));
     setAiRecommendationFrequency(
       loadPreference("ai_recommendation_frequency", "weekly")
     );
@@ -403,14 +353,6 @@ export default function SettingsPage() {
   }, [pushNotifications, mounted]);
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem(
-        "privacy_activity_visibility",
-        JSON.stringify(activityVisibility)
-      );
-    }
-  }, [activityVisibility, mounted]);
-  useEffect(() => {
-    if (mounted) {
       localStorage.setItem("privacy_show_skills", JSON.stringify(showSkills));
     }
   }, [showSkills, mounted]);
@@ -430,16 +372,6 @@ export default function SettingsPage() {
       );
     }
   }, [showCompletedCourses, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("learning_goal", JSON.stringify(learningGoal));
-    }
-  }, [learningGoal, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("learning_style", JSON.stringify(learningStyle));
-    }
-  }, [learningStyle, mounted]);
   useEffect(() => {
     if (mounted) {
       localStorage.setItem(
@@ -671,7 +603,18 @@ export default function SettingsPage() {
       // Optimistically update savedCourseDetails
       queryClient.setQueryData(
         ["savedCourseDetails"],
-        (prev: Course[] | undefined) => {
+        (
+          prev:
+            | Array<{
+                id: string;
+                title: string;
+                provider: string;
+                category: string;
+                level: string;
+                duration: string;
+              }>
+            | undefined
+        ) => {
           if (!prev) return prev;
           const courseIdString = String(courseId);
           return prev.filter((course) => String(course.id) !== courseIdString);
@@ -794,30 +737,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleConnectAccount = async (
-    provider: "google" | "linkedin" | "github"
-  ) => {
-    toast.info(`Connecting ${provider} account...`);
-    // TODO: Implement OAuth connection
-    setConnectedAccounts((prev) => ({ ...prev, [provider]: true }));
-    toast.success(
-      `${
-        provider.charAt(0).toUpperCase() + provider.slice(1)
-      } account connected!`
-    );
-  };
-
-  const handleDisconnectAccount = (
-    provider: "google" | "linkedin" | "github"
-  ) => {
-    setConnectedAccounts((prev) => ({ ...prev, [provider]: false }));
-    toast.success(
-      `${
-        provider.charAt(0).toUpperCase() + provider.slice(1)
-      } account disconnected.`
-    );
-  };
-
   const handleExportData = async () => {
     toast.info("Preparing your data export...");
     // TODO: Implement data export API call
@@ -826,25 +745,6 @@ export default function SettingsPage() {
         "Data export ready! Check your email for the download link."
       );
     }, 2000);
-  };
-
-  const handleLogoutAllDevices = async () => {
-    try {
-      // TODO: Implement logout all devices API call
-      toast.success("Logged out from all devices successfully!");
-    } catch (error) {
-      toast.error("Failed to log out from all devices.");
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    try {
-      // TODO: Implement delete account API call
-      toast.success("Account deletion request submitted.");
-      logout();
-    } catch (error) {
-      toast.error("Failed to delete account.");
-    }
   };
 
   const handleSaveProfile = async () => {
@@ -1113,151 +1013,6 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Two-Factor Authentication */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Two-Factor Authentication</CardTitle>
-                <CardDescription>
-                  Add an extra layer of security to your account
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable 2FA</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Require a verification code in addition to your password
-                    </p>
-                  </div>
-                  <Switch
-                    checked={twoFactorEnabled}
-                    onCheckedChange={setTwoFactorEnabled}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Connected Accounts */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Connected Accounts</CardTitle>
-                <CardDescription>
-                  Link your accounts for easier sign-in
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-5 w-5" />
-                    <span>Google</span>
-                  </div>
-                  {connectedAccounts.google ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDisconnectAccount("google")}
-                    >
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => handleConnectAccount("google")}
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <LinkIcon className="h-5 w-5" />
-                    <span>LinkedIn</span>
-                  </div>
-                  {connectedAccounts.linkedin ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDisconnectAccount("linkedin")}
-                    >
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => handleConnectAccount("linkedin")}
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <LinkIcon className="h-5 w-5" />
-                    <span>GitHub</span>
-                  </div>
-                  {connectedAccounts.github ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDisconnectAccount("github")}
-                    >
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => handleConnectAccount("github")}
-                    >
-                      Connect
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Delete Account */}
-            <Card className="border-destructive">
-              <CardHeader>
-                <CardTitle className="text-destructive">
-                  Delete Account
-                </CardTitle>
-                <CardDescription>
-                  Permanently delete your account and all associated data
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Account
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Are you absolutely sure?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently
-                        delete your account and remove your data from our
-                        servers.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDeleteAccount}
-                        className="bg-destructive text-destructive-foreground"
-                      >
-                        Delete Account
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
           </div>
         );
 
@@ -1387,52 +1142,9 @@ export default function SettingsPage() {
         );
 
       case "privacy": {
-        // Ensure activityVisibility is always a valid value
-        const validActivityVisibility:
-          | "public"
-          | "employers"
-          | "academies"
-          | "private" =
-          activityVisibility &&
-          ["public", "employers", "academies", "private"].includes(
-            activityVisibility
-          )
-            ? activityVisibility
-            : "private";
-
         return (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Privacy & Security</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Activity Visibility</CardTitle>
-                <CardDescription>
-                  Control who can see your activity and profile
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Who can see your activity</Label>
-                  <Select
-                    value={validActivityVisibility}
-                    onValueChange={(
-                      value: "public" | "employers" | "academies" | "private"
-                    ) => setActivityVisibility(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-[100]">
-                      <SelectItem value="public">Public</SelectItem>
-                      <SelectItem value="employers">Employers Only</SelectItem>
-                      <SelectItem value="academies">Academies Only</SelectItem>
-                      <SelectItem value="private">Private</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>
@@ -1499,21 +1211,6 @@ export default function SettingsPage() {
                 </p>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Session Management</CardTitle>
-                <CardDescription>
-                  Manage active sessions across devices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={handleLogoutAllDevices} variant="outline">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Log Out from All Devices
-                </Button>
-              </CardContent>
-            </Card>
           </div>
         );
       }
@@ -1522,165 +1219,6 @@ export default function SettingsPage() {
         return (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Subscription & Billing</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Pricing & Plans</CardTitle>
-                <CardDescription>
-                  Choose the plan that fits you and authenticate with Bank of
-                  Georgia to continue checkout.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 lg:grid-cols-3">
-                  {[
-                    {
-                      name: "Free",
-                      price: "₾0",
-                      period: "forever",
-                      features: [
-                        "Access to basic courses",
-                        "Limited skill tests",
-                        "Community support",
-                      ],
-                      cta: "Current Plan",
-                      disabled: true,
-                    },
-                    {
-                      name: "Pro",
-                      price: "₾26.99",
-                      period: "per month",
-                      features: [
-                        "Unlimited courses",
-                        "Advanced assessments",
-                        "Priority support",
-                      ],
-                      cta: "Subscribe",
-                    },
-                    {
-                      name: "Enterprise",
-                      price: "Contact",
-                      period: "for pricing",
-                      features: [
-                        "Team onboarding",
-                        "Dedicated success manager",
-                        "Custom integrations",
-                      ],
-                      cta: "Talk to Sales",
-                    },
-                  ].map((plan) => (
-                    <Card
-                      key={plan.name}
-                      className="border border-border shadow-sm"
-                    >
-                      <CardHeader>
-                        <CardTitle className="text-xl">{plan.name}</CardTitle>
-                        <CardDescription>
-                          <span className="text-3xl font-semibold">
-                            {plan.price}
-                          </span>
-                          {plan.period !== "forever" && (
-                            <span className="ml-2 text-muted-foreground text-sm">
-                              /{plan.period}
-                            </span>
-                          )}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <ul className="space-y-2">
-                          {plan.features.map((feature) => (
-                            <li
-                              key={feature}
-                              className="text-sm text-muted-foreground"
-                            >
-                              {feature}
-                            </li>
-                          ))}
-                        </ul>
-                        <Button
-                          className="w-full"
-                          disabled={
-                            plan.disabled ||
-                            bogAuthLoading ||
-                            plan.name === "Enterprise"
-                          }
-                          onClick={async () => {
-                            if (plan.name === "Enterprise") {
-                              toast.info(
-                                "Please contact sales for Enterprise pricing."
-                              );
-                              return;
-                            }
-
-                            setPendingPlan(plan.name);
-                            setBogAuthError(null);
-                            try {
-                              setBogAuthLoading(true);
-
-                              // Extract amount from price (remove currency symbol and parse)
-                              const amountStr = plan.price
-                                .replace(/[^\d.,]/g, "")
-                                .replace(",", ".");
-                              const amount = parseFloat(amountStr) || 0;
-
-                              if (amount <= 0) {
-                                throw new Error("Invalid plan price");
-                              }
-
-                              // Create order with BOG
-                              const order = await createBogOrder({
-                                plan_name: plan.name,
-                                amount: amount,
-                                currency: "GEL",
-                                external_order_id: `breneo-${plan.name.toLowerCase()}-${Date.now()}`,
-                              });
-
-                              // Redirect to BOG payment page
-                              if (order.redirect_url) {
-                                toast.success(
-                                  `Redirecting to payment page for ${plan.name} plan...`
-                                );
-                                // Store order info for callback handling
-                                localStorage.setItem(
-                                  `bog_order_${order.order_id}`,
-                                  JSON.stringify({
-                                    order_id: order.order_id,
-                                    plan_name: plan.name,
-                                    amount: amount,
-                                    created_at: new Date().toISOString(),
-                                  })
-                                );
-                                // Redirect to payment page
-                                window.location.href = order.redirect_url;
-                              } else {
-                                throw new Error(
-                                  "No redirect URL received from payment service"
-                                );
-                              }
-                            } catch (error) {
-                              const message =
-                                error instanceof Error
-                                  ? error.message
-                                  : "Failed to initiate payment.";
-                              setBogAuthError(message);
-                              toast.error(
-                                `Unable to process ${plan.name} subscription: ${message}`
-                              );
-                            } finally {
-                              setBogAuthLoading(false);
-                            }
-                          }}
-                        >
-                          {bogAuthLoading && pendingPlan === plan.name
-                            ? "Processing..."
-                            : plan.cta}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>
@@ -1717,7 +1255,7 @@ export default function SettingsPage() {
                     </p>
                   )}
                   {bogTokenInfo && (
-                    <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 text-sm">
+                    <div className="rounded-3xl border border-primary/40 bg-primary/5 p-4 text-sm">
                       <p className="font-medium text-primary">
                         Bank of Georgia authorization ready
                       </p>
@@ -1839,58 +1377,6 @@ export default function SettingsPage() {
         return (
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Learning Preferences</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Learning Goal</CardTitle>
-                <CardDescription>
-                  What are you trying to achieve?
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={learningGoal}
-                  onValueChange={(value: "job" | "skills" | "career_change") =>
-                    setLearningGoal(value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="job">Find a Job</SelectItem>
-                    <SelectItem value="skills">Develop New Skills</SelectItem>
-                    <SelectItem value="career_change">Career Change</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Preferred Learning Style</CardTitle>
-                <CardDescription>How do you prefer to learn?</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={learningStyle}
-                  onValueChange={(value: "video" | "reading" | "interactive") =>
-                    setLearningStyle(value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="reading">Reading</SelectItem>
-                    <SelectItem value="interactive">
-                      Interactive Tasks
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
 
             <Card>
               <CardHeader>
@@ -2028,7 +1514,7 @@ export default function SettingsPage() {
                     {[...Array(3)].map((_, i) => (
                       <div
                         key={i}
-                        className="h-16 bg-muted animate-pulse rounded-lg"
+                        className="h-16 bg-muted animate-pulse rounded-3xl"
                       />
                     ))}
                   </div>
@@ -2053,7 +1539,7 @@ export default function SettingsPage() {
                     {savedJobIds.map((jobId) => (
                       <div
                         key={jobId}
-                        className="flex items-center justify-between p-4 border rounded-lg"
+                        className="flex items-center justify-between p-4 border rounded-3xl"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-mono text-muted-foreground truncate">
@@ -2090,7 +1576,7 @@ export default function SettingsPage() {
                     {savedJobs.map((job) => (
                       <div
                         key={job.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex items-center justify-between p-4 border rounded-3xl hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold truncate">
@@ -2146,7 +1632,7 @@ export default function SettingsPage() {
                     {[...Array(3)].map((_, i) => (
                       <div
                         key={i}
-                        className="h-16 bg-muted animate-pulse rounded-lg"
+                        className="h-16 bg-muted animate-pulse rounded-3xl"
                       />
                     ))}
                   </div>
@@ -2170,7 +1656,7 @@ export default function SettingsPage() {
                     {savedCourses.map((course) => (
                       <div
                         key={course.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex items-center justify-between p-4 border rounded-3xl hover:bg-muted/50 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold truncate">

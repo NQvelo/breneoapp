@@ -402,7 +402,7 @@ const CoursePage = () => {
     <DashboardLayout>
       <div className="p-6 space-y-6">
         {/* Top Section: Course Info and Image in One Card */}
-        <Card className="rounded-lg mb-6">
+        <Card className="rounded-3xl mb-6">
           <CardContent className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
               {/* Left Side: Course Information */}
@@ -476,11 +476,11 @@ const CoursePage = () => {
               </div>
 
               {/* Right Side: Course Image */}
-              <div className="w-full h-[300px] flex items-center justify-center overflow-hidden rounded-lg">
+              <div className="w-full h-[300px] flex items-center justify-center overflow-hidden rounded-3xl">
                 <img
                   src={course.image}
                   alt={course.title}
-                  className="w-full h-[300px] object-cover rounded-lg"
+                  className="w-full h-[300px] object-cover rounded-3xl"
                 />
               </div>
             </div>
@@ -500,7 +500,7 @@ const CoursePage = () => {
           </div>
 
           {/* Details Content Card */}
-          <Card className="rounded-lg">
+          <Card className="rounded-3xl">
             <CardHeader className="pb-4">
               <CardTitle className="text-xl font-semibold mb-4 text-gray-900">
                 Details content
@@ -534,7 +534,7 @@ const CoursePage = () => {
         </div>
 
         {/* Bottom Section: Certificates */}
-        <Card className="rounded-lg mb-6">
+        <Card className="rounded-3xl mb-6">
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-gray-900">
               Obtain a career. Certificates
@@ -550,7 +550,7 @@ const CoursePage = () => {
 
         {/* About Academy Section */}
         {academyProfile && (
-          <Card className="rounded-lg">
+          <Card className="rounded-3xl">
             <CardHeader>
               <CardTitle className="text-xl font-semibold text-gray-900 mb-4">
                 About Academy

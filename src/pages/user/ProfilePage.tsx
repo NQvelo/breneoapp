@@ -2148,7 +2148,7 @@ const ProfilePage = () => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
+                    <div className="rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
                       <div className="flex flex-col gap-2">
                         <span className="font-semibold text-base text-gray-900 dark:text-gray-100">
                           {data.skill}
@@ -2564,7 +2564,7 @@ const ProfilePage = () => {
                 <div className="space-y-4">
                   {/* Final Role */}
                   {skillResults.final_role && (
-                    <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-lg border border-breneo-blue/20 dark:border-breneo-blue/30">
+                    <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border border-breneo-blue/20 dark:border-breneo-blue/30">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="bg-breneo-blue/10 rounded-full p-2">
                           <Award className="h-5 w-5 text-breneo-blue" />
@@ -2681,7 +2681,7 @@ const ProfilePage = () => {
                           <img
                             src={normalizeImagePath(course.image)}
                             alt={course.title}
-                            className="w-12 h-12 rounded-lg object-cover"
+                            className="w-12 h-12 rounded-3xl object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.src = "/lovable-uploads/no_photo.png";
@@ -2769,7 +2769,7 @@ const ProfilePage = () => {
                             <img
                               src={job.company_logo}
                               alt={`${job.company} logo`}
-                              className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
+                              className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = "none";
@@ -2782,7 +2782,7 @@ const ProfilePage = () => {
                             />
                           ) : null}
                           {!job.company_logo && (
-                            <div className="w-12 h-12 rounded-lg bg-breneo-blue/10 flex items-center justify-center">
+                            <div className="w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center">
                               <Briefcase className="h-6 w-6 text-breneo-blue" />
                             </div>
                           )}

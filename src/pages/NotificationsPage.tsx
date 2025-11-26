@@ -200,7 +200,11 @@ const NotificationsPage = () => {
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <img
+                    src="/lovable-uploads/3dicons-bell-dynamic-color.png"
+                    alt="No notifications"
+                    className="mx-auto h-48 w-48 mb-4 object-contain"
+                  />
                   <p>{t.notifications.noNotifications}</p>
                 </div>
               ) : (

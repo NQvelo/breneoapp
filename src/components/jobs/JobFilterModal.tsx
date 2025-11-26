@@ -136,7 +136,12 @@ const FilterForm: React.FC<FilterFormProps> = ({
       const country = countries.find((c) => c.code === filters.countries[0]);
       return country?.name || "Choose";
     }
-    return filters.countries.map((code) => {
+    // If more than 3 countries selected, show count instead of all names
+    if (filters.countries.length > 3) {
+      return `${filters.countries.length} countries selected`;
+    }
+    // Show up to 3 country names
+    return filters.countries.slice(0, 3).map((code) => {
       const country = countries.find((c) => c.code === code);
       return country?.name || code;
     }).join(", ");

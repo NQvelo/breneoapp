@@ -141,7 +141,7 @@ const ProgressBar = ({
 const StartScreen = ({ onStart }: { onStart: () => void }) => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-xl mx-auto mb-12">
-      <div className="w-full p-8 mb-12 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border">
+      <div className="w-full p-8 mb-12 bg-white dark:bg-card rounded-3xl border border-gray-200 dark:border-border">
         {/* Header Section - Centered */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center mb-4">
@@ -158,8 +158,8 @@ const StartScreen = ({ onStart }: { onStart: () => void }) => {
 
         {/* Sections List - Left Aligned */}
         <div className="space-y-3 mb-8">
-          <div className="flex items-start gap-4 p-4 rounded-xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
+          <div className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
+            <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-sm">1</span>
             </div>
             <div className="flex-1">
@@ -172,8 +172,8 @@ const StartScreen = ({ onStart }: { onStart: () => void }) => {
             </div>
           </div>
 
-          <div className="flex items-start gap-4 p-4 rounded-xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
+          <div className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
+            <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-sm">2</span>
             </div>
             <div className="flex-1">
@@ -186,8 +186,8 @@ const StartScreen = ({ onStart }: { onStart: () => void }) => {
             </div>
           </div>
 
-          <div className="flex items-start gap-4 p-4 rounded-xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
+          <div className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
+            <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
               <span className="text-white font-bold text-sm">3</span>
             </div>
             <div className="flex-1">

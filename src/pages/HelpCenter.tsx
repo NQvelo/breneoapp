@@ -156,7 +156,7 @@ const HelpCenter = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader className="pb-3">
-                <div className="w-12 h-12 bg-breneo-blue/10 rounded-lg flex items-center justify-center mb-2">
+                <div className="w-12 h-12 bg-breneo-blue/10 rounded-3xl flex items-center justify-center mb-2">
                   <Mail className="text-breneo-blue" size={24} />
                 </div>
                 <CardTitle className="text-base">Email Support</CardTitle>
@@ -166,7 +166,7 @@ const HelpCenter = () => {
 
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader className="pb-3">
-                <div className="w-12 h-12 bg-breneo-blue/10 rounded-lg flex items-center justify-center mb-2">
+                <div className="w-12 h-12 bg-breneo-blue/10 rounded-3xl flex items-center justify-center mb-2">
                   <Phone className="text-breneo-blue" size={24} />
                 </div>
                 <CardTitle className="text-base">Phone Support</CardTitle>
@@ -176,7 +176,7 @@ const HelpCenter = () => {
 
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader className="pb-3">
-                <div className="w-12 h-12 bg-breneo-blue/10 rounded-lg flex items-center justify-center mb-2">
+                <div className="w-12 h-12 bg-breneo-blue/10 rounded-3xl flex items-center justify-center mb-2">
                   <MessageCircle className="text-breneo-blue" size={24} />
                 </div>
                 <CardTitle className="text-base">Live Chat</CardTitle>
@@ -193,7 +193,7 @@ const HelpCenter = () => {
                   <Card key={categoryIndex} className="bg-white">
                     <CardHeader>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-breneo-blue/10 rounded-lg flex items-center justify-center">
+                        <div className="w-10 h-10 bg-breneo-blue/10 rounded-3xl flex items-center justify-center">
                           <category.icon
                             className="text-breneo-blue"
                             size={20}
@@ -238,14 +238,14 @@ const HelpCenter = () => {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <a
                     href="mailto:support@breneo.app"
-                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-breneo-blue text-white rounded-lg hover:bg-breneo-blue/90 transition-colors"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-breneo-blue text-white rounded-3xl hover:bg-breneo-blue/90 transition-colors"
                   >
                     <Mail size={18} />
                     Email Support
                   </a>
                   <a
                     href="tel:+995500992990"
-                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border border-breneo-blue text-breneo-blue rounded-lg hover:bg-breneo-blue/5 transition-colors"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border border-breneo-blue text-breneo-blue rounded-3xl hover:bg-breneo-blue/5 transition-colors"
                   >
                     <Phone size={18} />
                     Call Us

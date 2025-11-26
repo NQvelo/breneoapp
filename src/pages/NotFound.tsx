@@ -89,7 +89,7 @@ const NotFound = () => {
 
       <div className="z-10 relative">
         {/* White content container */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center max-w-md mx-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg p-8 text-center max-w-md mx-auto">
           {/* Logo */}
           <div className="mb-8">
             {!logoLoaded && !imageError && (
@@ -137,14 +137,14 @@ const NotFound = () => {
                     ? "/academy/dashboard"
                     : "/dashboard"
                 }
-                className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-3xl font-medium hover:bg-primary/90 transition-colors"
               >
                 {t.common.view} {t.nav.home}
               </Link>
             ) : (
               <Link
                 to="/auth/login"
-                className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                className="inline-block bg-primary text-primary-foreground px-6 py-3 rounded-3xl font-medium hover:bg-primary/90 transition-colors"
               >
                 {t.auth.login}
               </Link>

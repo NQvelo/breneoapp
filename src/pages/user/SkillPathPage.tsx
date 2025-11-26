@@ -666,7 +666,7 @@ const SkillPathPage = () => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
+                    <div className="rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
                       <div className="flex flex-col gap-2">
                         <span className="font-semibold text-base text-gray-900 dark:text-gray-100">
                           {data.skill}
@@ -1119,7 +1119,7 @@ const SkillPathPage = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {/* Why Important */}
-                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-3xl border border-blue-200 dark:border-blue-800">
                         <div className="flex items-start gap-2">
                           <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                           <div>
@@ -1192,7 +1192,7 @@ const SkillPathPage = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-gray-50 dark:bg-muted/50 p-4 rounded-lg text-center">
+                        <div className="bg-gray-50 dark:bg-muted/50 p-4 rounded-3xl text-center">
                           <p className="text-sm text-muted-foreground">
                             No courses found for this skill yet. Check back
                             later or search for "{missingSkill.skill}" courses.
@@ -1230,7 +1230,7 @@ const SkillPathPage = () => {
                   {jobPaths[0]?.certifications.map((cert, index) => (
                     <div
                       key={cert}
-                      className="flex items-center gap-3 p-3 border rounded-lg"
+                      className="flex items-center gap-3 p-3 border rounded-3xl"
                     >
                       <CheckCircle className="h-5 w-5 text-primary" />
                       <div className="flex-1">

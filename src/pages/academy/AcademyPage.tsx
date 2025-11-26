@@ -844,7 +844,7 @@ const AcademyPage = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg border">
+                    <div className="text-center py-12 bg-gray-50 rounded-3xl border">
                       <p className="text-gray-500 mb-4">
                         No courses found for {academyDisplayName}
                       </p>

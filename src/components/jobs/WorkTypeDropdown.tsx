@@ -75,10 +75,14 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
   };
 
   const isAllSelected = selectedWorkTypes.length === workTypes.length;
+  
+  // Smart display text: show count when all or many work types selected
   const displayText = selectedWorkTypes.length === 0 
     ? placeholder 
     : selectedWorkTypes.length === 1
     ? workTypes.find((t) => t.id === selectedWorkTypes[0])?.label || placeholder
+    : selectedWorkTypes.length === workTypes.length
+    ? "All work types"
     : selectedWorkTypes.map((id) => workTypes.find((t) => t.id === id)?.label || id).join(", ");
 
   const isPlaceholder = selectedWorkTypes.length === 0;
@@ -95,15 +99,15 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
   };
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className="relative w-full max-w-full" ref={dropdownRef}>
       {/* Work Type Input Field */}
-      <div className="flex items-center gap-2 w-full">
+      <div className="flex items-center gap-2 w-full min-w-0">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "flex items-center flex-1 min-w-0 h-auto py-0 px-0 text-sm text-left bg-transparent border-0 focus:outline-none focus:ring-0",
-            "transition-colors cursor-pointer hover:opacity-80",
+            "transition-colors cursor-pointer hover:opacity-80 overflow-hidden",
             isPlaceholder
               ? "text-gray-400 dark:text-gray-500" 
               : "text-gray-900 dark:text-gray-100"
@@ -111,9 +115,9 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
         >
           <Network className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
           {selectedWorkTypes.length === 0 ? (
-            <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>
+            <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">{placeholder}</span>
           ) : (
-            <span className="flex-1 min-w-0 truncate text-sm">{displayText}</span>
+            <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">{displayText}</span>
           )}
         </button>
         {selectedWorkTypes.length > 0 && (

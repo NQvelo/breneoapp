@@ -68,6 +68,9 @@ const JobDetailPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isMobile = useMobile();
+  const [showFixedBar, setShowFixedBar] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const mainContentRef = React.useRef<HTMLDivElement>(null);
 
   // Fetch job details using the job service
   const {
@@ -139,6 +142,147 @@ const JobDetailPage = () => {
     setHideOriginal(false);
   }, [jobId]);
 
+  // Handle scroll detection for fixed bottom bar
+  useEffect(() => {
+    if (!jobDetail) {
+      setShowFixedBar(false);
+      return;
+    }
+
+    let scrollContainer: HTMLElement | null = null;
+    let cleanup: (() => void) | null = null;
+
+    const findScrollContainer = (): HTMLElement | null => {
+      // Try multiple selectors to find the scrollable container
+      // DashboardLayout uses a main element with overflow-y-auto
+      const selectors = [
+        'main[class*="overflow-y-auto"]',
+        'main[class*="overflow"]',
+        "main",
+      ];
+
+      for (const selector of selectors) {
+        const element = document.querySelector(selector) as HTMLElement;
+        if (element) {
+          return element;
+        }
+      }
+
+      return null;
+    };
+
+    const handleScroll = () => {
+      if (scrollContainer) {
+        // Check scroll position of the container
+        const scrollTop = scrollContainer.scrollTop;
+        const shouldShow = scrollTop > 100;
+        setShowFixedBar(shouldShow);
+
+        // On mobile, hide navbar when scrolling
+        if (isMobile) {
+          // Find mobile navbar by its structure: div with md:hidden, fixed, bottom-0, z-50
+          const allFixedBottom = Array.from(
+            document.querySelectorAll(".fixed.bottom-0")
+          );
+          const mobileNav = allFixedBottom.find((el) => {
+            const htmlEl = el as HTMLElement;
+            return (
+              htmlEl.classList.contains("md:hidden") &&
+              htmlEl.classList.contains("z-50") &&
+              htmlEl.querySelector("nav.flex.justify-around") !== null
+            );
+          }) as HTMLElement;
+
+          if (mobileNav) {
+            if (shouldShow) {
+              mobileNav.style.transform = "translateY(100%)";
+              mobileNav.style.opacity = "0";
+            } else {
+              mobileNav.style.transform = "translateY(0)";
+              mobileNav.style.opacity = "1";
+            }
+            mobileNav.style.transition =
+              "transform 0.3s ease-in-out, opacity 0.3s ease-in-out";
+          }
+        }
+
+        // Detect sidebar state by checking main element's margin-left
+        const mainEl = scrollContainer.closest("main") as HTMLElement;
+        if (mainEl) {
+          const computedStyle = window.getComputedStyle(mainEl);
+          const marginLeft = parseInt(computedStyle.marginLeft) || 0;
+          // 96px = 24rem (collapsed), 272px = 17rem (expanded)
+          setSidebarCollapsed(marginLeft <= 100);
+        }
+      } else {
+        // Fallback to window scroll
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const shouldShow = scrollTop > 100;
+        setShowFixedBar(shouldShow);
+      }
+    };
+
+    // Setup scroll listener with retry mechanism
+    const setupListener = () => {
+      scrollContainer = findScrollContainer();
+
+      if (scrollContainer) {
+        scrollContainer.addEventListener("scroll", handleScroll, {
+          passive: true,
+        });
+        // Check initial scroll position
+        handleScroll();
+        cleanup = () => {
+          scrollContainer?.removeEventListener("scroll", handleScroll);
+        };
+      } else {
+        // Fallback to window scroll
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        handleScroll();
+        cleanup = () => {
+          window.removeEventListener("scroll", handleScroll);
+        };
+      }
+    };
+
+    // Try to setup immediately
+    setupListener();
+
+    // Retry after a delay if container not found initially
+    const retryTimeout = setTimeout(() => {
+      if (!scrollContainer) {
+        setupListener();
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(retryTimeout);
+      if (cleanup) {
+        cleanup();
+      }
+      // Reset mobile navbar visibility on cleanup
+      if (isMobile) {
+        const allFixedBottom = Array.from(
+          document.querySelectorAll(".fixed.bottom-0")
+        );
+        const mobileNav = allFixedBottom.find((el) => {
+          const htmlEl = el as HTMLElement;
+          return (
+            htmlEl.classList.contains("md:hidden") &&
+            htmlEl.classList.contains("z-50") &&
+            htmlEl.querySelector("nav.flex.justify-around") !== null
+          );
+        }) as HTMLElement;
+
+        if (mobileNav) {
+          mobileNav.style.transform = "";
+          mobileNav.style.opacity = "";
+          mobileNav.style.transition = "";
+        }
+      }
+    };
+  }, [jobDetail, isMobile]); // Re-attach when job detail loads or mobile state changes
+
   // Handle AI summarization
   const handleSummarize = async () => {
     // If summary is already shown, hide it
@@ -204,35 +348,16 @@ const JobDetailPage = () => {
       if (!jobDetail) throw new Error("Job details not available");
 
       try {
-        // Fetch current profile to get existing saved_jobs array
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const currentSavedJobs = profileResponse.data?.saved_jobs || [];
-
-        let updatedSavedJobs: string[];
-
         const jobIdForSaveString = String(jobIdForSave);
-        if (isSaved) {
-          // Unsave: Remove job ID from array
-          updatedSavedJobs = currentSavedJobs.filter(
-            (id: string | number) => String(id) !== jobIdForSaveString
-          );
-        } else {
-          // Save: Add job ID to array if not already present
-          if (
-            currentSavedJobs.some(
-              (id: string | number) => String(id) === jobIdForSaveString
-            )
-          ) {
-            // Already saved, treat as success
-            return;
-          }
-          updatedSavedJobs = [...currentSavedJobs, jobIdForSaveString];
-        }
+        const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobIdForSaveString}/`;
 
-        // Update profile with new saved_jobs array
-        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-          saved_jobs: updatedSavedJobs,
-        });
+        if (isSaved) {
+          // Unsave: DELETE request
+          await apiClient.delete(endpoint);
+        } else {
+          // Save: POST request
+          await apiClient.post(endpoint);
+        }
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error
@@ -1006,7 +1131,10 @@ const JobDetailPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto pt-2 sm:pt-4 pb-20 sm:pb-12 md:pb-6 px-2 sm:px-4 md:px-6">
+      <div
+        ref={mainContentRef}
+        className="max-w-5xl mx-auto pt-2 sm:pt-4 pb-20 sm:pb-12 md:pb-6 px-2 sm:px-4 md:px-6"
+      >
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
             <CardContent className="p-6">
@@ -1127,7 +1255,9 @@ const JobDetailPage = () => {
                           className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
                         >
                           <Bookmark
-                            className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
+                            className={`h-4 w-4 ${
+                              isSaved ? "fill-current" : ""
+                            }`}
                           />
                         </Button>
                       )}
@@ -1186,7 +1316,7 @@ const JobDetailPage = () => {
                     {getBenefitsList().map((benefit, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-3xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       >
                         <div className="flex-shrink-0 text-breneo-accent">
                           {getBenefitIcon(benefit)}
@@ -1203,9 +1333,7 @@ const JobDetailPage = () => {
               {/* Job Description */}
               <div className="pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <h2 className="text-lg font-semibold">
-                    Job Description
-                  </h2>
+                  <h2 className="text-lg font-semibold">Job Description</h2>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1239,154 +1367,151 @@ const JobDetailPage = () => {
                   </Button>
                 </div>
 
-                  {showSummary && (
-                    <div
-                      className={`transition-all duration-700 ${
-                        isSummarizing ||
-                        summaryError ||
-                        (hideOriginal && aiSummary)
-                          ? "opacity-100 max-h-[2000px]"
-                          : "opacity-0 max-h-0 overflow-hidden"
-                      }`}
-                    >
-                      <Card className="border-breneo-accent/20 bg-gradient-to-br from-breneo-accent/5 to-transparent">
-                        <CardContent className="p-4">
-                          {isSummarizing ? (
-                            <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                              <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                              <p className="text-sm">
-                                AI is analyzing the job description...
-                              </p>
-                            </div>
-                          ) : summaryError ? (
-                            <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
-                              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                              <div>
-                                <p className="text-sm font-medium mb-1">
-                                  Failed to generate summary
-                                </p>
-                                <p className="text-xs">{summaryError}</p>
-                              </div>
-                            </div>
-                          ) : aiSummary ? (
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-breneo-accent mb-2">
-                                <Sparkles className="h-4 w-4" />
-                                <span className="text-xs font-semibold">
-                                  AI-Generated Summary
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
-                                {aiSummary
-                                  .split("\n\n")
-                                  .map((paragraph, index) => {
-                                    // Check if paragraph contains list items (lines starting with •, -, *, or numbers)
-                                    const lines = paragraph.split("\n");
-                                    const hasListItems = lines.some(
-                                      (line) =>
-                                        /^[\s]*[•\-*]\s/.test(line) ||
-                                        /^[\s]*\d+\.\s/.test(line)
-                                    );
-
-                                    if (hasListItems) {
-                                      return (
-                                        <div
-                                          key={index}
-                                          className="mb-3 last:mb-0"
-                                        >
-                                          {lines.map((line, lineIndex) => {
-                                            const trimmedLine = line.trim();
-                                            // Check if it's a list item
-                                            if (
-                                              /^[•\-*]\s/.test(trimmedLine) ||
-                                              /^\d+\.\s/.test(trimmedLine)
-                                            ) {
-                                              // If it's the first line and starts with bullet, ensure it's on new line
-                                              const isFirstLine =
-                                                lineIndex === 0;
-                                              return (
-                                                <div
-                                                  key={lineIndex}
-                                                  className={`ml-4 mb-1 last:mb-0 ${
-                                                    isFirstLine &&
-                                                    /^[•\-*]\s/.test(
-                                                      trimmedLine
-                                                    )
-                                                      ? "mt-2"
-                                                      : ""
-                                                  }`}
-                                                >
-                                                  {trimmedLine}
-                                                </div>
-                                              );
-                                            }
-                                            // Regular text line
-                                            if (trimmedLine) {
-                                              return (
-                                                <p
-                                                  key={lineIndex}
-                                                  className="mb-2 last:mb-0"
-                                                >
-                                                  {trimmedLine}
-                                                </p>
-                                              );
-                                            }
-                                            return null;
-                                          })}
-                                        </div>
-                                      );
-                                    }
-
-                                    // Check if paragraph starts with bullet point
-                                    const startsWithBullet = /^[•\-*]\s/.test(
-                                      paragraph.trim()
-                                    );
-                                    if (startsWithBullet) {
-                                      return (
-                                        <div
-                                          key={index}
-                                          className="mb-3 last:mb-0"
-                                        >
-                                          <div className="ml-4">
-                                            {paragraph.trim()}
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-
-                                    // Regular paragraph
-                                    return (
-                                      <p key={index} className="mb-3 last:mb-0">
-                                        {paragraph}
-                                      </p>
-                                    );
-                                  })}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setShowSummary(false);
-                                  setAiSummary(null);
-                                  setSummaryError(null);
-                                  setShowGradient(false);
-                                  setHideOriginal(false);
-                                }}
-                                className="mt-2 text-xs"
-                              >
-                                Hide Summary
-                              </Button>
-                            </div>
-                          ) : (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Click "Summarize" to generate a concise summary of
-                              this job description.
+                {showSummary && (
+                  <div
+                    className={`transition-all duration-700 ${
+                      isSummarizing ||
+                      summaryError ||
+                      (hideOriginal && aiSummary)
+                        ? "opacity-100 max-h-[2000px]"
+                        : "opacity-0 max-h-0 overflow-hidden"
+                    }`}
+                  >
+                    <Card className="border-breneo-accent/20 bg-gradient-to-br from-breneo-accent/5 to-transparent">
+                      <CardContent className="p-4">
+                        {isSummarizing ? (
+                          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                            <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                            <p className="text-sm">
+                              AI is analyzing the job description...
                             </p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
+                          </div>
+                        ) : summaryError ? (
+                          <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+                            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-sm font-medium mb-1">
+                                Failed to generate summary
+                              </p>
+                              <p className="text-xs">{summaryError}</p>
+                            </div>
+                          </div>
+                        ) : aiSummary ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-breneo-accent mb-2">
+                              <Sparkles className="h-4 w-4" />
+                              <span className="text-xs font-semibold">
+                                AI-Generated Summary
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
+                              {aiSummary
+                                .split("\n\n")
+                                .map((paragraph, index) => {
+                                  // Check if paragraph contains list items (lines starting with •, -, *, or numbers)
+                                  const lines = paragraph.split("\n");
+                                  const hasListItems = lines.some(
+                                    (line) =>
+                                      /^[\s]*[•\-*]\s/.test(line) ||
+                                      /^[\s]*\d+\.\s/.test(line)
+                                  );
+
+                                  if (hasListItems) {
+                                    return (
+                                      <div
+                                        key={index}
+                                        className="mb-3 last:mb-0"
+                                      >
+                                        {lines.map((line, lineIndex) => {
+                                          const trimmedLine = line.trim();
+                                          // Check if it's a list item
+                                          if (
+                                            /^[•\-*]\s/.test(trimmedLine) ||
+                                            /^\d+\.\s/.test(trimmedLine)
+                                          ) {
+                                            // If it's the first line and starts with bullet, ensure it's on new line
+                                            const isFirstLine = lineIndex === 0;
+                                            return (
+                                              <div
+                                                key={lineIndex}
+                                                className={`ml-4 mb-1 last:mb-0 ${
+                                                  isFirstLine &&
+                                                  /^[•\-*]\s/.test(trimmedLine)
+                                                    ? "mt-2"
+                                                    : ""
+                                                }`}
+                                              >
+                                                {trimmedLine}
+                                              </div>
+                                            );
+                                          }
+                                          // Regular text line
+                                          if (trimmedLine) {
+                                            return (
+                                              <p
+                                                key={lineIndex}
+                                                className="mb-2 last:mb-0"
+                                              >
+                                                {trimmedLine}
+                                              </p>
+                                            );
+                                          }
+                                          return null;
+                                        })}
+                                      </div>
+                                    );
+                                  }
+
+                                  // Check if paragraph starts with bullet point
+                                  const startsWithBullet = /^[•\-*]\s/.test(
+                                    paragraph.trim()
+                                  );
+                                  if (startsWithBullet) {
+                                    return (
+                                      <div
+                                        key={index}
+                                        className="mb-3 last:mb-0"
+                                      >
+                                        <div className="ml-4">
+                                          {paragraph.trim()}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  // Regular paragraph
+                                  return (
+                                    <p key={index} className="mb-3 last:mb-0">
+                                      {paragraph}
+                                    </p>
+                                  );
+                                })}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setShowSummary(false);
+                                setAiSummary(null);
+                                setSummaryError(null);
+                                setShowGradient(false);
+                                setHideOriginal(false);
+                              }}
+                              className="mt-2 text-xs"
+                            >
+                              Hide Summary
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Click "Summarize" to generate a concise summary of
+                            this job description.
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
                 <div
                   className={`prose prose-sm max-w-none dark:prose-invert transition-all duration-700 ${
                     showGradient && !hideOriginal ? "animate-gradient-text" : ""
@@ -1539,6 +1664,133 @@ const JobDetailPage = () => {
           </Card>
         )}
       </div>
+
+      {/* Fixed Bottom Bar - Shows when scrolling */}
+      {jobDetail && (
+        <div
+          className={`fixed z-[60] bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border border-black/[0.03] dark:border-white/[0.03] shadow-lg transition-all duration-300 ease-in-out rounded-3xl ${
+            isMobile ? "left-3 right-3 bottom-3" : "md:bottom-4"
+          }`}
+          style={
+            !isMobile
+              ? {
+                  left: sidebarCollapsed
+                    ? "calc((96px + 100vw) / 2 - 300px)"
+                    : "calc((272px + 100vw) / 2 - 300px)",
+                  transform: showFixedBar
+                    ? `translateY(0)`
+                    : `translateY(100%)`,
+                  maxWidth: "600px",
+                  width: "600px",
+                  opacity: showFixedBar ? 1 : 0,
+                  pointerEvents: showFixedBar ? "auto" : "none",
+                }
+              : {
+                  transform: showFixedBar
+                    ? "translateY(0)"
+                    : "translateY(100%)",
+                  opacity: showFixedBar ? 1 : 0,
+                  pointerEvents: showFixedBar ? "auto" : "none",
+                }
+          }
+        >
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              {/* Job Title */}
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                  {getJobTitle()}
+                </h3>
+                {getCompanyName() && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {getCompanyName()}
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Save Button */}
+                {user && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => saveJobMutation.mutate()}
+                    disabled={saveJobMutation.isPending}
+                    aria-label={isSaved ? "Unsave job" : "Save job"}
+                    className="h-9 w-9 [&_svg]:size-4 bg-transparent hover:bg-transparent border-gray-300 dark:border-gray-600"
+                  >
+                    <Bookmark
+                      className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
+                    />
+                  </Button>
+                )}
+
+                {/* Share Button */}
+                {isMobile && navigator.share ? (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleShareClick}
+                    aria-label="Share job"
+                    className="h-9 w-9 [&_svg]:size-4 bg-transparent hover:bg-transparent border-gray-300 dark:border-gray-600"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Share job"
+                        className="h-9 w-9 [&_svg]:size-4 bg-transparent hover:bg-transparent border-gray-300 dark:border-gray-600"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleCopyLink}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        <span>Copy Link</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleFacebookShare}>
+                        <Facebook className="mr-2 h-4 w-4" />
+                        <span>Share on Facebook</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleLinkedInShare}>
+                        <Linkedin className="mr-2 h-4 w-4" />
+                        <span>Share on LinkedIn</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+
+                {/* Apply Button - Last */}
+                {getApplyUrl() ? (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => window.open(getApplyUrl(), "_blank")}
+                    className="whitespace-nowrap"
+                  >
+                    Apply Now
+                  </Button>
+                ) : (
+                  <Button
+                    disabled
+                    variant="outline"
+                    size="sm"
+                    className="whitespace-nowrap"
+                  >
+                    Apply Unavailable
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

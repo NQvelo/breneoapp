@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,39 +96,8 @@ const UserHome = () => {
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
-
-  // Show loading state if auth is still loading
-  if (authLoading) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading dashboard...</p>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // If user is not available, show a message (shouldn't happen due to ProtectedRoute, but safety check)
-  if (!user) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <p className="text-gray-600">
-                Please wait while we load your dashboard...
-              </p>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  const jobsScrollRef = useRef<HTMLDivElement>(null);
+  const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
 
   // Fetch user's top skills from skill test results
   useEffect(() => {
@@ -255,10 +224,14 @@ const UserHome = () => {
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    onError: (error) => {
-      console.error("Error fetching jobs:", error);
-    },
   });
+
+  // Handle jobs error
+  useEffect(() => {
+    if (jobsError) {
+      console.error("Error fetching jobs:", jobsError);
+    }
+  }, [jobsError]);
 
   // Save/unsave job mutation
   const saveJobMutation = useMutation({
@@ -450,11 +423,12 @@ const UserHome = () => {
           workArrangement = "Hybrid";
         }
 
-        return {
+        const transformedJob: Job = {
           id: jobId,
           title: jobTitle,
           company: companyName,
-          location,
+          location:
+            typeof location === "string" ? location : "Location not specified",
           logo,
           company_logo: logo,
           salary,
@@ -473,6 +447,7 @@ const UserHome = () => {
                 year: "numeric",
               }),
         };
+        return transformedJob;
       })
       .filter((job): job is Job => job !== null) // Filter out null jobs
       .slice(0, 10); // Take up to 10 jobs
@@ -480,6 +455,22 @@ const UserHome = () => {
 
   // Display up to 10 jobs
   const displayJobs = transformedJobs;
+
+  // Scroll functions for jobs
+  const scrollJobs = (direction: "left" | "right") => {
+    if (jobsScrollRef.current) {
+      const scrollAmount = 400; // Scroll by approximately one card width + gap
+      const scrollPosition =
+        direction === "left"
+          ? jobsScrollRef.current.scrollLeft - scrollAmount
+          : jobsScrollRef.current.scrollLeft + scrollAmount;
+
+      jobsScrollRef.current.scrollTo({
+        left: scrollPosition,
+        behavior: "smooth",
+      });
+    }
+  };
 
   // Debug logging
   console.log("🏠 UserHome render:", {
@@ -491,17 +482,50 @@ const UserHome = () => {
     coursesCount: courses.length,
   });
 
+  // Show loading state if auth is still loading
+  if (authLoading) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // If user is not available, show a message (shouldn't happen due to ProtectedRoute, but safety check)
+  if (!user) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-gray-600">
+                Please wait while we load your dashboard...
+              </p>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       {/* Mobile Welcome Message */}
       {isMobile && (
         <div className="mb-4 px-4 md:hidden">
-          <h1 className="text-lg font-semibold text-foreground">
+          <h1 className="text-xl font-semibold text-foreground">
             Welcome,{" "}
             <span className="font-bold">
               {user?.first_name || user?.email?.split("@")[0] || "User"}
             </span>
-            !
+            ! 👋🏻
           </h1>
         </div>
       )}
@@ -511,11 +535,11 @@ const UserHome = () => {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
             {!hasCompletedTest && !loadingSkills && (
-              <Card className="bg-white transition-all border border-gray-200 hover:border-gray-400 rounded-2xl">
+              <Card className="bg-white transition-all border border-gray-200 hover:border-gray-400 rounded-3xl">
                 <CardContent className="p-4">
                   <Link to="/skill-test" className="block cursor-pointer group">
                     <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-breneo-blue/10 flex items-center justify-center">
+                      <div className="flex-shrink-0 w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center">
                         <ClipboardCheck className="h-6 w-6 text-breneo-blue" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -543,14 +567,36 @@ const UserHome = () => {
 
             {/* Skill Path CTA Widget - Only show if user has completed the test */}
             {hasCompletedTest && !loadingSkills && (
-              <Card className="bg-white transition-all border border-gray-200 hover:border-gray-400 w-auto flex-shrink-0 max-w-lg rounded-2xl">
-                <CardContent className="p-4 md:p-5 min-h-[160px]">
+              <Card
+                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in"
+                style={{
+                  boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
+                  transform: isSkillPathPressed ? "scale(0.95)" : "scale(1)",
+                  transition: "transform 0.1s ease-in-out",
+                }}
+                onMouseDown={() => setIsSkillPathPressed(true)}
+                onMouseUp={() => setIsSkillPathPressed(false)}
+                onMouseLeave={() => setIsSkillPathPressed(false)}
+                onTouchStart={() => setIsSkillPathPressed(true)}
+                onTouchEnd={() => setIsSkillPathPressed(false)}
+              >
+                <CardContent className="p-4 md:p-4">
                   <Link to="/skill-path" className="block cursor-pointer group">
-                    <div className="flex items-center gap-3 md:gap-6">
-                      {/* Left side - Illustration */}
-                      <div className="flex-shrink-0 w-24 h-24 md:w-40 md:h-40 flex items-center justify-center">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      {/* Left side - Content */}
+                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                        <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
+                          Explore your personalized career path
+                        </h3>
+                        <p className="text-sm md:text-sm text-gray-900">
+                          Get personalized recommendations for your career.
+                        </p>
+                      </div>
+
+                      {/* Right side - Illustration */}
+                      <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
                         <img
-                          src="/lovable-uploads/Coding-A-Website--Streamline-New-York.png"
+                          src="/lovable-uploads/3dicons-explorer-front-color.png"
                           alt="Coding A Website"
                           className="w-full h-full object-contain"
                           onError={(e) => {
@@ -558,32 +604,6 @@ const UserHome = () => {
                               "none";
                           }}
                         />
-                      </div>
-
-                      {/* Right side - Content */}
-                      <div className="flex-1 flex flex-col justify-between gap-3 min-w-0">
-                        <div className="flex flex-col gap-2">
-                          <h3 className="font-bold text-base md:text-lg text-gray-900 group-hover:text-breneo-blue transition-colors">
-                            Your Skill Path
-                          </h3>
-                          <p className="text-xs md:text-sm text-gray-900">
-                            Explore your personalized career path with
-                            recommendations.
-                          </p>
-                        </div>
-
-                        {/* Button */}
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="text-xs md:text-sm h-8 md:h-9 px-3 md:px-4 w-fit rounded-md"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            navigate("/skill-path");
-                          }}
-                        >
-                          View Details
-                        </Button>
                       </div>
                     </div>
                   </Link>
@@ -593,19 +613,44 @@ const UserHome = () => {
           </div>
 
           {/* Main Content - Top Jobs and Courses */}
-          <div className="space-y-6">
+          <div className="space-y-6 pt-6 md:pt-8">
             {/* Top Job Picks Section */}
             <div>
-              <div className="mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
                   Top job picks for you
                 </h2>
+                {!jobsLoading && !jobsError && displayJobs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => scrollJobs("left")}
+                      aria-label="Scroll left"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => scrollJobs("right")}
+                      aria-label="Scroll right"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {jobsLoading ? (
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
                   {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="relative flex-shrink-0 w-72">
+                    <Card
+                      key={i}
+                      className="relative flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px]"
+                    >
                       <CardContent className="p-4">
                         <Skeleton className="h-4 w-20 mb-2" />
                         <Skeleton className="h-6 w-3/4 mb-4" />
@@ -634,11 +679,14 @@ const UserHome = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+                <div
+                  ref={jobsScrollRef}
+                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
+                >
                   {displayJobs.map((job) => (
                     <Card
                       key={job.id}
-                      className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden flex-shrink-0 w-72 cursor-pointer rounded-2xl"
+                      className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden flex-shrink-0 snap-start cursor-pointer rounded-3xl w-[calc((100%-2rem)/3)] min-w-[280px]"
                       onClick={() => {
                         if (job.id) {
                           navigate(`/jobs/${encodeURIComponent(job.id)}`);
@@ -738,45 +786,51 @@ const UserHome = () => {
                         </div>
 
                         {/* Job Title */}
-                        <h4 className="font-bold text-base mb-3 line-clamp-2">
+                        <h4 className="font-bold text-base mb-3 line-clamp-2 min-h-[3rem]">
                           {job.title}
                         </h4>
 
-                        {/* Job Details */}
-                        <div className="space-y-1.5 mb-3 flex-grow">
+                        {/* Spacer to push details to bottom */}
+                        <div className="flex-grow"></div>
+
+                        {/* Job Details - At the bottom */}
+                        <div className="space-y-1.5 mt-auto pb-16 md:pb-0">
                           {/* Salary */}
                           {job.salary && (
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <DollarSign className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                              <span className="text-gray-700 truncate">
+                            <div className="flex items-center gap-1.5 text-base">
+                              <DollarSign className="h-5 w-5 text-gray-400 flex-shrink-0" />
+                              <span className="text-gray-700 break-words font-medium">
                                 {job.salary}
                               </span>
                             </div>
                           )}
 
-                          {/* Employment Type */}
-                          {job.employment_type && (
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                              <span className="text-gray-700">
-                                {job.employment_type}
-                              </span>
-                            </div>
-                          )}
+                          {/* Employment Type and Work Arrangement - Inline */}
+                          <div className="flex items-center gap-3 flex-wrap">
+                            {/* Employment Type */}
+                            {job.employment_type && (
+                              <div className="flex items-center gap-1.5 text-sm">
+                                <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                <span className="text-gray-700">
+                                  {job.employment_type}
+                                </span>
+                              </div>
+                            )}
 
-                          {/* Work Arrangement */}
-                          {job.work_arrangement && (
-                            <div className="flex items-center gap-1.5 text-xs">
-                              <Briefcase className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                              <span className="text-gray-700">
-                                {job.work_arrangement}
-                              </span>
-                            </div>
-                          )}
+                            {/* Work Arrangement */}
+                            {job.work_arrangement && (
+                              <div className="flex items-center gap-1.5 text-sm">
+                                <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                <span className="text-gray-700">
+                                  {job.work_arrangement}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Action Buttons - Slide up on hover */}
-                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
+                        {/* Action Buttons - Slide up on hover and overlap details */}
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-card/95 backdrop-blur-sm flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg z-10">
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -850,7 +904,7 @@ const UserHome = () => {
                   {[...Array(3)].map((_, i) => (
                     <Card key={i} className="relative">
                       <CardContent className="p-0">
-                        <Skeleton className="h-40 w-full rounded-t-lg" />
+                        <Skeleton className="h-40 w-full rounded-t-3xl" />
                         <div className="p-4">
                           <Skeleton className="h-5 w-3/4 mb-2" />
                           <Skeleton className="h-4 w-1/2 mb-3" />
@@ -873,7 +927,7 @@ const UserHome = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {courses.slice(0, 3).map((course) => (
                     <Link key={course.id} to={`/course/${course.id}`}>
-                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 hover:border-gray-400 rounded-2xl">
+                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 hover:border-gray-400 rounded-3xl">
                         <CardContent className="p-0 overflow-hidden">
                           <div className="relative">
                             <img

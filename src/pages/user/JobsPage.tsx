@@ -518,7 +518,9 @@ const getSkillColor = (skill: string, index: number): string => {
 };
 
 // Fetch all internship jobs without any filtering
-const fetchInternshipJobs = async (page: number = 1): Promise<{
+const fetchInternshipJobs = async (
+  page: number = 1
+): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
   total: number;
@@ -570,7 +572,9 @@ const fetchInternshipJobs = async (page: number = 1): Promise<{
 };
 
 // Fetch latest regular jobs without any filtering
-const fetchLatestJobs = async (page: number = 1): Promise<{
+const fetchLatestJobs = async (
+  page: number = 1
+): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
   total: number;
@@ -747,6 +751,20 @@ const JobsPage = () => {
   // The jobs displayed here are always latest jobs without any filters
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
+
+  // Helper function to count active filters
+  const countActiveFilters = (filters: JobFilters): number => {
+    let count = 0;
+    if (filters.countries.length > 0) count += filters.countries.length;
+    if (filters.jobTypes.length > 0) count += filters.jobTypes.length;
+    if (filters.isRemote) count += 1;
+    if (filters.datePosted) count += 1;
+    if (filters.skills.length > 0) count += filters.skills.length;
+    if (filters.salaryMin !== undefined || filters.salaryMax !== undefined)
+      count += 1;
+    if (filters.salaryByAgreement) count += 1;
+    return count;
+  };
 
   // Sync tempFilters with activeFilters when modal opens to reflect current search bar location
   useEffect(() => {
@@ -1300,9 +1318,9 @@ const JobsPage = () => {
   // Separate regular jobs from intern jobs (no limit - show all loaded)
   const regularJobs = useMemo(() => {
     return transformedJobs.filter(
-        (job) =>
-          job.employment_type?.toLowerCase() !== "intern" &&
-          job.employment_type?.toLowerCase() !== "internship"
+      (job) =>
+        job.employment_type?.toLowerCase() !== "intern" &&
+        job.employment_type?.toLowerCase() !== "internship"
     );
   }, [transformedJobs]);
 
@@ -1719,7 +1737,7 @@ const JobsPage = () => {
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
-          <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-lg pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
+          <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
             {/* Briefcase Icon - At the start */}
             <Briefcase
               className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -1752,15 +1770,25 @@ const JobsPage = () => {
             )}
 
             {/* Filter Button - Inside search bar */}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setFilterModalOpen(true)}
-              className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md ml-2"
-              aria-label="Filter jobs"
-            >
-              <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
-            </Button>
+            {(() => {
+              const activeFilterCount = countActiveFilters(activeFilters);
+              return (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setFilterModalOpen(true)}
+                  className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md ml-2 relative"
+                  aria-label="Filter jobs"
+                >
+                  <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
+                  {activeFilterCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-breneo-blue text-white text-xs rounded-full">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              );
+            })()}
 
             {/* Search Button - Circular purple button with white magnifying glass */}
             <Button
@@ -1807,7 +1835,7 @@ const JobsPage = () => {
                 return (
                   <Card
                     key={skill}
-                    className="cursor-pointer transition-all duration-200 border border-gray-200 hover:border-gray-400 rounded-2xl"
+                    className="cursor-pointer transition-all duration-200 border border-gray-200 hover:border-gray-400 rounded-3xl"
                     onClick={() => {
                       // Add skill to filters if not already present
                       if (!activeFilters.skills.includes(skill)) {
@@ -1878,11 +1906,11 @@ const JobsPage = () => {
           !isLoadingInternships &&
           regularJobs.length === 0 &&
           internJobs.length === 0 && (
-            <div className="text-center p-10 border border-dashed rounded-lg text-muted-foreground">
+            <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
               <img
-                src="/lovable-uploads/no-data-found.png"
+                src="/lovable-uploads/3dicons-travel-front-color.png"
                 alt="No data found"
-                className="mx-auto h-64 w-64 mb-4 object-contain"
+                className="mx-auto h-48 w-48 mb-4 object-contain"
               />
               <h4 className="text-lg font-semibold mb-2">No Jobs Found</h4>
               <p className="text-sm">
@@ -1897,7 +1925,7 @@ const JobsPage = () => {
             {regularJobs.map((job) => (
               <Card
                 key={job.id}
-                className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-2xl"
+                className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
               >
                 <CardContent className="p-5 flex flex-col flex-grow relative">
                   {/* Company Logo and Info */}
@@ -2008,7 +2036,7 @@ const JobsPage = () => {
                   </h4>
 
                   {/* Job Details */}
-                  <div className="space-y-2 mb-4 flex-grow">
+                  <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
                     {/* Salary */}
                     <div className="flex items-center gap-2 text-sm">
                       <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -2043,7 +2071,7 @@ const JobsPage = () => {
                   </div>
 
                   {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
+                  <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
                     <Button
                       variant="default"
                       onClick={() => {
@@ -2105,8 +2133,8 @@ const JobsPage = () => {
                   "Load More Jobs"
                 )}
               </Button>
-          </div>
-        )}
+            </div>
+          )}
 
         {/* Intern Jobs Section */}
         {!isLoadingInternships && internJobs.length > 0 && (
@@ -2119,7 +2147,7 @@ const JobsPage = () => {
               {internJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-2xl"
+                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
                 >
                   <CardContent className="p-5 flex flex-col flex-grow relative">
                     {/* Company Logo and Info */}
@@ -2228,7 +2256,7 @@ const JobsPage = () => {
                     </h4>
 
                     {/* Job Details */}
-                    <div className="space-y-2 mb-4 flex-grow">
+                    <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
                       {/* Salary */}
                       <div className="flex items-center gap-2 text-sm">
                         <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -2263,7 +2291,7 @@ const JobsPage = () => {
                     </div>
 
                     {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
-                    <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-full group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
+                    <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
                       <Button
                         variant="default"
                         onClick={() => {

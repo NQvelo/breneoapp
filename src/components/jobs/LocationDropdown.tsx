@@ -77,11 +77,28 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
   const isAllSelected = filteredCountries.length > 0 && 
     filteredCountries.every((country) => selectedLocations.includes(country.code));
   
-  const displayText = selectedLocations.length === 0 
-    ? placeholder 
-    : selectedLocations.length === 1
-    ? countries.find((c) => c.code === selectedLocations[0])?.name || placeholder
-    : selectedLocations.map((code) => countries.find((c) => c.code === code)?.name || code).join(", ");
+  // Smart display text: show count when too many countries selected
+  const displayText = useMemo(() => {
+    if (selectedLocations.length === 0) {
+      return placeholder;
+    }
+    
+    if (selectedLocations.length === 1) {
+      return countries.find((c) => c.code === selectedLocations[0])?.name || placeholder;
+    }
+    
+    // If more than 3 countries selected, show count instead of all names
+    if (selectedLocations.length > 3) {
+      return `${selectedLocations.length} countries selected`;
+    }
+    
+    // Show up to 3 country names, truncate if needed
+    const countryNames = selectedLocations
+      .slice(0, 3)
+      .map((code) => countries.find((c) => c.code === code)?.name || code);
+    
+    return countryNames.join(", ");
+  }, [selectedLocations, placeholder]);
 
   const isPlaceholder = selectedLocations.length === 0;
 
@@ -96,15 +113,15 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
   };
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className="relative w-full max-w-full" ref={dropdownRef}>
       {/* Location Input Field */}
-      <div className="flex items-center gap-2 w-full">
+      <div className="flex items-center gap-2 w-full min-w-0">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "flex items-center flex-1 min-w-0 h-auto py-0 px-0 text-sm text-left bg-transparent border-0 focus:outline-none focus:ring-0",
-            "transition-colors cursor-pointer hover:opacity-80",
+            "transition-colors cursor-pointer hover:opacity-80 overflow-hidden",
             isPlaceholder
               ? "text-gray-400 dark:text-gray-500" 
               : "text-gray-900 dark:text-gray-100"
@@ -112,9 +129,9 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
         >
           <MapPin className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2" />
           {selectedLocations.length === 0 ? (
-            <span className="flex-1 min-w-0 truncate text-sm">{placeholder}</span>
+            <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">{placeholder}</span>
           ) : (
-            <span className="flex-1 min-w-0 truncate text-sm">{displayText}</span>
+            <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">{displayText}</span>
           )}
         </button>
         {selectedLocations.length > 0 && (

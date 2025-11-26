@@ -765,7 +765,7 @@ const AcademyDashboard = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="bg-white rounded-lg p-6 shadow-sm">
+        <div className="bg-white rounded-3xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             {/* <h2 className="text-xl font-semibold">Course Management</h2> */}
             <span className="text-md font-semibold">
