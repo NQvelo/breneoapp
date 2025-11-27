@@ -244,3 +244,82 @@
     background-position: 100% 50%;
   }
 }
+
+/* Career Path Card Animations */
+@keyframes homepage-shortcut-card_card_fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes homepage-shortcut-card_card_transform {
+  0% {
+    transform: scale(0.8) rotate(-5deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes homepage-shortcut-card_img_fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .career-path-card-animated {
+    animation: homepage-shortcut-card_card_fade 250ms linear 0ms,
+      homepage-shortcut-card_card_transform 1833ms
+        cubic-bezier(
+          0,
+          0.009,
+          0.035 2.1%,
+          0.142 4.6%,
+          0.283 6.9%,
+          0.726 13.3%,
+          0.941 17.2%,
+          1.02,
+          1.08,
+          1.124,
+          1.153 24.9%,
+          1.163,
+          1.167,
+          1.165,
+          1.157 30.7%,
+          1.132 33.7%,
+          1.051 40.7%,
+          1.017 44.2%,
+          0.99,
+          0.975 52.2%,
+          0.972 55.2%,
+          0.974 58.5%,
+          0.996 71.5%,
+          1.003,
+          1.005 85.7%,
+          1
+        )
+        100ms;
+    transform-origin: center center;
+  }
+  .career-path-card-animated .career-path-img {
+    opacity: 0;
+    animation: homepage-shortcut-card_img_fade 300ms linear 1900ms forwards;
+  }
+}
+
+.career-path-img {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .career-path-card-animated .career-path-img {
+    opacity: 1;
+  }
+}

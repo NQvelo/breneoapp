@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { useMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -93,10 +94,13 @@ const UserHome = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isMobile = useMobile();
+  const t = useTranslation();
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
   const jobsScrollRef = useRef<HTMLDivElement>(null);
+  const coursesScrollRef = useRef<HTMLDivElement>(null);
+  const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
 
   // Fetch user's top skills from skill test results
@@ -292,8 +296,7 @@ const UserHome = () => {
       const { data, error } = await supabase
         .from("courses")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(3);
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Error fetching courses:", error);
@@ -472,6 +475,22 @@ const UserHome = () => {
     }
   };
 
+  // Scroll functions for courses
+  const scrollCourses = (direction: "left" | "right") => {
+    if (coursesScrollRef.current) {
+      const scrollAmount = 400;
+      const scrollPosition =
+        direction === "left"
+          ? coursesScrollRef.current.scrollLeft - scrollAmount
+          : coursesScrollRef.current.scrollLeft + scrollAmount;
+
+      coursesScrollRef.current.scrollTo({
+        left: scrollPosition,
+        behavior: "smooth",
+      });
+    }
+  };
+
   // Debug logging
   console.log("🏠 UserHome render:", {
     user: !!user,
@@ -535,29 +554,39 @@ const UserHome = () => {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
             {!hasCompletedTest && !loadingSkills && (
-              <Card className="bg-white transition-all border border-gray-200 hover:border-gray-400 rounded-3xl">
-                <CardContent className="p-4">
+              <Card
+                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in"
+                style={{
+                  boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
+                  transform: isSkillTestPressed ? "scale(0.95)" : "scale(1)",
+                  transition: "transform 0.1s ease-in-out",
+                }}
+                onMouseDown={() => setIsSkillTestPressed(true)}
+                onMouseUp={() => setIsSkillTestPressed(false)}
+                onMouseLeave={() => setIsSkillTestPressed(false)}
+                onTouchStart={() => setIsSkillTestPressed(true)}
+                onTouchEnd={() => setIsSkillTestPressed(false)}
+              >
+                <CardContent className="p-4 md:p-4">
                   <Link to="/skill-test" className="block cursor-pointer group">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center">
-                        <ClipboardCheck className="h-6 w-6 text-breneo-blue" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-gray-900 mb-1 group-hover:text-breneo-blue transition-colors">
-                          Discover Your Skills
+                    <div className="flex items-center gap-3 md:gap-4">
+                      {/* Left side - Content */}
+                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                        <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
+                          {t.home.skillTestTitle}
                         </h3>
-                        <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                          Take our skill assessment to unlock personalized
-                          recommendations.
+                        <p className="text-sm md:text-sm text-gray-900">
+                          {t.home.skillTestSubtitle}
                         </p>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="text-xs h-7 px-3"
-                        >
-                          <Play className="h-3 w-3 mr-1" />
-                          Start Test
-                        </Button>
+                      </div>
+
+                      {/* Right side - Illustration / Icon */}
+                      <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
+                        <img
+                          src="/lovable-uploads/3dicons-target-dynamic-color.png"
+                          alt="Skill test target"
+                          className="w-full h-full object-contain"
+                        />
                       </div>
                     </div>
                   </Link>
@@ -586,10 +615,10 @@ const UserHome = () => {
                       {/* Left side - Content */}
                       <div className="flex-1 flex flex-col gap-1.5 min-w-0">
                         <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
-                          Explore your personalized career path
+                          {t.home.skillPathTitle}
                         </h3>
                         <p className="text-sm md:text-sm text-gray-900">
-                          Get personalized recommendations for your career.
+                          {t.home.skillPathSubtitle}
                         </p>
                       </div>
 
@@ -686,7 +715,7 @@ const UserHome = () => {
                   {displayJobs.map((job) => (
                     <Card
                       key={job.id}
-                      className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden flex-shrink-0 snap-start cursor-pointer rounded-3xl w-[calc((100%-2rem)/3)] min-w-[280px]"
+                      className="group flex flex-col transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 overflow-hidden flex-shrink-0 snap-start cursor-pointer rounded-3xl w-[calc((100%-2rem)/3)] min-w-[280px]"
                       onClick={() => {
                         if (job.id) {
                           navigate(`/jobs/${encodeURIComponent(job.id)}`);
@@ -695,7 +724,7 @@ const UserHome = () => {
                     >
                       <CardContent className="p-4 flex flex-col flex-grow relative">
                         {/* Company Logo and Info */}
-                        <div className="flex items-start gap-2 mb-3">
+                        <div className="flex items-start gap-2 mb-2">
                           <div className="flex-shrink-0 relative w-10 h-10">
                             {/* Primary: Logo from API */}
                             {job.company_logo ? (
@@ -785,6 +814,9 @@ const UserHome = () => {
                           </div>
                         </div>
 
+                        {/* Divider under company/logo/location */}
+                        <div className="border-t border-gray-100 dark:border-gray-200 mt-2 mb-3 -mx-4" />
+
                         {/* Job Title */}
                         <h4 className="font-bold text-base mb-3 line-clamp-2 min-h-[3rem]">
                           {job.title}
@@ -840,7 +872,7 @@ const UserHome = () => {
                             }}
                             variant="default"
                             size="xs"
-                            className="flex-1"
+                            className="flex-1 h-10"
                           >
                             View Details
                           </Button>
@@ -854,7 +886,7 @@ const UserHome = () => {
                             aria-label={
                               job.is_saved ? "Unsave job" : "Save job"
                             }
-                            className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90"
+                            className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-10 w-10"
                           >
                             <Bookmark
                               className={`h-4 w-4 transition-colors ${
@@ -876,33 +908,42 @@ const UserHome = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <GraduationCap className="h-6 w-6 text-breneo-blue" />
+                  {/* <GraduationCap className="h-6 w-6 text-breneo-blue" /> */}
                   <h2 className="text-lg font-bold text-gray-900">
                     Top courses picked for you
                   </h2>
                 </div>
-                {userTopSkills.length > 0 && (
+                {!coursesLoading && courses.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500">Based on:</span>
-                    <div className="flex gap-1">
-                      {userTopSkills.slice(0, 2).map((skill) => (
-                        <Badge
-                          key={skill}
-                          variant="secondary"
-                          className="text-xs bg-breneo-blue/10 text-breneo-blue border-0"
-                        >
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => scrollCourses("left")}
+                      aria-label="Scroll courses left"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => scrollCourses("right")}
+                      aria-label="Scroll courses right"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
 
               {coursesLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2">
                   {[...Array(3)].map((_, i) => (
-                    <Card key={i} className="relative">
+                    <Card
+                      key={i}
+                      className="relative flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px]"
+                    >
                       <CardContent className="p-0">
                         <Skeleton className="h-40 w-full rounded-t-3xl" />
                         <div className="p-4">
@@ -924,73 +965,72 @@ const UserHome = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {courses.slice(0, 3).map((course) => (
-                    <Link key={course.id} to={`/course/${course.id}`}>
-                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 hover:border-gray-400 rounded-3xl">
-                        <CardContent className="p-0 overflow-hidden">
-                          <div className="relative">
+                <div
+                  ref={coursesScrollRef}
+                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
+                >
+                  {courses.map((course) => (
+                    <Link
+                      key={course.id}
+                      to={`/course/${course.id}`}
+                      className="flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px] block"
+                    >
+                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col">
+                        <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
+                          <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                             <img
                               src={course.image || "/placeholder.svg"}
                               alt={course.title}
-                              className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-200"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 origin-center"
+                              style={{ transformOrigin: "center center" }}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src =
                                   "/placeholder.svg";
                               }}
                             />
                             <div className="absolute top-4 right-4">
-                              <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5">
-                                <Bookmark className="h-4 w-4 text-gray-600" />
-                              </div>
+                              <Button
+                                variant="secondary"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  // TODO: Implement save course functionality
+                                  toast.info(
+                                    "Save course functionality coming soon"
+                                  );
+                                }}
+                                aria-label="Save course"
+                                className="bg-[#E6E7EB]/80 hover:bg-[#E6E7EB]/90 h-9 w-9 backdrop-blur-sm"
+                              >
+                                <Bookmark className="h-4 w-4 text-black/80" />
+                              </Button>
                             </div>
-                            {course.category && (
-                              <div className="absolute top-4 left-4">
-                                <Badge className="bg-breneo-blue text-white text-xs">
-                                  {course.category}
-                                </Badge>
-                              </div>
-                            )}
                           </div>
-                          <div className="p-4">
+                          <div className="p-4 flex flex-col flex-grow min-h-[140px]">
                             <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
                               {course.title}
                             </h3>
 
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-6 h-6 rounded-full bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
-                                <GraduationCap className="h-3 w-3 text-breneo-blue" />
-                              </div>
-                              <span className="text-xs text-gray-600 font-medium">
-                                {course.provider || "Breneo Academy"}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-3 mb-3 flex-wrap">
+                            <div className="flex items-center gap-3 mt-auto flex-wrap">
                               {course.duration && (
-                                <div className="flex items-center gap-1 text-xs text-gray-500">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{course.duration}</span>
-                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
+                                >
+                                  <Clock className="h-4 w-4 mr-1.5" />
+                                  {course.duration}
+                                </Badge>
                               )}
                               {course.level && (
                                 <Badge
                                   variant="outline"
-                                  className="text-xs border-gray-300"
+                                  className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
                                 >
-                                  <Award className="h-3 w-3 mr-1" />
+                                  <Award className="h-4 w-4 mr-1.5" />
                                   {course.level}
                                 </Badge>
                               )}
-                            </div>
-
-                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
-                              <span className="text-xs text-gray-500">
-                                View details
-                              </span>
-                              <button className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-breneo-blue group-hover:text-white flex items-center justify-center transition-colors">
-                                <ChevronRight className="h-4 w-4 text-gray-600 group-hover:text-white transition-colors" />
-                              </button>
                             </div>
                           </div>
                         </CardContent>

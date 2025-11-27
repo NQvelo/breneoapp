@@ -191,6 +191,14 @@ export const en = {
     finish: "Finish",
     results: "Results",
   },
+  // Home CTAs
+  home: {
+    skillTestTitle: "Begin Your Skill Assessment Journey",
+    skillTestSubtitle:
+      "Take our skill test to unlock personalized recommendations.",
+    skillPathTitle: "Explore your personalized career path",
+    skillPathSubtitle: "Get personalized recommendations for your career.",
+  },
   // Errors
   errors: {
     somethingWentWrong: "Something went wrong",

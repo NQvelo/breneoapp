@@ -191,6 +191,15 @@ export const ka = {
     finish: "დასრულება",
     results: "შედეგები",
   },
+  // Home CTAs
+  home: {
+    skillTestTitle: "დაიწყე შენი უნარების შეფასების გზა",
+    skillTestSubtitle:
+      "ჩაიტარე უნარების ტესტი და მიიღო პერსონალიზებული რეკომენდაციები.",
+    skillPathTitle: "გაიგე შენი პერსონალური კარიერული გზა",
+    skillPathSubtitle:
+      "მიიღე შენზე მორგებული კარიერული რეკომენდაციები.",
+  },
   // Errors
   errors: {
     somethingWentWrong: "რაღაც შეცდომა მოხდა",

@@ -1756,7 +1756,7 @@ const JobsPage = () => {
             {/* Work Types Field - Hidden on mobile, shown on desktop */}
             {!isMobile && (
               <>
-                <div className="h-5 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0 self-stretch" />
+                <div className="w-px bg-gray-300 dark:bg-gray-600 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
                 <div className="flex items-center flex-1 min-w-0 relative">
                   <WorkTypeDropdown
                     selectedWorkTypes={activeFilters.jobTypes}

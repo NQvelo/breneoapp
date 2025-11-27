@@ -49,8 +49,15 @@ import {
   Facebook,
   Linkedin,
   Loader2,
+  XCircle,
 } from "lucide-react";
 import { summarizeText } from "@/utils/aiSummarizer";
+import { extractSkillsFromText } from "@/utils/skillExtractor";
+import {
+  getUserTestAnswers,
+  calculateSkillScores,
+} from "@/utils/skillTestUtils";
+import { numericIdToUuid, cn } from "@/lib/utils";
 import { jobService, JobDetail, CompanyInfo } from "@/api/jobs";
 import {
   DropdownMenu,
@@ -132,6 +139,12 @@ const JobDetailPage = () => {
   const [showGradient, setShowGradient] = useState(false);
   const [hideOriginal, setHideOriginal] = useState(false);
 
+  // Skills comparison state
+  const [jobSkills, setJobSkills] = useState<string[]>([]);
+  const [userSkills, setUserSkills] = useState<Set<string>>(new Set());
+  const [isExtractingSkills, setIsExtractingSkills] = useState(false);
+  const [isLoadingUserSkills, setIsLoadingUserSkills] = useState(false);
+
   // Reset summary when job changes
   useEffect(() => {
     setAiSummary(null);
@@ -141,6 +154,143 @@ const JobDetailPage = () => {
     setShowGradient(false);
     setHideOriginal(false);
   }, [jobId]);
+
+  // Fetch user skills from test results (same method as SkillPathPage)
+  useEffect(() => {
+    const fetchUserSkills = async () => {
+      if (!user) {
+        setUserSkills(new Set());
+        return;
+      }
+
+      setIsLoadingUserSkills(true);
+      try {
+        // Method 1: Try Django backend skill test results API (same as SkillPathPage)
+        try {
+          const response = await apiClient.get(
+            `/api/skilltest/results/?user=${user.id}`
+          );
+
+          let skillTestData = null;
+          if (Array.isArray(response.data) && response.data.length > 0) {
+            skillTestData = response.data[0];
+          } else if (response.data && typeof response.data === "object") {
+            skillTestData = response.data;
+          }
+
+          if (
+            skillTestData &&
+            (skillTestData.final_role || skillTestData.skills_json)
+          ) {
+            // Extract skills from skills_json
+            const skillsJson = skillTestData.skills_json || {};
+            const techSkills = Object.keys(skillsJson.tech || {});
+            const softSkills = Object.keys(skillsJson.soft || {});
+            const allSkills = [...techSkills, ...softSkills];
+            setUserSkills(new Set(allSkills.map((s) => s.toLowerCase())));
+            setIsLoadingUserSkills(false);
+            return;
+          }
+        } catch (apiError) {
+          console.log("Django API not available, trying Supabase...");
+        }
+
+        // Method 2: Fallback to Supabase: fetch from usertestanswers
+        const answers = await getUserTestAnswers(user.id);
+
+        if (answers && answers.length > 0) {
+          // Calculate skill scores
+          const skillScores = calculateSkillScores(answers);
+          // Get all skills the user has (skills with score > 0)
+          const skills = Object.keys(skillScores).filter(
+            (skill) => skillScores[skill] > 0
+          );
+          setUserSkills(new Set(skills.map((s) => s.toLowerCase())));
+        } else {
+          setUserSkills(new Set());
+        }
+      } catch (error) {
+        console.error("Error fetching user skills:", error);
+        setUserSkills(new Set());
+      } finally {
+        setIsLoadingUserSkills(false);
+      }
+    };
+
+    fetchUserSkills();
+  }, [user]);
+
+  // Extract skills from job when job detail changes
+  useEffect(() => {
+    const extractJobSkills = async () => {
+      if (!jobDetail) {
+        setJobSkills([]);
+        return;
+      }
+
+      setIsExtractingSkills(true);
+      try {
+        const allSkills: Set<string> = new Set();
+
+        // 1. Get skills from existing fields (these are already verified)
+        const existingSkills = getRequiredSkills();
+        existingSkills.forEach((skill) => {
+          allSkills.add(skill.toLowerCase());
+        });
+
+        // 2. Combine description and requirements for comprehensive AI analysis
+        const description = getDescription();
+        const requirements = getRequirements();
+
+        // Combine all text for AI to analyze comprehensively
+        let combinedText = "";
+        if (description && description.length > 50) {
+          combinedText += description + "\n\n";
+        }
+        if (requirements && requirements.length > 50) {
+          combinedText += "Requirements:\n" + requirements;
+        }
+
+        // 3. Extract skills using AI (more accurate - AI analyzes and thinks)
+        if (combinedText.length > 50) {
+          const extracted = await extractSkillsFromText(combinedText);
+          if (extracted.skills && extracted.skills.length > 0) {
+            extracted.skills.forEach((skill) => {
+              // Normalize skill names
+              const normalized = skill.toLowerCase().trim();
+              if (normalized.length > 0) {
+                allSkills.add(normalized);
+              }
+            });
+          }
+        }
+
+        // 4. Remove duplicates and normalize skill names
+        // Convert to array, normalize, and sort
+        const skillsArray = Array.from(allSkills)
+          .map((s) => {
+            // Capitalize first letter of each word
+            return s
+              .split(/[\s-]+/)
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+          })
+          .filter((s) => s.length > 0)
+          .sort();
+
+        setJobSkills(skillsArray);
+      } catch (error) {
+        console.error("Error extracting job skills:", error);
+        // Fallback to just required skills
+        const existingSkills = getRequiredSkills();
+        setJobSkills(existingSkills);
+      } finally {
+        setIsExtractingSkills(false);
+      }
+    };
+
+    extractJobSkills();
+  }, [jobDetail]);
 
   // Handle scroll detection for fixed bottom bar
   useEffect(() => {
@@ -1305,28 +1455,115 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-              {/* Benefits & Perks - Moved to Top */}
-              {getBenefitsList().length > 0 && (
+              {/* Skills Match Section */}
+              {user && (jobSkills.length > 0 || isExtractingSkills) && (
                 <div className="pt-8">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-                    <Sparkles className="h-5 w-5" />
-                    Benefits & Perks
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {getBenefitsList().map((benefit, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-3 rounded-3xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <div className="flex-shrink-0 text-breneo-accent">
-                          {getBenefitIcon(benefit)}
+                  {isExtractingSkills && jobSkills.length === 0 ? (
+                    <Card>
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                          <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                          <p className="text-sm">
+                            AI is extracting skills from the job description...
+                          </p>
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {formatBenefitName(benefit)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      </CardContent>
+                    </Card>
+                  ) : jobSkills.length > 0 ? (
+                    <Card>
+                      <CardContent className="p-6">
+                        {/* Skills Match Header with Image */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <h2 className="text-lg font-semibold">
+                            Skills Match
+                          </h2>
+                          {isExtractingSkills && (
+                            <div className="ml-auto flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Analyzing job requirements...</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            Compare your skills from the skill test with the
+                            skills required for this job:
+                          </p>
+                          {isLoadingUserSkills ? (
+                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Loading your skills...</span>
+                            </div>
+                          ) : userSkills.size === 0 ? (
+                            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>
+                                You haven't taken the skill test yet.{" "}
+                                <button
+                                  onClick={() => navigate("/skill-test")}
+                                  className="underline hover:no-underline font-medium"
+                                >
+                                  Take the skill test
+                                </button>{" "}
+                                to see your skill match.
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              <span className="font-medium">
+                                {
+                                  jobSkills.filter((skill) =>
+                                    userSkills.has(skill.toLowerCase())
+                                  ).length
+                                }
+                              </span>{" "}
+                              out of{" "}
+                              <span className="font-medium">
+                                {jobSkills.length}
+                              </span>{" "}
+                              required skills match your profile
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {jobSkills.map((skill, index) => {
+                            const hasSkill = userSkills.has(
+                              skill.toLowerCase()
+                            );
+                            return (
+                              <div
+                                key={index}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors ${
+                                  hasSkill
+                                    ? "bg-green-50 dark:bg-green-950/20"
+                                    : "bg-gray-50 dark:bg-gray-800/50"
+                                }`}
+                              >
+                                <div className="flex-shrink-0">
+                                  {hasSkill ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                                  ) : (
+                                    <XCircle className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                                  )}
+                                </div>
+                                <span
+                                  className={`text-xs font-medium whitespace-nowrap ${
+                                    hasSkill
+                                      ? "text-green-700 dark:text-green-300"
+                                      : "text-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {skill}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
                 </div>
               )}
 
@@ -1634,6 +1871,31 @@ const JobDetailPage = () => {
                   )}
                 </div>
               )}
+
+              {/* Benefits & Perks - Moved to Bottom */}
+              {getBenefitsList().length > 0 && (
+                <div className="pt-8">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
+                    <Sparkles className="h-5 w-5" />
+                    Benefits & Perks
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {getBenefitsList().map((benefit, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-3 p-3 rounded-3xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        <div className="flex-shrink-0 text-breneo-accent">
+                          {getBenefitIcon(benefit)}
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {formatBenefitName(benefit)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1668,33 +1930,19 @@ const JobDetailPage = () => {
       {/* Fixed Bottom Bar - Shows when scrolling */}
       {jobDetail && (
         <div
-          className={`fixed z-[60] bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border border-black/[0.03] dark:border-white/[0.03] shadow-lg transition-all duration-300 ease-in-out rounded-3xl ${
-            isMobile ? "left-3 right-3 bottom-3" : "md:bottom-4"
-          }`}
-          style={
-            !isMobile
-              ? {
-                  left: sidebarCollapsed
-                    ? "calc((96px + 100vw) / 2 - 300px)"
-                    : "calc((272px + 100vw) / 2 - 300px)",
-                  transform: showFixedBar
-                    ? `translateY(0)`
-                    : `translateY(100%)`,
-                  maxWidth: "600px",
-                  width: "600px",
-                  opacity: showFixedBar ? 1 : 0,
-                  pointerEvents: showFixedBar ? "auto" : "none",
-                }
-              : {
-                  transform: showFixedBar
-                    ? "translateY(0)"
-                    : "translateY(100%)",
-                  opacity: showFixedBar ? 1 : 0,
-                  pointerEvents: showFixedBar ? "auto" : "none",
-                }
-          }
+          className={cn(
+            "fixed bottom-0 right-0 z-[60]",
+            "bg-[#F8F9FA] dark:bg-[#181818]",
+            "border-t border-black/[0.03] dark:border-white/[0.03]",
+            "shadow-lg transition-all duration-300 ease-in-out",
+            sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
+            "left-0",
+            showFixedBar
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-full pointer-events-none"
+          )}
         >
-          <div className="px-4 py-3">
+          <div className="px-5 sm:px-9 md:px-12 lg:px-14 py-4">
             <div className="flex items-center justify-between gap-4">
               {/* Job Title */}
               <div className="flex-1 min-w-0">
@@ -1713,12 +1961,12 @@ const JobDetailPage = () => {
                 {/* Save Button */}
                 {user && (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="icon"
                     onClick={() => saveJobMutation.mutate()}
                     disabled={saveJobMutation.isPending}
                     aria-label={isSaved ? "Unsave job" : "Save job"}
-                    className="h-9 w-9 [&_svg]:size-4 bg-transparent hover:bg-transparent border-gray-300 dark:border-gray-600"
+                    className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
                   >
                     <Bookmark
                       className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
@@ -1729,11 +1977,11 @@ const JobDetailPage = () => {
                 {/* Share Button */}
                 {isMobile && navigator.share ? (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="icon"
                     onClick={handleShareClick}
                     aria-label="Share job"
-                    className="h-9 w-9 [&_svg]:size-4 bg-transparent hover:bg-transparent border-gray-300 dark:border-gray-600"
+                    className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
                   >
                     <Share2 className="h-4 w-4" />
                   </Button>
@@ -1741,10 +1989,10 @@ const JobDetailPage = () => {
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="icon"
                         aria-label="Share job"
-                        className="h-9 w-9 [&_svg]:size-4 bg-transparent hover:bg-transparent border-gray-300 dark:border-gray-600"
+                        className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
                       >
                         <Share2 className="h-4 w-4" />
                       </Button>

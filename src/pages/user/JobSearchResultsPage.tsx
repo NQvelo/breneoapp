@@ -21,6 +21,7 @@ import {
   ArrowUpDown,
   ArrowDown,
   ArrowUp,
+  SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
@@ -701,23 +702,28 @@ const JobSearchResultsPage = () => {
     <DashboardLayout>
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         {/* Search Bar */}
-        <div className="mb-8 relative">
+        <div className="mb-8 relative max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white dark:bg-[#242424] border border-breneo-blue dark:border-breneo-blue-dark rounded-3xl pl-3 md:pl-4 pr-2.5 md:pr-3 py-[1rem] overflow-visible flex-1">
-              <Search
-                className="h-5 w-5 text-breneo-blue dark:text-breneo-blue-dark flex-shrink-0 mr-3"
+            <div className="flex items-center bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-3 md:py-4 overflow-visible min-h-[3.5rem] flex-1">
+              {/* Briefcase Icon - At the start */}
+              <Briefcase
+                className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
                 strokeWidth={2}
               />
+
+              {/* Search Input Field */}
               <Input
                 type="text"
                 placeholder={t.jobs.searchPlaceholder}
                 value={searchTerm}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0 rounded-none"
+                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
               />
+
+              {/* Work Types Field - Hidden on mobile, shown on desktop */}
               {!isMobile && (
                 <>
-                  <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                  <div className="w-px bg-gray-300 dark:bg-gray-600 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
                   <div className="flex items-center flex-1 min-w-0 relative">
                     <WorkTypeDropdown
                       selectedWorkTypes={activeFilters.jobTypes}
@@ -732,7 +738,7 @@ const JobSearchResultsPage = () => {
                       }}
                     />
                   </div>
-                  <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-2 flex-shrink-0" />
+                  <div className="w-px bg-gray-300 dark:bg-gray-600 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
                   <div className="flex items-center flex-1 min-w-0 relative">
                     <LocationDropdown
                       selectedLocations={activeFilters.countries}
@@ -748,15 +754,17 @@ const JobSearchResultsPage = () => {
               )}
             </div>
 
+            {/* Filter Button - Outside search bar */}
             {(() => {
               const activeFilterCount = countActiveFilters(activeFilters);
               return (
                 <Button
                   variant="outline"
                   onClick={() => setFilterModalOpen(true)}
-                  className="flex items-center gap-2 bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-3xl px-4 py-[1rem] hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative"
+                  className="group flex items-center gap-2 bg-transparent border border-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
+                  aria-label="Filter jobs"
                 >
-                  <Filter className="h-4 w-4" strokeWidth={2} />
+                  <SlidersHorizontal className="h-4 w-4 group-hover:text-white" strokeWidth={2} />
                   <span className="hidden md:inline text-sm font-medium">
                     {t.jobs.filters}
                   </span>
