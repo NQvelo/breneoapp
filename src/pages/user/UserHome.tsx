@@ -11,7 +11,7 @@ import { useTranslation } from "@/contexts/LanguageContext";
 import { useMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Bookmark,
+  Heart,
   MoreVertical,
   ChevronRight,
   Clock,
@@ -59,6 +59,7 @@ interface Course {
   level: string;
   duration: string;
   image: string;
+  is_saved?: boolean;
 }
 
 // Fetch jobs from job service API without any filters
@@ -217,6 +218,23 @@ const UserHome = () => {
     enabled: !!user,
   });
 
+  // Fetch saved courses
+  const { data: savedCourses = [] } = useQuery<string[]>({
+    queryKey: ["savedCourses", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedCoursesArray = profileResponse.data?.saved_courses || [];
+        return savedCoursesArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved courses:", error);
+        return [];
+      }
+    },
+    enabled: !!user,
+  });
+
   // Fetch jobs without any filters
   const {
     data: jobs = [],
@@ -237,7 +255,7 @@ const UserHome = () => {
     }
   }, [jobsError]);
 
-  // Save/unsave job mutation
+  // Save/unsave job mutation (uses backend save-job endpoint)
   const saveJobMutation = useMutation({
     mutationFn: async (job: Job) => {
       if (!user) throw new Error("User not logged in");
@@ -247,27 +265,10 @@ const UserHome = () => {
       const isSaved = job.is_saved;
 
       try {
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const currentSavedJobs = profileResponse.data?.saved_jobs || [];
+        const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobId}/`;
 
-        let updatedSavedJobs: string[];
-
-        if (isSaved) {
-          updatedSavedJobs = currentSavedJobs.filter(
-            (id: string | number) => String(id) !== jobId
-          );
-        } else {
-          if (
-            currentSavedJobs.some((id: string | number) => String(id) === jobId)
-          ) {
-            return;
-          }
-          updatedSavedJobs = [...currentSavedJobs, jobId];
-        }
-
-        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-          saved_jobs: updatedSavedJobs,
-        });
+        // Backend toggles save/unsave on POST
+        await apiClient.post(endpoint);
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error
@@ -305,6 +306,62 @@ const UserHome = () => {
       return data || [];
     },
     enabled: !!user,
+  });
+
+  // Save/unsave course mutation
+  const saveCourseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user?.id) {
+        throw new Error("Please log in to save courses.");
+      }
+
+      await apiClient.post(`/api/save-course/${id}/`);
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({
+        queryKey: ["savedCourses", user?.id],
+      });
+
+      const previousSavedCourses = queryClient.getQueryData<string[]>([
+        "savedCourses",
+        user?.id,
+      ]);
+
+      let wasSaved = false;
+      queryClient.setQueryData<string[]>(["savedCourses", user?.id], (prev) => {
+        if (!prev) return prev;
+        const idString = String(id);
+        wasSaved = prev.includes(idString);
+        return wasSaved
+          ? prev.filter((c) => c !== idString)
+          : [...prev, idString];
+      });
+
+      return { previousSavedCourses, wasSaved };
+    },
+    onError: (error, id, context) => {
+      if (context?.previousSavedCourses && user?.id) {
+        queryClient.setQueryData(
+          ["savedCourses", user.id],
+          context.previousSavedCourses
+        );
+      }
+
+      console.error("Error updating saved courses:", error);
+      toast.error("Failed to update saved courses. Please try again.");
+    },
+    onSuccess: (_, id, context) => {
+      queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["home-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+      const wasSaved = context?.wasSaved ?? false;
+      toast.success(
+        wasSaved
+          ? "Removed from saved courses."
+          : "Course saved to your profile."
+      );
+    },
   });
 
   // Transform jobs - handle empty or undefined arrays
@@ -888,10 +945,10 @@ const UserHome = () => {
                             }
                             className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-10 w-10"
                           >
-                            <Bookmark
+                            <Heart
                               className={`h-4 w-4 transition-colors ${
                                 job.is_saved
-                                  ? "fill-black text-black"
+                                  ? "text-red-500 fill-red-500 animate-heart-pop"
                                   : "text-black"
                               }`}
                             />
@@ -969,7 +1026,11 @@ const UserHome = () => {
                   ref={coursesScrollRef}
                   className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
                 >
-                  {courses.map((course) => (
+                  {courses.map((course) => {
+                    const isCourseSaved = savedCourses.includes(
+                      String(course.id)
+                    );
+                    return (
                     <Link
                       key={course.id}
                       to={`/course/${course.id}`}
@@ -995,15 +1056,20 @@ const UserHome = () => {
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  // TODO: Implement save course functionality
-                                  toast.info(
-                                    "Save course functionality coming soon"
-                                  );
+                                  saveCourseMutation.mutate(String(course.id));
                                 }}
-                                aria-label="Save course"
+                                aria-label={
+                                  isCourseSaved ? "Unsave course" : "Save course"
+                                }
                                 className="bg-[#E6E7EB]/80 hover:bg-[#E6E7EB]/90 h-9 w-9 backdrop-blur-sm"
                               >
-                                <Bookmark className="h-4 w-4 text-black/80" />
+                                <Heart
+                                  className={`h-4 w-4 transition-colors ${
+                                    isCourseSaved
+                                      ? "text-red-500 fill-red-500 animate-heart-pop"
+                                      : "text-black/80"
+                                  }`}
+                                />
                               </Button>
                             </div>
                           </div>
@@ -1036,7 +1102,8 @@ const UserHome = () => {
                         </CardContent>
                       </Card>
                     </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

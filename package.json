@@ -42,6 +42,7 @@
     "@radix-ui/react-toggle": "^1.1.0",
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
+    "@react-three/fiber": "^8.18.0",
     "@supabase/supabase-js": "^2.50.0",
     "@tanstack/react-query": "^5.56.2",
     "axios": "^1.12.2",
@@ -55,6 +56,7 @@
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
+    "react-3d-icons": "^1.0.2",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
@@ -65,6 +67,7 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
+    "three": "^0.133.1",
     "uuid": "^13.0.0",
     "vaul": "^0.9.3",
     "zod": "^3.23.8"

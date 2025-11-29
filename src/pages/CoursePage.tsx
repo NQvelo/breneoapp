@@ -13,8 +13,7 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  Bookmark,
-  BookmarkCheck,
+  Heart,
   Loader2,
   Clock,
   Diamond,
@@ -230,8 +229,8 @@ const CoursePage = () => {
       setIsSaving(true);
 
       try {
-        // Use the new API endpoint
-        await apiClient.post(`/save-course/${id}`);
+        // Use the correct API endpoint with /api prefix and trailing slash
+        await apiClient.post(`/api/save-course/${id}/`);
       } catch (error: unknown) {
         console.error("Error saving course:", error);
 
@@ -461,12 +460,12 @@ const CoursePage = () => {
                       </>
                     ) : isSaved ? (
                       <>
-                        <BookmarkCheck className="h-4 w-4" />
+                        <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
                         Saved
                       </>
                     ) : (
                       <>
-                        <Bookmark className="h-4 w-4" />
+                        <Heart className="h-4 w-4" />
                         Save Course
                       </>
                     )}

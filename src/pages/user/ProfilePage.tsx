@@ -68,11 +68,13 @@ import {
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
-import { useQuery } from "@tanstack/react-query";
-import { Briefcase, GraduationCap, ArrowRight, MapPin } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Briefcase, GraduationCap, ArrowRight, MapPin, Heart, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
+import { jobService } from "@/api/jobs";
 
 interface SkillTestResult {
   final_role?: string;
@@ -278,6 +280,7 @@ const ProfilePage = () => {
   const { user, loading, logout } = useAuth();
   const isMobile = useMobile();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // State for skill test results
   const [skillResults, setSkillResults] = useState<SkillTestResult | null>(
@@ -343,6 +346,23 @@ const ProfilePage = () => {
   const manualSocialLinkUpdateRef = useRef(false);
   const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Fetch saved course IDs from API profile endpoint
+  const { data: savedCourseIds = [] } = useQuery<string[]>({
+    queryKey: ["savedCourseIds", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedCoursesArray = profileResponse.data?.saved_courses || [];
+        return savedCoursesArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved course IDs:", error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
+
   // Fetch saved courses from API profile endpoint
   const { data: savedCourses = [], isLoading: loadingSavedCourses } = useQuery({
     queryKey: ["savedCourses", user?.id],
@@ -354,34 +374,34 @@ const ProfilePage = () => {
         const response = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
         // Extract saved_courses array from profile response
-        let savedCourseIds: string[] = [];
+        let savedCourseIdsList: string[] = [];
 
         if (response.data && typeof response.data === "object") {
           const data = response.data as Record<string, unknown>;
 
           // Check for saved_courses in various possible locations
           if (Array.isArray(data.saved_courses)) {
-            savedCourseIds = data.saved_courses as string[];
+            savedCourseIdsList = data.saved_courses.map((id: string | number) => String(id));
           } else if (data.profile && typeof data.profile === "object") {
             const profile = data.profile as Record<string, unknown>;
             if (Array.isArray(profile.saved_courses)) {
-              savedCourseIds = profile.saved_courses as string[];
+              savedCourseIdsList = profile.saved_courses.map((id: string | number) => String(id));
             }
           } else if (data.user && typeof data.user === "object") {
             const userData = data.user as Record<string, unknown>;
             if (Array.isArray(userData.saved_courses)) {
-              savedCourseIds = userData.saved_courses as string[];
+              savedCourseIdsList = userData.saved_courses.map((id: string | number) => String(id));
             }
           }
         }
 
         // If no saved courses found, return empty array
-        if (!savedCourseIds || savedCourseIds.length === 0) {
+        if (!savedCourseIdsList || savedCourseIdsList.length === 0) {
           return [];
         }
 
         // Limit to 6 for display
-        const limitedIds = savedCourseIds.slice(0, 6);
+        const limitedIds = savedCourseIdsList.slice(0, 6);
 
         // Fetch course details from Supabase using the IDs from API
         const { data: coursesData, error: coursesError } = await supabase
@@ -456,31 +476,36 @@ const ProfilePage = () => {
           }
         }
 
+        console.log("📋 ProfilePage - Saved job IDs from API:", savedJobIds);
+
         // If no saved jobs found, return empty array
         if (!savedJobIds || savedJobIds.length === 0) {
+          console.log("📋 ProfilePage - No saved jobs found");
           return [];
         }
 
         // Limit to 6 for display
         const limitedIds = savedJobIds.slice(0, 6);
 
-        // Fetch job details for each saved job ID
+        // Try to fetch job details for each saved job ID
         const jobPromises = limitedIds.map(async (jobId) => {
           try {
+            console.log(`📋 ProfilePage - Fetching job detail for ID: ${jobId}`);
             const jobDetail = await fetchJobDetail(jobId);
+            console.log(`✅ ProfilePage - Successfully fetched job: ${jobId}`, jobDetail);
             return {
               id: jobId,
-              title: (jobDetail.job_title || jobDetail.title || "") as string,
+              title: (jobDetail.job_title || jobDetail.title || "Untitled Job") as string,
               company: (jobDetail.company_name ||
                 jobDetail.employer_name ||
                 jobDetail.company ||
-                "") as string,
+                "Unknown Company") as string,
               location: (jobDetail.location ||
                 jobDetail.job_location ||
                 [jobDetail.city, jobDetail.state, jobDetail.country]
                   .filter(Boolean)
                   .join(", ") ||
-                "") as string,
+                "Location not specified") as string,
               url: (jobDetail.job_apply_link ||
                 jobDetail.url ||
                 jobDetail.apply_url ||
@@ -502,12 +527,74 @@ const ProfilePage = () => {
                 | undefined,
             } as SavedJob;
           } catch (error) {
-            console.error(`Error fetching job detail for ID ${jobId}:`, error);
-            // Return a placeholder job if fetch fails
+            console.error(`❌ ProfilePage - Error fetching job detail for ID ${jobId}:`, error);
+            // Try fallback: fetch from batch and filter
+            try {
+              console.log(`🔄 ProfilePage - Trying fallback batch fetch for ${jobId}`);
+              const batchResponse = await jobService.fetchActiveJobs({
+                query: "",
+                filters: {
+                  country: "",
+                  countries: [],
+                  jobTypes: [],
+                  isRemote: false,
+                  datePosted: undefined,
+                  skills: [],
+                },
+                page: 1,
+                pageSize: 100,
+              });
+
+              const foundJob = batchResponse.jobs.find((job) => {
+                const foundId = String(job.job_id || job.id || "");
+                return foundId === String(jobId);
+              });
+
+              if (foundJob) {
+                console.log(`✅ ProfilePage - Found job ${jobId} in batch`);
+                const jobIdStr = String(foundJob.job_id || foundJob.id || "");
+                return {
+                  id: jobIdStr,
+                  title: (foundJob.job_title || foundJob.title || "Untitled Job") as string,
+                  company: (foundJob.company_name ||
+                    foundJob.employer_name ||
+                    foundJob.company ||
+                    "Unknown Company") as string,
+                  location: (foundJob.location ||
+                    [foundJob.job_city, foundJob.job_state, foundJob.job_country]
+                      .filter(Boolean)
+                      .join(", ") ||
+                    "Location not specified") as string,
+                  url: (foundJob.job_apply_link ||
+                    foundJob.url ||
+                    foundJob.apply_url ||
+                    "") as string,
+                  company_logo: (foundJob.company_logo ||
+                    foundJob.employer_logo ||
+                    foundJob.logo_url ||
+                    undefined) as string | undefined,
+                  salary: (foundJob.job_min_salary && foundJob.job_max_salary
+                    ? `${foundJob.job_min_salary}-${foundJob.job_max_salary} ${
+                        foundJob.job_salary_currency || ""
+                      }`
+                    : foundJob.salary || undefined) as string | undefined,
+                  employment_type: (foundJob.employment_type ||
+                    foundJob.job_employment_type ||
+                    undefined) as string | undefined,
+                  work_arrangement: (foundJob.job_is_remote || foundJob.is_remote ? "Remote" : undefined) as
+                    | string
+                    | undefined,
+                } as SavedJob;
+              }
+            } catch (fallbackError) {
+              console.error(`❌ ProfilePage - Fallback also failed for ${jobId}:`, fallbackError);
+            }
+
+            // Return a minimal job object so it still displays
             return {
               id: jobId,
-              title: "Job not found",
-              company: "",
+              title: `Job ${jobId}`,
+              company: "Details unavailable",
               location: "",
               url: "",
             } as SavedJob;
@@ -515,14 +602,148 @@ const ProfilePage = () => {
         });
 
         const jobs = await Promise.all(jobPromises);
-        // Filter out placeholder jobs if needed
-        return jobs.filter((job) => job.title !== "Job not found");
+        // Filter out jobs with "Details unavailable" if they have no other info
+        const validJobs = jobs.filter((job) => {
+          // Keep jobs that have at least a title that's not just "Job {id}"
+          return job.title && job.title !== `Job ${job.id}`;
+        });
+
+        console.log(`📋 ProfilePage - Returning ${validJobs.length} valid jobs out of ${jobs.length} total`);
+        return validJobs;
       } catch (error) {
-        console.error("Error fetching saved jobs from API profile:", error);
+        console.error("❌ ProfilePage - Error fetching saved jobs from API profile:", error);
         return [];
       }
     },
     enabled: !!user?.id,
+  });
+
+  // Save course mutation
+  const saveCourseMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      if (!user?.id) {
+        throw new Error("Please log in to save courses.");
+      }
+      await apiClient.post(`/api/save-course/${courseId}/`);
+    },
+    onMutate: async (courseId: string) => {
+      await queryClient.cancelQueries({
+        queryKey: ["savedCourses", user?.id],
+      });
+      const previousSavedCourses = queryClient.getQueryData<string[]>([
+        "savedCourses",
+        user?.id,
+      ]);
+      queryClient.setQueryData<string[]>(["savedCourses", user?.id], (prev) => {
+        if (!prev) return prev;
+        const idString = String(courseId);
+        return prev.includes(idString)
+          ? prev.filter((c) => c !== idString)
+          : [...prev, idString];
+      });
+      return { previousSavedCourses };
+    },
+    onError: (error, courseId, context) => {
+      if (context?.previousSavedCourses && user?.id) {
+        queryClient.setQueryData(
+          ["savedCourses", user?.id],
+          context.previousSavedCourses
+        );
+      }
+      console.error("Error updating saved courses:", error);
+      toast.error("Failed to update saved courses. Please try again.");
+    },
+    onSuccess: (_, courseId) => {
+      queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      const savedCoursesList = queryClient.getQueryData<string[]>([
+        "savedCourses",
+        user?.id,
+      ]);
+      const isCurrentlySaved = savedCoursesList?.includes(String(courseId));
+      toast.success(
+        isCurrentlySaved
+          ? "Removed from saved courses."
+          : "Course saved to your profile."
+      );
+    },
+  });
+
+  // Fetch saved job IDs for checking if jobs are saved
+  const { data: savedJobIds = [] } = useQuery<string[]>({
+    queryKey: ["savedJobIds", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedJobsArray = profileResponse.data?.saved_jobs || [];
+        return savedJobsArray.map((id: string | number) => String(id));
+      } catch (error) {
+        console.error("Error fetching saved job IDs:", error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
+
+  // Save job mutation
+  const saveJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      if (!user?.id) {
+        throw new Error("Please log in to save jobs.");
+      }
+      const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobId}/`;
+      await apiClient.post(endpoint);
+    },
+    onMutate: async (jobId: string) => {
+      await queryClient.cancelQueries({
+        queryKey: ["savedJobs", user?.id],
+      });
+      await queryClient.cancelQueries({
+        queryKey: ["savedJobIds", user?.id],
+      });
+      const previousSavedJobs = queryClient.getQueryData<string[]>([
+        "savedJobs",
+        user?.id,
+      ]);
+      const previousSavedJobIds = queryClient.getQueryData<string[]>([
+        "savedJobIds",
+        user?.id,
+      ]);
+      queryClient.setQueryData<string[]>(["savedJobIds", user?.id], (prev) => {
+        if (!prev) return prev;
+        const idString = String(jobId);
+        return prev.includes(idString)
+          ? prev.filter((j) => j !== idString)
+          : [...prev, idString];
+      });
+      return { previousSavedJobs, previousSavedJobIds };
+    },
+    onError: (error, jobId, context) => {
+      if (context?.previousSavedJobIds && user?.id) {
+        queryClient.setQueryData(
+          ["savedJobIds", user?.id],
+          context.previousSavedJobIds
+        );
+      }
+      console.error("Error updating saved jobs:", error);
+      toast.error("Failed to update saved jobs. Please try again.");
+    },
+    onSuccess: (_, jobId) => {
+      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["savedJobIds", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      const savedJobsList = queryClient.getQueryData<string[]>([
+        "savedJobIds",
+        user?.id,
+      ]);
+      const isCurrentlySaved = savedJobsList?.includes(String(jobId));
+      toast.success(
+        isCurrentlySaved
+          ? "Removed from saved jobs."
+          : "Job saved to your profile."
+      );
+    },
   });
 
   const phoneVerifiedFromServer = React.useMemo(() => {
@@ -2661,49 +2882,106 @@ const ProfilePage = () => {
             </CardHeader>
             <CardContent className="p-0">
               {loadingSavedCourses ? (
-                <div className="text-center py-4 text-gray-500 text-sm px-6">
-                  Loading...
-                </div>
-              ) : savedCourses.length > 0 ? (
-                <div>
-                  {savedCourses.map((course, index) => (
-                    <div
-                      key={course.id}
-                      className={`px-6 py-4 ${
-                        index < savedCourses.length - 1
-                          ? "border-b border-gray-200 dark:border-gray-700"
-                          : ""
-                      } cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
-                      onClick={() => navigate(`/course/${course.id}`)}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
-                          <img
-                            src={normalizeImagePath(course.image)}
-                            alt={course.title}
-                            className="w-12 h-12 rounded-3xl object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/lovable-uploads/no_photo.png";
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 line-clamp-1">
-                            {course.title}
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            {course.provider}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span>{course.level}</span>
-                            <span>•</span>
-                            <span>{course.duration}</span>
-                          </div>
+                <div className="px-6 py-4 space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-3 animate-pulse">
+                      <Skeleton className="w-12 h-12 rounded-3xl flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                        <Skeleton className="h-3 w-2/3" />
+                        <div className="flex items-center gap-2 mt-2">
+                          <Skeleton className="h-7 w-20" />
+                          <Skeleton className="h-7 w-7 rounded-full" />
                         </div>
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : savedCourses.length > 0 ? (
+                <div>
+                  {savedCourses.map((course, index) => {
+                    const isCourseSaved = savedCourseIds?.includes(String(course.id)) ?? false;
+                    return (
+                      <div
+                        key={course.id}
+                        className={`px-6 py-4 ${
+                          index < savedCourses.length - 1
+                            ? "border-b border-gray-200 dark:border-gray-700"
+                            : ""
+                        } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            <img
+                              src={normalizeImagePath(course.image)}
+                              alt={course.title}
+                              className="w-12 h-12 rounded-3xl object-cover cursor-pointer"
+                              onClick={() => navigate(`/course/${course.id}`)}
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = "/lovable-uploads/no_photo.png";
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h4 
+                                className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
+                                onClick={() => navigate(`/course/${course.id}`)}
+                              >
+                                {course.title}
+                              </h4>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 border-breneo-blue text-breneo-blue hover:bg-breneo-blue hover:text-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/course/${course.id}`);
+                                  }}
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-7 w-7 p-0 rounded-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveCourseMutation.mutate(course.id);
+                                  }}
+                                  disabled={saveCourseMutation.isPending}
+                                  aria-label={isCourseSaved ? "Unsave course" : "Save course"}
+                                >
+                                  {saveCourseMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Heart
+                                      className={`h-3 w-3 transition-colors ${
+                                        isCourseSaved
+                                          ? "text-red-500 fill-red-500 animate-heart-pop"
+                                          : "text-black"
+                                      }`}
+                                    />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              {course.provider}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span>{course.level}</span>
+                              <span>•</span>
+                              <span>{course.duration}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {savedCourses.length >= 6 && (
                     <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
                       <Button
@@ -2749,77 +3027,125 @@ const ProfilePage = () => {
             </CardHeader>
             <CardContent className="p-0">
               {loadingSavedJobs ? (
-                <div className="text-center py-4 text-gray-500 text-sm px-6">
-                  Loading...
-                </div>
-              ) : savedJobs.length > 0 ? (
-                <div>
-                  {savedJobs.map((job, index) => (
-                    <div
-                      key={job.id}
-                      className={`px-6 py-4 ${
-                        index < savedJobs.length - 1
-                          ? "border-b border-gray-200 dark:border-gray-700"
-                          : ""
-                      } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
-                          {job.company_logo ? (
-                            <img
-                              src={job.company_logo}
-                              alt={`${job.company} logo`}
-                              className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = "none";
-                                if (target.nextElementSibling) {
-                                  (
-                                    target.nextElementSibling as HTMLElement
-                                  ).style.display = "flex";
-                                }
-                              }}
-                            />
-                          ) : null}
-                          {!job.company_logo && (
-                            <div className="w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center">
-                              <Briefcase className="h-6 w-6 text-breneo-blue" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-1 line-clamp-1">
-                            {job.title}
-                          </h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            {job.company}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                            <MapPin className="h-3 w-3" />
-                            <span className="line-clamp-1">{job.location}</span>
-                          </div>
-                          {job.salary && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                              {job.salary}
-                            </p>
-                          )}
-                          {job.url && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-7 mt-1 border-breneo-blue text-breneo-blue hover:bg-breneo-blue hover:text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(job.url, "_blank");
-                              }}
-                            >
-                              View Job
-                            </Button>
-                          )}
+                <div className="px-6 py-4 space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-3 animate-pulse">
+                      <Skeleton className="w-12 h-12 rounded-3xl flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                        <Skeleton className="h-3 w-2/3" />
+                        <div className="flex items-center gap-2 mt-2">
+                          <Skeleton className="h-7 w-20" />
+                          <Skeleton className="h-7 w-7 rounded-full" />
                         </div>
                       </div>
                     </div>
                   ))}
+                </div>
+              ) : savedJobs.length > 0 ? (
+                <div>
+                  {savedJobs.map((job, index) => {
+                    const isJobSaved = savedJobIds?.includes(String(job.id)) ?? false;
+                    return (
+                      <div
+                        key={job.id}
+                        className={`px-6 py-4 ${
+                          index < savedJobs.length - 1
+                            ? "border-b border-gray-200 dark:border-gray-700"
+                            : ""
+                        } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex-shrink-0">
+                            {job.company_logo ? (
+                              <img
+                                src={job.company_logo}
+                                alt={`${job.company} logo`}
+                                className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = "none";
+                                  if (target.nextElementSibling) {
+                                    (
+                                      target.nextElementSibling as HTMLElement
+                                    ).style.display = "flex";
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            {!job.company_logo && (
+                              <div className="w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center">
+                                <Briefcase className="h-6 w-6 text-breneo-blue" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <h4 
+                                className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
+                                onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
+                              >
+                                {job.title}
+                              </h4>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 border-breneo-blue text-breneo-blue hover:bg-breneo-blue hover:text-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (job.url) {
+                                      window.open(job.url, "_blank");
+                                    } else {
+                                      navigate(`/jobs/${encodeURIComponent(job.id)}`);
+                                    }
+                                  }}
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-7 w-7 p-0 rounded-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveJobMutation.mutate(job.id);
+                                  }}
+                                  disabled={saveJobMutation.isPending}
+                                  aria-label={isJobSaved ? "Unsave job" : "Save job"}
+                                >
+                                  {saveJobMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Heart
+                                      className={`h-3 w-3 transition-colors ${
+                                        isJobSaved
+                                          ? "text-red-500 fill-red-500 animate-heart-pop"
+                                          : "text-black"
+                                      }`}
+                                    />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                              {job.company}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                              <MapPin className="h-3 w-3" />
+                              <span className="line-clamp-1">{job.location}</span>
+                            </div>
+                            {job.salary && (
+                              <p className="text-xs text-gray-600 dark:text-gray-400">
+                                {job.salary}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {savedJobs.length >= 6 && (
                     <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
                       <Button

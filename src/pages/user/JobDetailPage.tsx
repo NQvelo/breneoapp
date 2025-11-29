@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
-  Bookmark,
+  Heart,
   ArrowLeft,
   Briefcase,
   MapPin,
@@ -34,7 +34,6 @@ import {
   FileText,
   CheckCircle2,
   Sparkles,
-  Heart,
   Smile,
   Shield,
   Car,
@@ -501,13 +500,8 @@ const JobDetailPage = () => {
         const jobIdForSaveString = String(jobIdForSave);
         const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobIdForSaveString}/`;
 
-        if (isSaved) {
-          // Unsave: DELETE request
-          await apiClient.delete(endpoint);
-        } else {
-          // Save: POST request
-          await apiClient.post(endpoint);
-        }
+        // Backend toggles save/unsave on POST
+        await apiClient.post(endpoint);
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error
@@ -1404,9 +1398,11 @@ const JobDetailPage = () => {
                           aria-label={isSaved ? "Unsave job" : "Save job"}
                           className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
                         >
-                          <Bookmark
+                          <Heart
                             className={`h-4 w-4 ${
-                              isSaved ? "fill-current" : ""
+                              isSaved
+                                ? "text-red-500 fill-red-500 animate-heart-pop"
+                                : ""
                             }`}
                           />
                         </Button>
@@ -1968,8 +1964,12 @@ const JobDetailPage = () => {
                     aria-label={isSaved ? "Unsave job" : "Save job"}
                     className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
                   >
-                    <Bookmark
-                      className={`h-4 w-4 ${isSaved ? "fill-current" : ""}`}
+                    <Heart
+                      className={`h-4 w-4 ${
+                        isSaved
+                          ? "text-red-500 fill-red-500 animate-heart-pop"
+                          : ""
+                      }`}
                     />
                   </Button>
                 )}

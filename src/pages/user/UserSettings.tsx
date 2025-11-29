@@ -43,7 +43,7 @@ import {
   Info,
   Briefcase,
   GraduationCap,
-  BookmarkCheck,
+  Heart,
   ExternalLink,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
@@ -574,8 +574,8 @@ export default function SettingsPage() {
     mutationFn: async (courseId: string) => {
       if (!user?.id) throw new Error("User not logged in");
 
-      // Use the new API endpoint (toggles save/unsave)
-      await apiClient.post(`/save-course/${courseId}`);
+      // Use the correct API endpoint (toggles save/unsave)
+      await apiClient.post(`/api/save-course/${courseId}/`);
     },
     onMutate: async (courseId: string) => {
       // Cancel any outgoing refetches
@@ -1565,7 +1565,7 @@ export default function SettingsPage() {
                             disabled={unsaveJobMutation.isPending}
                             className="text-destructive hover:text-destructive"
                           >
-                            <BookmarkCheck className="h-4 w-4" />
+                            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
                           </Button>
                         </div>
                       </div>
@@ -1605,7 +1605,7 @@ export default function SettingsPage() {
                             disabled={unsaveJobMutation.isPending}
                             className="text-destructive hover:text-destructive"
                           >
-                            <BookmarkCheck className="h-4 w-4" />
+                            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
                           </Button>
                         </div>
                       </div>
@@ -1686,7 +1686,7 @@ export default function SettingsPage() {
                             disabled={unsaveCourseMutation.isPending}
                             className="text-destructive hover:text-destructive"
                           >
-                            <BookmarkCheck className="h-4 w-4" />
+                            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
                           </Button>
                         </div>
                       </div>

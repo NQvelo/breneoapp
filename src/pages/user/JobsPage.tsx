@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Bookmark,
+  Heart,
   AlertCircle,
   Filter,
   ChevronLeft,
@@ -573,7 +573,8 @@ const fetchInternshipJobs = async (
 
 // Fetch latest regular jobs without any filtering
 const fetchLatestJobs = async (
-  page: number = 1
+  page: number = 1,
+  userTopSkills: string[] = []
 ): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
@@ -584,15 +585,17 @@ const fetchLatestJobs = async (
       `🚀 fetchLatestJobs called - fetching regular jobs page ${page}`
     );
 
+    // If user has skills but we want all jobs, don't filter by skills
+    // This function is for the JobsPage which shows all jobs
     const response = await jobService.fetchActiveJobs({
-      query: "", // No search term
+      query: "", // No search term - will use "jobs" as default in jobService
       filters: {
         country: undefined,
         countries: [], // No country filtering
         jobTypes: [], // No job type filtering (will exclude interns client-side)
         isRemote: undefined,
         datePosted: undefined,
-        skills: [], // No skill filtering
+        skills: [], // No skill filtering - show all jobs
         salaryMin: undefined,
         salaryMax: undefined,
         salaryByAgreement: undefined,
@@ -902,8 +905,8 @@ const JobsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["latestJobs", regularJobsPage],
-    queryFn: () => fetchLatestJobs(regularJobsPage),
+    queryKey: ["latestJobs", regularJobsPage, userTopSkills.join(",")],
+    queryFn: () => fetchLatestJobs(regularJobsPage, userTopSkills),
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -1057,35 +1060,10 @@ const JobsPage = () => {
       const isSaved = job.is_saved;
 
       try {
-        // Fetch current profile to get existing saved_jobs array
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const currentSavedJobs = profileResponse.data?.saved_jobs || [];
+        const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobId}/`;
 
-        let updatedSavedJobs: string[];
-
-        const jobIdString = String(job.id);
-        if (isSaved) {
-          // Unsave: Remove job ID from array
-          updatedSavedJobs = currentSavedJobs.filter(
-            (id: string | number) => String(id) !== jobIdString
-          );
-        } else {
-          // Save: Add job ID to array if not already present
-          if (
-            currentSavedJobs.some(
-              (id: string | number) => String(id) === jobIdString
-            )
-          ) {
-            // Already saved, treat as success
-            return;
-          }
-          updatedSavedJobs = [...currentSavedJobs, jobIdString];
-        }
-
-        // Update profile with new saved_jobs array
-        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-          saved_jobs: updatedSavedJobs,
-        });
+        // Backend toggles save/unsave on POST
+        await apiClient.post(endpoint);
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error
@@ -2099,9 +2077,11 @@ const JobsPage = () => {
                       aria-label={job.is_saved ? "Unsave job" : "Save job"}
                       className={job.is_saved ? "bg-primary/90" : ""}
                     >
-                      <Bookmark
+                      <Heart
                         className={`h-5 w-5 transition-colors ${
-                          job.is_saved ? "fill-white text-white" : "text-white"
+                          job.is_saved
+                            ? "text-red-500 fill-red-500 animate-heart-pop"
+                            : "text-white"
                         }`}
                       />
                     </Button>
@@ -2311,17 +2291,17 @@ const JobsPage = () => {
                       >
                         View
                       </Button>
-                      <Button
+                    <Button
                         variant="default"
                         size="icon"
                         onClick={() => saveJobMutation.mutate(job)}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
                         className={job.is_saved ? "bg-primary/90" : ""}
                       >
-                        <Bookmark
+                        <Heart
                           className={`h-5 w-5 transition-colors ${
                             job.is_saved
-                              ? "fill-white text-white"
+                              ? "text-red-500 fill-red-500 animate-heart-pop"
                               : "text-white"
                           }`}
                         />

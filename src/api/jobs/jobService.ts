@@ -69,11 +69,11 @@ const fetchJobsFromJSearchAPI = async (
 
   // Add query/search term (required)
   // Query is already built in fetchActiveJobs (includes search term + skills)
-  // So we just use it here, or default to "developer"
+  // So we just use it here, or default to "jobs" for broad search
   if (query && query.trim()) {
     urlParams.append("query", query.trim());
   } else {
-    urlParams.append("query", "developer"); // Default query
+    urlParams.append("query", "jobs"); // Default query - broad search to get all jobs
   }
 
   // Add page and num_pages
@@ -573,13 +573,15 @@ export const fetchActiveJobs = async (
       queryParts.push(params.query.trim());
     }
 
-    // Add skills to query
+    // Add skills to query ONLY if skills are provided and not empty
+    // Note: The caller should handle the "all interests selected" case by passing empty skills array
     if (params.filters.skills.length > 0) {
       queryParts.push(...params.filters.skills);
     }
 
-    // Combine all query parts - if empty, use default
-    const query = queryParts.length > 0 ? queryParts.join(" ") : "developer";
+    // If no query parts, use a broad search term to get all jobs
+    // Using "jobs" as a very broad term that will return many results
+    const query = queryParts.length > 0 ? queryParts.join(" ") : "jobs";
 
     // Pass filters as-is - only add filters when user explicitly changes them
     // No default filters are applied here

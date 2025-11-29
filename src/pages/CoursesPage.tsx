@@ -15,8 +15,7 @@ import {
 } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Bookmark,
-  BookmarkCheck,
+  Heart,
   Filter,
   Search,
   GraduationCap,
@@ -858,8 +857,8 @@ const CoursesPage = () => {
           throw new Error("Please log in to save courses.");
         }
 
-        // Use the new API endpoint
-        await apiClient.post(`/save-course/${id}`);
+        // Use the correct API endpoint with /api prefix and trailing slash
+        await apiClient.post(`/api/save-course/${id}/`);
       },
       onMutate: async (id: string) => {
         // Cancel any outgoing refetches
@@ -874,16 +873,18 @@ const CoursesPage = () => {
         ]);
 
         // Optimistically update to the new value
+        let wasSaved = false;
         queryClient.setQueryData<string[]>(["savedCourses", userId], (prev) => {
           if (!prev) return prev;
           const idString = String(id);
-          return prev.includes(idString)
+          wasSaved = prev.includes(idString);
+          return wasSaved
             ? prev.filter((c) => c !== idString)
             : [...prev, idString];
         });
 
         // Return a context object with the snapshotted value
-        return { previousSavedCourses };
+        return { previousSavedCourses, wasSaved };
       },
       onError: (error, id, context) => {
         // If the mutation fails, use the context returned from onMutate to roll back
@@ -897,16 +898,16 @@ const CoursesPage = () => {
         console.error("Error updating saved courses:", error);
         toast.error("Failed to update saved courses. Please try again.");
       },
-      onSuccess: (_, id) => {
+      onSuccess: (_, id, context) => {
         // Invalidate queries to ensure consistency
         queryClient.invalidateQueries({ queryKey: ["savedCourses", userId] });
         queryClient.invalidateQueries({ queryKey: ["courses"] });
         queryClient.invalidateQueries({ queryKey: ["profile"] });
 
         const idString = String(id);
-        const isCurrentlySaved = savedCourses?.includes(idString);
+        const wasSaved = context?.wasSaved ?? false;
         toast.success(
-          isCurrentlySaved
+          wasSaved
             ? "Removed from saved courses."
             : "Course saved to your profile."
         );
@@ -922,11 +923,13 @@ const CoursesPage = () => {
         disabled={saveCourseMutation.isPending}
         aria-label={course.is_saved ? "Unsave course" : "Save course"}
       >
-        {course.is_saved ? (
-          <BookmarkCheck className="h-5 w-5 fill-black text-black" />
-        ) : (
-          <Bookmark className="h-5 w-5 text-gray-400 hover:text-black transition-colors" />
-        )}
+        <Heart
+          className={`h-5 w-5 transition-colors ${
+            course.is_saved
+              ? "text-red-500 fill-red-500 animate-heart-pop"
+              : "text-gray-400 hover:text-black"
+          }`}
+        />
       </Button>
     );
   };
@@ -1226,7 +1229,10 @@ const CoursesPage = () => {
                   className="group flex items-center gap-2 bg-transparent border border-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
                   aria-label="Filter courses"
                 >
-                  <SlidersHorizontal className="h-4 w-4 group-hover:text-white" strokeWidth={2} />
+                  <SlidersHorizontal
+                    className="h-4 w-4 group-hover:text-white"
+                    strokeWidth={2}
+                  />
                   <span className="hidden md:inline text-sm font-medium">
                     ფილტრები
                   </span>

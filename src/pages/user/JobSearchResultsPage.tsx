@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
   Filter,
-  Bookmark,
+  Heart,
   MapPin,
   Clock,
   Briefcase,
@@ -236,6 +236,32 @@ const JobSearchResultsPage = () => {
     };
   });
 
+  // Sync activeFilters when URL params change
+  useEffect(() => {
+    const countriesParam = searchParams.get("countries");
+    const skillsParam = searchParams.get("skills");
+    const jobTypesParam = searchParams.get("jobTypes");
+    const isRemoteParam = searchParams.get("isRemote");
+    const datePostedParam = searchParams.get("datePosted");
+    const salaryMinParam = searchParams.get("salaryMin");
+    const salaryMaxParam = searchParams.get("salaryMax");
+    const salaryByAgreementParam = searchParams.get("salaryByAgreement");
+
+    setActiveFilters({
+      country: "Georgia",
+      countries: countriesParam
+        ? countriesParam.split(",").filter(Boolean)
+        : [],
+      jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
+      isRemote: isRemoteParam === "true",
+      datePosted: datePostedParam || undefined,
+      skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
+      salaryMin: salaryMinParam ? parseInt(salaryMinParam, 10) : undefined,
+      salaryMax: salaryMaxParam ? parseInt(salaryMaxParam, 10) : undefined,
+      salaryByAgreement: salaryByAgreementParam === "true",
+    });
+  }, [searchParams]);
+
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
 
   // Helper function to count active filters
@@ -322,12 +348,27 @@ const JobSearchResultsPage = () => {
   const fetchJobs = async (
     searchTerm: string,
     filters: JobFilters,
-    page: number
+    page: number,
+    userTopSkills: string[]
   ): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
     try {
+      // If all interests are selected, treat as no filter (load all jobs)
+      const allInterestsSelected = 
+        userTopSkills.length > 0 && 
+        filters.skills.length > 0 &&
+        userTopSkills.every(skill => filters.skills.includes(skill)) &&
+        filters.skills.length === userTopSkills.length;
+
+      // Prepare filters for API call
+      const filtersForAPI: JobFilters = {
+        ...filters,
+        // If all interests selected, clear skills filter to get all jobs
+        skills: allInterestsSelected ? [] : filters.skills,
+      };
+
       const response = await jobService.fetchActiveJobs({
         query: searchTerm || "",
-        filters,
+        filters: filtersForAPI,
         page,
         pageSize: 12,
       });
@@ -336,10 +377,49 @@ const JobSearchResultsPage = () => {
         return { jobs: [], hasMore: false, total: 0 };
       }
 
-      const validJobs = response.jobs.filter((job) => {
+      let validJobs = response.jobs.filter((job) => {
         const jobId = job.job_id || job.id;
         return jobId && jobId.trim() !== "";
       });
+
+      // Apply client-side salary filtering
+      if (filters.salaryMin !== undefined || filters.salaryMax !== undefined || filters.salaryByAgreement) {
+        validJobs = validJobs.filter((job) => {
+          const minSalary = job.job_min_salary || job.min_salary;
+          const maxSalary = job.job_max_salary || job.max_salary;
+
+          // If "by agreement" is checked, include jobs without salary info
+          if (filters.salaryByAgreement && (!minSalary && !maxSalary)) {
+            return true;
+          }
+
+          // If no salary info and "by agreement" is not checked, exclude if salary filters are set
+          if (!minSalary && !maxSalary && !filters.salaryByAgreement) {
+            // If salary filters are set, exclude jobs without salary
+            if (filters.salaryMin !== undefined || filters.salaryMax !== undefined) {
+              return false;
+            }
+            return true;
+          }
+
+          // Check if job salary matches the range
+          if (filters.salaryMin !== undefined && maxSalary && maxSalary < filters.salaryMin) {
+            return false;
+          }
+          if (filters.salaryMax !== undefined && minSalary && minSalary > filters.salaryMax) {
+            return false;
+          }
+
+          return true;
+        });
+      }
+
+      // Apply client-side remote filter if needed (API should handle this, but double-check)
+      if (filters.isRemote) {
+        validJobs = validJobs.filter((job) => {
+          return job.job_is_remote || job.is_remote || job.remote === true;
+        });
+      }
 
       return {
         jobs: validJobs,
@@ -359,6 +439,9 @@ const JobSearchResultsPage = () => {
       jobTypes: activeFilters.jobTypes.sort(),
       isRemote: activeFilters.isRemote,
       datePosted: activeFilters.datePosted,
+      salaryMin: activeFilters.salaryMin,
+      salaryMax: activeFilters.salaryMax,
+      salaryByAgreement: activeFilters.salaryByAgreement,
     });
   }, [activeFilters]);
 
@@ -367,8 +450,8 @@ const JobSearchResultsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["job-search", searchTerm, filtersKey, page],
-    queryFn: () => fetchJobs(searchTerm, activeFilters, page),
+    queryKey: ["job-search", searchTerm, filtersKey, page, userTopSkills.join(",")],
+    queryFn: () => fetchJobs(searchTerm, activeFilters, page, userTopSkills),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -567,13 +650,8 @@ const JobSearchResultsPage = () => {
       try {
         const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobId}/`;
 
-        if (isSaved) {
-          // Unsave: DELETE request
-          await apiClient.delete(endpoint);
-        } else {
-          // Save: POST request
-          await apiClient.post(endpoint);
-        }
+        // Backend toggles save/unsave on POST
+        await apiClient.post(endpoint);
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error
@@ -731,6 +809,16 @@ const JobSearchResultsPage = () => {
                         const newFilters = {
                           ...activeFilters,
                           jobTypes: types,
+                        };
+                        setActiveFilters(newFilters);
+                        setTempFilters(newFilters);
+                        updateUrlWithFilters(newFilters, searchTerm, 1);
+                      }}
+                      isRemote={activeFilters.isRemote}
+                      onRemoteChange={(isRemote) => {
+                        const newFilters = {
+                          ...activeFilters,
+                          isRemote: isRemote,
                         };
                         setActiveFilters(newFilters);
                         setTempFilters(newFilters);
@@ -938,10 +1026,10 @@ const JobSearchResultsPage = () => {
                               }}
                               className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-9 w-9 p-0 rounded-full flex-shrink-0"
                             >
-                              <Bookmark
+                              <Heart
                                 className={`h-4 w-4 ${
                                   job.is_saved
-                                    ? "fill-black text-black"
+                                    ? "text-red-500 fill-red-500 animate-heart-pop"
                                     : "text-black"
                                 }`}
                               />
@@ -977,10 +1065,10 @@ const JobSearchResultsPage = () => {
                                 }}
                                 className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-9 w-9 p-0 absolute right-0 rounded-full"
                               >
-                                <Bookmark
+                                <Heart
                                   className={`h-4 w-4 ${
                                     job.is_saved
-                                      ? "fill-black text-black"
+                                      ? "text-red-500 fill-red-500 animate-heart-pop"
                                       : "text-black"
                                   }`}
                                 />
