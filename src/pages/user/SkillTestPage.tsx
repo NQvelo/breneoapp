@@ -5,9 +5,10 @@ import {
 } from "@/components/skills/DynamicSkillTest";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { Play, CheckCircle2 } from "lucide-react";
 
-// Progress Bar Component
+/* ----------------------------- Progress Bar ----------------------------- */
+
 const ProgressBar = ({
   phase,
   currentTechQ,
@@ -17,134 +18,98 @@ const ProgressBar = ({
   currentTechQ: Question | null;
   currentSoftQ: Question | null;
 }) => {
-  // Determine current stage (1, 2, or 3)
-  let currentStage = 0;
-  let stageName = "";
+  const stage =
+    phase === "career" ? 1 : phase === "assessment" && currentTechQ ? 2 : 3;
 
-  if (phase === "career") {
-    currentStage = 1;
-    stageName = "Interest Questions";
-  } else if (phase === "assessment" && currentTechQ) {
-    currentStage = 2;
-    stageName = "Tech Skills";
-  } else if (phase === "assessment" && currentSoftQ) {
-    currentStage = 3;
-    stageName = "Soft Skills";
-  } else if (phase === "finished") {
-    currentStage = 3;
-    stageName = "Complete!";
-  }
-
-  const stages = [
-    { number: 1, label: "Interest Questions" },
-    { number: 2, label: "Tech Skills" },
-    { number: 3, label: "Soft Skills" },
+  const steps = [
+    { index: 1, name: "Career" },
+    { index: 2, name: "Tech" },
+    { index: 3, name: "Soft" },
   ];
 
-  return (
-    <div className="mb-8 max-w-xl mx-auto">
-      {/* Progress Bar */}
-      <div className="relative mb-4">
-        <div className="flex items-center justify-between">
-          {/* Stage 1 */}
-          <div className="flex flex-col items-center flex-1">
-            <div
-              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
-                currentStage >= 1
-                  ? "bg-[#01bfff] text-white scale-110 shadow-lg dark:shadow-blue-500/20"
-                  : "bg-gray-200 dark:bg-muted text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              <span className="transition-all duration-300">
-                {currentStage > 1 ? "✓" : "1"}
-              </span>
-            </div>
-            <span
-              className={`text-[10px] md:text-xs mt-1 md:mt-2 text-center transition-all duration-300 ${
-                currentStage >= 1
-                  ? "text-[#01bfff] font-semibold dark:text-[#5AC9F8]"
-                  : "text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              Interest
-            </span>
-          </div>
-
-          {/* Connector Line 1 */}
-          <div
-            className={`flex-1 h-1 mx-1 md:mx-2 transition-all duration-500 ease-in-out ${
-              currentStage > 1 ? "bg-[#01bfff]" : "bg-gray-200 dark:bg-muted"
+  const renderStep = (step: { index: number; name: string }) => {
+    const isActive = stage >= step.index;
+    const isCompleted = stage > step.index;
+    return (
+      <div className="flex-1 min-w-[80px] md:min-w-[120px]">
+        <div
+          className={`h-6 md:h-8 rounded-full transition-all duration-500 flex items-center justify-start px-3 md:px-4 gap-2 ${
+            isCompleted
+              ? "bg-green-500 dark:bg-green-600"
+              : isActive
+              ? "bg-[#01bfff]"
+              : "bg-gray-200 dark:bg-gray-700"
+          }`}
+        >
+          <span
+            className={`text-xs md:text-sm font-semibold transition-colors duration-500 ${
+              isActive || isCompleted
+                ? "text-white"
+                : "text-gray-500 dark:text-gray-400"
             }`}
-          ></div>
-
-          {/* Stage 2 */}
-          <div className="flex flex-col items-center flex-1">
-            <div
-              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
-                currentStage >= 2
-                  ? "bg-[#01bfff] text-white scale-110 shadow-lg dark:shadow-blue-500/20"
-                  : "bg-gray-200 dark:bg-muted text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              <span className="transition-all duration-300">
-                {currentStage > 2 ? "✓" : "2"}
-              </span>
-            </div>
-            <span
-              className={`text-[10px] md:text-xs mt-1 md:mt-2 text-center transition-all duration-300 ${
-                currentStage >= 2
-                  ? "text-[#01bfff] font-semibold dark:text-[#5AC9F8]"
-                  : "text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              Tech Skills
-            </span>
-          </div>
-
-          {/* Connector Line 2 */}
-          <div
-            className={`flex-1 h-1 mx-1 md:mx-2 transition-all duration-500 ease-in-out ${
-              currentStage > 2 ? "bg-[#01bfff]" : "bg-gray-200 dark:bg-muted"
-            }`}
-          ></div>
-
-          {/* Stage 3 */}
-          <div className="flex flex-col items-center flex-1">
-            <div
-              className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold transition-all duration-300 ease-in-out ${
-                currentStage >= 3
-                  ? "bg-[#01bfff] text-white scale-110 shadow-lg dark:shadow-blue-500/20"
-                  : "bg-gray-200 dark:bg-muted text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              <span className="transition-all duration-300">
-                {currentStage > 3 ? "✓" : "3"}
-              </span>
-            </div>
-            <span
-              className={`text-[10px] md:text-xs mt-1 md:mt-2 text-center transition-all duration-300 ${
-                currentStage >= 3
-                  ? "text-[#01bfff] font-semibold dark:text-[#5AC9F8]"
-                  : "text-gray-500 dark:text-muted-foreground"
-              }`}
-            >
-              Soft Skills
-            </span>
-          </div>
+          >
+            {step.name}
+          </span>
+          {isCompleted && (
+            <CheckCircle2 className="w-3 h-3 md:w-4 md:h-4 text-white flex-shrink-0" />
+          )}
         </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-full max-w-[280px] md:max-w-[600px]">
+      <div className="flex items-center gap-1.5 md:gap-2">
+        {steps.map((step) => renderStep(step))}
       </div>
     </div>
   );
 };
 
-// Start Screen Component
+/* ----------------------------- Start Screen ----------------------------- */
+
 const StartScreen = ({ onStart }: { onStart: () => void }) => {
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-xl mx-auto mb-12">
-      <div className="w-full p-8 mb-12 bg-white dark:bg-card rounded-3xl border border-gray-200 dark:border-border">
-        {/* Header Section - Centered */}
+    <div className="flex flex-col items-center justify-center w-full max-w-xl mx-auto">
+      {/* Logo */}
+      <div className="mb-8">
+        {!logoLoaded && !imageError && (
+          <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 animate-pulse rounded flex items-center justify-center mx-auto mb-4">
+            <span className="text-xs text-gray-400">Loading...</span>
+          </div>
+        )}
+
+        {!imageError ? (
+          <img
+            src="/lovable-uploads/breneo_logo.png"
+            alt="Breneo Logo"
+            className={`h-10 mx-auto transition-opacity duration-300 ${
+              logoLoaded ? "opacity-100" : "opacity-0"
+            }`}
+            onLoad={() => setLogoLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setLogoLoaded(true);
+            }}
+          />
+        ) : (
+          <div className="h-10 w-32 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Breneo
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Card */}
+      <div className="w-full p-8 bg-white dark:bg-card rounded-3xl border border-gray-200 dark:border-border">
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center mb-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center mb-4 shadow-md">
             <Play className="w-8 h-8 text-white" fill="white" />
           </div>
 
@@ -152,76 +117,60 @@ const StartScreen = ({ onStart }: { onStart: () => void }) => {
             Skill Assessment Test
           </h1>
           <p className="text-base text-gray-600 dark:text-muted-foreground">
-            This test will evaluate your abilities across three key areas
+            This test will evaluate your abilities across three key areas.
           </p>
         </div>
 
-        {/* Sections List - Left Aligned */}
+        {/* Steps list */}
         <div className="space-y-3 mb-8">
-          <div className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
-            <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">1</span>
+          {[
+            {
+              title: "Interest Questions",
+              desc: "Help us understand your career interests and preferences",
+            },
+            {
+              title: "Tech Skills",
+              desc: "Assess your technical knowledge and expertise",
+            },
+            {
+              title: "Soft Skills",
+              desc: "Evaluate your communication and interpersonal abilities",
+            },
+          ].map((item, index) => (
+            <div
+              key={index}
+              className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent"
+            >
+              <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-sm">
+                  {index + 1}
+                </span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-foreground mb-1">
+                  {item.title}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-muted-foreground">
+                  {item.desc}
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-foreground mb-1">
-                Interest Questions
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-muted-foreground">
-                Help us understand your career interests and preferences
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
-            <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">2</span>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-foreground mb-1">
-                Tech Skills
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-muted-foreground">
-                Assess your technical knowledge and expertise
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-4 p-4 rounded-3xl border border-blue-100 dark:border-border bg-gradient-to-br from-blue-50 to-transparent dark:from-muted dark:to-transparent transition-all">
-            <div className="w-7 h-7 rounded-3xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] flex items-center justify-center flex-shrink-0">
-              <span className="text-white font-bold text-sm">3</span>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-foreground mb-1">
-                Soft Skills
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-muted-foreground">
-                Evaluate your communication and interpersonal abilities
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Button */}
-        <div className="mb-6">
-          <Button
-            onClick={onStart}
-            size="lg"
-            className="w-full bg-[#01bfff] hover:bg-[#01bfff]/90 dark:bg-[#5AC9F8] dark:hover:bg-[#5AC9F8]/90 text-white font-semibold"
-          >
-            <Play />
-            Start Test
-          </Button>
-        </div>
-
-        {/* Footer Note */}
-        <p className="text-xs text-center text-gray-500 dark:text-muted-foreground">
-          Please answer all questions honestly. The test will take approximately
-          10-15 minutes.
-        </p>
+        {/* Start Button */}
+        <Button
+          className="w-full text-white font-medium rounded-2xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90 h-12 text-base"
+          onClick={onStart}
+        >
+          Start the Test
+        </Button>
       </div>
     </div>
   );
 };
+
+/* ----------------------------- Skill Test Page ----------------------------- */
 
 const SkillTestPage = () => {
   const [testStarted, setTestStarted] = useState(false);
@@ -230,11 +179,19 @@ const SkillTestPage = () => {
   );
   const [currentTechQ, setCurrentTechQ] = useState<Question | null>(null);
   const [currentSoftQ, setCurrentSoftQ] = useState<Question | null>(null);
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  const layoutProps = {
+    showSidebar: false,
+    showHeader: false,
+    background: "white" as const,
+  };
 
   if (!testStarted) {
     return (
-      <DashboardLayout>
-        <div className="pb-32 md:pb-0">
+      <DashboardLayout {...layoutProps}>
+        <div className="flex flex-col items-center justify-center h-full w-full bg-[#F8F9FA] dark:bg-[#181818]">
           <StartScreen onStart={() => setTestStarted(true)} />
         </div>
       </DashboardLayout>
@@ -242,20 +199,74 @@ const SkillTestPage = () => {
   }
 
   return (
-    <DashboardLayout>
-      <div className="pb-32 md:pb-0">
-        {/* Progress Bar */}
-        <ProgressBar
-          phase={phase}
-          currentTechQ={currentTechQ}
-          currentSoftQ={currentSoftQ}
-        />
-        {/* <h1 className="text-2xl font-bold text-breneo-navy mb-6">Skill Assessment</h1> */}
-        <DynamicSkillTest
-          onPhaseChange={setPhase}
-          onTechQChange={setCurrentTechQ}
-          onSoftQChange={setCurrentSoftQ}
-        />
+    <DashboardLayout {...layoutProps}>
+      <div className="flex flex-col h-full w-full bg-[#F8F9FA] dark:bg-[#181818]">
+        {/* Logo and Progress Bar - Top of page, Logo left, Progress right */}
+        <div className="w-full flex items-center justify-between px-6 py-6 md:px-8 md:py-6">
+          {/* Breneo Logo - Left */}
+          <div className="flex-shrink-0">
+            {!logoLoaded && !imageError && (
+              <div className="h-8 w-8 md:w-28 bg-gray-200 dark:bg-gray-700 animate-pulse rounded flex items-center justify-center">
+                <span className="text-xs text-gray-400 hidden md:inline">
+                  Loading...
+                </span>
+              </div>
+            )}
+            <img
+              src="/lovable-uploads/breneo-only-logo.png"
+              alt="Breneo Logo"
+              className={`h-8 w-8 md:hidden transition-opacity duration-300 ${
+                logoLoaded ? "opacity-100" : "opacity-0"
+              }`}
+              onLoad={() => setLogoLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setLogoLoaded(true);
+              }}
+            />
+            <img
+              src="/lovable-uploads/breneo_logo.png"
+              alt="Breneo Logo"
+              className={`hidden md:block h-8 transition-opacity duration-300 ${
+                logoLoaded ? "opacity-100" : "opacity-0"
+              }`}
+              onLoad={() => setLogoLoaded(true)}
+              onError={() => {
+                setImageError(true);
+                setLogoLoaded(true);
+              }}
+            />
+            {imageError && (
+              <div className="h-8 w-8 md:w-28 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+                <span className="text-xs text-gray-600 dark:text-gray-400 hidden md:inline">
+                  Breneo
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Progress Bar - Right */}
+          <div className="flex-shrink-0">
+            <ProgressBar
+              phase={phase}
+              currentTechQ={currentTechQ}
+              currentSoftQ={currentSoftQ}
+            />
+          </div>
+        </div>
+
+        {/* Test Content - Fully Stretched */}
+        <div className="flex-1 w-full overflow-y-auto px-[15px] pb-[15px] pt-2">
+          <div className="h-full w-full rounded-lg bg-white dark:bg-[#242424] p-8 md:p-[15rem] overflow-y-auto">
+            <div className="max-w-xl mx-auto">
+              <DynamicSkillTest
+                onPhaseChange={setPhase}
+                onTechQChange={setCurrentTechQ}
+                onSoftQChange={setCurrentSoftQ}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );

@@ -1,14 +1,23 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
-import { Bell, Users, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
+import {
+  Bell,
+  Users,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Settings,
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useJobNotifications } from "@/hooks/useJobNotifications";
 
 // Define the shape of a notification
 interface Notification {
@@ -27,13 +36,27 @@ const NotificationsPage = () => {
   const queryClient = useQueryClient();
   const queryKey = ["user-notifications", user?.id];
 
+  // Enable job notifications - checks for new jobs matching user skills
+  // Only enable for regular users (not academy users)
+  const isRegularUser = user?.user_type !== "academy";
+  const {
+    permission: notificationPermission,
+    requestPermission,
+    isChecking,
+  } = useJobNotifications({
+    enabled: isRegularUser && !!user?.id,
+    checkInterval: 30 * 60 * 1000, // Check every 30 minutes
+  });
+
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+
   // Fetch all notifications for the current user (personal and broadcast)
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
     queryKey,
     queryFn: async () => {
       if (!user?.id) return [];
       const { data, error } = await supabase
-        .from("notifications")
+        .from("notifications" as any)
         .select("*")
         .or(`recipient_id.is.null,recipient_id.eq.${user.id}`)
         .order("created_at", { ascending: false });
@@ -42,7 +65,7 @@ const NotificationsPage = () => {
         console.error("Error fetching notifications:", error);
         throw new Error("Could not fetch notifications.");
       }
-      return data;
+      return (data || []) as Notification[];
     },
     enabled: !!user?.id,
   });
@@ -52,7 +75,7 @@ const NotificationsPage = () => {
     mutationFn: async (notificationId: string) => {
       if (!user?.id) throw new Error("User not authenticated.");
       const { error } = await supabase
-        .from("notifications")
+        .from("notifications" as any)
         .update({ is_read: true, updated_at: new Date().toISOString() })
         .eq("id", notificationId)
         .eq("recipient_id", user.id);
@@ -86,7 +109,7 @@ const NotificationsPage = () => {
   useEffect(() => {
     if (!user?.id) return;
 
-    const handleNewNotification = (payload: any) => {
+    const handleNewNotification = (payload: { new?: Notification }) => {
       queryClient.invalidateQueries({ queryKey });
       if (payload.new) {
         const notification = payload.new;
@@ -114,7 +137,7 @@ const NotificationsPage = () => {
         {
           event: "INSERT",
           schema: "public",
-          table: "notifications",
+          table: "notifications" as any,
           filter: `recipient_id=eq.${user.id}`,
         },
         handleNewNotification
@@ -128,7 +151,7 @@ const NotificationsPage = () => {
         {
           event: "INSERT",
           schema: "public",
-          table: "notifications",
+          table: "notifications" as any,
           filter: "recipient_id=is.null",
         },
         handleNewNotification

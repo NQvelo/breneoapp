@@ -34,7 +34,160 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
+import { filterATSJobs } from "@/utils/jobFilterUtils";
 import { toast } from "sonner";
+
+// Function to extract skills from job data (same as in JobsPage.tsx)
+const extractJobSkills = (job: ApiJob): string[] => {
+  const skills: string[] = [];
+  const textToSearch = [
+    job.job_title || job.title || "",
+    job.description || "",
+    job.job_description || "",
+    job.job_required_experience || job.required_experience || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // Common tech skills keywords
+  const skillKeywords: Record<string, string[]> = {
+    javascript: [
+      "javascript",
+      "js",
+      "node.js",
+      "nodejs",
+      "react",
+      "vue",
+      "angular",
+    ],
+    python: ["python", "django", "flask", "fastapi"],
+    java: ["java", "spring", "spring boot"],
+    "c++": ["c++", "cpp", "c plus plus"],
+    "c#": ["c#", "csharp", "dotnet", ".net"],
+    go: ["go", "golang"],
+    rust: ["rust"],
+    php: ["php", "laravel", "symfony"],
+    ruby: ["ruby", "rails"],
+    swift: ["swift", "ios"],
+    kotlin: ["kotlin", "android"],
+    typescript: ["typescript", "ts"],
+    html: ["html", "html5"],
+    css: ["css", "css3", "sass", "scss", "tailwind"],
+    sql: ["sql", "mysql", "postgresql", "mongodb", "database"],
+    react: ["react", "reactjs", "react.js"],
+    vue: ["vue", "vuejs", "vue.js"],
+    angular: ["angular", "angularjs"],
+    "node.js": ["node.js", "nodejs", "node"],
+    express: ["express", "express.js"],
+    django: ["django"],
+    flask: ["flask"],
+    spring: ["spring", "spring boot"],
+    laravel: ["laravel"],
+    rails: ["rails", "ruby on rails"],
+    git: ["git", "github", "gitlab"],
+    docker: ["docker", "containerization"],
+    kubernetes: ["kubernetes", "k8s"],
+    aws: ["aws", "amazon web services"],
+    azure: ["azure", "microsoft azure"],
+    gcp: ["gcp", "google cloud", "google cloud platform"],
+    linux: ["linux", "unix"],
+    "machine learning": [
+      "machine learning",
+      "ml",
+      "deep learning",
+      "neural network",
+    ],
+    "data science": ["data science", "data analysis", "data analytics"],
+    ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
+    blockchain: ["blockchain", "ethereum", "solidity", "web3"],
+    devops: ["devops", "ci/cd", "continuous integration"],
+    testing: ["testing", "qa", "quality assurance", "test automation"],
+    ui: ["ui", "user interface", "ux", "user experience"],
+    design: ["design", "figma", "sketch", "adobe"],
+  };
+
+  // Check for each skill
+  Object.keys(skillKeywords).forEach((skill) => {
+    const keywords = skillKeywords[skill];
+    if (keywords.some((keyword) => textToSearch.includes(keyword))) {
+      skills.push(skill);
+    }
+  });
+
+  return [...new Set(skills)]; // Remove duplicates
+};
+
+// Function to calculate job relevance score based on user's hard skills
+const calculateJobRelevanceScore = (
+  job: ApiJob,
+  userHardSkills: string[]
+): number => {
+  // If no user hard skills, return base score
+  if (!userHardSkills || userHardSkills.length === 0) {
+    return 1;
+  }
+
+  // Extract skills from the job
+  const jobSkills = extractJobSkills(job);
+
+  // If no skills found in job, return low score (but don't filter out completely)
+  if (jobSkills.length === 0) {
+    return 0.1;
+  }
+
+  // Normalize skills for comparison
+  const normalizeSkill = (skill: string) =>
+    skill.toLowerCase().trim().replace(/\s+/g, " ");
+
+  const normalizedUserSkills = userHardSkills.map(normalizeSkill);
+  const normalizedJobSkills = jobSkills.map(normalizeSkill);
+
+  // Count matching skills
+  let matchCount = 0;
+  normalizedJobSkills.forEach((jobSkill) => {
+    normalizedUserSkills.forEach((userSkill) => {
+      // Exact match - highest score
+      if (userSkill === jobSkill) {
+        matchCount += 2;
+      }
+      // Partial match - medium score
+      else if (jobSkill.includes(userSkill) || userSkill.includes(jobSkill)) {
+        matchCount += 1;
+      }
+    });
+  });
+
+  // Calculate relevance score: (matches / total job skills) * (matches / total user skills)
+  // This gives higher scores to jobs that match more of the user's skills
+  const score = matchCount > 0 
+    ? (matchCount / normalizedJobSkills.length) * (matchCount / normalizedUserSkills.length) * 10
+    : 0.1;
+
+  return score;
+};
+
+// Function to check if a job is tech-related (for broader filtering)
+const isTechJob = (job: ApiJob): boolean => {
+  const textToSearch = [
+    job.job_title || job.title || "",
+    job.description || "",
+    job.job_description || "",
+    job.job_required_experience || job.required_experience || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // Tech keywords to identify tech jobs
+  const techKeywords = [
+    "developer", "programmer", "engineer", "software", "coding", "programming",
+    "javascript", "python", "java", "react", "node", "sql", "database",
+    "frontend", "backend", "full stack", "web developer", "mobile developer",
+    "devops", "cloud", "aws", "azure", "docker", "kubernetes", "api",
+    "machine learning", "ai", "data science", "analytics", "cybersecurity"
+  ];
+
+  return techKeywords.some(keyword => textToSearch.includes(keyword));
+};
 
 // Transformed Job for UI
 interface Job {
@@ -62,25 +215,25 @@ interface Course {
   is_saved?: boolean;
 }
 
-// Fetch jobs from job service API without any filters
-const fetchJobs = async () => {
+// Fetch jobs from job service API - fetch more to have enough for careful filtering
+const fetchJobs = async (userHardSkills: string[] = []) => {
   try {
-    // No filters - just fetch general jobs
+    // Use user hard skills if available, but be lenient
     const filters: JobFilters = {
       country: "",
       countries: [], // No country filter
       jobTypes: [], // No job type filter
       isRemote: false, // No remote filter
       datePosted: undefined, // No date filter
-      skills: [], // No skills filter
+      skills: userHardSkills.length > 0 ? userHardSkills : [], // Filter by user hard skills if available
     };
 
-    // Fetch jobs using the job service
+    // Fetch jobs using the job service - fetch more jobs for better filtering
     const response = await jobService.fetchActiveJobs({
-      query: "developer", // Simple default query
+      query: userHardSkills.length > 0 ? "" : "developer", // Use skills filter if available, otherwise use default query
       filters,
       page: 1,
-      pageSize: 10, // Fetch exactly 10 jobs
+      pageSize: 50, // Fetch more jobs to have enough for careful filtering and sorting
     });
 
     return response.jobs || [];
@@ -97,6 +250,7 @@ const UserHome = () => {
   const isMobile = useMobile();
   const t = useTranslation();
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
+  const [userHardSkills, setUserHardSkills] = useState<string[]>([]); // Only tech/hard skills
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
   const jobsScrollRef = useRef<HTMLDivElement>(null);
@@ -146,6 +300,7 @@ const UserHome = () => {
             const softSkills = Object.keys(skillsJson.soft || {});
             const allSkills = [...techSkills, ...softSkills].slice(0, 5);
             setUserTopSkills(allSkills);
+            setUserHardSkills(techSkills); // Store only hard/tech skills
             setLoadingSkills(false);
             return;
           }
@@ -161,6 +316,8 @@ const UserHome = () => {
           if (response.data && response.data.skills) {
             const topSkills = response.data.skills.slice(0, 5);
             setUserTopSkills(topSkills);
+            // Assume all skills from this endpoint are tech skills
+            setUserHardSkills(topSkills);
             setHasCompletedTest(topSkills.length > 0);
             setLoadingSkills(false);
             return;
@@ -186,6 +343,22 @@ const UserHome = () => {
           const topSkillsData = getTopSkills(skillScores, 5);
           const topSkills = topSkillsData.map((s) => s.skill);
           setUserTopSkills(topSkills);
+          // For Supabase, we'll filter to tech skills by checking against known tech skill keywords
+          // This is a fallback - ideally we'd have tech/soft separation in the data
+          const techSkillKeywords = [
+            "javascript", "python", "java", "c++", "c#", "go", "rust", "php", "ruby",
+            "swift", "kotlin", "typescript", "html", "css", "sql", "react", "vue",
+            "angular", "node.js", "express", "django", "flask", "spring", "laravel",
+            "rails", "git", "docker", "kubernetes", "aws", "azure", "gcp", "linux",
+            "machine learning", "data science", "ai", "blockchain", "devops", "testing"
+          ];
+          const hardSkills = topSkills.filter(skill => 
+            techSkillKeywords.some(keyword => 
+              skill.toLowerCase().includes(keyword.toLowerCase()) || 
+              keyword.toLowerCase().includes(skill.toLowerCase())
+            )
+          );
+          setUserHardSkills(hardSkills.length > 0 ? hardSkills : topSkills); // Fallback to all if no match
         } else {
           console.log("❌ User has not completed skill test");
           setHasCompletedTest(false);
@@ -235,15 +408,15 @@ const UserHome = () => {
     enabled: !!user,
   });
 
-  // Fetch jobs without any filters
+  // Fetch jobs - filtered by user hard skills
   const {
     data: jobs = [],
     isLoading: jobsLoading,
     error: jobsError,
   } = useQuery({
-    queryKey: ["home-jobs"],
-    queryFn: () => fetchJobs(),
-    enabled: !!user,
+    queryKey: ["home-jobs", userHardSkills.join(",")],
+    queryFn: () => fetchJobs(userHardSkills),
+    enabled: !!user && !loadingSkills, // Wait for skills to load
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -365,9 +538,45 @@ const UserHome = () => {
   });
 
   // Transform jobs - handle empty or undefined arrays
-  // Transform all jobs first, then filter out nulls, then take up to 10
+  // Carefully filter and sort by relevance, then take up to 10
   const transformedJobs: Job[] = useMemo(() => {
-    return (jobs || [])
+    // Step 1: Filter to only allowed ATS platforms first (ensures only jobs from approved platforms are shown)
+    // This checks all apply links in the job object against the allowed ATS domains list
+    let filteredJobs = filterATSJobs(jobs || []);
+    
+    // Step 2: Filter to tech jobs if user has hard skills, otherwise show all
+    if (userHardSkills.length > 0) {
+      // Show tech jobs and jobs that match user skills
+      filteredJobs = filteredJobs.filter((job: ApiJob) => {
+        // Show if it's a tech job OR if it matches user skills
+        return isTechJob(job) || calculateJobRelevanceScore(job, userHardSkills) > 0.1;
+      });
+    }
+
+    // Step 2: Calculate relevance scores and sort by relevance (highest first)
+    const jobsWithScores = filteredJobs.map((job: ApiJob) => ({
+      job,
+      score: calculateJobRelevanceScore(job, userHardSkills),
+    }));
+
+    // Sort by relevance score (highest first), then by tech job status
+    jobsWithScores.sort((a, b) => {
+      // First sort by relevance score
+      if (Math.abs(a.score - b.score) > 0.1) {
+        return b.score - a.score;
+      }
+      // If scores are similar, prioritize tech jobs
+      const aIsTech = isTechJob(a.job);
+      const bIsTech = isTechJob(b.job);
+      if (aIsTech && !bIsTech) return -1;
+      if (!aIsTech && bIsTech) return 1;
+      return 0;
+    });
+
+    // Step 3: Take top 10 most relevant jobs
+    const topJobs = jobsWithScores.slice(0, 10).map(item => item.job);
+
+    return topJobs
       .map((job: ApiJob) => {
         // Extract job ID - check all possible fields
         const jobId = job.job_id || job.id || "";
@@ -511,7 +720,7 @@ const UserHome = () => {
       })
       .filter((job): job is Job => job !== null) // Filter out null jobs
       .slice(0, 10); // Take up to 10 jobs
-  }, [jobs, savedJobs]);
+  }, [jobs, savedJobs, userHardSkills]);
 
   // Display up to 10 jobs
   const displayJobs = transformedJobs;
@@ -640,7 +849,7 @@ const UserHome = () => {
                       {/* Right side - Illustration / Icon */}
                       <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
                         <img
-                          src="/lovable-uploads/3dicons-target-dynamic-color.png"
+                          src="/lovable-uploads/3dicons-target-front-color.png"
                           alt="Skill test target"
                           className="w-full h-full object-contain"
                         />
@@ -1031,77 +1240,81 @@ const UserHome = () => {
                       String(course.id)
                     );
                     return (
-                    <Link
-                      key={course.id}
-                      to={`/course/${course.id}`}
-                      className="flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px] block"
-                    >
-                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col">
-                        <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
-                          <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
-                            <img
-                              src={course.image || "/placeholder.svg"}
-                              alt={course.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 origin-center"
-                              style={{ transformOrigin: "center center" }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src =
-                                  "/placeholder.svg";
-                              }}
-                            />
-                            <div className="absolute top-4 right-4">
-                              <Button
-                                variant="secondary"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  saveCourseMutation.mutate(String(course.id));
+                      <Link
+                        key={course.id}
+                        to={`/course/${course.id}`}
+                        className="flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px] block"
+                      >
+                        <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col">
+                          <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
+                            <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
+                              <img
+                                src={course.image || "/placeholder.svg"}
+                                alt={course.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 origin-center"
+                                style={{ transformOrigin: "center center" }}
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src =
+                                    "/placeholder.svg";
                                 }}
-                                aria-label={
-                                  isCourseSaved ? "Unsave course" : "Save course"
-                                }
-                                className="bg-[#E6E7EB]/80 hover:bg-[#E6E7EB]/90 h-9 w-9 backdrop-blur-sm"
-                              >
-                                <Heart
-                                  className={`h-4 w-4 transition-colors ${
+                              />
+                              <div className="absolute top-4 right-4">
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    saveCourseMutation.mutate(
+                                      String(course.id)
+                                    );
+                                  }}
+                                  aria-label={
                                     isCourseSaved
-                                      ? "text-red-500 fill-red-500 animate-heart-pop"
-                                      : "text-black/80"
-                                  }`}
-                                />
-                              </Button>
+                                      ? "Unsave course"
+                                      : "Save course"
+                                  }
+                                  className="bg-[#E6E7EB]/80 hover:bg-[#E6E7EB]/90 h-9 w-9 backdrop-blur-sm"
+                                >
+                                  <Heart
+                                    className={`h-4 w-4 transition-colors ${
+                                      isCourseSaved
+                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        : "text-black/80"
+                                    }`}
+                                  />
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                          <div className="p-4 flex flex-col flex-grow min-h-[140px]">
-                            <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
-                              {course.title}
-                            </h3>
+                            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
+                              <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
+                                {course.title}
+                              </h3>
 
-                            <div className="flex items-center gap-3 mt-auto flex-wrap">
-                              {course.duration && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
-                                >
-                                  <Clock className="h-4 w-4 mr-1.5" />
-                                  {course.duration}
-                                </Badge>
-                              )}
-                              {course.level && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
-                                >
-                                  <Award className="h-4 w-4 mr-1.5" />
-                                  {course.level}
-                                </Badge>
-                              )}
+                              <div className="flex items-center gap-3 mt-auto flex-wrap">
+                                {course.duration && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
+                                  >
+                                    <Clock className="h-4 w-4 mr-1.5" />
+                                    {course.duration}
+                                  </Badge>
+                                )}
+                                {course.level && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
+                                  >
+                                    <Award className="h-4 w-4 mr-1.5" />
+                                    {course.level}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                          </CardContent>
+                        </Card>
+                      </Link>
                     );
                   })}
                 </div>

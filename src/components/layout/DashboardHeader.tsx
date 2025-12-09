@@ -28,8 +28,18 @@ const isCourseDetailPage = (pathname: string): boolean => {
   return courseDetailPattern.test(pathname);
 };
 
+// Helper function to check if current path is a skill path page
+const isSkillPathPage = (pathname: string): boolean => {
+  // Match patterns like /skill-path, /en/skill-path, /ka/skill-path, /skill-path/:skillName, etc.
+  return pathname.includes("/skill-path");
+};
+
 // Helper function to get the page title from the pathname
-const getPageTitle = (pathname: string, username?: string, t?: any) => {
+const getPageTitle = (
+  pathname: string,
+  username?: string,
+  t?: ReturnType<typeof useTranslation>
+) => {
   if (!t) return "Home";
 
   // Don't show title for job detail pages or course detail pages
@@ -68,6 +78,8 @@ const getPageTitle = (pathname: string, username?: string, t?: any) => {
     return t.profile.title;
   if (pathname.startsWith("/notifications")) return t.notifications.title;
   if (pathname.startsWith("/skill-test")) return t.skillTest.title;
+  // Don't show title for skill-path page - show back button instead
+  if (pathname.startsWith("/skill-path")) return null;
   return t.nav.home;
 };
 
@@ -87,6 +99,7 @@ export function DashboardHeader({
   const pageTitle = getPageTitle(currentPath, username, t);
   const isJobDetail = isJobDetailPage(currentPath);
   const isCourseDetail = isCourseDetailPage(currentPath);
+  const isSkillPath = isSkillPathPage(currentPath);
 
   const currentLanguageText = language === "ka" ? "GEO" : "EN";
 
@@ -107,7 +120,7 @@ export function DashboardHeader({
     >
       <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">
         <div className="hidden md:flex items-center space-x-3">
-          {isJobDetail || isCourseDetail ? (
+          {isJobDetail || isCourseDetail || isSkillPath ? (
             <Button
               variant="ghost"
               onClick={() => navigate(-1)}

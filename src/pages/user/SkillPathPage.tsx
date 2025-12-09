@@ -44,6 +44,7 @@ import {
   Globe,
   Settings,
   Rocket,
+  DollarSign,
 } from "lucide-react";
 import {
   getUserTestAnswers,
@@ -53,6 +54,13 @@ import {
 } from "@/utils/skillTestUtils";
 import { supabase } from "@/integrations/supabase/client";
 import apiClient from "@/api/auth/apiClient";
+import {
+  calculateAISalary,
+  formatSalaryRange,
+} from "@/services/jobs/salaryService";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import { jobService, ApiJob, JobFilters } from "@/api/jobs";
+import { filterATSJobs } from "@/utils/jobFilterUtils";
 
 interface JobPath {
   title: string;
@@ -63,6 +71,7 @@ interface JobPath {
   certifications: string[];
   salaryRange: string;
   timeToReady: string;
+  jobs?: ApiJob[]; // Actual job listings for this path
 }
 
 interface CourseRecommendation {
@@ -84,6 +93,341 @@ interface MissingSkill {
   frequency: number; // How many job paths require this skill
 }
 
+// Helper function to generate job path details based on category and skills
+const getJobPathDetails = (
+  category: string,
+  skills: Array<{ skill: string; score: number }>
+): Omit<JobPath, "matchPercentage"> => {
+  const skillNames = skills.map((s) => s.skill);
+  const topSkills = skillNames.slice(0, 4);
+
+  // Default job path structure
+  const basePath: Omit<JobPath, "matchPercentage"> = {
+    title: category,
+    description: `Build your career using your skills in ${skillNames.join(
+      ", "
+    )}.`,
+    requiredSkills: topSkills,
+    suggestedCourses: [
+      `${category} Fundamentals`,
+      "Advanced Techniques",
+      "Industry Best Practices",
+    ],
+    certifications: [`${category} Professional Certificate`],
+    salaryRange: "", // Will be populated dynamically
+    timeToReady: "3-6 months",
+  };
+
+  // Customize based on category
+  switch (category) {
+    case "Software Development":
+      return {
+        ...basePath,
+        title: "Software Engineer",
+        description:
+          "Build and maintain software applications using modern technologies and your programming skills.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : ["Programming", "Problem Solving", "Version Control", "Testing"],
+        suggestedCourses: [
+          "Full-Stack Development",
+          "Data Structures & Algorithms",
+          "System Design",
+        ],
+        certifications: ["AWS Cloud Practitioner", "Google Cloud Associate"],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "6-12 months",
+      };
+
+    case "UX/UI Design":
+      return {
+        ...basePath,
+        title: "UX/UI Designer",
+        description:
+          "Create intuitive and beautiful user interfaces and experiences.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : [
+                "Design Thinking",
+                "Prototyping",
+                "User Research",
+                "Visual Design",
+              ],
+        suggestedCourses: [
+          "UI/UX Design Fundamentals",
+          "Design Systems",
+          "User Research Methods",
+        ],
+        certifications: [
+          "Google UX Design Certificate",
+          "Adobe Certified Expert",
+        ],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "4-8 months",
+      };
+
+    case "Data Analysis":
+      return {
+        ...basePath,
+        title: "Data Analyst",
+        description:
+          "Transform data into actionable insights for business decisions.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : ["Data Analysis", "SQL", "Statistics", "Data Visualization"],
+        suggestedCourses: [
+          "Data Analysis with Python",
+          "SQL for Data Science",
+          "Business Intelligence",
+        ],
+        certifications: ["Microsoft Power BI", "Tableau Desktop Specialist"],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "3-6 months",
+      };
+
+    case "Product Management":
+      return {
+        ...basePath,
+        title: "Product Manager",
+        description:
+          "Lead product development and coordinate cross-functional teams.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : [
+                "Project Management",
+                "Strategic Thinking",
+                "Communication",
+                "Agile",
+              ],
+        suggestedCourses: [
+          "Product Management Fundamentals",
+          "Agile Methodologies",
+          "Leadership Skills",
+        ],
+        certifications: ["PMP Certification", "Scrum Master Certification"],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "4-8 months",
+      };
+
+    case "DevOps & Cloud":
+      return {
+        ...basePath,
+        title: "DevOps Engineer",
+        description:
+          "Manage infrastructure, automate deployments, and ensure system reliability.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : [
+                "Cloud Computing",
+                "CI/CD",
+                "Containerization",
+                "Infrastructure as Code",
+              ],
+        suggestedCourses: [
+          "Cloud Architecture",
+          "DevOps Fundamentals",
+          "Kubernetes & Docker",
+        ],
+        certifications: [
+          "AWS Certified Solutions Architect",
+          "Kubernetes Administrator",
+        ],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "4-8 months",
+      };
+
+    case "Mobile Development":
+      return {
+        ...basePath,
+        title: "Mobile Developer",
+        description:
+          "Build native and cross-platform mobile applications for iOS and Android.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : [
+                "Mobile Development",
+                "React Native",
+                "iOS/Android",
+                "App Design",
+              ],
+        suggestedCourses: [
+          "Mobile App Development",
+          "React Native Mastery",
+          "Native Development",
+        ],
+        certifications: ["Google Mobile Web Specialist", "Apple Developer"],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "4-8 months",
+      };
+
+    case "Cybersecurity":
+      return {
+        ...basePath,
+        title: "Cybersecurity Specialist",
+        description:
+          "Protect systems and data from cyber threats and vulnerabilities.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : [
+                "Network Security",
+                "Penetration Testing",
+                "Encryption",
+                "Security Analysis",
+              ],
+        suggestedCourses: [
+          "Cybersecurity Fundamentals",
+          "Ethical Hacking",
+          "Security Architecture",
+        ],
+        certifications: ["CompTIA Security+", "CEH Certification"],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "6-12 months",
+      };
+
+    case "Quality Assurance":
+      return {
+        ...basePath,
+        title: "QA Engineer",
+        description:
+          "Ensure software quality through comprehensive testing and automation.",
+        requiredSkills:
+          topSkills.length > 0
+            ? topSkills
+            : [
+                "Test Automation",
+                "Quality Assurance",
+                "Bug Tracking",
+                "Test Planning",
+              ],
+        suggestedCourses: [
+          "QA Fundamentals",
+          "Test Automation",
+          "Performance Testing",
+        ],
+        certifications: ["ISTQB Certification", "Selenium Expert"],
+        salaryRange: "", // Will be populated dynamically
+        timeToReady: "3-6 months",
+      };
+
+    default:
+      // For custom/generic categories, use the skill names as the title
+      return {
+        ...basePath,
+        title: category,
+        description: `Leverage your expertise in ${skillNames.join(
+          ", "
+        )} to advance your career.`,
+        requiredSkills: topSkills,
+      };
+  }
+};
+
+// Generate job paths based on hard skills from user test
+// Uses exact skill names from the hard skills chart
+const generateJobPaths = (
+  skills: Array<{ skill: string; score: number }>
+): JobPath[] => {
+  // Filter out soft skills - only use hard/tech skills for job path generation
+  const softSkillKeywords = [
+    "communication",
+    "teamwork",
+    "leadership",
+    "problem solving",
+    "critical thinking",
+    "time management",
+    "adaptability",
+    "creativity",
+    "collaboration",
+    "emotional intelligence",
+    "work ethic",
+    "interpersonal",
+    "negotiation",
+    "presentation",
+    "public speaking",
+    "active listening",
+    "empathy",
+    "patience",
+    "flexibility",
+    "stress management",
+    "conflict resolution",
+    "decision making",
+    "organization",
+    "planning",
+    "multitasking",
+  ];
+
+  // Filter to only hard/tech skills
+  const hardSkillsOnly = skills.filter((skill) => {
+    const skillLower = skill.skill.toLowerCase().trim();
+    return !softSkillKeywords.some(
+      (keyword) => skillLower.includes(keyword) || keyword.includes(skillLower)
+    );
+  });
+
+  // If no hard skills, return empty array (don't generate paths from soft skills)
+  if (hardSkillsOnly.length === 0) {
+    console.warn("No hard/tech skills found for job path generation");
+    return [];
+  }
+
+  // Create job paths directly from hard skills - use exact skill names as titles
+  // Sort by score (highest first) and limit to top 5
+  const sortedHardSkills = hardSkillsOnly
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  // Convert each hard skill to a job path using its exact name
+  const jobPaths: JobPath[] = sortedHardSkills.map((skillEntry) => {
+    const skillName = skillEntry.skill;
+
+    // Calculate match percentage based on skill score
+    // Normalize score to percentage (assuming max score is around 5)
+    const maxPossibleScore = 5;
+    const matchPercentage = Math.min(
+      95,
+      Math.max(60, Math.round((skillEntry.score / maxPossibleScore) * 100))
+    );
+
+    // Generate description and details based on the skill name
+    const description = `Build your career using your ${skillName} skills. This path is tailored to your expertise in ${skillName}.`;
+
+    // Use the skill name as the required skill (it's already in the user's skills)
+    const requiredSkills = [skillName];
+
+    // Generate generic courses and certifications that would help with this skill
+    const suggestedCourses = [
+      `Advanced ${skillName}`,
+      `${skillName} Best Practices`,
+      `${skillName} Professional Development`,
+    ];
+
+    const certifications = [
+      `${skillName} Professional Certificate`,
+      `${skillName} Specialist`,
+    ];
+
+    return {
+      title: skillName, // Use exact skill name as job path title
+      description,
+      matchPercentage,
+      requiredSkills,
+      suggestedCourses,
+      certifications,
+      salaryRange: "", // Will be updated dynamically by fetchSalariesForJobPaths
+      timeToReady: "3-6 months",
+    };
+  });
+
+  return jobPaths;
+};
+
 const SkillPathPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -101,6 +445,192 @@ const SkillPathPage = () => {
   >([]);
   const [missingSkills, setMissingSkills] = useState<MissingSkill[]>([]);
   const [finalRole, setFinalRole] = useState<string | null>(null);
+  const [userCountry, setUserCountry] = useState<string>("Georgia");
+
+  // Fetch user country from profile
+  const fetchUserCountry = useCallback(async () => {
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+      const profileData = response.data;
+      // Check for country in various possible fields
+      const country =
+        (profileData as { country?: string })?.country ||
+        (user as { country?: string })?.country ||
+        "Georgia"; // Default to Georgia
+      setUserCountry(country);
+      return country;
+    } catch (error) {
+      console.error("Error fetching user country:", error);
+      setUserCountry("Georgia"); // Default to Georgia on error
+      return "Georgia";
+    }
+  }, [user]);
+
+  // Calculate salary data for all job paths using AI (instant, no API calls)
+  // Salary is calculated using AI algorithms in: src/services/jobs/salaryService.ts
+  const calculateSalariesForJobPaths = useCallback(
+    (paths: JobPath[], country: string): JobPath[] => {
+      // Map job titles to search-friendly terms
+      const jobTitleMap: Record<string, string> = {
+        "Software Engineer": "software engineer",
+        "UX/UI Designer": "ux designer",
+        "Data Analyst": "data analyst",
+        "Product Manager": "product manager",
+      };
+
+      // Calculate all salaries instantly using AI
+      return paths.map((path) => {
+        try {
+          // Try mapped title first, then skill name directly
+          const skillLower = path.title.toLowerCase().trim();
+          let searchTitle = jobTitleMap[path.title] || skillLower;
+
+          // Calculate salary using AI (instant, no API call)
+          let salaryData = calculateAISalary(searchTitle, country);
+
+          // If no salary data and searchTitle doesn't include "developer", try with "developer" suffix
+          if (
+            !salaryData.min_salary &&
+            !salaryData.max_salary &&
+            !searchTitle.includes("developer")
+          ) {
+            const developerTitle = `${searchTitle} developer`;
+            salaryData = calculateAISalary(developerTitle, country);
+            if (salaryData.min_salary || salaryData.max_salary) {
+              searchTitle = developerTitle;
+            }
+          }
+
+          // If still no salary data and searchTitle doesn't include "engineer", try as "engineer"
+          if (
+            !salaryData.min_salary &&
+            !salaryData.max_salary &&
+            !searchTitle.includes("engineer")
+          ) {
+            const engineerTitle = `${searchTitle} engineer`;
+            salaryData = calculateAISalary(engineerTitle, country);
+            if (salaryData.min_salary || salaryData.max_salary) {
+              searchTitle = engineerTitle;
+            }
+          }
+
+          // Check if we have valid salary data (both min and max should be positive numbers)
+          if (
+            salaryData &&
+            (salaryData.min_salary || salaryData.max_salary) &&
+            (salaryData.min_salary! > 0 || salaryData.max_salary! > 0)
+          ) {
+            const formattedSalary = formatSalaryRange(salaryData);
+            // Double-check formatted salary is valid
+            if (
+              formattedSalary &&
+              formattedSalary !== "Salary data not available"
+            ) {
+              return {
+                ...path,
+                salaryRange: formattedSalary,
+              };
+            }
+          }
+
+          // If we get here, try one more time with a generic developer title
+          const genericTitle = skillLower.includes("design")
+            ? "ui/ux designer"
+            : skillLower.includes("data") || skillLower.includes("analyst")
+            ? "data analyst"
+            : skillLower.includes("manager")
+            ? "product manager"
+            : "software developer";
+
+          const fallbackSalary = calculateAISalary(genericTitle, country);
+          if (fallbackSalary.min_salary && fallbackSalary.max_salary) {
+            const formattedSalary = formatSalaryRange(fallbackSalary);
+            return {
+              ...path,
+              salaryRange: formattedSalary,
+            };
+          }
+
+          // Last resort fallback
+          console.warn(
+            `Could not calculate salary for "${path.title}" (${searchTitle})`
+          );
+          return {
+            ...path,
+            salaryRange: "Salary data not available",
+          };
+        } catch (error) {
+          console.error(`Error calculating salary for ${path.title}:`, error);
+          return {
+            ...path,
+            salaryRange: "Salary data not available",
+          };
+        }
+      });
+    },
+    []
+  );
+
+  // Fetch jobs for each job path based on tech skills (not job titles)
+  // Jobs are fetched using the exact tech skills from the user's skill test
+  const fetchJobsForJobPaths = useCallback(
+    async (
+      paths: JobPath[],
+      techSkillsList: string[],
+      country: string
+    ): Promise<JobPath[]> => {
+      const updatedPaths = await Promise.all(
+        paths.map(async (path) => {
+          try {
+            // Use tech skills directly as the search query instead of job titles
+            // This ensures jobs match exactly with the user's tech skills
+            const searchQuery =
+              techSkillsList.length > 0
+                ? techSkillsList.join(" ") // Combine all tech skills into search query
+                : path.title.toLowerCase(); // Fallback to job title if no tech skills
+
+            // Build filters with tech skills
+            const filters: JobFilters = {
+              country: country,
+              countries: [],
+              jobTypes: [],
+              isRemote: false,
+              datePosted: undefined,
+              skills: techSkillsList, // Use tech skills for filtering
+              salaryMin: undefined,
+              salaryMax: undefined,
+              salaryByAgreement: false,
+            };
+
+            // Fetch jobs for this job path using tech skills
+            const jobsResponse = await jobService.fetchActiveJobs({
+              query: searchQuery,
+              filters: filters,
+              page: 1,
+              pageSize: 5, // Limit to 5 jobs per path
+            });
+
+            // Filter to only allowed ATS platforms
+            const allowedATSJobs = filterATSJobs(jobsResponse.jobs);
+
+            return {
+              ...path,
+              jobs: allowedATSJobs.slice(0, 5), // Limit to 5 jobs
+            };
+          } catch (error) {
+            console.error(`Error fetching jobs for ${path.title}:`, error);
+            return {
+              ...path,
+              jobs: [], // Return empty array on error
+            };
+          }
+        })
+      );
+
+      return updatedPaths;
+    },
+    []
+  );
 
   const loadSkillData = useCallback(async () => {
     try {
@@ -153,31 +683,67 @@ const SkillPathPage = () => {
               score: parseFloat(String(pct).replace("%", "")) || 0,
             })
           );
-          const allSkills = [...techSkillsArray, ...softSkillsArray].sort(
+
+          // Prioritize hard/tech skills over soft skills
+          // Sort tech skills first, then soft skills, then combine
+          const sortedTechSkills = techSkillsArray.sort(
+            (a, b) => b.score - a.score
+          );
+          const sortedSoftSkills = softSkillsArray.sort(
             (a, b) => b.score - a.score
           );
 
+          // Use tech skills primarily, only add soft skills if we need more for display
+          const allSkills = [...sortedTechSkills, ...sortedSoftSkills];
           const top = allSkills.slice(0, 5);
           setTopSkills(top);
 
-          // Generate job paths and course recommendations
-          const paths = generateJobPaths(top);
-          setJobPaths(paths);
+          // Generate job paths based on hard/tech skills only (generateJobPaths filters soft skills internally)
+          const paths = generateJobPaths(sortedTechSkills);
 
-          const courses = await getCourseRecommendations(
-            top.map((s) => s.skill)
+          // Get tech skills for job filtering (use tech skills only, not soft skills)
+          const techSkillsList = Object.keys(skillsJson.tech || {});
+
+          // Fetch user country first, then calculate salaries synchronously
+          const country = await fetchUserCountry();
+          const pathsWithSalaries = calculateSalariesForJobPaths(
+            paths,
+            country
           );
-          setCourseRecommendations(courses);
 
-          // Identify missing skills and fetch courses for them
-          const missing = await identifyMissingSkills(
-            Object.keys(skillsJson.tech || {}),
-            Object.keys(skillsJson.soft || {}),
-            paths
-          );
-          setMissingSkills(missing);
-
+          // Set job paths with salaries immediately for instant display
+          setJobPaths(pathsWithSalaries);
           setLoading(false);
+
+          // Parallelize all heavy operations (jobs, missing skills, courses)
+          Promise.all([
+            // Update jobs in background
+            (async () => {
+              const pathsWithJobs = await fetchJobsForJobPaths(
+                pathsWithSalaries,
+                techSkillsList,
+                country
+              );
+
+              setJobPaths(pathsWithJobs);
+
+              // Identify missing skills after jobs are loaded
+              const missing = await identifyMissingSkills(
+                Object.keys(skillsJson.tech || {}),
+                Object.keys(skillsJson.soft || {}),
+                pathsWithJobs
+              );
+              setMissingSkills(missing);
+            })(),
+            // Get course recommendations in parallel
+            (async () => {
+              const courses = await getCourseRecommendations(techSkillsList);
+              setCourseRecommendations(courses);
+            })(),
+          ]).catch((error) => {
+            console.error("Error in background operations:", error);
+          });
+
           return;
         }
       } catch (apiError) {
@@ -206,22 +772,108 @@ const SkillPathPage = () => {
       const scores = calculateSkillScores(answers);
       setSkillScores(scores);
 
-      // Get top skills
-      const top = getTopSkills(scores, 5);
-      setTopSkills(top);
+      // Filter out soft skills - only use hard/tech skills for job matching
+      // Common soft skills to exclude
+      const softSkillKeywords = [
+        "communication",
+        "teamwork",
+        "leadership",
+        "problem solving",
+        "critical thinking",
+        "time management",
+        "adaptability",
+        "creativity",
+        "collaboration",
+        "emotional intelligence",
+        "work ethic",
+        "interpersonal",
+        "negotiation",
+        "presentation",
+        "public speaking",
+        "active listening",
+        "empathy",
+        "patience",
+        "flexibility",
+        "stress management",
+        "conflict resolution",
+        "decision making",
+        "organization",
+        "planning",
+        "multitasking",
+      ];
 
-      // Generate job paths based on top skills
-      const paths = generateJobPaths(top);
-      setJobPaths(paths);
+      // Separate hard skills (tech) from soft skills
+      const hardSkills: Array<{ skill: string; score: number }> = [];
+      const softSkillsOnly: Array<{ skill: string; score: number }> = [];
 
-      // Get course recommendations
-      const courses = await getCourseRecommendations(top.map((s) => s.skill));
-      setCourseRecommendations(courses);
+      Object.entries(scores).forEach(([skill, score]) => {
+        const skillLower = skill.toLowerCase().trim();
+        const isSoftSkill = softSkillKeywords.some(
+          (keyword) =>
+            skillLower.includes(keyword) || keyword.includes(skillLower)
+        );
 
-      // Identify missing skills and fetch courses for them
-      const userSkillNames = top.map((s) => s.skill);
-      const missing = await identifyMissingSkills(userSkillNames, [], paths);
-      setMissingSkills(missing);
+        if (isSoftSkill) {
+          softSkillsOnly.push({ skill, score: score as number });
+        } else {
+          // Treat as hard/tech skill
+          hardSkills.push({ skill, score: score as number });
+        }
+      });
+
+      // Prioritize hard skills - sort by score
+      const sortedHardSkills = hardSkills.sort((a, b) => b.score - a.score);
+      const sortedSoftSkills = softSkillsOnly.sort((a, b) => b.score - a.score);
+
+      // Use hard skills primarily, only add soft skills if we need more for display
+      const allSkillsForDisplay = [
+        ...sortedHardSkills,
+        ...sortedSoftSkills,
+      ].slice(0, 5);
+      setTopSkills(allSkillsForDisplay);
+
+      // Generate job paths based on hard skills only
+      const paths = generateJobPaths(sortedHardSkills);
+
+      // Get hard/tech skills for job filtering (exclude soft skills)
+      const hardSkillsList = sortedHardSkills.map((s) => s.skill);
+
+      // Fetch user country first, then calculate salaries synchronously
+      const country = await fetchUserCountry();
+      const pathsWithSalaries = calculateSalariesForJobPaths(paths, country);
+
+      // Set job paths with salaries immediately for instant display
+      setJobPaths(pathsWithSalaries);
+      setLoading(false);
+
+      // Parallelize all heavy operations (jobs, missing skills, courses)
+      Promise.all([
+        // Update jobs in background
+        (async () => {
+          const pathsWithJobs = await fetchJobsForJobPaths(
+            pathsWithSalaries,
+            hardSkillsList,
+            country
+          );
+
+          setJobPaths(pathsWithJobs);
+
+          // Identify missing skills after jobs are loaded
+          const missing = await identifyMissingSkills(
+            hardSkillsList,
+            [],
+            pathsWithJobs
+          );
+          setMissingSkills(missing);
+        })(),
+        // Get course recommendations in parallel
+        (async () => {
+          const courses = await getCourseRecommendations(hardSkillsList);
+          setCourseRecommendations(courses);
+        })(),
+      ]).catch((error) => {
+        console.error("Error in background operations:", error);
+      });
     } catch (error) {
       console.error("❌ Error loading skill data:", error);
       console.error(
@@ -234,7 +886,12 @@ const SkillPathPage = () => {
       console.log("🏁 loadSkillData finished - setting loading to false");
       setLoading(false);
     }
-  }, [user]);
+  }, [
+    user,
+    fetchUserCountry,
+    calculateSalariesForJobPaths,
+    fetchJobsForJobPaths,
+  ]);
 
   useEffect(() => {
     console.log("🔍 SkillPathPage useEffect - User:", user?.id);
@@ -245,114 +902,8 @@ const SkillPathPage = () => {
     }
     console.log("✅ User found, loading skill data");
     loadSkillData();
-  }, [user, navigate, loadSkillData]);
-
-  const generateJobPaths = (
-    skills: Array<{ skill: string; score: number }>
-  ): JobPath[] => {
-    const jobPathMap: Record<string, JobPath> = {
-      Developer: {
-        title: "Software Engineer",
-        description:
-          "Build and maintain software applications using modern technologies.",
-        matchPercentage: Math.min(
-          95,
-          skills.find((s) => s.skill === "Developer")?.score * 20 || 0
-        ),
-        requiredSkills: [
-          "Programming",
-          "Problem Solving",
-          "Version Control",
-          "Testing",
-        ],
-        suggestedCourses: [
-          "Full-Stack Development",
-          "Data Structures & Algorithms",
-          "System Design",
-        ],
-        certifications: ["AWS Cloud Practitioner", "Google Cloud Associate"],
-        salaryRange: "$70,000 - $150,000",
-        timeToReady: "6-12 months",
-      },
-      Designer: {
-        title: "UX/UI Designer",
-        description:
-          "Create intuitive and beautiful user interfaces and experiences.",
-        matchPercentage: Math.min(
-          95,
-          skills.find((s) => s.skill === "Designer")?.score * 20 || 0
-        ),
-        requiredSkills: [
-          "Design Thinking",
-          "Prototyping",
-          "User Research",
-          "Visual Design",
-        ],
-        suggestedCourses: [
-          "UI/UX Design Fundamentals",
-          "Design Systems",
-          "User Research Methods",
-        ],
-        certifications: [
-          "Google UX Design Certificate",
-          "Adobe Certified Expert",
-        ],
-        salaryRange: "$55,000 - $120,000",
-        timeToReady: "4-8 months",
-      },
-      Analyst: {
-        title: "Data Analyst",
-        description:
-          "Transform data into actionable insights for business decisions.",
-        matchPercentage: Math.min(
-          95,
-          skills.find((s) => s.skill === "Analyst")?.score * 20 || 0
-        ),
-        requiredSkills: [
-          "Data Analysis",
-          "SQL",
-          "Statistics",
-          "Data Visualization",
-        ],
-        suggestedCourses: [
-          "Data Analysis with Python",
-          "SQL for Data Science",
-          "Business Intelligence",
-        ],
-        certifications: ["Microsoft Power BI", "Tableau Desktop Specialist"],
-        salaryRange: "$50,000 - $100,000",
-        timeToReady: "3-6 months",
-      },
-      "Project Manager": {
-        title: "Product Manager",
-        description:
-          "Lead product development and coordinate cross-functional teams.",
-        matchPercentage: Math.min(
-          95,
-          skills.find((s) => s.skill === "Project Manager")?.score * 20 || 0
-        ),
-        requiredSkills: [
-          "Project Management",
-          "Strategic Thinking",
-          "Communication",
-          "Agile",
-        ],
-        suggestedCourses: [
-          "Product Management Fundamentals",
-          "Agile Methodologies",
-          "Leadership Skills",
-        ],
-        certifications: ["PMP Certification", "Scrum Master Certification"],
-        salaryRange: "$80,000 - $160,000",
-        timeToReady: "4-8 months",
-      },
-    };
-
-    return skills
-      .map((skill) => jobPathMap[skill.skill])
-      .filter(Boolean)
-      .sort((a, b) => b.matchPercentage - a.matchPercentage);
-  };
+    fetchUserCountry();
+  }, [user, navigate, loadSkillData, fetchUserCountry]);
 
   const getCourseRecommendations = async (
     skills: string[]
@@ -791,45 +1342,6 @@ const SkillPathPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
-        {/* Debug Info - Development Only */}
-        {process.env.NODE_ENV === "development" && (
-          <Card className="mb-4 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-            <CardContent className="p-4">
-              <div className="text-xs space-y-1">
-                <p>
-                  <strong>Loading:</strong> {loading ? "Yes" : "No"}
-                </p>
-                <p>
-                  <strong>Has Test Answers:</strong>{" "}
-                  {hasTestAnswers ? "Yes" : "No"}
-                </p>
-                <p>
-                  <strong>User ID:</strong> {user?.id || "Not logged in"}
-                </p>
-                <p>
-                  <strong>Top Skills:</strong> {topSkills.length}
-                </p>
-                <p>
-                  <strong>Job Paths:</strong> {jobPaths.length}
-                </p>
-                <p>
-                  <strong>Final Role:</strong> {finalRole || "Not set"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Your Personalized Skill Path
-          </h1>
-          <p className="text-muted-foreground">
-            Based on your assessment, here's your roadmap to career success
-          </p>
-        </div>
-
         {/* Recommended Role and Skills Breakdown */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recommended Role */}
@@ -844,7 +1356,7 @@ const SkillPathPage = () => {
               <CardContent className="p-2 pb-1">
                 <div className="flex flex-col items-center justify-center py-4 gap-4">
                   <img
-                    src="/lovable-uploads/Code-Learning--Streamline-New-York.png"
+                    src="/lovable-uploads/3dicons-explorer-front-color.png"
                     alt="Code Learning"
                     className="w-full h-auto max-w-[100px] object-contain"
                   />
@@ -917,31 +1429,32 @@ const SkillPathPage = () => {
                   key={job.title}
                   className={index === 0 ? "border-primary" : ""}
                 >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col gap-4">
                       <div>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="text-xl mb-4">
                           {job.title}
-                          {index === 0 && (
-                            <Badge variant="default">Best Match</Badge>
-                          )}
                         </CardTitle>
-                        <p className="text-muted-foreground mt-1">
-                          {job.description}
-                        </p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-primary">
-                          {job.matchPercentage}%
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Match
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      {/* Salary Information Card */}
+                      <Card className="border-primary/20">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-primary" />
+                            Salary Information
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="text-2xl font-bold text-primary mb-2">
+                            {job.salaryRange || "Salary data not available"}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Average salary range based on current market data
+                          </p>
+                        </CardContent>
+                      </Card>
+
                       <div>
                         <h4 className="font-medium mb-2">Required Skills</h4>
                         <div className="flex flex-wrap gap-1">
@@ -956,23 +1469,17 @@ const SkillPathPage = () => {
                           ))}
                         </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Career Info</h4>
-                        <div className="space-y-1 text-sm">
-                          <div>
-                            <span className="font-medium">Salary:</span>{" "}
-                            {job.salaryRange}
-                          </div>
-                          <div>
-                            <span className="font-medium">Time to Ready:</span>{" "}
-                            {job.timeToReady}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t">
-                      <Button className="w-full">
-                        Start Learning Path
+
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          navigate(
+                            `/skill-path/${encodeURIComponent(job.title)}`,
+                            { state: { jobPath: job } }
+                          );
+                        }}
+                      >
+                        View Details
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </div>

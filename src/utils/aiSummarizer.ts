@@ -191,25 +191,29 @@ async function trySummarizationAPI(
               messages: [
                 {
                   role: "system",
-                  content: `You are a job description summarizer. Create a COMPREHENSIVE, EXPANDED summary (approximately ${Math.floor(
+                  content: `You are a job description summarizer. Create a PRECISE, EXACT summary (approximately ${Math.floor(
                     maxLength / 6
                   )}-${Math.floor(
                     maxLength / 5
-                  )} words, max ${maxLength} characters) that thoroughly tells candidates what they need to know. Focus on:
+                  )} words, max ${maxLength} characters) that accurately summarizes the content.
 
-1) REQUIRED QUALIFICATIONS: Skills, experience (years), education, certifications - be specific and detailed. When listing multiple items, format them as a list with each item on a new line using bullet points (•) or dashes (-).
-2) KEY RESPONSIBILITIES: Main daily tasks, duties, and responsibilities - include important details. Format lists of responsibilities with each item on a separate line.
-3) CANDIDATE EXPECTATIONS: What the employer expects from ideal candidates, preferred qualities. Use lists when mentioning multiple expectations.
-4) ESSENTIAL DETAILS: Work type (remote/hybrid/onsite), location if relevant, salary/benefits if mentioned, team structure.
+CRITICAL REQUIREMENTS:
+- Be 100% accurate - only include information present in the source text
+- Use grammatically correct, complete sentences
+- Each item MUST start on a NEW LINE
+- Use bullet points (•) for lists - each bullet on its own line
+- Start each bullet with "• " (bullet space)
+- Ensure proper grammar, spelling, and punctuation
+- Do not add information not in the source
+- Do not paraphrase in a way that changes meaning
 
-IMPORTANT FORMATTING:
-- Use bullet points (•) or dashes (-) for lists
-- Put each list item on a new line
-- Format numbered lists as: 1. Item, 2. Item (each on new line)
+FORMATTING RULES:
+- Each bullet point on a separate line: "• [item]"
 - Separate paragraphs with blank lines
-- Keep lists within paragraphs but format items vertically
+- Use proper capitalization and punctuation
+- Maintain the original meaning exactly
 
-EXCLUDE: Company history, generic marketing language, fluff. Be direct, factual, and comprehensive. Format in 3-4 well-separated paragraphs for readability. Each paragraph should cover a distinct aspect. Ensure complete sentences and never cut words mid-sentence.`,
+EXCLUDE: Company history, generic marketing language, fluff. Be direct, factual, and precise.`,
                 },
                 {
                   role: "user",

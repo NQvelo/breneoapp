@@ -75,6 +75,7 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { jobService } from "@/api/jobs";
+import { filterATSJobs } from "@/utils/jobFilterUtils";
 
 interface SkillTestResult {
   final_role?: string;
@@ -545,7 +546,10 @@ const ProfilePage = () => {
                 pageSize: 100,
               });
 
-              const foundJob = batchResponse.jobs.find((job) => {
+              // Filter to only allowed ATS platforms
+              const allowedATSJobs = filterATSJobs(batchResponse.jobs);
+
+              const foundJob = allowedATSJobs.find((job) => {
                 const foundId = String(job.job_id || job.id || "");
                 return foundId === String(jobId);
               });

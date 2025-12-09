@@ -31,6 +31,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { jobService, ApiJob } from "@/api/jobs";
+import { filterATSJobs } from "@/utils/jobFilterUtils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Download,
@@ -472,8 +473,11 @@ export default function SettingsPage() {
           pageSize: 100, // Fetch a larger batch to find saved jobs
         });
 
+        // Filter to only allowed ATS platforms first
+        const allowedATSJobs = filterATSJobs(response.jobs || []);
+
         // Filter to only include saved jobs
-        const jobs = (response.jobs || [])
+        const jobs = allowedATSJobs
           .filter((job) => {
             const jobId = job.job_id || job.id || "";
             return savedJobIds.includes(String(jobId));

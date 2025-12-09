@@ -16,7 +16,7 @@ import {
 
 export type Language = "en" | "ka";
 
-type Translations = typeof en;
+export type Translations = typeof en;
 
 interface LanguageContextType {
   language: Language;

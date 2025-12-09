@@ -37,6 +37,7 @@ import {
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
 
 interface Job {
   id: string;
@@ -457,9 +458,14 @@ const JobSearchResultsPage = () => {
     retry: 1,
   });
 
-  const jobs = jobsData.jobs || [];
+  // Filter to only tech jobs from allowed ATS platforms
+  const jobs = useMemo(() => {
+    const allJobs = jobsData.jobs || [];
+    const techJobs = filterTechJobs(allJobs);
+    return filterATSJobs(techJobs);
+  }, [jobsData.jobs]);
   const hasMore = jobsData.hasMore || false;
-  const totalJobs = jobsData.total || 0;
+  const totalJobs = jobs.length; // Update total to reflect filtered count
 
   // Transform jobs
   const transformedJobs: Job[] = useMemo(() => {

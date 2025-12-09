@@ -653,11 +653,7 @@ export function DynamicSkillTest({
   if (phase === "career" && careerQuestions.length > 0) {
     const q = careerQuestions[careerIndex];
     return (
-      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
-        {/* <h1 className="text-2xl font-bold mb-4">🧭 Interest / Career Test</h1> */}
-        {/* <div className="text-gray-700 mb-2">
-          Question {careerIndex + 1} of {careerQuestions.length}
-        </div> */}
+      <>
         <h2 className="mt-2 mb-4 text-xl font-semibold text-gray-800 dark:text-foreground">
           {q.text}
         </h2>
@@ -668,39 +664,41 @@ export function DynamicSkillTest({
             return (
               <button
                 key={opt.id}
-                className={`w-full px-4 py-3 rounded-lg border flex items-center gap-3 transition-all ${
+                className={`w-full px-4 py-3 rounded-lg border block transition-all ${
                   isSelected
                     ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
                     : "bg-[#eff9fc] dark:bg-[rgba(26,38,51,0.3)] border-blue-200 dark:border-gray-700 hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
                 }`}
                 onClick={() => selectCareerAnswer(opt)}
               >
-                <div
-                  className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
-                    isSelected
-                      ? "bg-[#00afea] dark:bg-[#5AC9F8]"
-                      : "bg-white dark:bg-gray-800"
-                  }`}
-                >
-                  <span
-                    className={`text-xs font-medium ${
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
                       isSelected
-                        ? "text-white"
-                        : "text-gray-600 dark:text-gray-300"
+                        ? "bg-[#00afea] dark:bg-[#5AC9F8]"
+                        : "bg-white dark:bg-gray-800"
                     }`}
                   >
-                    {letter}
+                    <span
+                      className={`text-xs font-medium ${
+                        isSelected
+                          ? "text-white"
+                          : "text-gray-600 dark:text-gray-300"
+                      }`}
+                    >
+                      {letter}
+                    </span>
+                  </div>
+                  <span
+                    className={`flex-1 text-left ${
+                      isSelected
+                        ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
+                        : "text-gray-700 dark:text-foreground"
+                    }`}
+                  >
+                    {opt.text}
                   </span>
                 </div>
-                <span
-                  className={`flex-1 text-left ${
-                    isSelected
-                      ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
-                      : "text-gray-700 dark:text-foreground"
-                  }`}
-                >
-                  {opt.text}
-                </span>
               </button>
             );
           })}
@@ -715,7 +713,7 @@ export function DynamicSkillTest({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -745,7 +743,7 @@ export function DynamicSkillTest({
 
   if (currentTechQ) {
     return (
-      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+      <>
         {/* <h2 className="text-xl font-bold mb-2">⚡ Tech Question</h2> */}
         <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
           {currentTechQ.text}
@@ -759,39 +757,41 @@ export function DynamicSkillTest({
               return (
                 <button
                   key={i}
-                  className={`w-full px-4 py-3 rounded-lg border flex items-center gap-3 transition-all ${
+                  className={`w-full px-4 py-3 rounded-lg border block transition-all ${
                     isSelected
                       ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
                       : "bg-[#eff9fc] dark:bg-muted border-blue-200 dark:border-border hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
                   }`}
                   onClick={() => setSelectedTechAnswer(option)}
                 >
-                  <div
-                    className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
-                      isSelected
-                        ? "bg-[#00afea] dark:bg-[#5AC9F8]"
-                        : "bg-white dark:bg-gray-800"
-                    }`}
-                  >
-                    <span
-                      className={`text-xs font-medium ${
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
                         isSelected
-                          ? "text-white"
-                          : "text-gray-600 dark:text-gray-300"
+                          ? "bg-[#00afea] dark:bg-[#5AC9F8]"
+                          : "bg-white dark:bg-gray-800"
                       }`}
                     >
-                      {letter}
+                      <span
+                        className={`text-xs font-medium ${
+                          isSelected
+                            ? "text-white"
+                            : "text-gray-600 dark:text-gray-300"
+                        }`}
+                      >
+                        {letter}
+                      </span>
+                    </div>
+                    <span
+                      className={`flex-1 text-left ${
+                        isSelected
+                          ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
+                          : "text-gray-700 dark:text-foreground"
+                      }`}
+                    >
+                      {option}
                     </span>
                   </div>
-                  <span
-                    className={`flex-1 text-left ${
-                      isSelected
-                        ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
-                        : "text-gray-700 dark:text-foreground"
-                    }`}
-                  >
-                    {option}
-                  </span>
                 </button>
               );
             }
@@ -808,7 +808,7 @@ export function DynamicSkillTest({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -854,7 +854,7 @@ export function DynamicSkillTest({
 
     if (!hasOptions) {
       return (
-        <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+        <>
           <h2 className="text-xl font-bold mb-2 dark:text-foreground">
             ⚠️ Error Loading Question
           </h2>
@@ -864,12 +864,12 @@ export function DynamicSkillTest({
           <pre className="text-xs bg-gray-100 dark:bg-muted text-gray-800 dark:text-foreground p-4 overflow-auto">
             {JSON.stringify(currentSoftQ, null, 2)}
           </pre>
-        </div>
+        </>
       );
     }
 
     return (
-      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
+      <>
         {/* <h2 className="text-xl font-bold mb-2">🌟 Soft Skills Question</h2> */}
         <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
           {questionText}
@@ -883,39 +883,41 @@ export function DynamicSkillTest({
               return (
                 <button
                   key={i}
-                  className={`w-full px-4 py-3 rounded-lg border flex items-center gap-3 transition-all ${
+                  className={`w-full px-4 py-3 rounded-lg border block transition-all ${
                     isSelected
                       ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
                       : "bg-[#eff9fc] dark:bg-muted border-blue-200 dark:border-border hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
                   }`}
                   onClick={() => setSelectedSoftAnswer(option)}
                 >
-                  <div
-                    className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
-                      isSelected
-                        ? "bg-[#00afea] dark:bg-[#5AC9F8]"
-                        : "bg-white dark:bg-gray-800"
-                    }`}
-                  >
-                    <span
-                      className={`text-xs font-medium ${
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
                         isSelected
-                          ? "text-white"
-                          : "text-gray-600 dark:text-gray-300"
+                          ? "bg-[#00afea] dark:bg-[#5AC9F8]"
+                          : "bg-white dark:bg-gray-800"
                       }`}
                     >
-                      {letter}
+                      <span
+                        className={`text-xs font-medium ${
+                          isSelected
+                            ? "text-white"
+                            : "text-gray-600 dark:text-gray-300"
+                        }`}
+                      >
+                        {letter}
+                      </span>
+                    </div>
+                    <span
+                      className={`flex-1 text-left ${
+                        isSelected
+                          ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
+                          : "text-gray-700 dark:text-foreground"
+                      }`}
+                    >
+                      {option}
                     </span>
                   </div>
-                  <span
-                    className={`flex-1 text-left ${
-                      isSelected
-                        ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
-                        : "text-gray-700 dark:text-foreground"
-                    }`}
-                  >
-                    {option}
-                  </span>
                 </button>
               );
             }
@@ -932,7 +934,7 @@ export function DynamicSkillTest({
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </>
     );
   }
 

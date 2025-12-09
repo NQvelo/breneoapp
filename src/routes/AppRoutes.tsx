@@ -29,10 +29,12 @@ import UserSettings from "@/pages/user/UserSettings";
 import JobsPage from "@/pages/user/JobsPage";
 import JobSearchResultsPage from "@/pages/user/JobSearchResultsPage";
 import JobDetailPage from "@/pages/user/JobDetailPage";
+import CompanyJobsPage from "@/pages/user/CompanyJobsPage";
 import CoursesPage from "@/pages/CoursesPage";
 import CoursePage from "@/pages/CoursePage";
 import SkillTestPage from "@/pages/user/SkillTestPage";
 import SkillPathPage from "@/pages/user/SkillPathPage";
+import SkillPathDetailPage from "@/pages/user/SkillPathDetailPage";
 import InterestsPage from "@/pages/user/InterestsPage";
 import UserNotificationsPage from "@/pages/NotificationsPage";
 
@@ -125,6 +127,11 @@ export const AppRoutes = () => {
           <SkillTestPage />
         </ProtectedRoute>
       ))}
+      {createLocalizedRoute("/skill-path/:skillName", (
+        <ProtectedRoute requiredRole="user">
+          <SkillPathDetailPage />
+        </ProtectedRoute>
+      ))}
       {createLocalizedRoute("/skill-path", (
         <ProtectedRoute requiredRole="user">
           <SkillPathPage />
@@ -143,6 +150,11 @@ export const AppRoutes = () => {
       {createLocalizedRoute("/jobs/:jobId", (
         <ProtectedRoute requiredRole="user">
           <JobDetailPage />
+        </ProtectedRoute>
+      ))}
+      {createLocalizedRoute("/jobs/company/:companyName", (
+        <ProtectedRoute requiredRole="user">
+          <CompanyJobsPage />
         </ProtectedRoute>
       ))}
       {createLocalizedRoute("/courses", (

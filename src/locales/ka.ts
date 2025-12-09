@@ -162,6 +162,19 @@ export const ka = {
     noNotifications: "შეტყობინებები არ არის",
     markAsRead: "წაკითხულად მონიშვნა",
     markAllAsRead: "ყველას წაკითხულად მონიშვნა",
+    browserNotifications: "ბრაუზერის შეტყობინებები",
+    enableBrowserNotifications: "ბრაუზერის შეტყობინებების ჩართვა",
+    browserNotificationsDescription:
+      "მიიღეთ შეტყობინებები, როდესაც გამოქვეყნდება ახალი ვაკანსიები, რომლებიც შეესაბამება თქვენს უნარებს. თქვენ მიიღებთ ბრაუზერის შეტყობინებებს, მაშინაც კი, როცა საიტზე არ ხართ.",
+    notificationPermissionGranted: "ბრაუზერის შეტყობინებები ჩართულია",
+    notificationPermissionDenied:
+      "ბრაუზერის შეტყობინებები დაბლოკილია. გთხოვთ, ჩართოთ ისინი თქვენი ბრაუზერის პარამეტრებში.",
+    notificationPermissionDefault:
+      "დააჭირეთ ქვემოთ მოცემულ ღილაკს, რათა ჩართოთ ბრაუზერის შეტყობინებები ახალი ვაკანსიების შესახებ.",
+    requestPermission: "შეტყობინებების ჩართვა",
+    checkingForJobs: "ახალი ვაკანსიების შემოწმება...",
+    notificationsEnabled: "შეტყობინებები ჩართულია",
+    notificationsDisabled: "შეტყობინებები გამორთულია",
   },
   // Subscription
   subscription: {
@@ -191,14 +204,17 @@ export const ka = {
     finish: "დასრულება",
     results: "შედეგები",
   },
+  // Skill Path
+  skillPath: {
+    title: "თქვენი პერსონალიზებული უნარების გზა",
+  },
   // Home CTAs
   home: {
     skillTestTitle: "დაიწყე შენი უნარების შეფასების გზა",
     skillTestSubtitle:
       "ჩაიტარე უნარების ტესტი და მიიღო პერსონალიზებული რეკომენდაციები.",
     skillPathTitle: "გაიგე შენი პერსონალური კარიერული გზა",
-    skillPathSubtitle:
-      "მიიღე შენზე მორგებული კარიერული რეკომენდაციები.",
+    skillPathSubtitle: "მიიღე შენზე მორგებული კარიერული რეკომენდაციები.",
   },
   // Errors
   errors: {

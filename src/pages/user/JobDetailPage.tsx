@@ -49,9 +49,14 @@ import {
   Linkedin,
   Loader2,
   XCircle,
+  ThumbsUp,
 } from "lucide-react";
-import { summarizeText } from "@/utils/aiSummarizer";
 import { extractSkillsFromText } from "@/utils/skillExtractor";
+import {
+  extractResponsibilities,
+  extractQualifications,
+  extractSkillsFromQualifications,
+} from "@/utils/jobSectionExtractor";
 import {
   getUserTestAnswers,
   calculateSkillScores,
@@ -130,29 +135,110 @@ const JobDetailPage = () => {
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
 
-  // AI Summary state
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
-  const [showGradient, setShowGradient] = useState(false);
-  const [hideOriginal, setHideOriginal] = useState(false);
+  // Responsibilities state
+  const [responsibilities, setResponsibilities] = useState<string | null>(null);
+  const [isExtractingResponsibilities, setIsExtractingResponsibilities] =
+    useState(false);
+  const [responsibilitiesError, setResponsibilitiesError] = useState<
+    string | null
+  >(null);
+
+  // Qualifications state
+  const [qualifications, setQualifications] = useState<string | null>(null);
+  const [isExtractingQualifications, setIsExtractingQualifications] =
+    useState(false);
+  const [qualificationsError, setQualificationsError] = useState<
+    string | null
+  >(null);
 
   // Skills comparison state
   const [jobSkills, setJobSkills] = useState<string[]>([]);
+  const [qualificationSkills, setQualificationSkills] = useState<string[]>([]);
   const [userSkills, setUserSkills] = useState<Set<string>>(new Set());
   const [isExtractingSkills, setIsExtractingSkills] = useState(false);
   const [isLoadingUserSkills, setIsLoadingUserSkills] = useState(false);
 
-  // Reset summary when job changes
+  // Reset sections when job changes
   useEffect(() => {
-    setAiSummary(null);
-    setSummaryError(null);
-    setShowSummary(false);
-    setIsSummarizing(false);
-    setShowGradient(false);
-    setHideOriginal(false);
+    setResponsibilities(null);
+    setResponsibilitiesError(null);
+    setIsExtractingResponsibilities(false);
+
+    setQualifications(null);
+    setQualificationsError(null);
+    setIsExtractingQualifications(false);
   }, [jobId]);
+
+  // Extract responsibilities and qualifications when job detail changes
+  useEffect(() => {
+    const extractSections = async () => {
+      if (!jobDetail) {
+        setResponsibilities(null);
+        setQualifications(null);
+        return;
+      }
+
+      const description = getDescription();
+      if (!description || description.length < 50) {
+        setResponsibilities(null);
+        setQualifications(null);
+        return;
+      }
+
+      // Extract responsibilities
+      setIsExtractingResponsibilities(true);
+      setResponsibilitiesError(null);
+      try {
+        const respResult = await extractResponsibilities(description);
+        if (respResult.error) {
+          setResponsibilitiesError(respResult.error);
+          setResponsibilities(null);
+        } else {
+          setResponsibilities(respResult.content);
+        }
+      } catch (error) {
+        console.error("Error extracting responsibilities:", error);
+        setResponsibilitiesError(
+          error instanceof Error ? error.message : "Failed to extract responsibilities"
+        );
+        setResponsibilities(null);
+      } finally {
+        setIsExtractingResponsibilities(false);
+      }
+
+      // Extract qualifications
+      setIsExtractingQualifications(true);
+      setQualificationsError(null);
+      try {
+        const qualResult = await extractQualifications(description);
+        if (qualResult.error) {
+          setQualificationsError(qualResult.error);
+          setQualifications(null);
+          setQualificationSkills([]);
+        } else {
+          setQualifications(qualResult.content);
+          // Extract skills from qualifications
+          const skills = extractSkillsFromQualifications(qualResult.content);
+          setQualificationSkills(skills);
+          // Also update jobSkills with skills from qualifications
+          if (skills.length > 0) {
+            setJobSkills(skills);
+          }
+        }
+      } catch (error) {
+        console.error("Error extracting qualifications:", error);
+        setQualificationsError(
+          error instanceof Error ? error.message : "Failed to extract qualifications"
+        );
+        setQualifications(null);
+        setQualificationSkills([]);
+      } finally {
+        setIsExtractingQualifications(false);
+      }
+    };
+
+    extractSections();
+  }, [jobDetail]);
 
   // Fetch user skills from test results (same method as SkillPathPage)
   useEffect(() => {
@@ -432,63 +518,6 @@ const JobDetailPage = () => {
     };
   }, [jobDetail, isMobile]); // Re-attach when job detail loads or mobile state changes
 
-  // Handle AI summarization
-  const handleSummarize = async () => {
-    // If summary is already shown, hide it
-    if (aiSummary && hideOriginal) {
-      setShowSummary(false);
-      setAiSummary(null);
-      setSummaryError(null);
-      setShowGradient(false);
-      setHideOriginal(false);
-      return;
-    }
-
-    if (isSummarizing) return;
-
-    if (!jobDetail) return;
-
-    const description = getDescription();
-    if (!description || description.length < 50) {
-      toast.error("Job description is too short to summarize");
-      return;
-    }
-
-    setIsSummarizing(true);
-    setSummaryError(null);
-    setShowSummary(true);
-    setShowGradient(true);
-    setHideOriginal(false);
-
-    try {
-      // Comprehensive, expanded summarization: longer, detailed, focused on what candidates need to know
-      const result = await summarizeText(description, 1200, 400);
-      if (result.error) {
-        setSummaryError(result.error);
-        setShowGradient(false);
-        setHideOriginal(false);
-        toast.error("Failed to generate summary: " + result.error);
-      } else if (result.summary) {
-        setAiSummary(result.summary);
-        setTimeout(() => {
-          setHideOriginal(true);
-          setShowGradient(false);
-        }, 300);
-        toast.success("Summary generated successfully!");
-      } else {
-        throw new Error("No summary generated");
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to generate summary";
-      setSummaryError(errorMessage);
-      toast.error("Failed to generate summary");
-      setShowGradient(false);
-      setHideOriginal(false);
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
 
   // Save/unsave job mutation
   const saveJobMutation = useMutation({
@@ -1277,7 +1306,7 @@ const JobDetailPage = () => {
     <DashboardLayout>
       <div
         ref={mainContentRef}
-        className="max-w-5xl mx-auto pt-2 sm:pt-4 pb-20 sm:pb-12 md:pb-6 px-2 sm:px-4 md:px-6"
+        className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 px-1 sm:px-4 md:px-6"
       >
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
@@ -1313,8 +1342,8 @@ const JobDetailPage = () => {
         )}
 
         {!isLoading && jobDetail && (
-          <Card>
-            <CardContent className="p-6 space-y-8">
+          <Card className="md:bg-card md:border md:shadow-sm bg-transparent border-0 shadow-none">
+            <CardContent className="p-3 sm:p-6 space-y-8">
               {/* Job Header */}
               <div>
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
@@ -1451,48 +1480,133 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-              {/* Skills Match Section */}
-              {user && (jobSkills.length > 0 || isExtractingSkills) && (
-                <div className="pt-8">
-                  {isExtractingSkills && jobSkills.length === 0 ? (
+
+              {/* Responsibilities Section */}
+              <div className="pt-8">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Briefcase className="h-5 w-5" />
+                    Responsibilities
+                  </h2>
+                </div>
+
+                {isExtractingResponsibilities ? (
                     <Card>
                       <CardContent className="p-6">
                         <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
                           <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
                           <p className="text-sm">
-                            AI is extracting skills from the job description...
+                          AI is extracting responsibilities from the job
+                          description...
                           </p>
                         </div>
                       </CardContent>
                     </Card>
-                  ) : jobSkills.length > 0 ? (
-                    <Card>
+                ) : responsibilitiesError ? (
+                  <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
                       <CardContent className="p-6">
-                        {/* Skills Match Header with Image */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <h2 className="text-lg font-semibold">
-                            Skills Match
-                          </h2>
-                          {isExtractingSkills && (
-                            <div className="ml-auto flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Analyzing job requirements...</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mb-4">
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            Compare your skills from the skill test with the
-                            skills required for this job:
+                      <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+                        <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium mb-1">
+                            Failed to extract responsibilities
                           </p>
+                          <p className="text-xs">{responsibilitiesError}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                  </Card>
+                ) : responsibilities ? (
+                  <div
+                    className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line"
+                    style={{ whiteSpace: "pre-line" }}
+                  >
+                    {responsibilities
+                      .split("\n")
+                      .map((line, index) => {
+                        const trimmedLine = line.trim();
+                        if (!trimmedLine) return null;
+                        
+                        if (/^[•\-*]\s/.test(trimmedLine)) {
+                          return (
+                            <div key={index} className="mb-2 ml-4">
+                              {trimmedLine}
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <p key={index} className="mb-2">
+                            {trimmedLine}
+                          </p>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-6">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No responsibilities information available for this job.
+                      </p>
+                      </CardContent>
+                    </Card>
+              )}
+              </div>
+
+              {/* Qualifications Section */}
+              <div className="pt-8">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5" />
+                    Qualifications
+                  </h2>
+                </div>
+
+                {isExtractingQualifications ? (
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                        <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                        <p className="text-sm">
+                          AI is extracting qualifications from the job
+                          description...
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : qualificationsError ? (
+                  <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+                        <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium mb-1">
+                            Failed to extract qualifications
+                          </p>
+                          <p className="text-xs">{qualificationsError}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : qualifications ? (
+                  <div className="space-y-4">
+                    {/* Skills Match Section - Moved here from top */}
+                    {user && (qualificationSkills.length > 0 || jobSkills.length > 0) && (
+                      <Card>
+                        <CardContent className="p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <h3 className="text-base font-semibold">
+                              Skills Match
+                            </h3>
+                          </div>
+
                           {isLoadingUserSkills ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span>Loading your skills...</span>
                             </div>
                           ) : userSkills.size === 0 ? (
-                            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 mb-4">
                               <AlertCircle className="h-4 w-4" />
                               <span>
                                 You haven't taken the skill test yet.{" "}
@@ -1505,256 +1619,78 @@ const JobDetailPage = () => {
                                 to see your skill match.
                               </span>
                             </div>
-                          ) : (
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              <span className="font-medium">
-                                {
-                                  jobSkills.filter((skill) =>
-                                    userSkills.has(skill.toLowerCase())
-                                  ).length
-                                }
-                              </span>{" "}
-                              out of{" "}
-                              <span className="font-medium">
-                                {jobSkills.length}
-                              </span>{" "}
-                              required skills match your profile
-                            </div>
-                          )}
-                        </div>
+                          ) : null}
 
-                        <div className="flex flex-wrap gap-2">
-                          {jobSkills.map((skill, index) => {
-                            const hasSkill = userSkills.has(
-                              skill.toLowerCase()
-                            );
-                            return (
-                              <div
-                                key={index}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-colors ${
-                                  hasSkill
-                                    ? "bg-green-50 dark:bg-green-950/20"
-                                    : "bg-gray-50 dark:bg-gray-800/50"
-                                }`}
-                              >
-                                <div className="flex-shrink-0">
-                                  {hasSkill ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                                  ) : (
-                                    <XCircle className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-                                  )}
-                                </div>
-                                <span
-                                  className={`text-xs font-medium whitespace-nowrap ${
+                          <div className="flex flex-wrap gap-2">
+                            {(qualificationSkills.length > 0 ? qualificationSkills : jobSkills).map((skill, index) => {
+                              const hasSkill = userSkills.has(
+                                skill.toLowerCase()
+                              );
+                                    return (
+                                      <div
+                                        key={index}
+                                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors ${
                                     hasSkill
-                                      ? "text-green-700 dark:text-green-300"
-                                      : "text-gray-700 dark:text-gray-300"
+                                      ? "bg-green-500 text-white"
+                                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                                   }`}
                                 >
-                                  {skill}
-                                </span>
-                              </div>
+                                  <div className="flex-shrink-0">
+                                    {hasSkill ? (
+                                      <ThumbsUp className="h-4 w-4 text-white" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4" />
+                                    )}
+                                        </div>
+                                  <span className="text-sm font-medium whitespace-nowrap">
+                                    {skill}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Qualifications List */}
+                    <div>
+                      <div
+                        className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line"
+                        style={{ whiteSpace: "pre-line" }}
+                      >
+                        {qualifications
+                          .split("\n")
+                          .map((line, index) => {
+                            const trimmedLine = line.trim();
+                            if (!trimmedLine) return null;
+                            
+                            if (/^[•\-*]\s/.test(trimmedLine)) {
+                              return (
+                                <div key={index} className="mb-2 ml-4">
+                                  {trimmedLine}
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <p key={index} className="mb-2">
+                                {trimmedLine}
+                              </p>
                             );
                           })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : null}
-                </div>
-              )}
-
-              {/* Job Description */}
-              <div className="pt-8">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <h2 className="text-lg font-semibold">Job Description</h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSummarize}
-                    disabled={isSummarizing || !jobDetail}
-                    className="flex items-center gap-2"
-                    aria-label={
-                      isSummarizing
-                        ? "Summarizing..."
-                        : aiSummary && hideOriginal
-                        ? "Hide Summary"
-                        : "Summarize"
-                    }
-                  >
-                    {isSummarizing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Summarizing...</span>
-                      </>
-                    ) : aiSummary && hideOriginal ? (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        <span>Hide Summary</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        <span>Summarize</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {showSummary && (
-                  <div
-                    className={`transition-all duration-700 ${
-                      isSummarizing ||
-                      summaryError ||
-                      (hideOriginal && aiSummary)
-                        ? "opacity-100 max-h-[2000px]"
-                        : "opacity-0 max-h-0 overflow-hidden"
-                    }`}
-                  >
-                    <Card className="border-breneo-accent/20 bg-gradient-to-br from-breneo-accent/5 to-transparent">
-                      <CardContent className="p-4">
-                        {isSummarizing ? (
-                          <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                            <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                            <p className="text-sm">
-                              AI is analyzing the job description...
-                            </p>
-                          </div>
-                        ) : summaryError ? (
-                          <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
-                            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-sm font-medium mb-1">
-                                Failed to generate summary
-                              </p>
-                              <p className="text-xs">{summaryError}</p>
-                            </div>
-                          </div>
-                        ) : aiSummary ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-breneo-accent mb-2">
-                              <Sparkles className="h-4 w-4" />
-                              <span className="text-xs font-semibold">
-                                AI-Generated Summary
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed space-y-3">
-                              {aiSummary
-                                .split("\n\n")
-                                .map((paragraph, index) => {
-                                  // Check if paragraph contains list items (lines starting with •, -, *, or numbers)
-                                  const lines = paragraph.split("\n");
-                                  const hasListItems = lines.some(
-                                    (line) =>
-                                      /^[\s]*[•\-*]\s/.test(line) ||
-                                      /^[\s]*\d+\.\s/.test(line)
-                                  );
-
-                                  if (hasListItems) {
-                                    return (
-                                      <div
-                                        key={index}
-                                        className="mb-3 last:mb-0"
-                                      >
-                                        {lines.map((line, lineIndex) => {
-                                          const trimmedLine = line.trim();
-                                          // Check if it's a list item
-                                          if (
-                                            /^[•\-*]\s/.test(trimmedLine) ||
-                                            /^\d+\.\s/.test(trimmedLine)
-                                          ) {
-                                            // If it's the first line and starts with bullet, ensure it's on new line
-                                            const isFirstLine = lineIndex === 0;
-                                            return (
-                                              <div
-                                                key={lineIndex}
-                                                className={`ml-4 mb-1 last:mb-0 ${
-                                                  isFirstLine &&
-                                                  /^[•\-*]\s/.test(trimmedLine)
-                                                    ? "mt-2"
-                                                    : ""
-                                                }`}
-                                              >
-                                                {trimmedLine}
-                                              </div>
-                                            );
-                                          }
-                                          // Regular text line
-                                          if (trimmedLine) {
-                                            return (
-                                              <p
-                                                key={lineIndex}
-                                                className="mb-2 last:mb-0"
-                                              >
-                                                {trimmedLine}
-                                              </p>
-                                            );
-                                          }
-                                          return null;
-                                        })}
-                                      </div>
-                                    );
-                                  }
-
-                                  // Check if paragraph starts with bullet point
-                                  const startsWithBullet = /^[•\-*]\s/.test(
-                                    paragraph.trim()
-                                  );
-                                  if (startsWithBullet) {
-                                    return (
-                                      <div
-                                        key={index}
-                                        className="mb-3 last:mb-0"
-                                      >
-                                        <div className="ml-4">
-                                          {paragraph.trim()}
-                                        </div>
-                                      </div>
-                                    );
-                                  }
-
-                                  // Regular paragraph
-                                  return (
-                                    <p key={index} className="mb-3 last:mb-0">
-                                      {paragraph}
-                                    </p>
-                                  );
-                                })}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setShowSummary(false);
-                                setAiSummary(null);
-                                setSummaryError(null);
-                                setShowGradient(false);
-                                setHideOriginal(false);
-                              }}
-                              className="mt-2 text-xs"
-                            >
-                              Hide Summary
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            Click "Summarize" to generate a concise summary of
-                            this job description.
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </div>
                   </div>
+                        ) : (
+                  <Card>
+                    <CardContent className="p-6">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No qualifications information available for this job.
+                          </p>
+                      </CardContent>
+                    </Card>
                 )}
-                <div
-                  className={`prose prose-sm max-w-none dark:prose-invert transition-all duration-700 ${
-                    showGradient && !hideOriginal ? "animate-gradient-text" : ""
-                  } ${hideOriginal ? "opacity-0 max-h-0 overflow-hidden" : ""}`}
-                  dangerouslySetInnerHTML={{
-                    __html: getDescription()
-                      .toString()
-                      .replace(/\n/g, "<br />"),
-                  }}
-                />
               </div>
 
               {/* Requirements & Qualifications */}

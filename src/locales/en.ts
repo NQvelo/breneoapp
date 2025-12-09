@@ -162,6 +162,19 @@ export const en = {
     noNotifications: "No notifications",
     markAsRead: "Mark as read",
     markAllAsRead: "Mark all as read",
+    browserNotifications: "Browser Notifications",
+    enableBrowserNotifications: "Enable Browser Notifications",
+    browserNotificationsDescription:
+      "Get notified when new jobs matching your skills are posted. You'll receive browser notifications even when you're not on the site.",
+    notificationPermissionGranted: "Browser notifications are enabled",
+    notificationPermissionDenied:
+      "Browser notifications are blocked. Please enable them in your browser settings.",
+    notificationPermissionDefault:
+      "Click the button below to enable browser notifications for new job matches.",
+    requestPermission: "Enable Notifications",
+    checkingForJobs: "Checking for new jobs...",
+    notificationsEnabled: "Notifications Enabled",
+    notificationsDisabled: "Notifications Disabled",
   },
   // Subscription
   subscription: {
@@ -190,6 +203,10 @@ export const en = {
     previous: "Previous",
     finish: "Finish",
     results: "Results",
+  },
+  // Skill Path
+  skillPath: {
+    title: "Your Personalized Skill Path",
   },
   // Home CTAs
   home: {
