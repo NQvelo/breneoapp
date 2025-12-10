@@ -159,9 +159,12 @@ const calculateJobRelevanceScore = (
 
   // Calculate relevance score: (matches / total job skills) * (matches / total user skills)
   // This gives higher scores to jobs that match more of the user's skills
-  const score = matchCount > 0 
-    ? (matchCount / normalizedJobSkills.length) * (matchCount / normalizedUserSkills.length) * 10
-    : 0.1;
+  const score =
+    matchCount > 0
+      ? (matchCount / normalizedJobSkills.length) *
+        (matchCount / normalizedUserSkills.length) *
+        10
+      : 0.1;
 
   return score;
 };
@@ -179,14 +182,39 @@ const isTechJob = (job: ApiJob): boolean => {
 
   // Tech keywords to identify tech jobs
   const techKeywords = [
-    "developer", "programmer", "engineer", "software", "coding", "programming",
-    "javascript", "python", "java", "react", "node", "sql", "database",
-    "frontend", "backend", "full stack", "web developer", "mobile developer",
-    "devops", "cloud", "aws", "azure", "docker", "kubernetes", "api",
-    "machine learning", "ai", "data science", "analytics", "cybersecurity"
+    "developer",
+    "programmer",
+    "engineer",
+    "software",
+    "coding",
+    "programming",
+    "javascript",
+    "python",
+    "java",
+    "react",
+    "node",
+    "sql",
+    "database",
+    "frontend",
+    "backend",
+    "full stack",
+    "web developer",
+    "mobile developer",
+    "devops",
+    "cloud",
+    "aws",
+    "azure",
+    "docker",
+    "kubernetes",
+    "api",
+    "machine learning",
+    "ai",
+    "data science",
+    "analytics",
+    "cybersecurity",
   ];
 
-  return techKeywords.some(keyword => textToSearch.includes(keyword));
+  return techKeywords.some((keyword) => textToSearch.includes(keyword));
 };
 
 // Transformed Job for UI
@@ -346,16 +374,50 @@ const UserHome = () => {
           // For Supabase, we'll filter to tech skills by checking against known tech skill keywords
           // This is a fallback - ideally we'd have tech/soft separation in the data
           const techSkillKeywords = [
-            "javascript", "python", "java", "c++", "c#", "go", "rust", "php", "ruby",
-            "swift", "kotlin", "typescript", "html", "css", "sql", "react", "vue",
-            "angular", "node.js", "express", "django", "flask", "spring", "laravel",
-            "rails", "git", "docker", "kubernetes", "aws", "azure", "gcp", "linux",
-            "machine learning", "data science", "ai", "blockchain", "devops", "testing"
+            "javascript",
+            "python",
+            "java",
+            "c++",
+            "c#",
+            "go",
+            "rust",
+            "php",
+            "ruby",
+            "swift",
+            "kotlin",
+            "typescript",
+            "html",
+            "css",
+            "sql",
+            "react",
+            "vue",
+            "angular",
+            "node.js",
+            "express",
+            "django",
+            "flask",
+            "spring",
+            "laravel",
+            "rails",
+            "git",
+            "docker",
+            "kubernetes",
+            "aws",
+            "azure",
+            "gcp",
+            "linux",
+            "machine learning",
+            "data science",
+            "ai",
+            "blockchain",
+            "devops",
+            "testing",
           ];
-          const hardSkills = topSkills.filter(skill => 
-            techSkillKeywords.some(keyword => 
-              skill.toLowerCase().includes(keyword.toLowerCase()) || 
-              keyword.toLowerCase().includes(skill.toLowerCase())
+          const hardSkills = topSkills.filter((skill) =>
+            techSkillKeywords.some(
+              (keyword) =>
+                skill.toLowerCase().includes(keyword.toLowerCase()) ||
+                keyword.toLowerCase().includes(skill.toLowerCase())
             )
           );
           setUserHardSkills(hardSkills.length > 0 ? hardSkills : topSkills); // Fallback to all if no match
@@ -543,13 +605,16 @@ const UserHome = () => {
     // Step 1: Filter to only allowed ATS platforms first (ensures only jobs from approved platforms are shown)
     // This checks all apply links in the job object against the allowed ATS domains list
     let filteredJobs = filterATSJobs(jobs || []);
-    
+
     // Step 2: Filter to tech jobs if user has hard skills, otherwise show all
     if (userHardSkills.length > 0) {
       // Show tech jobs and jobs that match user skills
       filteredJobs = filteredJobs.filter((job: ApiJob) => {
         // Show if it's a tech job OR if it matches user skills
-        return isTechJob(job) || calculateJobRelevanceScore(job, userHardSkills) > 0.1;
+        return (
+          isTechJob(job) ||
+          calculateJobRelevanceScore(job, userHardSkills) > 0.1
+        );
       });
     }
 
@@ -574,7 +639,7 @@ const UserHome = () => {
     });
 
     // Step 3: Take top 10 most relevant jobs
-    const topJobs = jobsWithScores.slice(0, 10).map(item => item.job);
+    const topJobs = jobsWithScores.slice(0, 10).map((item) => item.job);
 
     return topJobs
       .map((job: ApiJob) => {

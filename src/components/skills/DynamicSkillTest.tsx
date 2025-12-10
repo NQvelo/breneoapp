@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext"; // corrected relative path
 import apiClient from "@/api/auth/apiClient";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export function DynamicSkillTest({
   onSoftQChange,
 }: DynamicSkillTestProps = {}) {
   const { user } = useAuth(); // ✅ get current user
+  const navigate = useNavigate();
   const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
     "career"
   );
@@ -92,6 +94,9 @@ export function DynamicSkillTest({
   const [selectedSoftAnswer, setSelectedSoftAnswer] = useState<string | null>(
     null
   );
+  const [questionKey, setQuestionKey] = useState(0);
+  const [showMotivationalAfterCareer, setShowMotivationalAfterCareer] = useState(false);
+  const [showMotivationalAfterTech, setShowMotivationalAfterTech] = useState(false);
 
   const numQuestions = 5;
 
@@ -236,6 +241,9 @@ export function DynamicSkillTest({
       console.log("✅ Response:", response.data);
       console.log("✅ Saved total_score:", payload.total_score);
       console.log("✅ Saved total_questions:", payload.total_questions);
+      
+      // Redirect to skill-path page
+      navigate("/skill-path");
     } catch (err: any) {
       console.error("❌ Error saving test results:");
       console.error("Full error object:", err);
@@ -276,10 +284,18 @@ export function DynamicSkillTest({
 
     if (careerIndex + 1 < careerQuestions.length) {
       setCareerIndex(careerIndex + 1);
+      setQuestionKey((prev) => prev + 1);
     } else {
-      setPhase("assessment");
-      startAssessments();
+      setShowMotivationalAfterCareer(true);
+      setQuestionKey((prev) => prev + 1);
     }
+  };
+
+  const handleContinueAfterCareer = () => {
+    setShowMotivationalAfterCareer(false);
+    setPhase("assessment");
+    startAssessments();
+    setQuestionKey((prev) => prev + 1);
   };
 
   // Start tech & soft assessments
@@ -301,6 +317,7 @@ export function DynamicSkillTest({
       console.log("✅ Tech Response:", techRes.data);
       setTechSession(techRes.data);
       setCurrentTechQ(techRes.data.questions[0]);
+      setQuestionKey((prev) => prev + 1);
 
       // Start soft skills assessment
       console.log("🌟 Starting SOFT SKILLS assessment with params:", {
@@ -363,7 +380,12 @@ export function DynamicSkillTest({
         Object.keys(softQuestion || {})
       );
 
-      setCurrentSoftQ(softQuestion);
+      // Store first question in session for later use (after motivational screen)
+      const softSessionWithQuestion = {
+        ...softRes.data,
+        first_question: softQuestion
+      };
+      setSoftSession(softSessionWithQuestion);
 
       console.log("✅ Assessments started successfully");
     } catch (err) {
@@ -386,10 +408,12 @@ export function DynamicSkillTest({
       setSelectedTechAnswer(null);
       if (res.data.next_question) {
         setCurrentTechQ(res.data.next_question);
+        setQuestionKey((prev) => prev + 1);
       } else {
         setTechDone(true);
         setCurrentTechQ(null);
-        finishTechAssessment();
+        setShowMotivationalAfterTech(true);
+        setQuestionKey((prev) => prev + 1);
       }
     } catch (err) {
       console.error(err);
@@ -434,6 +458,7 @@ export function DynamicSkillTest({
       if (res.data.next_question) {
         console.log("✅ Got next question:", res.data.next_question);
         setCurrentSoftQ(res.data.next_question);
+        setQuestionKey((prev) => prev + 1);
       } else {
         console.log("✅ Soft questions completed");
         setSoftDone(true);
@@ -445,6 +470,50 @@ export function DynamicSkillTest({
       // Log the full error details
       if (err instanceof Error) {
         console.error("Error details:", err.message);
+      }
+    }
+  };
+
+  const handleContinueAfterTech = async () => {
+    setShowMotivationalAfterTech(false);
+    await finishTechAssessment();
+    // Get first soft question after motivational screen
+    if (softSession) {
+      try {
+        // Check if soft session has first question stored
+        let softQuestion = null;
+        
+        if (softSession.first_question) {
+          softQuestion = softSession.first_question;
+        } else if (softSession.questions && softSession.questions[0]) {
+          softQuestion = softSession.questions[0];
+        } else if (softSession.question) {
+          softQuestion = softSession.question;
+        } else {
+          // If not stored, get it from API
+          const softRes = await apiClient.post("/api/soft/next/", {
+            session_id: softSession.session_id,
+          });
+          
+          if (softRes.data.next_question) {
+            softQuestion = softRes.data.next_question;
+          } else if (softRes.data.question) {
+            softQuestion = softRes.data.question;
+          } else if (softRes.data.first_question) {
+            softQuestion = softRes.data.first_question;
+          } else {
+            softQuestion = softRes.data;
+          }
+        }
+        
+        if (softQuestion) {
+          setCurrentSoftQ(softQuestion);
+          setQuestionKey((prev) => prev + 1);
+        } else {
+          console.error("❌ No soft question found");
+        }
+      } catch (err) {
+        console.error("❌ Error getting first soft question:", err);
       }
     }
   };
@@ -638,131 +707,101 @@ export function DynamicSkillTest({
         total_questions_value: resultsToSave.total_questions,
       });
 
-      // Wait 5 seconds before saving and showing results
+      // Wait 5 seconds before saving and redirecting
       setTimeout(() => {
         console.log("✅ 5 seconds passed, saving results now");
-        saveTestResults(resultsToSave);
         setIsCalculatingResults(false);
         setPhase("finished");
+        saveTestResults(resultsToSave);
       }, 5000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [techDone, softDone, results, user]);
 
   // ----- RENDER LOGIC -----
-  if (phase === "career" && careerQuestions.length > 0) {
-    const q = careerQuestions[careerIndex];
+  // Motivational screen after career questions
+  if (showMotivationalAfterCareer) {
     return (
-      <>
-        <h2 className="mt-2 mb-4 text-xl font-semibold text-gray-800 dark:text-foreground">
-          {q.text}
-        </h2>
-        <div className="space-y-3">
-          {q.options.map((opt: CareerOption, index: number) => {
-            const letter = String.fromCharCode(65 + index); // A, B, C, D
-            const isSelected = selectedCareerAnswer === opt.text;
-            return (
-              <button
-                key={opt.id}
-                className={`w-full px-4 py-3 rounded-lg border block transition-all ${
-                  isSelected
-                    ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
-                    : "bg-[#eff9fc] dark:bg-[rgba(26,38,51,0.3)] border-blue-200 dark:border-gray-700 hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
-                }`}
-                onClick={() => selectCareerAnswer(opt)}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
-                      isSelected
-                        ? "bg-[#00afea] dark:bg-[#5AC9F8]"
-                        : "bg-white dark:bg-gray-800"
-                    }`}
-                  >
-                    <span
-                      className={`text-xs font-medium ${
-                        isSelected
-                          ? "text-white"
-                          : "text-gray-600 dark:text-gray-300"
-                      }`}
-                    >
-                      {letter}
-                    </span>
-                  </div>
-                  <span
-                    className={`flex-1 text-left ${
-                      isSelected
-                        ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
-                        : "text-gray-700 dark:text-foreground"
-                    }`}
-                  >
-                    {opt.text}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+      <div key={questionKey} className="flex flex-col h-full md:h-auto animate-in fade-in duration-500">
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <div className="w-32 h-32 md:w-40 md:h-40 mx-auto mb-8 flex items-center justify-center">
+            <Award className="w-32 h-32 md:w-40 md:h-40 text-[#01bfff] dark:text-[#5AC9F8]" />
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-foreground mb-4">
+            Great Job! 🎉
+          </h2>
+          <p className="text-base md:text-lg text-gray-600 dark:text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-2">
+            You've completed the interest assessment. Now let's evaluate your technical skills.
+          </p>
+          <p className="text-base md:text-lg text-gray-600 dark:text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Take your time and answer honestly - this helps us find the perfect role for you.
+          </p>
         </div>
-        <div className="mt-6 flex justify-end">
+        <div className="mt-auto md:mt-8 w-full flex justify-center">
           <Button
-            onClick={submitCareerAnswer}
-            disabled={!selectedCareerAnswer}
-            className="h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 flex items-center justify-center gap-2 px-8"
+            onClick={handleContinueAfterCareer}
+            className="w-full md:w-full px-12 text-white font-medium rounded-2xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90 h-12 text-base transition-all duration-300 hover:scale-105 active:scale-95"
           >
-            Next
-            <ChevronRight className="h-4 w-4" />
+            Continue
+            <ChevronRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
-      </>
-    );
-  }
-
-  if (!techSession || !softSession) {
-    console.log("⏳ Waiting for sessions...", {
-      hasTechSession: !!techSession,
-      hasSoftSession: !!softSession,
-      techSession: techSession,
-      softSession: softSession,
-    });
-    return (
-      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border text-center dark:text-foreground">
-        Loading assessments...
       </div>
     );
   }
 
-  // Debug logging for render state
-  console.log("🔍 Render State:", {
-    hasCurrentTechQ: !!currentTechQ,
-    hasCurrentSoftQ: !!currentSoftQ,
-    techDone,
-    softDone,
-    currentTechQData: currentTechQ,
-    currentSoftQData: currentSoftQ,
-  });
-
-  if (currentTechQ) {
+  // Motivational screen after tech skills
+  if (showMotivationalAfterTech) {
     return (
-      <>
-        {/* <h2 className="text-xl font-bold mb-2">⚡ Tech Question</h2> */}
-        <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
-          {currentTechQ.text}
-        </p>
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => {
-            const option = currentTechQ[`option${i}`];
-            if (option) {
-              const letter = String.fromCharCode(64 + i); // A, B, C, D
-              const isSelected = selectedTechAnswer === option;
+      <div key={questionKey} className="flex flex-col h-full md:h-auto animate-in fade-in duration-500">
+        <div className="flex-1 flex flex-col items-center justify-center text-center">
+          <div className="w-32 h-32 md:w-40 md:h-40 mx-auto mb-8 flex items-center justify-center">
+            <CheckCircle2 className="w-32 h-32 md:w-40 md:h-40 text-green-500 dark:text-green-400" />
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-foreground mb-4">
+            Excellent Progress! ✨
+          </h2>
+          <p className="text-base md:text-lg text-gray-600 dark:text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-2">
+            You've finished the technical skills assessment. Well done!
+          </p>
+          <p className="text-base md:text-lg text-gray-600 dark:text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            Just one more section - let's explore your soft skills and communication abilities.
+          </p>
+        </div>
+        <div className="mt-auto md:mt-8 w-full flex justify-center">
+          <Button
+            onClick={handleContinueAfterTech}
+            className="w-full md:w-full px-12 text-white font-medium rounded-2xl bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90 h-12 text-base transition-all duration-300 hover:scale-105 active:scale-95"
+          >
+            Continue
+            <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "career" && careerQuestions.length > 0) {
+    const q = careerQuestions[careerIndex];
+    return (
+      <div key={questionKey} className="flex flex-col h-full md:h-auto animate-in fade-in duration-500">
+        <div className="flex-1">
+          <h2 className="mt-2 mb-4 text-xl font-semibold text-gray-800 dark:text-foreground">
+            {q.text}
+          </h2>
+          <div className="space-y-3">
+            {q.options.map((opt: CareerOption, index: number) => {
+              const letter = String.fromCharCode(65 + index); // A, B, C, D
+              const isSelected = selectedCareerAnswer === opt.text;
               return (
                 <button
-                  key={i}
-                  className={`w-full px-4 py-3 rounded-lg border block transition-all ${
+                  key={opt.id}
+                  className={`w-full px-5 py-4 rounded-lg border block transition-all ${
                     isSelected
                       ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
-                      : "bg-[#eff9fc] dark:bg-muted border-blue-200 dark:border-border hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
+                      : "bg-[#eff9fc] dark:bg-[rgba(26,38,51,0.3)] border-blue-200 dark:border-gray-700 hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
                   }`}
-                  onClick={() => setSelectedTechAnswer(option)}
+                  onClick={() => selectCareerAnswer(opt)}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -789,26 +828,122 @@ export function DynamicSkillTest({
                           : "text-gray-700 dark:text-foreground"
                       }`}
                     >
-                      {option}
+                      {opt.text}
                     </span>
                   </div>
                 </button>
               );
-            }
-            return null;
-          })}
+            })}
+          </div>
         </div>
-        <div className="mt-6 flex justify-end">
+        <div className="mt-auto md:mt-8 flex justify-end">
           <Button
-            onClick={submitTechAnswer}
-            disabled={!selectedTechAnswer}
-            className="h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 flex items-center justify-center gap-2 px-8"
+            onClick={submitCareerAnswer}
+            disabled={!selectedCareerAnswer}
+            className="w-full md:w-auto h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 flex items-center justify-center gap-2 px-8"
           >
             Next
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </>
+      </div>
+    );
+  }
+
+  if (!techSession || !softSession) {
+    console.log("⏳ Waiting for sessions...", {
+      hasTechSession: !!techSession,
+      hasSoftSession: !!softSession,
+      techSession: techSession,
+      softSession: softSession,
+    });
+    return (
+      <div className="p-8 max-w-xl mx-auto mb-8 bg-white dark:bg-card rounded-md  text-center dark:text-foreground">
+        Loading assessments...
+      </div>
+    );
+  }
+
+  // Debug logging for render state
+  console.log("🔍 Render State:", {
+    hasCurrentTechQ: !!currentTechQ,
+    hasCurrentSoftQ: !!currentSoftQ,
+    techDone,
+    softDone,
+    currentTechQData: currentTechQ,
+    currentSoftQData: currentSoftQ,
+  });
+
+  if (currentTechQ) {
+    return (
+      <div key={questionKey} className="flex flex-col h-full md:h-auto animate-in fade-in duration-500">
+        <div className="flex-1">
+          {/* <h2 className="text-xl font-bold mb-2">⚡ Tech Question</h2> */}
+          <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
+            {currentTechQ.text}
+          </p>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => {
+              const option = currentTechQ[`option${i}`];
+              if (option) {
+                const letter = String.fromCharCode(64 + i); // A, B, C, D
+                const isSelected = selectedTechAnswer === option;
+                return (
+                  <button
+                    key={i}
+                    className={`w-full px-5 py-4 rounded-lg border block transition-all ${
+                      isSelected
+                        ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
+                        : "bg-[#eff9fc] dark:bg-muted border-blue-200 dark:border-border hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
+                    }`}
+                    onClick={() => setSelectedTechAnswer(option)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
+                          isSelected
+                            ? "bg-[#00afea] dark:bg-[#5AC9F8]"
+                            : "bg-white dark:bg-gray-800"
+                        }`}
+                      >
+                        <span
+                          className={`text-xs font-medium ${
+                            isSelected
+                              ? "text-white"
+                              : "text-gray-600 dark:text-gray-300"
+                          }`}
+                        >
+                          {letter}
+                        </span>
+                      </div>
+                      <span
+                        className={`flex-1 text-left ${
+                          isSelected
+                            ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
+                            : "text-gray-700 dark:text-foreground"
+                        }`}
+                      >
+                        {option}
+                      </span>
+                    </div>
+                  </button>
+                );
+              }
+              return null;
+            })}
+          </div>
+        </div>
+        <div className="mt-auto md:mt-8 flex justify-end">
+          <Button
+            onClick={submitTechAnswer}
+            disabled={!selectedTechAnswer}
+            className="w-full md:w-auto h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 flex items-center justify-center gap-2 px-8"
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -869,86 +1004,86 @@ export function DynamicSkillTest({
     }
 
     return (
-      <>
-        {/* <h2 className="text-xl font-bold mb-2">🌟 Soft Skills Question</h2> */}
-        <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
-          {questionText}
-        </p>
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((i) => {
-            const option = currentSoftQ[`option${i}`];
-            if (option) {
-              const letter = String.fromCharCode(64 + i); // A, B, C, D
-              const isSelected = selectedSoftAnswer === option;
-              return (
-                <button
-                  key={i}
-                  className={`w-full px-4 py-3 rounded-lg border block transition-all ${
-                    isSelected
-                      ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
-                      : "bg-[#eff9fc] dark:bg-muted border-blue-200 dark:border-border hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
-                  }`}
-                  onClick={() => setSelectedSoftAnswer(option)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
-                        isSelected
-                          ? "bg-[#00afea] dark:bg-[#5AC9F8]"
-                          : "bg-white dark:bg-gray-800"
-                      }`}
-                    >
-                      <span
-                        className={`text-xs font-medium ${
+      <div key={questionKey} className="flex flex-col h-full md:h-auto animate-in fade-in duration-500">
+        <div className="flex-1">
+          {/* <h2 className="text-xl font-bold mb-2">🌟 Soft Skills Question</h2> */}
+          <p className="text-xl font-semibold text-gray-800 dark:text-foreground mb-4">
+            {questionText}
+          </p>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => {
+              const option = currentSoftQ[`option${i}`];
+              if (option) {
+                const letter = String.fromCharCode(64 + i); // A, B, C, D
+                const isSelected = selectedSoftAnswer === option;
+                return (
+                  <button
+                    key={i}
+                    className={`w-full px-5 py-4 rounded-lg border block transition-all ${
+                      isSelected
+                        ? "bg-[#00afea]/10 dark:bg-[#00afea]/20 border-[#00afea] dark:border-[#5AC9F8]"
+                        : "bg-[#eff9fc] dark:bg-muted border-blue-200 dark:border-border hover:border-[#00afea]/50 dark:hover:border-[#00afea]"
+                    }`}
+                    onClick={() => setSelectedSoftAnswer(option)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-6 h-6 rounded-[6px] flex items-center justify-center flex-shrink-0 ${
                           isSelected
-                            ? "text-white"
-                            : "text-gray-600 dark:text-gray-300"
+                            ? "bg-[#00afea] dark:bg-[#5AC9F8]"
+                            : "bg-white dark:bg-gray-800"
                         }`}
                       >
-                        {letter}
+                        <span
+                          className={`text-xs font-medium ${
+                            isSelected
+                              ? "text-white"
+                              : "text-gray-600 dark:text-gray-300"
+                          }`}
+                        >
+                          {letter}
+                        </span>
+                      </div>
+                      <span
+                        className={`flex-1 text-left ${
+                          isSelected
+                            ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
+                            : "text-gray-700 dark:text-foreground"
+                        }`}
+                      >
+                        {option}
                       </span>
                     </div>
-                    <span
-                      className={`flex-1 text-left ${
-                        isSelected
-                          ? "text-[#00afea] dark:text-[#5AC9F8] font-medium"
-                          : "text-gray-700 dark:text-foreground"
-                      }`}
-                    >
-                      {option}
-                    </span>
-                  </div>
-                </button>
-              );
-            }
-            return null;
-          })}
+                  </button>
+                );
+              }
+              return null;
+            })}
+          </div>
         </div>
-        <div className="mt-6 flex justify-end">
+        <div className="mt-auto md:mt-8 flex justify-end">
           <Button
             onClick={submitSoftAnswer}
             disabled={!selectedSoftAnswer}
-            className="h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 flex items-center justify-center gap-2 px-8"
+            className="w-full md:w-auto h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 flex items-center justify-center gap-2 px-8"
           >
             Next
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-      </>
+      </div>
     );
   }
 
   // Show loading screen while calculating results
   if (isCalculatingResults) {
     return (
-      <div className="max-w-4xl mx-auto mb-8">
-        <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
-          <CardContent className="flex flex-col items-center justify-center py-16">
+      <div className="w-full flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center justify-center">
             <div className="relative mb-8">
-              <div className="h-32 w-32 rounded-full border-4 border-[#00afea]/20 animate-pulse"></div>
-              <div className="absolute top-0 left-0 h-32 w-32 rounded-full border-4 border-transparent border-t-[#00afea] animate-spin"></div>
+            <div className="h-32 w-32 rounded-full bg-gradient-to-r from-blue-500 to-[#01bfff] animate-spin"></div>
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <Award className="h-12 w-12 text-[#00afea]" />
+              <Award className="h-12 w-12 text-white" />
               </div>
             </div>
             <h2 className="text-3xl font-bold text-[#00afea] mb-4 text-center">
@@ -959,103 +1094,30 @@ export function DynamicSkillTest({
             </p>
             <div className="mt-8 w-full max-w-md">
               <Progress
-                value={
-                  ((loadingMessageIndex + 1) / loadingMessages.length) * 100
-                }
+              value={((loadingMessageIndex + 1) / loadingMessages.length) * 100}
                 className="h-2"
               />
             </div>
-          </CardContent>
-        </Card>
+        </div>
       </div>
     );
   }
 
-  if (phase === "finished" && results) {
-    const totalScore =
-      (results.tech?.total_score || 0) + (results.soft?.total_score || 0);
-    const totalQuestions =
-      (results.tech?.total_questions || 0) +
-      (results.soft?.total_questions || 0);
-    const finalRole =
-      results.soft?.final_role || results.tech?.final_role || "N/A";
-
-    const hasTechResults =
-      results.tech?.score_per_skill &&
-      Object.keys(results.tech.score_per_skill).length > 0;
-    const hasSoftResults =
-      results.soft?.score_per_skill &&
-      Object.keys(results.soft.score_per_skill).length > 0;
-
+  // Show loading screen when test is finished (redirecting to skill-path)
+  if (phase === "finished") {
     return (
-      <div className="p-8 max-w-4xl mx-auto mb-8 bg-white dark:bg-card rounded-md border border-gray-200 dark:border-border">
-        {/* Celebration Header */}
-        <div className="text-center pb-6 mb-6 border-b border-gray-200 dark:border-border">
-          <div className="flex justify-center mb-4">
-            <div className="h-20 w-20 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-              <Award className="h-12 w-12 text-green-600 dark:text-green-400" />
-            </div>
+      <div className="flex flex-col items-center justify-center h-full">
+        <div className="text-center">
+          <div className="w-32 h-32 mx-auto mb-8 flex items-center justify-center">
+            <Award className="w-32 h-32 text-green-500 dark:text-green-400 animate-pulse" />
           </div>
-          <h1 className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-            ტესტი დასრულდა! 🎉
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            გილოცავთ! თქვენ დაასრულეთ უნარების ტესტი
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-foreground mb-4">
+            Test Completed! 🎉
+          </h2>
+          <p className="text-base md:text-lg text-gray-600 dark:text-muted-foreground">
+            Redirecting to your skill path...
           </p>
         </div>
-
-        {/* Final Role Section */}
-        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-border">
-          <h2 className="text-xl font-semibold text-blue-700 dark:text-blue-300 mb-4 flex items-center gap-2">
-            <Award className="h-5 w-5" />
-            რეკომენდაცია
-          </h2>
-          <div className="text-center bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 p-6 rounded-lg border border-blue-200 dark:border-blue-800">
-            <Badge
-              variant="default"
-              className="text-lg px-6 py-3 bg-blue-600 hover:bg-blue-700"
-            >
-              {finalRole}
-            </Badge>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-              ამ როლისთვის რეკომენდირებული როლი
-            </p>
-          </div>
-        </div>
-
-        {/* Skills Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Technical Skills */}
-          {hasTechResults && (
-            <div className="bg-gray-50 dark:bg-muted/50 p-6 rounded-lg border border-gray-200 dark:border-border">
-              <h3 className="text-lg font-semibold mb-4 dark:text-foreground flex items-center gap-2">
-                ⚡ ტექნიკური უნარები
-              </h3>
-              {results.tech?.score_per_skill &&
-                renderSkillResults(results.tech.score_per_skill)}
-            </div>
-          )}
-
-          {/* Soft Skills */}
-          {hasSoftResults && (
-            <div className="bg-gray-50 dark:bg-muted/50 p-6 rounded-lg border border-gray-200 dark:border-border">
-              <h3 className="text-lg font-semibold mb-4 dark:text-foreground flex items-center gap-2">
-                🌟 რბილი უნარები
-              </h3>
-              {results.soft?.score_per_skill &&
-                renderSkillResults(results.soft.score_per_skill)}
-            </div>
-          )}
-        </div>
-
-        {/* Empty State */}
-        {!hasTechResults && !hasSoftResults && (
-          <div className="py-8 text-center">
-            <p className="text-gray-500 dark:text-gray-400">
-              ქულები დაზუსტების პროცესშია
-            </p>
-          </div>
-        )}
       </div>
     );
   }
