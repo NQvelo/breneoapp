@@ -31,7 +31,7 @@ export default {
           blue: "#19B5FE",
           navy: "#303B5A",
           accent: "#19ACE5",
-          lightgray: "#F8F9FA",
+          lightgray: "#F6F9F9",
           gray: "#E9ECEF",
           success: "#20C997",
           warning: "#FFC107",

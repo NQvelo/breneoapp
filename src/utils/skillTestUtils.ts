@@ -32,7 +32,7 @@ export interface UserTestResult {
 // Fetch all user answers for analysis
 export const getUserTestAnswers = async (userId: string | number) => {
   const userIdStr = String(userId);
-  
+
   // Try multiple user ID formats to handle different storage methods
   const userIdVariants = [
     numericIdToUuid(userIdStr), // Converted UUID format
@@ -48,7 +48,7 @@ export const getUserTestAnswers = async (userId: string | number) => {
   console.log("🔍 getUserTestAnswers - Trying variants:", {
     originalUserId: userId,
     userIdStr,
-    variants: userIdVariants
+    variants: userIdVariants,
   });
 
   // Try each variant
@@ -61,13 +61,18 @@ export const getUserTestAnswers = async (userId: string | number) => {
         .order("answeredat", { ascending: true });
 
       if (error) {
-        console.warn(`⚠️ Error fetching with variant ${userIdVariant}:`, error.message);
+        console.warn(
+          `⚠️ Error fetching with variant ${userIdVariant}:`,
+          error.message
+        );
         // Continue to next variant
         continue;
       }
 
       if (data && data.length > 0) {
-        console.log(`✅ Found ${data.length} test answers for user ${userIdVariant}`);
+        console.log(
+          `✅ Found ${data.length} test answers for user ${userIdVariant}`
+        );
         return data;
       } else {
         console.log(`ℹ️ No answers found for variant ${userIdVariant}`);
@@ -80,7 +85,9 @@ export const getUserTestAnswers = async (userId: string | number) => {
 
   // Last resort: try to get current user's answers using auth context
   try {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
     if (authUser) {
       console.log("🔍 Trying with auth user ID:", authUser.id);
       const { data, error } = await supabase
@@ -250,4 +257,42 @@ export const updateQuestion = async (
   }
 
   return data[0];
+};
+
+// Filter out soft skills and interests, keeping only hard/tech skills
+export const filterHardSkills = (skills: string[]): string[] => {
+  const softSkillKeywords = [
+    "communication",
+    "teamwork",
+    "leadership",
+    "problem solving",
+    "critical thinking",
+    "time management",
+    "adaptability",
+    "creativity",
+    "collaboration",
+    "emotional intelligence",
+    "work ethic",
+    "interpersonal",
+    "negotiation",
+    "presentation",
+    "public speaking",
+    "active listening",
+    "empathy",
+    "patience",
+    "flexibility",
+    "stress management",
+    "conflict resolution",
+    "decision making",
+    "organization",
+    "planning",
+    "multitasking",
+  ];
+
+  return skills.filter((skill) => {
+    const skillLower = skill.toLowerCase().trim();
+    return !softSkillKeywords.some(
+      (keyword) => skillLower.includes(keyword) || keyword.includes(skillLower)
+    );
+  });
 };

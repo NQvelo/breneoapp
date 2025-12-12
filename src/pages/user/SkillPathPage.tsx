@@ -93,6 +93,68 @@ interface MissingSkill {
   frequency: number; // How many job paths require this skill
 }
 
+// Generate AI-powered explanation for recommended role
+const generateRoleExplanation = (
+  role: string,
+  techSkills: Record<string, string>,
+  softSkills: Record<string, string>,
+  topSkills: Array<{ skill: string; score: number }>,
+  jobPaths: JobPath[]
+): string => {
+  const topTechSkills = Object.entries(techSkills)
+    .sort((a, b) => {
+      const scoreA = parseFloat(String(a[1]).replace("%", "")) || 0;
+      const scoreB = parseFloat(String(b[1]).replace("%", "")) || 0;
+      return scoreB - scoreA;
+    })
+    .slice(0, 3)
+    .map(([skill]) => skill);
+
+  const topSoftSkills = Object.entries(softSkills)
+    .sort((a, b) => {
+      const scoreA = parseFloat(String(a[1]).replace("%", "")) || 0;
+      const scoreB = parseFloat(String(b[1]).replace("%", "")) || 0;
+      return scoreB - scoreA;
+    })
+    .slice(0, 2)
+    .map(([skill]) => skill);
+
+  const avgMatchPercentage =
+    jobPaths.length > 0
+      ? jobPaths.reduce((sum, path) => sum + path.matchPercentage, 0) /
+        jobPaths.length
+      : 75;
+
+  // Build personalized explanation in simple, human-friendly language
+  let explanation = `We think **${role}** is the perfect career path for you. `;
+
+  // Why user deserves it - simple language
+  explanation += `You're really good at `;
+  if (topTechSkills.length > 0) {
+    explanation += topTechSkills.join(", ");
+    if (topSoftSkills.length > 0) {
+      explanation += `, and you also have great ${topSoftSkills.join(
+        " and "
+      )} skills`;
+    }
+  } else if (topSoftSkills.length > 0) {
+    explanation += topSoftSkills.join(" and ");
+  } else {
+    explanation += "many important skills";
+  }
+  explanation += `. Your skills match really well with what ${role} jobs need - about ${Math.round(
+    avgMatchPercentage
+  )}% match! `;
+
+  // Why it's good - simple language
+  explanation += `This role is great for you because it lets you use your best skills every day. `;
+  explanation += `You'll get to learn new things and grow in your career. `;
+  explanation += `Your mix of technical skills and people skills means you'll do really well in this job. `;
+  explanation += `There are lots of opportunities for ${role.toLowerCase()}s, so you'll have a stable and exciting career path ahead.`;
+
+  return explanation;
+};
+
 // Helper function to generate job path details based on category and skills
 const getJobPathDetails = (
   category: string,
@@ -446,6 +508,7 @@ const SkillPathPage = () => {
   const [missingSkills, setMissingSkills] = useState<MissingSkill[]>([]);
   const [finalRole, setFinalRole] = useState<string | null>(null);
   const [userCountry, setUserCountry] = useState<string>("Georgia");
+  const [roleExplanation, setRoleExplanation] = useState<string>("");
 
   // Fetch user country from profile
   const fetchUserCountry = useCallback(async () => {
@@ -713,6 +776,19 @@ const SkillPathPage = () => {
 
           // Set job paths with salaries immediately for instant display
           setJobPaths(pathsWithSalaries);
+
+          // Generate AI explanation for recommended role
+          if (skillTestData.final_role) {
+            const explanation = generateRoleExplanation(
+              skillTestData.final_role,
+              skillsJson.tech || {},
+              skillsJson.soft || {},
+              top,
+              pathsWithSalaries
+            );
+            setRoleExplanation(explanation);
+          }
+
           setLoading(false);
 
           // Parallelize all heavy operations (jobs, missing skills, courses)
@@ -844,6 +920,31 @@ const SkillPathPage = () => {
 
       // Set job paths with salaries immediately for instant display
       setJobPaths(pathsWithSalaries);
+
+      // Generate AI explanation if we have a role from job paths
+      if (pathsWithSalaries.length > 0) {
+        const primaryRole = pathsWithSalaries[0].title;
+        const techSkillsMap: Record<string, string> = {};
+        const softSkillsMap: Record<string, string> = {};
+
+        sortedHardSkills.forEach((s) => {
+          techSkillsMap[s.skill] = `${s.score}%`;
+        });
+        sortedSoftSkills.forEach((s) => {
+          softSkillsMap[s.skill] = `${s.score}%`;
+        });
+
+        const explanation = generateRoleExplanation(
+          primaryRole,
+          techSkillsMap,
+          softSkillsMap,
+          allSkillsForDisplay,
+          pathsWithSalaries
+        );
+        setRoleExplanation(explanation);
+        setFinalRole(primaryRole);
+      }
+
       setLoading(false);
 
       // Parallelize all heavy operations (jobs, missing skills, courses)
@@ -1049,7 +1150,7 @@ const SkillPathPage = () => {
     });
   };
 
-  // Render skills as a modern vertical bar chart with primary color and opacity
+  // Render skills as a modern horizontal bar chart with primary color and opacity
   const renderSkillsChart = (skills: Record<string, string>, title: string) => {
     const primaryColor = "#19B5FE"; // breneo-blue (primary color)
 
@@ -1098,47 +1199,37 @@ const SkillPathPage = () => {
       },
     };
 
-    // Custom label component to show skill name at bottom of chart (below bars)
-    const CustomInsideLabel = (props: {
+    // Custom label component to show skill name on the left (Y-axis side)
+    const CustomYAxisLabel = (props: {
       x?: number;
       y?: number;
-      width?: number;
-      height?: number;
-      payload?: { skill?: string };
-      value?: string;
+      payload?: { skill?: string; value?: string };
     }) => {
-      const { x, y, width, height, payload, value } = props;
-      const skillName = payload?.skill || value || "";
+      const { x, y, payload } = props;
+      const skillName = payload?.skill || payload?.value || "";
 
-      if (!x || !y || !width || !height || !skillName) {
+      if (!x || !y || !skillName) {
         return null;
       }
 
-      const centerX = x + width / 2;
-      // Position skill name at fixed bottom position of chart
-      // Chart height is 250px, bottom margin is 60px, so bottom is at ~190px
-      // Use a fixed Y position that's always at the bottom regardless of bar height
-      const chartHeight = 250;
-      const bottomMargin = 60;
-      const skillY = chartHeight - bottomMargin + 15; // Fixed position at bottom
-
       return (
         <text
-          x={centerX}
-          y={skillY}
+          x={x}
+          y={y}
           fill="#374151"
-          textAnchor="middle"
+          textAnchor="end"
           fontSize={12}
           fontWeight={600}
           className="dark:fill-gray-200"
+          dx={-10}
         >
           {skillName}
         </text>
       );
     };
 
-    // Custom label component to show percentage at bottom of chart (below bars)
-    const CustomBottomLabel = (props: {
+    // Custom label component to show percentage at the end of the bar
+    const CustomEndLabel = (props: {
       x?: number;
       y?: number;
       width?: number;
@@ -1152,23 +1243,20 @@ const SkillPathPage = () => {
         return null;
       }
 
-      const centerX = x + width / 2;
-      // Position percentage at fixed bottom position of chart
-      // Chart height is 250px, bottom margin is 60px, so bottom is at ~190px
-      // Use a fixed Y position that's always at the bottom regardless of bar height
-      const chartHeight = 250;
-      const bottomMargin = 60;
-      const percentY = chartHeight - bottomMargin + 35; // Fixed position below skill name
+      // Position percentage at the end of the bar (right side)
+      const labelX = x + width + 10;
+      const centerY = y + height / 2;
 
       return (
         <text
-          x={centerX}
-          y={percentY}
+          x={labelX}
+          y={centerY}
           fill="#374151"
-          textAnchor="middle"
+          textAnchor="start"
           fontSize={13}
           fontWeight={700}
           className="dark:fill-gray-200"
+          dy={4}
         >
           {`${percentage.toFixed(0)}%`}
         </text>
@@ -1176,16 +1264,20 @@ const SkillPathPage = () => {
     };
 
     return (
-      <div className="w-full -mb-4">
-        <ChartContainer config={chartConfig} className="h-[250px] w-full">
+      <div className="w-full">
+        <ChartContainer
+          config={chartConfig}
+          className="h-auto w-full min-h-[300px]"
+        >
           <BarChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            barCategoryGap="25%"
+            layout="vertical"
+            margin={{ top: 20, right: 80, left: 100, bottom: 20 }}
+            barCategoryGap="15%"
           >
             <defs>
               {chartData.map((entry) => {
-                // Create darker shade for gradient bottom
+                // Create darker shade for gradient (horizontal gradient now)
                 const darkerShade = "#0EA5E9"; // Slightly darker blue
                 return (
                   <linearGradient
@@ -1193,8 +1285,8 @@ const SkillPathPage = () => {
                     id={entry.gradientId}
                     x1="0"
                     y1="0"
-                    x2="0"
-                    y2="1"
+                    x2="1"
+                    y2="0"
                   >
                     <stop
                       offset="0%"
@@ -1210,8 +1302,15 @@ const SkillPathPage = () => {
                 );
               })}
             </defs>
-            <XAxis dataKey="skill" hide={true} />
-            <YAxis type="number" domain={[0, 100]} hide={true} />
+            <XAxis type="number" domain={[0, 100]} hide={true} />
+            <YAxis
+              type="category"
+              dataKey="skill"
+              width={90}
+              tick={<CustomYAxisLabel />}
+              axisLine={false}
+              tickLine={false}
+            />
             <ChartTooltip
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
@@ -1249,7 +1348,7 @@ const SkillPathPage = () => {
             />
             <Bar
               dataKey="percentage"
-              radius={[8, 8, 8, 8]}
+              radius={[0, 8, 8, 0]}
               animationDuration={1000}
               animationEasing="ease-out"
             >
@@ -1262,10 +1361,8 @@ const SkillPathPage = () => {
                   }}
                 />
               ))}
-              {/* Skill name at bottom inside bar */}
-              <LabelList content={CustomInsideLabel} dataKey="skill" />
-              {/* Percentage at bottom inside bar */}
-              <LabelList content={CustomBottomLabel} dataKey="percentage" />
+              {/* Percentage at the end of the bar */}
+              <LabelList content={CustomEndLabel} dataKey="percentage" />
             </Bar>
           </BarChart>
         </ChartContainer>
@@ -1342,32 +1439,38 @@ const SkillPathPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
-        {/* Recommended Role and Skills Breakdown */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recommended Role */}
-          {finalRole && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="text-xl">🏆</span>
-                  Recommended Role
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 pb-1">
-                <div className="flex flex-col items-center justify-center py-4 gap-4">
-                  <img
-                    src="/lovable-uploads/3dicons-explorer-front-color.png"
-                    alt="Code Learning"
-                    className="w-full h-auto max-w-[100px] object-contain"
-                  />
-                  <Badge className="text-lg px-6 py-3 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
-                    {finalRole}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        {/* AI-Generated Role Explanation */}
+        {finalRole && roleExplanation && (
+          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Rocket className="h-5 w-5 text-primary" />
+                Your Recommended Career Path: {finalRole}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                  {roleExplanation.split("**").map((part, index) =>
+                    index % 2 === 1 ? (
+                      <strong
+                        key={index}
+                        className="text-primary font-semibold"
+                      >
+                        {part}
+                      </strong>
+                    ) : (
+                      part
+                    )
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
+        {/* Skills Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Technical Skills */}
           {Object.keys(techSkills).length > 0 && (
             <Card>

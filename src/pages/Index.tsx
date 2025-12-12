@@ -41,7 +41,7 @@ const Index = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-breneo-lightgray dark:bg-[#1a1a1a] px-3">
+    <div className="min-h-screen flex items-center justify-center bg-breneo-lightgray dark:bg-[#181818] px-3">
       <div className="text-center">
         {!logoLoaded && !imageError && (
           <div className="h-16 w-64 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center mx-auto mb-4">

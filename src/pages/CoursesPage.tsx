@@ -12,6 +12,7 @@ import {
   calculateSkillScores,
   getTopSkills,
   getUserTestAnswers,
+  filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -329,17 +330,18 @@ const CoursesPage = () => {
             const result = response.data[0];
             const skillsJson = result.skills_json;
 
-            // Extract skills from tech and soft skills
+            // Extract only hard/tech skills (exclude soft skills and interests)
             const allSkills: string[] = [];
             if (skillsJson?.tech) {
               allSkills.push(...Object.keys(skillsJson.tech));
             }
-            if (skillsJson?.soft) {
-              allSkills.push(...Object.keys(skillsJson.soft));
-            }
+            // Don't include soft skills - only hard/tech skills for filters
 
-            // Get top 5 skills
-            const topSkills = allSkills.slice(0, 5);
+            // Filter to only hard skills
+            const hardSkillsOnly = filterHardSkills(allSkills);
+
+            // Get top 5 hard skills
+            const topSkills = hardSkillsOnly.slice(0, 5);
             setUserTopSkills(topSkills);
 
             // Auto-populate filters with top skills if not already set and no URL params
@@ -374,8 +376,12 @@ const CoursesPage = () => {
         const answers = await getUserTestAnswers(String(user.id));
         if (answers && answers.length > 0) {
           const skillScores = calculateSkillScores(answers);
-          const topSkillsData = getTopSkills(skillScores, 5);
-          const topSkills = topSkillsData.map((s) => s.skill);
+          const topSkillsData = getTopSkills(skillScores, 10); // Get more to filter
+          const allTopSkills = topSkillsData.map((s) => s.skill);
+
+          // Filter to only hard skills
+          const hardSkillsOnly = filterHardSkills(allTopSkills);
+          const topSkills = hardSkillsOnly.slice(0, 5); // Get top 5 hard skills
 
           setUserTopSkills(topSkills);
 

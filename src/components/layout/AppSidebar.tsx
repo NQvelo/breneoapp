@@ -120,7 +120,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   return (
     <>
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F6F9F9]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] px-4 py-3">
         <div className="flex items-center justify-between">
           <LocalizedLink to={homePath} className="flex items-center">
             <img
@@ -163,7 +163,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-t border-black/[0.03] dark:border-white/[0.03]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F6F9F9]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-t border-black/[0.03] dark:border-white/[0.03]">
         <nav className="flex justify-around items-center py-2">
           {mobileNavItems.map((item, index) => {
             // Check if current path matches the item href

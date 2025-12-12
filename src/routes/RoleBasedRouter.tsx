@@ -87,10 +87,10 @@ export const RoleBasedRouter = () => {
   // This prevents premature redirects before role is determined
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-breneo-lightgray dark:bg-[#181818]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading...</p>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Heart,
@@ -77,6 +78,7 @@ import {
   getUserTestAnswers,
   calculateSkillScores,
   getTopSkills,
+  filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
@@ -518,7 +520,6 @@ const getSkillColor = (skill: string, index: number): string => {
   return colors[index % colors.length];
 };
 
-
 // Fetch all internship jobs without any filtering
 const fetchInternshipJobs = async (
   page: number = 1
@@ -573,9 +574,10 @@ const fetchInternshipJobs = async (
   }
 };
 
-// Fetch latest regular jobs without any filtering
+// Fetch latest regular jobs - filtered like JobSearchResultsPage
 const fetchLatestJobs = async (
   page: number = 1,
+  filters: JobFilters,
   userTopSkills: string[] = []
 ): Promise<{
   jobs: ApiJob[];
@@ -584,24 +586,27 @@ const fetchLatestJobs = async (
 }> => {
   try {
     console.log(
-      `🚀 fetchLatestJobs called - fetching regular jobs page ${page} with user skills:`,
-      userTopSkills
+      `🚀 fetchLatestJobs called - fetching regular jobs page ${page} with filters:`,
+      filters
     );
 
-    // Filter by user's top skills if available
+    // Check if all interests are selected (like JobSearchResultsPage does)
+    const allInterestsSelected =
+      userTopSkills.length > 0 &&
+      filters.skills.length > 0 &&
+      userTopSkills.every((skill) => filters.skills.includes(skill)) &&
+      filters.skills.length === userTopSkills.length;
+
+    // Prepare filters for API call (same as JobSearchResultsPage)
+    const filtersForAPI: JobFilters = {
+      ...filters,
+      // If all interests selected, clear skills filter to get all jobs
+      skills: allInterestsSelected ? [] : filters.skills,
+    };
+
     const response = await jobService.fetchActiveJobs({
       query: "", // No search term - will use "jobs" as default in jobService
-      filters: {
-        country: undefined,
-        countries: [], // No country filtering
-        jobTypes: [], // No job type filtering (will exclude interns client-side)
-        isRemote: undefined,
-        datePosted: undefined,
-        skills: userTopSkills.length > 0 ? userTopSkills : [], // Filter by user skills
-        salaryMin: undefined,
-        salaryMax: undefined,
-        salaryByAgreement: undefined,
-      },
+      filters: filtersForAPI,
       page: page,
       pageSize: 12, // Fetch 12 jobs per page
     });
@@ -618,38 +623,63 @@ const fetchLatestJobs = async (
       return jobId && jobId.trim() !== "";
     });
 
-    // Filter jobs to match user's skills (client-side filtering for better accuracy)
-    if (userTopSkills.length > 0) {
+    // Apply client-side salary filtering (same as JobSearchResultsPage)
+    if (
+      filters.salaryMin !== undefined ||
+      filters.salaryMax !== undefined ||
+      filters.salaryByAgreement
+    ) {
       validJobs = validJobs.filter((job) => {
-        const jobSkills = extractJobSkills(job);
-        if (jobSkills.length === 0) {
-          // If no skills found in job, skip it
+        const minSalary = job.job_min_salary || job.min_salary;
+        const maxSalary = job.job_max_salary || job.max_salary;
+
+        // If "by agreement" is checked, include jobs without salary info
+        if (filters.salaryByAgreement && !minSalary && !maxSalary) {
+          return true;
+        }
+
+        // If no salary info and "by agreement" is not checked, exclude if salary filters are set
+        if (!minSalary && !maxSalary && !filters.salaryByAgreement) {
+          // If salary filters are set, exclude jobs without salary
+          if (
+            filters.salaryMin !== undefined ||
+            filters.salaryMax !== undefined
+          ) {
+            return false;
+          }
+          return true;
+        }
+
+        // Check if job salary matches the range
+        if (
+          filters.salaryMin !== undefined &&
+          maxSalary &&
+          maxSalary < filters.salaryMin
+        ) {
           return false;
         }
-        
-        // Check if job has at least one skill matching user's skills
-        const normalizedUserSkills = userTopSkills.map((s) =>
-          s.toLowerCase().trim()
-        );
-        const normalizedJobSkills = jobSkills.map((s) => s.toLowerCase().trim());
+        if (
+          filters.salaryMax !== undefined &&
+          minSalary &&
+          minSalary > filters.salaryMax
+        ) {
+          return false;
+        }
 
-        // Check for matches (exact or partial)
-        const hasMatchingSkill = normalizedJobSkills.some((jobSkill) =>
-          normalizedUserSkills.some((userSkill) => {
-            // Exact match
-            if (jobSkill === userSkill) return true;
-            // Partial match (one contains the other)
-            if (jobSkill.includes(userSkill) || userSkill.includes(jobSkill))
-              return true;
-            return false;
-          })
-        );
-
-        return hasMatchingSkill;
+        return true;
       });
     }
 
-    console.log(`✅ fetchLatestJobs: ${validJobs.length} jobs matching user skills found`);
+    // Apply client-side remote filter if needed (same as JobSearchResultsPage)
+    if (filters.isRemote) {
+      validJobs = validJobs.filter((job) => {
+        return job.job_is_remote || job.is_remote || job.remote === true;
+      });
+    }
+
+    console.log(
+      `✅ fetchLatestJobs: ${validJobs.length} jobs found after filtering`
+    );
 
     // Return valid jobs with pagination info
     return {
@@ -679,9 +709,10 @@ const fetchRemoteJobs = async (
     );
 
     // Build query: use skills if available, otherwise use "remote" as search term
-    const searchQuery = userTopSkills.length > 0 
-      ? "" // Will combine skills in jobService
-      : "remote"; // Use "remote" as search term when no skills
+    const searchQuery =
+      userTopSkills.length > 0
+        ? "" // Will combine skills in jobService
+        : "remote"; // Use "remote" as search term when no skills
 
     const response = await jobService.fetchActiveJobs({
       query: searchQuery,
@@ -718,7 +749,9 @@ const fetchRemoteJobs = async (
       return jobId && jobId.trim() !== "";
     });
 
-    console.log(`✅ fetchRemoteJobs: ${validJobs.length} valid remote jobs found`);
+    console.log(
+      `✅ fetchRemoteJobs: ${validJobs.length} valid remote jobs found`
+    );
 
     // Return valid remote jobs with pagination info
     return {
@@ -927,17 +960,18 @@ const JobsPage = () => {
             const result = response.data[0];
             const skillsJson = result.skills_json;
 
-            // Extract skills from tech and soft skills
+            // Extract only hard/tech skills (exclude soft skills and interests)
             const allSkills: string[] = [];
             if (skillsJson?.tech) {
               allSkills.push(...Object.keys(skillsJson.tech));
             }
-            if (skillsJson?.soft) {
-              allSkills.push(...Object.keys(skillsJson.soft));
-            }
+            // Don't include soft skills - only hard/tech skills for filters
 
-            // Get top 5 skills
-            const topSkills = allSkills.slice(0, 5);
+            // Filter to only hard skills
+            const hardSkillsOnly = filterHardSkills(allSkills);
+
+            // Get top 5 hard skills
+            const topSkills = hardSkillsOnly.slice(0, 5);
             setUserTopSkills(topSkills);
             setLoadingSkills(false);
             return;
@@ -950,8 +984,12 @@ const JobsPage = () => {
         const answers = await getUserTestAnswers(String(user.id));
         if (answers && answers.length > 0) {
           const skillScores = calculateSkillScores(answers);
-          const topSkillsData = getTopSkills(skillScores, 5);
-          const topSkills = topSkillsData.map((s) => s.skill);
+          const topSkillsData = getTopSkills(skillScores, 10); // Get more to filter
+          const allTopSkills = topSkillsData.map((s) => s.skill);
+
+          // Filter to only hard skills
+          const hardSkillsOnly = filterHardSkills(allTopSkills);
+          const topSkills = hardSkillsOnly.slice(0, 5); // Get top 5 hard skills
 
           setUserTopSkills(topSkills);
         }
@@ -1009,14 +1047,40 @@ const JobsPage = () => {
     enabled: !!user,
   });
 
-  // Fetch latest regular jobs filtered by user's top skills
+  // Get hard skills from activeFilters (filter section) for filtering latest jobs
+  const filterHardSkillsList = useMemo(() => {
+    // Filter to only hard skills from the skills selected in the filter section
+    return filterHardSkills(activeFilters.skills || []);
+  }, [activeFilters.skills]);
+
+  // Create filters key for query (same as JobSearchResultsPage)
+  const filtersKey = useMemo(() => {
+    return JSON.stringify({
+      countries: activeFilters.countries.sort(),
+      skills: activeFilters.skills.sort(),
+      jobTypes: activeFilters.jobTypes.sort(),
+      isRemote: activeFilters.isRemote,
+      datePosted: activeFilters.datePosted,
+      salaryMin: activeFilters.salaryMin,
+      salaryMax: activeFilters.salaryMax,
+      salaryByAgreement: activeFilters.salaryByAgreement,
+    });
+  }, [activeFilters]);
+
+  // Fetch latest regular jobs filtered like JobSearchResultsPage
   const {
     data: jobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["latestJobs", regularJobsPage, userTopSkills.join(",")],
-    queryFn: () => fetchLatestJobs(regularJobsPage, userTopSkills),
+    queryKey: [
+      "latestJobs",
+      regularJobsPage,
+      filtersKey,
+      userTopSkills.join(","),
+    ],
+    queryFn: () =>
+      fetchLatestJobs(regularJobsPage, activeFilters, userTopSkills),
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -1063,7 +1127,7 @@ const JobsPage = () => {
     enabled: !loadingSkills, // Always fetch remote jobs (will filter by skills if available)
   });
 
-  // Update all regular jobs when new data arrives - filter to only tech jobs from allowed ATS
+  // Update all regular jobs when new data arrives - filter to only tech jobs from allowed ATS (same as JobSearchResultsPage)
   useEffect(() => {
     if (jobsData.jobs && jobsData.jobs.length > 0) {
       const techJobs = filterTechJobs(jobsData.jobs);
@@ -1458,14 +1522,63 @@ const JobsPage = () => {
     }
   }, [jobs, savedJobs, userTopSkills]);
 
-  // Separate regular jobs from intern jobs (no limit - show all loaded)
+  // Filter by hard skills only, sort by match percentage (highest first), limit to 6
   const regularJobs = useMemo(() => {
-    return transformedJobs.filter(
-      (job) =>
-        job.employment_type?.toLowerCase() !== "intern" &&
-        job.employment_type?.toLowerCase() !== "internship"
-    );
-  }, [transformedJobs]);
+    // No filtering by job type - show all jobs, only filter by hard skills
+    const filtered = transformedJobs;
+
+    // Calculate match percentages for jobs with hard skills only
+    const jobsWithHardSkills = filtered
+      .map((job): Job | null => {
+        // Find the original job data to extract skills
+        const originalJob = allRegularJobs.find(
+          (j) => (j.job_id || j.id) === job.id
+        );
+
+        if (!originalJob) {
+          return null;
+        }
+
+        const jobSkills = extractJobSkills(originalJob);
+        // Filter to only hard skills (exclude soft skills)
+        const jobHardSkills = filterHardSkills(jobSkills);
+
+        // CRITICAL: Only show jobs that have at least one hard skill
+        // This is a safety check to ensure no jobs without hard skills slip through
+        if (jobHardSkills.length === 0) {
+          return null; // Exclude jobs with no hard skills
+        }
+
+        // Recalculate match percentage based on filter hard skills only
+        const hardSkillsMatchPercentage =
+          filterHardSkillsList.length > 0
+            ? calculateMatchPercentage(filterHardSkillsList, jobHardSkills)
+            : 50; // Default match if no filter skills available
+
+        const result: Job = {
+          ...job,
+          matchPercentage: hardSkillsMatchPercentage,
+        };
+        return result;
+      })
+      .filter((job) => job !== null) as Job[]; // Filter out null jobs
+
+    // Show all jobs with hard skills (matching is used for sorting, not filtering)
+    const jobsWithMatches = jobsWithHardSkills;
+
+    // Sort by match percentage (highest first), then by job ID for stability
+    const sorted = jobsWithMatches.sort((a, b) => {
+      const aMatch = a.matchPercentage ?? 0;
+      const bMatch = b.matchPercentage ?? 0;
+      if (bMatch !== aMatch) {
+        return bMatch - aMatch;
+      }
+      return (a.id || "").localeCompare(b.id || "");
+    });
+
+    // Limit to 6 jobs
+    return sorted.slice(0, 6);
+  }, [transformedJobs, allRegularJobs, filterHardSkillsList]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
   const transformedInternshipJobs = React.useMemo(() => {
@@ -1842,7 +1955,6 @@ const JobsPage = () => {
     );
   }, [transformedRemoteJobs]);
 
-
   // Debug logging
   useEffect(() => {
     console.log("📊 JobsPage State:", {
@@ -2216,27 +2328,18 @@ const JobsPage = () => {
           </div>
         ) : null}
 
-        {/* Latest Vacancies Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Sun className="h-6 w-6 text-yellow-500" />
-            <h2 className="text-lg font-bold">Latest Vacancies</h2>
-          </div>
-        </div>
-
-        {(error || internshipError || remoteError) && (
+        {(internshipError || remoteError) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
             <AlertCircle className="h-5 w-5" />
             <p>
               <strong>Error:</strong>{" "}
-              {(error as Error)?.message ||
-                (internshipError as Error)?.message ||
+              {(internshipError as Error)?.message ||
                 (remoteError as Error)?.message}
             </p>
           </div>
         )}
 
-        {(isLoading || isLoadingInternships || isLoadingRemote) && (
+        {(isLoadingInternships || isLoadingRemote) && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
@@ -2248,10 +2351,8 @@ const JobsPage = () => {
           </div>
         )}
 
-        {!isLoading &&
-          !isLoadingInternships &&
+        {!isLoadingInternships &&
           !isLoadingRemote &&
-          regularJobs.length === 0 &&
           internJobs.length === 0 &&
           remoteJobs.length === 0 && (
             <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
@@ -2264,225 +2365,6 @@ const JobsPage = () => {
               <p className="text-sm">
                 Try adjusting your search terms or filters
               </p>
-            </div>
-          )}
-
-        {/* Regular Job Cards Grid */}
-        {regularJobs.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-            {regularJobs.map((job) => (
-              <Card
-                key={job.id}
-                className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
-              >
-                <CardContent className="p-5 flex flex-col flex-grow relative">
-                  {/* Company Logo and Info */}
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="flex-shrink-0 relative w-12 h-12">
-                      {/* Primary: Logo from API - shown first if available */}
-                      {job.company_logo ? (
-                        <img
-                          src={job.company_logo}
-                          alt={`${job.company} logo`}
-                          className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
-                          loading="lazy"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.style.display = "none";
-                            // Show Clearbit logo fallback
-                            const clearbitLogo =
-                              target.parentElement?.querySelector(
-                                ".clearbit-logo"
-                              ) as HTMLImageElement;
-                            if (clearbitLogo) {
-                              clearbitLogo.style.display = "block";
-                              clearbitLogo.style.zIndex = "10";
-                            } else {
-                              // Show default icon
-                              const iconFallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback"
-                                ) as HTMLElement;
-                              if (iconFallback) {
-                                iconFallback.style.display = "flex";
-                                iconFallback.style.zIndex = "10";
-                              }
-                            }
-                          }}
-                        />
-                      ) : null}
-
-                      {/* Fallback 1: Clearbit logo API - shown if no API logo and company name exists */}
-                      {job.company && !job.company_logo ? (
-                        <img
-                          src={`https://logo.clearbit.com/${encodeURIComponent(
-                            job.company
-                          )}`}
-                          alt={`${job.company} logo`}
-                          className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
-                          style={{ zIndex: 10 }}
-                          loading="lazy"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.onerror = null;
-                            target.style.display = "none";
-                            // Show default icon fallback
-                            const iconFallback =
-                              target.parentElement?.querySelector(
-                                ".logo-fallback"
-                              ) as HTMLElement;
-                            if (iconFallback) {
-                              iconFallback.style.display = "flex";
-                              iconFallback.style.zIndex = "10";
-                            }
-                          }}
-                        />
-                      ) : null}
-
-                      {/* Fallback 2: Default icon - always present, shown when all logos fail or no company name */}
-                      <div
-                        className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                          job.company_logo || (job.company && !job.company_logo)
-                            ? "hidden"
-                            : "flex"
-                        }`}
-                        style={{
-                          zIndex:
-                            job.company_logo ||
-                            (job.company && !job.company_logo)
-                              ? 0
-                              : 10,
-                        }}
-                      >
-                        <Briefcase className="h-6 w-6 text-white" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <h3 className="font-semibold text-base truncate">
-                          {job.company}
-                        </h3>
-                        {job.matchPercentage !== undefined && (
-                          <Badge
-                            variant="secondary"
-                            className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
-                          >
-                            {job.matchPercentage}% Match
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {job.location}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Job Title */}
-                  <h4 className="font-bold text-lg mb-4 line-clamp-2">
-                    {job.title}
-                  </h4>
-
-                  {/* Job Details */}
-                  <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
-                    {/* Salary */}
-                    <div className="flex items-center gap-2 text-sm">
-                      <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-700">{job.salary}</span>
-                    </div>
-
-                    {/* Employment Type */}
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      <span className="text-gray-700">
-                        {job.employment_type}
-                      </span>
-                    </div>
-
-                    {/* Work Arrangement */}
-                    {job.work_arrangement && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">
-                          {job.work_arrangement}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Benefits */}
-                    {job.benefits && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{job.benefits}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
-                    <Button
-                      variant="default"
-                      onClick={() => {
-                        if (!job.id || job.id.trim() === "") {
-                          toast.error("Cannot open job: Invalid job ID");
-                          console.error(
-                            "Attempted to navigate to job with invalid ID:",
-                            job
-                          );
-                          return;
-                        }
-                        // Encode the job ID to handle special characters
-                        const encodedId = encodeURIComponent(job.id);
-                        navigate(`/jobs/${encodedId}`);
-                      }}
-                      className="flex-1"
-                      disabled={!job.id || job.id.trim() === ""}
-                    >
-                      View
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="icon"
-                      onClick={() => saveJobMutation.mutate(job)}
-                      aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                      className={job.is_saved ? "bg-primary/90" : ""}
-                    >
-                      <Heart
-                        className={`h-5 w-5 transition-colors ${
-                          job.is_saved
-                            ? "text-red-500 fill-red-500 animate-heart-pop"
-                            : "text-white"
-                        }`}
-                      />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Load More Button for Regular Jobs */}
-        {!isLoading &&
-          !isLoadingInternships &&
-          regularJobs.length > 0 &&
-          hasMoreRegularJobs && (
-            <div className="flex justify-center mt-6 mb-8">
-              <Button
-                onClick={handleLoadMoreRegular}
-                disabled={isLoadingMoreRegular}
-                variant="outline"
-                className="min-w-[200px]"
-              >
-                {isLoadingMoreRegular ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  "Load More Jobs"
-                )}
-              </Button>
             </div>
           )}
 
@@ -2518,7 +2400,9 @@ const JobsPage = () => {
           {!isLoadingRemote && !remoteError && remoteJobs.length === 0 && (
             <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground mb-8">
               <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h4 className="text-lg font-semibold mb-2">No Remote Jobs Found</h4>
+              <h4 className="text-lg font-semibold mb-2">
+                No Remote Jobs Found
+              </h4>
               <p className="text-sm">
                 {userTopSkills.length > 0
                   ? "No remote jobs match your skills. Try adjusting your filters or check back later."
@@ -2528,36 +2412,63 @@ const JobsPage = () => {
           )}
 
           {!isLoadingRemote && remoteJobs.length > 0 && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-                  {remoteJobs.map((job) => (
-                <Card
-                  key={job.id}
-                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
-                >
-                  <CardContent className="p-5 flex flex-col flex-grow relative">
-                    {/* Company Logo and Info */}
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="flex-shrink-0 relative w-12 h-12">
-                        {/* Primary: Logo from API - shown first if available */}
-                        {job.company_logo ? (
-                          <img
-                            src={job.company_logo}
-                            alt={`${job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.style.display = "none";
-                              const clearbitLogo =
-                                target.parentElement?.querySelector(
-                                  ".clearbit-logo"
-                                ) as HTMLImageElement;
-                              if (clearbitLogo) {
-                                clearbitLogo.style.display = "block";
-                                clearbitLogo.style.zIndex = "10";
-                              } else {
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
+                {remoteJobs.map((job) => (
+                  <Card
+                    key={job.id}
+                    className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
+                  >
+                    <CardContent className="p-5 flex flex-col flex-grow relative">
+                      {/* Company Logo and Info */}
+                      <div className="flex items-start gap-3 mb-4">
+                        <div className="flex-shrink-0 relative w-12 h-12">
+                          {/* Primary: Logo from API - shown first if available */}
+                          {job.company_logo ? (
+                            <img
+                              src={job.company_logo}
+                              alt={`${job.company} logo`}
+                              className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null;
+                                target.style.display = "none";
+                                const clearbitLogo =
+                                  target.parentElement?.querySelector(
+                                    ".clearbit-logo"
+                                  ) as HTMLImageElement;
+                                if (clearbitLogo) {
+                                  clearbitLogo.style.display = "block";
+                                  clearbitLogo.style.zIndex = "10";
+                                } else {
+                                  const iconFallback =
+                                    target.parentElement?.querySelector(
+                                      ".logo-fallback"
+                                    ) as HTMLElement;
+                                  if (iconFallback) {
+                                    iconFallback.style.display = "flex";
+                                    iconFallback.style.zIndex = "10";
+                                  }
+                                }
+                              }}
+                            />
+                          ) : null}
+
+                          {/* Fallback 1: Clearbit logo API */}
+                          {job.company && !job.company_logo ? (
+                            <img
+                              src={`https://logo.clearbit.com/${encodeURIComponent(
+                                job.company
+                              )}`}
+                              alt={`${job.company} logo`}
+                              className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
+                              style={{ zIndex: 10 }}
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null;
+                                target.style.display = "none";
                                 const iconFallback =
                                   target.parentElement?.querySelector(
                                     ".logo-fallback"
@@ -2566,180 +2477,160 @@ const JobsPage = () => {
                                   iconFallback.style.display = "flex";
                                   iconFallback.style.zIndex = "10";
                                 }
-                              }
-                            }}
-                          />
-                        ) : null}
+                              }}
+                            />
+                          ) : null}
 
-                        {/* Fallback 1: Clearbit logo API */}
-                        {job.company && !job.company_logo ? (
-                          <img
-                            src={`https://logo.clearbit.com/${encodeURIComponent(
-                              job.company
-                            )}`}
-                            alt={`${job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
-                            style={{ zIndex: 10 }}
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.style.display = "none";
-                              const iconFallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback"
-                                ) as HTMLElement;
-                              if (iconFallback) {
-                                iconFallback.style.display = "flex";
-                                iconFallback.style.zIndex = "10";
-                              }
-                            }}
-                          />
-                        ) : null}
-
-                        {/* Fallback 2: Default icon */}
-                        <div
-                          className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                            job.company_logo ||
-                            (job.company && !job.company_logo)
-                              ? "hidden"
-                              : "flex"
-                          }`}
-                          style={{
-                            zIndex:
+                          {/* Fallback 2: Default icon */}
+                          <div
+                            className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
                               job.company_logo ||
                               (job.company && !job.company_logo)
-                                ? 0
-                                : 10,
-                          }}
-                        >
-                          <Briefcase className="h-6 w-6 text-white" />
+                                ? "hidden"
+                                : "flex"
+                            }`}
+                            style={{
+                              zIndex:
+                                job.company_logo ||
+                                (job.company && !job.company_logo)
+                                  ? 0
+                                  : 10,
+                            }}
+                          >
+                            <Briefcase className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h3 className="font-semibold text-base truncate">
+                              {job.company}
+                            </h3>
+                            {job.matchPercentage !== undefined && (
+                              <Badge
+                                variant="secondary"
+                                className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
+                              >
+                                {job.matchPercentage}% Match
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 truncate">
+                            {job.location}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <h3 className="font-semibold text-base truncate">
-                            {job.company}
-                          </h3>
-                          {job.matchPercentage !== undefined && (
-                            <Badge
-                              variant="secondary"
-                              className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
-                            >
-                              {job.matchPercentage}% Match
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500 truncate">
-                          {job.location}
-                        </p>
-                      </div>
-                    </div>
 
-                    {/* Job Title */}
-                    <h4 className="font-bold text-lg mb-4 line-clamp-2">
-                      {job.title}
-                    </h4>
+                      {/* Job Title */}
+                      <h4 className="font-bold text-lg mb-4 line-clamp-2">
+                        {job.title}
+                      </h4>
 
-                    {/* Job Details */}
-                    <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
-                      {/* Salary */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{job.salary}</span>
-                      </div>
-
-                      {/* Employment Type */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">
-                          {job.employment_type}
-                        </span>
-                      </div>
-
-                      {/* Work Arrangement */}
-                      {job.work_arrangement && (
+                      {/* Job Details */}
+                      <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
+                        {/* Salary */}
                         <div className="flex items-center gap-2 text-sm">
-                          <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-700">{job.salary}</span>
+                        </div>
+
+                        {/* Employment Type */}
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
                           <span className="text-gray-700">
-                            {job.work_arrangement}
+                            {job.employment_type}
                           </span>
                         </div>
-                      )}
 
-                      {/* Benefits */}
-                      {job.benefits && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700">{job.benefits}</span>
-                        </div>
-                      )}
-                    </div>
+                        {/* Work Arrangement */}
+                        {job.work_arrangement && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-700">
+                              {job.work_arrangement}
+                            </span>
+                          </div>
+                        )}
 
-                    {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
-                    <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
-                      <Button
-                        variant="default"
-                        onClick={() => {
-                          if (!job.id || job.id.trim() === "") {
-                            toast.error("Cannot open job: Invalid job ID");
-                            console.error(
-                              "Attempted to navigate to job with invalid ID:",
-                              job
-                            );
-                            return;
-                          }
-                          const encodedId = encodeURIComponent(job.id);
-                          navigate(`/jobs/${encodedId}`);
-                        }}
-                        className="flex-1"
-                        disabled={!job.id || job.id.trim() === ""}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="icon"
-                        onClick={() => saveJobMutation.mutate(job)}
-                        aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                        className={job.is_saved ? "bg-primary/90" : ""}
-                      >
-                        <Heart
-                          className={`h-5 w-5 transition-colors ${
+                        {/* Benefits */}
+                        {job.benefits && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-700">
+                              {job.benefits}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 shadow-lg">
+                        <Button
+                          variant="default"
+                          onClick={() => {
+                            if (!job.id || job.id.trim() === "") {
+                              toast.error("Cannot open job: Invalid job ID");
+                              console.error(
+                                "Attempted to navigate to job with invalid ID:",
+                                job
+                              );
+                              return;
+                            }
+                            const encodedId = encodeURIComponent(job.id);
+                            navigate(`/jobs/${encodedId}`);
+                          }}
+                          className="flex-1"
+                          disabled={!job.id || job.id.trim() === ""}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveJobMutation.mutate(job)}
+                          aria-label={job.is_saved ? "Unsave job" : "Save job"}
+                          className={cn(
+                            "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50",
                             job.is_saved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
-                              : "text-white"
-                          }`}
-                        />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                  ))}
-                </div>
+                              ? "text-red-500 border-red-200 bg-red-50"
+                              : ""
+                          )}
+                        >
+                          <Heart
+                            className={`h-5 w-5 transition-colors ${
+                              job.is_saved
+                                ? "text-red-500 fill-red-500 animate-heart-pop"
+                                : ""
+                            }`}
+                          />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-                {/* Load More Button for Remote Jobs */}
-                {hasMoreRemoteJobs && (
-                  <div className="flex justify-center mt-6 mb-8">
-                    <Button
-                      onClick={handleLoadMoreRemote}
-                      disabled={isLoadingMoreRemote}
-                      variant="outline"
-                      className="min-w-[200px]"
-                    >
-                      {isLoadingMoreRemote ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Loading...
-                        </>
-                      ) : (
-                        "Load More Remote Jobs"
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </>
-            )}
+              {/* Load More Button for Remote Jobs */}
+              {hasMoreRemoteJobs && (
+                <div className="flex justify-center mt-6 mb-8">
+                  <Button
+                    onClick={handleLoadMoreRemote}
+                    disabled={isLoadingMoreRemote}
+                    variant="outline"
+                    className="min-w-[200px]"
+                  >
+                    {isLoadingMoreRemote ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      "Load More Remote Jobs"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </>
 
         {/* Intern Jobs Section */}
@@ -2896,8 +2787,8 @@ const JobsPage = () => {
                       )}
                     </div>
 
-                    {/* Action Buttons - Slide up from bottom on hover, overlapping job details */}
-                    <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
+                    {/* Action Buttons */}
+                    <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 shadow-lg">
                       <Button
                         variant="default"
                         onClick={() => {
@@ -2917,18 +2808,23 @@ const JobsPage = () => {
                       >
                         View
                       </Button>
-                    <Button
-                        variant="default"
-                        size="icon"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => saveJobMutation.mutate(job)}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                        className={job.is_saved ? "bg-primary/90" : ""}
+                        className={cn(
+                          "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50",
+                          job.is_saved
+                            ? "text-red-500 border-red-200 bg-red-50"
+                            : ""
+                        )}
                       >
                         <Heart
                           className={`h-5 w-5 transition-colors ${
                             job.is_saved
                               ? "text-red-500 fill-red-500 animate-heart-pop"
-                              : "text-white"
+                              : ""
                           }`}
                         />
                       </Button>

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Download, CheckCircle2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -33,6 +34,7 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({
     useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -70,29 +72,142 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({
 
     window.addEventListener("beforeinstallprompt", handler);
 
+    // Also check if service worker is ready and try to get prompt
+    // Sometimes the event fires after a delay
+    const checkInstallability = async () => {
+      try {
+        if ("serviceWorker" in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          // The prompt might be available even if event hasn't fired
+          // We'll wait a bit for it
+        }
+      } catch (error) {
+        console.log("Service worker check:", error);
+      }
+    };
+
+    // Wait a bit for the prompt to become available
+    const timeoutId = setTimeout(() => {
+      checkInstallability();
+    }, 1000);
+
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      clearTimeout(timeoutId);
     };
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) {
-      // If no deferred prompt, browser will handle it natively
+    setIsInstalling(true);
+
+    // If we have a deferred prompt, use it immediately
+    if (deferredPrompt) {
+      try {
+        // Directly trigger the native browser install prompt
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+
+        if (outcome === "accepted") {
+          setIsInstalled(true);
+          setDeferredPrompt(null);
+          toast.success("App installation started!");
+        } else {
+          toast.info("Installation cancelled. You can try again later.");
+        }
+      } catch (error) {
+        console.error("Error installing PWA:", error);
+        toast.error(
+          "Failed to trigger installation. Please try using your browser menu."
+        );
+      } finally {
+        setIsInstalling(false);
+      }
       return;
     }
 
-    try {
-      // Directly trigger the native browser install prompt
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
+    // If no prompt yet, wait a moment for it to become available
+    // Sometimes the event fires with a delay
+    let promptReceived = false;
+    const waitForPrompt = new Promise<BeforeInstallPromptEvent | null>(
+      (resolve) => {
+        const handler = (e: Event) => {
+          e.preventDefault();
+          promptReceived = true;
+          const prompt = e as BeforeInstallPromptEvent;
+          setDeferredPrompt(prompt);
+          resolve(prompt);
+        };
 
-      if (outcome === "accepted") {
-        setIsInstalled(true);
-        setDeferredPrompt(null);
+        window.addEventListener("beforeinstallprompt", handler, { once: true });
+
+        // Wait up to 2 seconds for the prompt
+        setTimeout(() => {
+          if (!promptReceived) {
+            window.removeEventListener("beforeinstallprompt", handler);
+            resolve(null);
+          }
+        }, 2000);
+      }
+    );
+
+    const prompt = await waitForPrompt;
+
+    if (prompt) {
+      try {
+        await prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+
+        if (outcome === "accepted") {
+          setIsInstalled(true);
+          setDeferredPrompt(null);
+          toast.success("App installation started!");
+        } else {
+          toast.info("Installation cancelled. You can try again later.");
+        }
+      } catch (error) {
+        console.error("Error installing PWA:", error);
+        toast.error(
+          "Failed to trigger installation. Please try using your browser menu."
+        );
+      } finally {
+        setIsInstalling(false);
+      }
+      return;
+    }
+
+    // If still no prompt, check if it's iOS (which doesn't support beforeinstallprompt)
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+    if (isIOS) {
+      // For iOS, we can't programmatically trigger install
+      // But we can show a less intrusive message
+      toast.info(
+        "Tap the Share button (square with arrow), then select 'Add to Home Screen'",
+        { duration: 4000 }
+      );
+      setIsInstalling(false);
+      return;
+    }
+
+    // For other browsers, the app might not be installable yet
+    // Check if service worker is registered
+    try {
+      if ("serviceWorker" in navigator) {
+        const registration = await navigator.serviceWorker.ready;
+        // Service worker is ready, but prompt didn't fire
+        // This might mean the app isn't installable or was already dismissed
+        toast.info(
+          "Install prompt not available. Please check your browser's menu for 'Install' or 'Add to Home Screen' option.",
+          { duration: 4000 }
+        );
       }
     } catch (error) {
-      console.error("Error installing PWA:", error);
+      console.error("Service worker check failed:", error);
     }
+
+    setIsInstalling(false);
   };
 
   const handleDismiss = () => {
@@ -166,10 +281,15 @@ export const PWAInstallCard: React.FC<PWAInstallCardProps> = ({
         {/* Download/Install Button */}
         <Button
           onClick={handleInstall}
+          disabled={isInstalling}
           className={cn("w-full", compact && "h-9")}
         >
           <Download className={cn("mr-2 h-4 w-4", compact && "h-3.5 w-3.5")} />
-          {deferredPrompt ? "Download & Install Now" : "Download App"}
+          {isInstalling
+            ? "Preparing..."
+            : deferredPrompt
+            ? "Download & Install Now"
+            : "Download App"}
         </Button>
       </CardContent>
     </Card>

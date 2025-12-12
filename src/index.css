@@ -36,6 +36,11 @@
     scrollbar-width: none; /* Firefox */
   }
 
+  /* Remove vaul drawer bottom ::after pseudo-element */
+  [data-vaul-drawer][data-vaul-drawer-direction="bottom"]::after {
+    display: none;
+  }
+
   /* Custom py-4 utility with 1rem padding on all sides */
   .py-4 {
     padding: 1rem;
@@ -44,7 +49,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 180 20% 97%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -133,11 +138,13 @@
   html {
     /* Set root font size for accessibility - all rem-based sizes will scale */
     font-size: var(--font-size-base);
+    background-color: #f6f9f9;
   }
   body {
     @apply bg-background text-foreground;
     font-family: "Mark GEO", sans-serif; /* Apply the font here */
     transition: background-color 0.3s ease, color 0.3s ease;
+    background-color: #f6f9f9;
   }
 }
 

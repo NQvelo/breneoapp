@@ -29,9 +29,6 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { jobService, ApiJob } from "@/api/jobs";
-import { filterATSJobs } from "@/utils/jobFilterUtils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Download,
@@ -39,13 +36,8 @@ import {
   Bell,
   CreditCard,
   BookOpen,
-  Eye,
   AlertCircle,
   Info,
-  Briefcase,
-  GraduationCap,
-  Heart,
-  ExternalLink,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 import { useMobile } from "@/hooks/use-mobile";
@@ -62,8 +54,7 @@ type SettingsSection =
   | "privacy"
   | "subscription"
   | "learning"
-  | "accessibility"
-  | "saved";
+  | "accessibility";
 
 const settingsSections: Array<{ id: SettingsSection; label: string }> = [
   { id: "account", label: "Account Settings" },
@@ -72,7 +63,6 @@ const settingsSections: Array<{ id: SettingsSection; label: string }> = [
   { id: "subscription", label: "Subscription & Billing" },
   { id: "learning", label: "Learning Preferences" },
   { id: "accessibility", label: "Theme & Accessibility" },
-  { id: "saved", label: "Saved Jobs & Courses" },
 ];
 
 export default function SettingsPage() {
@@ -99,7 +89,6 @@ export default function SettingsPage() {
       "subscription",
       "learning",
       "accessibility",
-      "saved",
     ];
     try {
       const sectionFromUrl = searchParams.get("section") as SettingsSection;
@@ -404,255 +393,6 @@ export default function SettingsPage() {
       localStorage.setItem("accessibility_language", JSON.stringify(language));
     }
   }, [language, mounted]);
-
-  // Fetch saved jobs
-  const { data: savedJobIds = [], isLoading: loadingSavedJobs } = useQuery<
-    string[]
-  >({
-    queryKey: ["savedJobs", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      try {
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const savedJobsArray = profileResponse.data?.saved_jobs || [];
-        return savedJobsArray.map((id: string | number) => String(id));
-      } catch (error) {
-        console.error("Error fetching saved jobs:", error);
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-  });
-
-  // Fetch saved courses
-  const { data: savedCourseIds = [], isLoading: loadingSavedCourses } =
-    useQuery<string[]>({
-      queryKey: ["savedCourses", user?.id],
-      queryFn: async () => {
-        if (!user?.id) return [];
-        try {
-          const profileResponse = await apiClient.get(
-            API_ENDPOINTS.AUTH.PROFILE
-          );
-          const savedCoursesArray = profileResponse.data?.saved_courses || [];
-          return savedCoursesArray.map((id: string | number) => String(id));
-        } catch (error) {
-          console.error("Error fetching saved courses:", error);
-          return [];
-        }
-      },
-      enabled: !!user?.id,
-    });
-
-  useEffect(() => {
-    if (savedCourseIds && savedCourseIds.length > 0) {
-      console.log("📚 Saved course IDs:", savedCourseIds);
-    } else if (savedCourseIds) {
-      console.log("📚 Saved course IDs: none");
-    }
-  }, [savedCourseIds]);
-
-  // Fetch job details for saved jobs
-  // Note: We'll fetch a batch of jobs and filter by saved IDs
-  const { data: savedJobs = [], isLoading: loadingJobDetails } = useQuery({
-    queryKey: ["savedJobDetails", savedJobIds],
-    queryFn: async () => {
-      if (!savedJobIds || savedJobIds.length === 0) return [];
-      try {
-        // Fetch jobs using the job service with a general query
-        // We'll filter the results to match saved job IDs
-        const response = await jobService.fetchActiveJobs({
-          query: "",
-          filters: {
-            country: "Georgia",
-            countries: [],
-            jobTypes: [],
-            isRemote: false,
-            skills: [],
-          },
-          pageSize: 100, // Fetch a larger batch to find saved jobs
-        });
-
-        // Filter to only allowed ATS platforms first
-        const allowedATSJobs = filterATSJobs(response.jobs || []);
-
-        // Filter to only include saved jobs
-        const jobs = allowedATSJobs
-          .filter((job) => {
-            const jobId = job.job_id || job.id || "";
-            return savedJobIds.includes(String(jobId));
-          })
-          .map((job) => {
-            const jobId = String(job.job_id || job.id || "");
-            return {
-              id: jobId,
-              title: (job.job_title || job.title || "Unknown Job") as string,
-              company: (job.company_name ||
-                job.employer_name ||
-                job.company ||
-                "Unknown Company") as string,
-              location: (job.location ||
-                [job.job_city, job.job_state, job.job_country]
-                  .filter(Boolean)
-                  .join(", ") ||
-                "Unknown Location") as string,
-              url: (job.job_apply_link ||
-                job.url ||
-                job.apply_url ||
-                "") as string,
-            };
-          });
-
-        return jobs;
-      } catch (error) {
-        console.error("Error fetching saved job details:", error);
-        return [];
-      }
-    },
-    enabled: savedJobIds.length > 0,
-  });
-
-  // Fetch course details for saved courses
-  const { data: savedCourses = [], isLoading: loadingCourseDetails } = useQuery(
-    {
-      queryKey: ["savedCourseDetails", savedCourseIds],
-      queryFn: async () => {
-        if (!savedCourseIds || savedCourseIds.length === 0) return [];
-        try {
-          const { data, error } = await supabase
-            .from("courses")
-            .select("id, title, provider, category, level, duration")
-            .in("id", savedCourseIds);
-
-          if (error) {
-            console.error("Error fetching saved course details:", error);
-            return [];
-          }
-
-          return (data || []).map((course) => ({
-            id: course.id,
-            title: course.title,
-            provider: course.provider,
-            category: course.category,
-            level: course.level,
-            duration: course.duration,
-          }));
-        } catch (error) {
-          console.error("Error fetching saved course details:", error);
-          return [];
-        }
-      },
-      enabled: savedCourseIds.length > 0,
-    }
-  );
-
-  // Mutation to unsave a job
-  const unsaveJobMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      if (!user?.id) throw new Error("User not logged in");
-
-      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-      const currentSavedJobs = profileResponse.data?.saved_jobs || [];
-
-      const updatedSavedJobs = currentSavedJobs.filter(
-        (id: string | number) => String(id) !== jobId
-      );
-
-      await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-        saved_jobs: updatedSavedJobs,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["savedJobDetails"] });
-      toast.success("Job unsaved successfully");
-    },
-    onError: (error: Error) => {
-      console.error("Error unsaving job:", error);
-      toast.error("Failed to unsave job. Please try again.");
-    },
-  });
-
-  // Mutation to toggle save/unsave a course
-  const unsaveCourseMutation = useMutation({
-    mutationFn: async (courseId: string) => {
-      if (!user?.id) throw new Error("User not logged in");
-
-      // Use the correct API endpoint (toggles save/unsave)
-      await apiClient.post(`/api/save-course/${courseId}/`);
-    },
-    onMutate: async (courseId: string) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["savedCourses", user?.id] });
-      await queryClient.cancelQueries({ queryKey: ["savedCourseDetails"] });
-
-      // Snapshot the previous values
-      const previousSavedCourses = queryClient.getQueryData<string[]>([
-        "savedCourses",
-        user?.id,
-      ]);
-      const previousSavedCourseDetails = queryClient.getQueryData([
-        "savedCourseDetails",
-      ]);
-
-      // Optimistically update savedCourses
-      queryClient.setQueryData<string[]>(["savedCourses", user?.id], (prev) => {
-        if (!prev) return prev;
-        const courseIdString = String(courseId);
-        return prev.includes(courseIdString)
-          ? prev.filter((c) => c !== courseIdString)
-          : [...prev, courseIdString];
-      });
-
-      // Optimistically update savedCourseDetails
-      queryClient.setQueryData(
-        ["savedCourseDetails"],
-        (
-          prev:
-            | Array<{
-                id: string;
-                title: string;
-                provider: string;
-                category: string;
-                level: string;
-                duration: string;
-              }>
-            | undefined
-        ) => {
-          if (!prev) return prev;
-          const courseIdString = String(courseId);
-          return prev.filter((course) => String(course.id) !== courseIdString);
-        }
-      );
-
-      // Return context for rollback
-      return { previousSavedCourses, previousSavedCourseDetails };
-    },
-    onError: (error: unknown, courseId: string, context) => {
-      // Rollback on error
-      if (context?.previousSavedCourses) {
-        queryClient.setQueryData(
-          ["savedCourses", user?.id],
-          context.previousSavedCourses
-        );
-      }
-      if (context?.previousSavedCourseDetails) {
-        queryClient.setQueryData(
-          ["savedCourseDetails"],
-          context.previousSavedCourseDetails
-        );
-      }
-
-      console.error("Error toggling course save:", error);
-      toast.error("Failed to update course. Please try again.");
-    },
-    onSuccess: () => {
-      // Invalidate queries to ensure consistency
-      queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["savedCourseDetails"] });
-      toast.success("Course updated successfully");
-    },
-  });
 
   // Password Reset Functions
   const handleSendCode = async (e: React.FormEvent) => {
@@ -1491,212 +1231,6 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-
-      case "saved":
-        return (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Saved Jobs & Courses</h1>
-
-            {/* Saved Jobs */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5" />
-                  Saved Jobs
-                </CardTitle>
-                <CardDescription>
-                  Manage your saved job listings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingSavedJobs || loadingJobDetails ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="h-16 bg-muted animate-pulse rounded-3xl"
-                      />
-                    ))}
-                  </div>
-                ) : savedJobIds.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No saved jobs yet.</p>
-                    <p className="text-sm mt-2">
-                      Start saving jobs from the{" "}
-                      <Link to="/jobs" className="text-primary hover:underline">
-                        jobs page
-                      </Link>
-                      .
-                    </p>
-                  </div>
-                ) : savedJobs.length === 0 && savedJobIds.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      {savedJobIds.length} saved job
-                      {savedJobIds.length !== 1 ? "s" : ""} (details loading...)
-                    </div>
-                    {savedJobIds.map((jobId) => (
-                      <div
-                        key={jobId}
-                        className="flex items-center justify-between p-4 border rounded-3xl"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-mono text-muted-foreground truncate">
-                            Job ID: {jobId}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              navigate(`/jobs/${encodeURIComponent(jobId)}`)
-                            }
-                            className="flex items-center gap-1"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            View
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unsaveJobMutation.mutate(jobId)}
-                            disabled={unsaveJobMutation.isPending}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {savedJobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className="flex items-center justify-between p-4 border rounded-3xl hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate">
-                            {job.title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {job.company} • {job.location}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              navigate(`/jobs/${encodeURIComponent(job.id)}`)
-                            }
-                            className="flex items-center gap-1"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => unsaveJobMutation.mutate(job.id)}
-                            disabled={unsaveJobMutation.isPending}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Saved Courses */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <GraduationCap className="h-5 w-5" />
-                  Saved Courses
-                </CardTitle>
-                <CardDescription>
-                  Manage your saved course listings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingSavedCourses || loadingCourseDetails ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="h-16 bg-muted animate-pulse rounded-3xl"
-                      />
-                    ))}
-                  </div>
-                ) : savedCourses.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No saved courses yet.</p>
-                    <p className="text-sm mt-2">
-                      Start saving courses from the{" "}
-                      <Link
-                        to="/courses"
-                        className="text-primary hover:underline"
-                      >
-                        courses page
-                      </Link>
-                      .
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {savedCourses.map((course) => (
-                      <div
-                        key={course.id}
-                        className="flex items-center justify-between p-4 border rounded-3xl hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate">
-                            {course.title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {course.provider} • {course.category} •{" "}
-                            {course.level} • {course.duration}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/course/${course.id}`)}
-                            className="flex items-center gap-1"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              unsaveCourseMutation.mutate(course.id)
-                            }
-                            disabled={unsaveCourseMutation.isPending}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>

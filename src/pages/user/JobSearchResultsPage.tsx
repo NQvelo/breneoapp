@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { RadialProgress } from "@/components/ui/radial-progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -22,6 +23,7 @@ import {
   ArrowDown,
   ArrowUp,
   SlidersHorizontal,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
@@ -38,6 +40,7 @@ import {
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
+import { cn } from "@/lib/utils";
 
 interface Job {
   id: string;
@@ -53,6 +56,7 @@ interface Job {
   benefits?: string;
   matchPercentage?: number;
   datePosted?: string;
+  jobSkills?: string[];
 }
 
 const jobTypeLabels: Record<string, string> = {
@@ -167,6 +171,46 @@ const calculateMatchPercentage = (
   );
 
   return Math.min(matchPercentage, 100);
+};
+
+// Generate AI text explaining why user is a good match
+const generateMatchExplanation = (
+  matchPercentage: number,
+  userSkills: string[],
+  jobTitle: string,
+  jobSkills: string[]
+): string => {
+  const matchingSkills = userSkills.filter((userSkill) =>
+    jobSkills.some((jobSkill) => {
+      const normalizedUser = userSkill.toLowerCase().trim();
+      const normalizedJob = jobSkill.toLowerCase().trim();
+      return (
+        normalizedUser === normalizedJob ||
+        normalizedUser.includes(normalizedJob) ||
+        normalizedJob.includes(normalizedUser)
+      );
+    })
+  );
+
+  if (matchPercentage >= 80) {
+    if (matchingSkills.length > 0) {
+      return `Your strong expertise in ${matchingSkills
+        .slice(0, 3)
+        .join(
+          ", "
+        )} aligns perfectly with this ${jobTitle} role. You have the technical foundation to excel in this position.`;
+    }
+    return `Your skillset demonstrates excellent alignment with this ${jobTitle} position. You're well-positioned to make an immediate impact.`;
+  } else if (matchPercentage >= 60) {
+    if (matchingSkills.length > 0) {
+      return `Your experience with ${matchingSkills[0]} and related technologies provides a solid foundation for this ${jobTitle} role. With your current skills, you can quickly adapt to the requirements.`;
+    }
+    return `Your background shows good potential for this ${jobTitle} position. Your existing skills provide a strong base for growth in this role.`;
+  } else if (matchPercentage >= 40) {
+    return `While there's room to expand your skillset, your current experience offers a starting point for this ${jobTitle} role. Consider building on your existing foundation.`;
+  } else {
+    return `This ${jobTitle} position may require additional skill development, but your willingness to learn and adapt can help bridge the gap.`;
+  }
 };
 
 // Helper function to format date from API
@@ -354,10 +398,10 @@ const JobSearchResultsPage = () => {
   ): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
     try {
       // If all interests are selected, treat as no filter (load all jobs)
-      const allInterestsSelected = 
-        userTopSkills.length > 0 && 
+      const allInterestsSelected =
+        userTopSkills.length > 0 &&
         filters.skills.length > 0 &&
-        userTopSkills.every(skill => filters.skills.includes(skill)) &&
+        userTopSkills.every((skill) => filters.skills.includes(skill)) &&
         filters.skills.length === userTopSkills.length;
 
       // Prepare filters for API call
@@ -384,30 +428,45 @@ const JobSearchResultsPage = () => {
       });
 
       // Apply client-side salary filtering
-      if (filters.salaryMin !== undefined || filters.salaryMax !== undefined || filters.salaryByAgreement) {
+      if (
+        filters.salaryMin !== undefined ||
+        filters.salaryMax !== undefined ||
+        filters.salaryByAgreement
+      ) {
         validJobs = validJobs.filter((job) => {
           const minSalary = job.job_min_salary || job.min_salary;
           const maxSalary = job.job_max_salary || job.max_salary;
 
           // If "by agreement" is checked, include jobs without salary info
-          if (filters.salaryByAgreement && (!minSalary && !maxSalary)) {
+          if (filters.salaryByAgreement && !minSalary && !maxSalary) {
             return true;
           }
 
           // If no salary info and "by agreement" is not checked, exclude if salary filters are set
           if (!minSalary && !maxSalary && !filters.salaryByAgreement) {
             // If salary filters are set, exclude jobs without salary
-            if (filters.salaryMin !== undefined || filters.salaryMax !== undefined) {
+            if (
+              filters.salaryMin !== undefined ||
+              filters.salaryMax !== undefined
+            ) {
               return false;
             }
             return true;
           }
 
           // Check if job salary matches the range
-          if (filters.salaryMin !== undefined && maxSalary && maxSalary < filters.salaryMin) {
+          if (
+            filters.salaryMin !== undefined &&
+            maxSalary &&
+            maxSalary < filters.salaryMin
+          ) {
             return false;
           }
-          if (filters.salaryMax !== undefined && minSalary && minSalary > filters.salaryMax) {
+          if (
+            filters.salaryMax !== undefined &&
+            minSalary &&
+            minSalary > filters.salaryMax
+          ) {
             return false;
           }
 
@@ -451,7 +510,13 @@ const JobSearchResultsPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["job-search", searchTerm, filtersKey, page, userTopSkills.join(",")],
+    queryKey: [
+      "job-search",
+      searchTerm,
+      filtersKey,
+      page,
+      userTopSkills.join(","),
+    ],
     queryFn: () => fetchJobs(searchTerm, activeFilters, page, userTopSkills),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -487,9 +552,9 @@ const JobSearchResultsPage = () => {
         const jobCity = job.job_city || job.city || "";
         const jobState = job.job_state || job.state || "";
         const jobCountry = job.job_country || job.country || "";
-        const location =
-          job.job_location ||
-          job.location ||
+        const location: string =
+          (job.job_location as string | undefined) ||
+          (job.location as string | undefined) ||
           [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
           "Location not specified";
 
@@ -582,16 +647,17 @@ const JobSearchResultsPage = () => {
 
         // Extract date posted - try all possible date fields from API
         // JSearch API typically uses: job_posted_at_datetime_utc, date_posted, or posted_date
+        const jobRecord = job as Record<string, unknown>;
         const datePosted =
-          job.job_posted_at_datetime_utc || // JSearch API primary field
-          job.date_posted ||
-          job.posted_date ||
-          job.postedAt ||
-          job.job_posted_at ||
-          (job as any).job_publish_timestamp ||
-          (job as any).publish_time ||
-          job.created_at ||
-          job.published_at ||
+          (job.job_posted_at_datetime_utc as string | undefined) || // JSearch API primary field
+          (job.date_posted as string | undefined) ||
+          (job.posted_date as string | undefined) ||
+          (job.postedAt as string | undefined) ||
+          (job.job_posted_at as string | undefined) ||
+          (jobRecord.job_publish_timestamp as string | undefined) ||
+          (jobRecord.publish_time as string | undefined) ||
+          (job.created_at as string | undefined) ||
+          (job.published_at as string | undefined) ||
           undefined;
 
         // Debug: Log if we found a date (only in development)
@@ -607,7 +673,7 @@ const JobSearchResultsPage = () => {
           id: jobId,
           title: jobTitle,
           company: companyName,
-          location,
+          location: String(location),
           url: applyLink,
           company_logo: companyLogo,
           is_saved: savedJobs?.includes(String(jobId)),
@@ -616,6 +682,7 @@ const JobSearchResultsPage = () => {
           work_arrangement: workArrangement,
           matchPercentage,
           datePosted,
+          jobSkills,
         };
       })
       .filter((job): job is Job => job !== null);
@@ -858,7 +925,10 @@ const JobSearchResultsPage = () => {
                   className="group flex items-center gap-2 bg-transparent border border-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
                   aria-label="Filter jobs"
                 >
-                  <SlidersHorizontal className="h-4 w-4 group-hover:text-white" strokeWidth={2} />
+                  <SlidersHorizontal
+                    className="h-4 w-4 group-hover:text-white"
+                    strokeWidth={2}
+                  />
                   <span className="hidden md:inline text-sm font-medium">
                     {t.jobs.filters}
                   </span>
@@ -945,144 +1015,224 @@ const JobSearchResultsPage = () => {
             {regularJobs.map((job) => (
               <div
                 key={job.id}
-                className={`group cursor-pointer ${
-                  job.matchPercentage !== undefined && job.matchPercentage > 0
-                    ? "p-[2px] rounded-3xl bg-gradient-to-r from-breneo-blue via-breneo-accent to-breneo-blue"
-                    : ""
-                }`}
+                className="group cursor-pointer"
                 onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
               >
-                <Card
-                  className={`border ${
-                    job.matchPercentage !== undefined && job.matchPercentage > 0
-                      ? "border-transparent rounded-3xl"
-                      : "border-gray-200"
-                  } hover:shadow-md transition-shadow`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      {/* Company Logo */}
-                      <div className="flex-shrink-0 relative w-12 h-12">
-                        {job.company_logo ? (
-                          <img
-                            src={job.company_logo}
-                            alt={job.company}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-300 absolute inset-0 z-10"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = "none";
-                              const fallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback"
-                                ) as HTMLElement;
-                              if (fallback) {
-                                fallback.style.display = "flex";
-                                fallback.style.zIndex = "10";
-                              }
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className={`w-12 h-12 rounded-full bg-breneo-blue/10 flex items-center justify-center border border-gray-300 logo-fallback absolute inset-0 ${
-                            job.company_logo ? "z-0" : "z-10"
-                          }`}
-                          style={{
-                            display: job.company_logo ? "none" : "flex",
-                          }}
-                        >
-                          <Briefcase className="h-6 w-6 text-breneo-blue" />
+                <Card className="border border-gray-200 hover:shadow-md transition-shadow overflow-hidden rounded-lg">
+                  <CardContent className="p-0">
+                    <div className="flex gap-4">
+                      {/* Left Section - Job Details */}
+                      <div className="flex-1 p-4 pr-2 rounded-l-lg">
+                        <div className="flex items-start gap-4">
+                          {/* Company Logo */}
+                          <div className="flex-shrink-0 relative w-12 h-12">
+                            {job.company_logo ? (
+                              <img
+                                src={job.company_logo}
+                                alt={job.company}
+                                className="w-12 h-12 rounded-md object-cover border border-gray-300 absolute inset-0 z-10"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = "none";
+                                  const fallback =
+                                    target.parentElement?.querySelector(
+                                      ".logo-fallback"
+                                    ) as HTMLElement;
+                                  if (fallback) {
+                                    fallback.style.display = "flex";
+                                    fallback.style.zIndex = "10";
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center border border-gray-300 logo-fallback absolute inset-0 ${
+                                job.company_logo ? "z-0" : "z-10"
+                              }`}
+                              style={{
+                                display: job.company_logo ? "none" : "flex",
+                              }}
+                            >
+                              <Briefcase className="h-6 w-6 text-breneo-blue" />
+                            </div>
+                          </div>
+
+                          {/* Job Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="mb-1 md:mb-2">
+                              <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
+                                {job.company}
+                              </h3>
+                              <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
+                                {job.title}
+                              </h4>
+                            </div>
+
+                            {/* Mobile: Location, Date, and buttons */}
+                            {isMobile ? (
+                              <div className="space-y-2 mt-1">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-sm text-gray-600">
+                                    {job.location}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {formatJobDate(job.datePosted)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      saveJobMutation.mutate(job);
+                                    }}
+                                    className={cn(
+                                      "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 flex-shrink-0",
+                                      job.is_saved
+                                        ? "text-red-500 border-red-200 bg-red-50"
+                                        : ""
+                                    )}
+                                  >
+                                    <Heart
+                                      className={`h-4 w-4 ${
+                                        job.is_saved
+                                          ? "text-red-500 fill-red-500 animate-heart-pop"
+                                          : ""
+                                      }`}
+                                    />
+                                  </Button>
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (job.url) {
+                                        window.open(job.url, "_blank");
+                                      } else {
+                                        navigate(
+                                          `/jobs/${encodeURIComponent(job.id)}`
+                                        );
+                                      }
+                                    }}
+                                    className="flex-1"
+                                  >
+                                    Apply Now
+                                    <ExternalLink className="h-4 w-4 ml-2" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Desktop: All details in one row */
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                                  <div className="flex items-center gap-1.5">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{job.location}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock className="h-4 w-4" />
+                                    <span>{job.employment_type}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <Briefcase className="h-4 w-4" />
+                                    <span>{job.work_arrangement}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-500">
+                                    {formatJobDate(job.datePosted)}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        saveJobMutation.mutate(job);
+                                      }}
+                                      className={cn(
+                                        "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50",
+                                        job.is_saved
+                                          ? "text-red-500 border-red-200 bg-red-50"
+                                          : ""
+                                      )}
+                                    >
+                                      <Heart
+                                        className={`h-4 w-4 ${
+                                          job.is_saved
+                                            ? "text-red-500 fill-red-500 animate-heart-pop"
+                                            : ""
+                                        }`}
+                                      />
+                                    </Button>
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (job.url) {
+                                          window.open(job.url, "_blank");
+                                        } else {
+                                          navigate(
+                                            `/jobs/${encodeURIComponent(
+                                              job.id
+                                            )}`
+                                          );
+                                        }
+                                      }}
+                                    >
+                                      Apply Now
+                                      <ExternalLink className="h-4 w-4 ml-2" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Job Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4 mb-1 md:mb-2">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
-                              {job.company}
-                            </h3>
-                            <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
-                              {job.title}
-                            </h4>
-                          </div>
-                          {job.matchPercentage !== undefined && (
-                            <Badge className="bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 flex-shrink-0">
-                              {job.matchPercentage}% Match
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Mobile: Location, Date, and Save button */}
-                        {isMobile ? (
-                          <div className="flex items-start justify-between gap-4 mt-1">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-sm text-gray-600">
-                                {job.location}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {formatJobDate(job.datePosted)}
-                              </span>
-                            </div>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                saveJobMutation.mutate(job);
-                              }}
-                              className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-9 w-9 p-0 rounded-full flex-shrink-0"
-                            >
-                              <Heart
-                                className={`h-4 w-4 ${
-                                  job.is_saved
-                                    ? "text-red-500 fill-red-500 animate-heart-pop"
-                                    : "text-black"
-                                }`}
-                              />
-                            </Button>
-                          </div>
-                        ) : (
-                          /* Desktop: All details in one row */
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                              <div className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4" />
-                                <span>{job.location}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4" />
-                                <span>{job.employment_type}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Briefcase className="h-4 w-4" />
-                                <span>{job.work_arrangement}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center flex-shrink-0 ml-auto relative h-9">
-                              <span className="text-xs text-gray-500 group-hover:opacity-0 transition-opacity duration-200 flex items-center h-9">
-                                {formatJobDate(job.datePosted)}
-                              </span>
-                              <Button
-                                variant="secondary"
-                                size="sm"
+                      {/* Right Section - Match Score */}
+                      {job.matchPercentage !== undefined &&
+                        job.matchPercentage > 0 && (
+                          <div className="w-56 flex-shrink-0 p-4 flex flex-col items-center justify-center relative rounded-2xl bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+                            {/* Overflow Menu (optional) */}
+                            <div className="absolute top-3 right-3">
+                              <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  saveJobMutation.mutate(job);
                                 }}
-                                className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-9 w-9 p-0 absolute right-0 rounded-full"
+                                className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                               >
-                                <Heart
-                                  className={`h-4 w-4 ${
-                                    job.is_saved
-                                      ? "text-red-500 fill-red-500 animate-heart-pop"
-                                      : "text-black"
-                                  }`}
-                                />
-                              </Button>
+                                <span className="text-lg">⋯</span>
+                              </button>
+                            </div>
+
+                            {/* Radial Progress Bar */}
+                            <div className="mb-3">
+                              <RadialProgress
+                                value={job.matchPercentage}
+                                size={60}
+                                strokeWidth={3}
+                                showLabel={false}
+                                percentageTextSize="lg"
+                                className="justify-center text-green-600"
+                              />
+                            </div>
+
+                            {/* Match Label */}
+                            <div>
+                              <p className="text-base font-bold text-center text-gray-800 dark:text-gray-200">
+                                {job.matchPercentage >= 70
+                                  ? "GOOD MATCH"
+                                  : job.matchPercentage >= 40
+                                  ? "FAIR MATCH"
+                                  : "POOR MATCH"}
+                              </p>
                             </div>
                           </div>
                         )}
-                      </div>
                     </div>
                   </CardContent>
                 </Card>

@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label";
 import { useMobile } from "@/hooks/use-mobile";
 import { countries, Country } from "@/data/countries";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Search as SearchIcon } from "lucide-react";
+import { ChevronRight, Search as SearchIcon } from "lucide-react";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
@@ -127,7 +127,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
     if (filters.jobTypes.length === 1) {
       return workTypeLabels[filters.jobTypes[0]] || filters.jobTypes[0];
     }
-    return filters.jobTypes.map((type) => workTypeLabels[type] || type).join(", ");
+    return filters.jobTypes
+      .map((type) => workTypeLabels[type] || type)
+      .join(", ");
   };
 
   const getLocationDisplayText = () => {
@@ -141,10 +143,13 @@ const FilterForm: React.FC<FilterFormProps> = ({
       return `${filters.countries.length} countries selected`;
     }
     // Show up to 3 country names
-    return filters.countries.slice(0, 3).map((code) => {
-      const country = countries.find((c) => c.code === code);
-      return country?.name || code;
-    }).join(", ");
+    return filters.countries
+      .slice(0, 3)
+      .map((code) => {
+        const country = countries.find((c) => c.code === code);
+        return country?.name || code;
+      })
+      .join(", ");
   };
 
   const getSkillsDisplayText = () => {
@@ -234,7 +239,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
         {/* Work Type Filter - Mobile Style */}
         <div
-          className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
+          className="bg-white rounded-xl border border-gray-200 p-4 cursor-pointer"
           onClick={onWorkTypeClick}
         >
           <div className="flex items-center justify-between">
@@ -252,7 +257,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
         {/* Location Filter - Mobile Style */}
         <div
-          className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer"
+          className="bg-white rounded-xl border border-gray-200 p-4 cursor-pointer"
           onClick={onLocationClick}
         >
           <div className="flex items-center justify-between">
@@ -549,20 +554,10 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
           }}
         >
           <DrawerContent className="max-h-[90vh] flex flex-col">
-            <DrawerHeader className="border-b flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full -ml-2"
-                  onClick={() => setShowWorkTypePicker(false)}
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <DrawerTitle>{t.jobs.workType}</DrawerTitle>
-              </div>
+            <DrawerHeader className="flex-shrink-0">
+              <DrawerTitle>{t.jobs.workType}</DrawerTitle>
             </DrawerHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto -mx-4 px-4">
+            <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
               <div className="py-4 space-y-3">
                 {jobTypes.map((type) => {
                   const isChecked = filters.jobTypes.includes(type);
@@ -570,7 +565,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                     <Label
                       key={type}
                       htmlFor={type}
-                      className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 cursor-pointer min-h-[48px] active:bg-gray-50 transition-colors select-none"
+                      className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 cursor-pointer min-h-[48px] active:bg-gray-50 transition-colors select-none"
                     >
                       <span className="flex-1 text-sm font-medium">
                         {workTypeLabels[type] || type}
@@ -627,24 +622,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
           }}
         >
           <DrawerContent className="max-h-[90vh] flex flex-col">
-            <DrawerHeader className="border-b flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full -ml-2"
-                  onClick={() => {
-                    setShowLocationPicker(false);
-                    setLocationSearchQuery("");
-                  }}
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <DrawerTitle>Countries</DrawerTitle>
-              </div>
+            <DrawerHeader className="flex-shrink-0">
+              <DrawerTitle>Countries</DrawerTitle>
             </DrawerHeader>
             {/* Search Input */}
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -669,7 +651,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                       <Label
                         key={country.code}
                         htmlFor={country.code}
-                        className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer min-h-[48px] active:bg-gray-50 dark:active:bg-gray-700 transition-colors select-none"
+                        className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer min-h-[48px] active:bg-gray-50 dark:active:bg-gray-700 transition-colors select-none"
                       >
                         <span className="flex-1 text-sm font-medium">
                           {country.name}
@@ -701,22 +683,12 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
         <DrawerContent className="max-h-[90vh]">
-          <DrawerHeader className="border-b pb-4">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full -ml-2"
-                onClick={onClose}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <DrawerTitle className="text-xl font-bold">
-                {SEARCH_TITLE_KA}
-              </DrawerTitle>
-            </div>
+          <DrawerHeader>
+            <DrawerTitle className="text-xl font-bold">
+              {SEARCH_TITLE_KA}
+            </DrawerTitle>
           </DrawerHeader>
-          <div className="px-4 py-6 flex-1 overflow-y-auto">
+          <div className="px-6 py-6 flex-1 overflow-y-auto">
             <FilterForm
               filters={filters}
               onFiltersChange={onFiltersChange}
@@ -726,7 +698,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               userTopSkills={userTopSkills}
             />
           </div>
-          <DrawerFooter className="border-t pt-4 px-4 pb-6">
+          <DrawerFooter>
             <div
               className={`flex gap-3 w-full ${
                 onClear ? "justify-between" : "justify-end"
@@ -740,7 +712,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                     setShowLocationPicker(false);
                   }}
                   variant="ghost"
-                  className="w-auto h-12 px-4 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0"
+                  className="h-12 px-6 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0 rounded-[18px]"
                 >
                   {t.common.clear}
                 </Button>
@@ -751,7 +723,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                   setShowWorkTypePicker(false);
                   setShowLocationPicker(false);
                 }}
-                className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-lg text-base font-medium"
+                className="h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
               >
                 {t.common.apply}
               </Button>

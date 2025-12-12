@@ -159,7 +159,7 @@ const SkillTestPage = () => {
   if (!testStarted) {
     return (
       <DashboardLayout {...layoutProps}>
-        <div className="flex flex-col h-full w-full bg-[#F8F9FA] dark:bg-[#181818] animate-in fade-in duration-500">
+        <div className="flex flex-col h-full w-full bg-[#efefef] dark:bg-[#181818] animate-in fade-in duration-500">
           {/* Header: Logo, Progress Bar, Cancel Button - Same structure as test screen */}
           <div className="w-full grid grid-cols-[1fr_auto_1fr] md:grid-cols-3 items-center px-6 py-6 md:px-8 md:py-6 transition-all duration-300">
             {/* Breneo Logo - Left Column */}
@@ -237,10 +237,10 @@ const SkillTestPage = () => {
           <Drawer open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
             <DrawerContent>
               <DrawerHeader>
-                <DrawerTitle className="text-center">Are you sure?</DrawerTitle>
+                <DrawerTitle>Are you sure?</DrawerTitle>
               </DrawerHeader>
-              <div className="px-4 pb-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">
+              <div className="px-6 pb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                   Your progress will be lost if you exit the test.
                 </p>
               </div>
@@ -380,10 +380,10 @@ const SkillTestPage = () => {
         <Drawer open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle className="text-center">Are you sure?</DrawerTitle>
+              <DrawerTitle>Are you sure?</DrawerTitle>
             </DrawerHeader>
-            <div className="px-4 pb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">
+            <div className="px-6 pb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Your progress will be lost if you exit the test.
               </p>
             </div>
