@@ -8,9 +8,12 @@ import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useTheme } from "next-themes";
 
 const AcademyRegistrationPage = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   // State for form steps
   const [step, setStep] = useState(1);
@@ -34,6 +37,13 @@ const AcademyRegistrationPage = () => {
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+
+  // Handle mounted state to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && theme === "dark";
 
   // Image preloading function
   const preloadImage = useCallback((src: string): Promise<void> => {
@@ -130,7 +140,7 @@ const AcademyRegistrationPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
@@ -185,7 +195,7 @@ const AcademyRegistrationPage = () => {
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-8">
+            <div className="w-full bg-gray-200 dark:bg-secondary rounded-full h-2 mb-8">
               <div
                 className="bg-[#00BFFF] h-2 rounded-full transition-all duration-500 ease-in-out"
                 style={{ width: step === 1 ? "50%" : "100%" }}
@@ -237,9 +247,9 @@ const AcademyRegistrationPage = () => {
                       <CountrySelector
                         value={selectedCountry}
                         onChange={setSelectedCountry}
-                        className="w-auto h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
+                        className="max-w-fit px-3 h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
                       />
-                      <div className="h-6 w-px bg-slate-200" />
+                      <div className="h-6 w-px bg-slate-200 dark:bg-border" />
                       <Input
                         id="phone"
                         type="tel"
@@ -272,9 +282,9 @@ const AcademyRegistrationPage = () => {
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-500" />
+                          <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                         ) : (
-                          <Eye className="h-4 w-4 text-gray-500" />
+                          <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                         )}
                       </Button>
                     </div>

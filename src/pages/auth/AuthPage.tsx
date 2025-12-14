@@ -95,7 +95,7 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
@@ -213,9 +213,9 @@ const AuthPage: React.FC = () => {
                   <CountrySelector
                     value={selectedCountry}
                     onChange={setSelectedCountry}
-                    className="w-auto h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
+                    className="max-w-fit px-3 h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
                   />
-                  <div className="h-6 w-px bg-slate-200" />
+                  <div className="h-6 w-px bg-slate-200 dark:bg-border" />
                   <Input
                     id="phone"
                     type="tel"
@@ -248,9 +248,9 @@ const AuthPage: React.FC = () => {
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
+                      <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                     )}
                   </Button>
                 </div>

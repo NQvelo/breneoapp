@@ -138,13 +138,12 @@
   html {
     /* Set root font size for accessibility - all rem-based sizes will scale */
     font-size: var(--font-size-base);
-    background-color: #f6f9f9;
+    @apply bg-background;
   }
   body {
     @apply bg-background text-foreground;
     font-family: "Mark GEO", sans-serif; /* Apply the font here */
     transition: background-color 0.3s ease, color 0.3s ease;
-    background-color: #f6f9f9;
   }
 }
 

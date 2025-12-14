@@ -214,7 +214,7 @@ const LoginPage: React.FC = () => {
   const isLoading = authLoading;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
@@ -236,8 +236,8 @@ const LoginPage: React.FC = () => {
             }}
           />
           {imageError && (
-            <div className="h-7 w-20 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-              <span className="text-xs text-gray-500">Breneo</span>
+            <div className="h-7 w-20 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-border rounded flex items-center justify-center">
+              <span className="text-xs text-gray-500 dark:text-muted-foreground">Breneo</span>
             </div>
           )}
         </div>
@@ -269,8 +269,8 @@ const LoginPage: React.FC = () => {
                   }}
                 />
                 {imageError && (
-                  <div className="h-10 w-32 bg-gray-100 border border-gray-300 rounded flex items-center justify-center">
-                    <span className="text-sm text-gray-500">Breneo</span>
+                  <div className="h-10 w-32 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-border rounded flex items-center justify-center">
+                    <span className="text-sm text-gray-500 dark:text-muted-foreground">Breneo</span>
                   </div>
                 )}
               </div>
@@ -318,9 +318,9 @@ const LoginPage: React.FC = () => {
                     disabled={isLoading}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
+                      <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
                     )}
                   </Button>
                 </div>
@@ -357,7 +357,7 @@ const LoginPage: React.FC = () => {
 
         {/* Right Section (Image) */}
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-          <div className="relative w-full h-full rounded-3xl overflow-hidden">
+          <div className="relative w-full h-full rounded-xl overflow-hidden">
             {/* Loading skeleton */}
             {!backgroundLoaded && !imageError && (
               <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-[#242424] dark:to-[#2a2a2a] animate-pulse flex items-center justify-center">
@@ -391,8 +391,8 @@ const LoginPage: React.FC = () => {
 
             {/* Error fallback */}
             {imageError && (
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                <div className="text-center text-blue-600">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-[#1a1a1a] dark:to-[#2a2a2a] flex items-center justify-center">
+                <div className="text-center text-blue-600 dark:text-gray-400">
                   <ImageIcon className="h-16 w-16 mx-auto mb-2" />
                   <p className="text-sm">Future Technology</p>
                 </div>

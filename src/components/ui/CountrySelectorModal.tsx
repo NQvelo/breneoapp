@@ -89,15 +89,17 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
         <DrawerContent className="h-[85vh]">
-          <DrawerHeader className="pb-4">
+          <DrawerHeader>
             <DrawerTitle>Select Country</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-4 pb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search countries or dial codes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 w-full"
               />
               {searchTerm && (
                 <Button
@@ -110,7 +112,7 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
                 </Button>
               )}
             </div>
-          </DrawerHeader>
+          </div>
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full px-4">
               <CountryList
@@ -137,13 +139,15 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
       <DialogContent className="max-w-md max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>Select Country</DialogTitle>
-          <div className="relative">
+        </DialogHeader>
+        <div className="mt-4 pb-4">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search countries or dial codes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-10"
+              className="pl-10 pr-10 w-full"
             />
             {searchTerm && (
               <Button
@@ -156,7 +160,7 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
               </Button>
             )}
           </div>
-        </DialogHeader>
+        </div>
         <div className="overflow-hidden">
           <ScrollArea className="h-[400px]">
             <CountryList

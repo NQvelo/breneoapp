@@ -7,20 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Cell,
-  LabelList,
-} from "recharts";
-import {
   Brain,
   Target,
   BookOpen,
@@ -52,6 +38,7 @@ import {
   getTopSkills,
   generateRecommendations,
 } from "@/utils/skillTestUtils";
+import { generateRoleSummary, generateRequiredSkills } from "@/utils/roleUtils";
 import { supabase } from "@/integrations/supabase/client";
 import apiClient from "@/api/auth/apiClient";
 import {
@@ -61,6 +48,12 @@ import {
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, ApiJob, JobFilters } from "@/api/jobs";
 import { filterATSJobs } from "@/utils/jobFilterUtils";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, LabelList, Cell } from "recharts";
 
 interface JobPath {
   title: string;
@@ -72,6 +65,8 @@ interface JobPath {
   salaryRange: string;
   timeToReady: string;
   jobs?: ApiJob[]; // Actual job listings for this path
+  summary?: string; // AI-generated role summary
+  aiGeneratedSkills?: string[]; // AI-generated required skills
 }
 
 interface CourseRecommendation {
@@ -509,6 +504,10 @@ const SkillPathPage = () => {
   const [finalRole, setFinalRole] = useState<string | null>(null);
   const [userCountry, setUserCountry] = useState<string>("Georgia");
   const [roleExplanation, setRoleExplanation] = useState<string>("");
+  const [activeView, setActiveView] = useState<"skills" | "matchedRoles">(
+    "skills"
+  );
+  const [userSkillsSet, setUserSkillsSet] = useState<Set<string>>(new Set());
 
   // Fetch user country from profile
   const fetchUserCountry = useCallback(async () => {
@@ -774,7 +773,14 @@ const SkillPathPage = () => {
             country
           );
 
-          // Set job paths with salaries immediately for instant display
+          // Store user skills for comparison
+          const allUserSkills = [...techSkillsArray, ...softSkillsArray].map(
+            (s) => s.skill.toLowerCase()
+          );
+          setUserSkillsSet(new Set(allUserSkills));
+
+          // Initialize paths without summaries - they'll be generated immediately
+          // Don't set placeholders to avoid showing short text
           setJobPaths(pathsWithSalaries);
 
           // Generate AI explanation for recommended role
@@ -790,6 +796,64 @@ const SkillPathPage = () => {
           }
 
           setLoading(false);
+
+          // Generate summaries and AI skills for each job path in background
+          Promise.all(
+            pathsWithSalaries.map(async (path) => {
+              try {
+                // Get user's top skills for personalized summary
+                const userTopSkills = top.map((s) => s.skill);
+                const [summary, aiSkills] = await Promise.all([
+                  generateRoleSummary(
+                    path.title,
+                    userTopSkills,
+                    path.matchPercentage
+                  ),
+                  generateRequiredSkills(path.title),
+                ]);
+                // Ensure we always have an expanded summary (function should never return empty)
+                const finalSummary =
+                  summary && summary.length > 100
+                    ? summary
+                    : `**${
+                        path.title
+                      }** is an exciting and rewarding career path that offers tremendous opportunities for professional growth and personal fulfillment. This role allows you to work on meaningful projects that make a real impact, using your skills and creativity every day. As a ${path.title.toLowerCase()}, you'll have the chance to collaborate with talented teams, solve interesting challenges, and continuously learn new technologies and methodologies. The field is growing rapidly, with strong demand for skilled professionals, ensuring excellent job security and career advancement opportunities.`;
+
+                return {
+                  ...path,
+                  summary: finalSummary,
+                  aiGeneratedSkills:
+                    aiSkills.length > 0 ? aiSkills : path.requiredSkills,
+                };
+              } catch (error) {
+                console.error(
+                  `Error generating data for ${path.title}:`,
+                  error
+                );
+                // Use expanded fallback, not short placeholder
+                return {
+                  ...path,
+                  summary: `**${
+                    path.title
+                  }** is an exciting and rewarding career path that offers tremendous opportunities for professional growth and personal fulfillment. This role allows you to work on meaningful projects that make a real impact, using your skills and creativity every day. As a ${path.title.toLowerCase()}, you'll have the chance to collaborate with talented teams, solve interesting challenges, and continuously learn new technologies and methodologies. The field is growing rapidly, with strong demand for skilled professionals, ensuring excellent job security and career advancement opportunities.`,
+                  aiGeneratedSkills: path.requiredSkills,
+                };
+              }
+            })
+          ).then((updatedPaths) => {
+            // Use functional update to ensure we're updating the correct state
+            setJobPaths((prevPaths) => {
+              // Create a map of updated paths by title for quick lookup
+              const updatedMap = new Map(
+                updatedPaths.map((path) => [path.title, path])
+              );
+              // Merge updates with existing paths, preserving any other state
+              return prevPaths.map((prevPath) => {
+                const updated = updatedMap.get(prevPath.title);
+                return updated || prevPath;
+              });
+            });
+          });
 
           // Parallelize all heavy operations (jobs, missing skills, courses)
           Promise.all([
@@ -918,7 +982,14 @@ const SkillPathPage = () => {
       const country = await fetchUserCountry();
       const pathsWithSalaries = calculateSalariesForJobPaths(paths, country);
 
-      // Set job paths with salaries immediately for instant display
+      // Store user skills for comparison
+      const allUserSkills = [...sortedHardSkills, ...sortedSoftSkills].map(
+        (s) => s.skill.toLowerCase()
+      );
+      setUserSkillsSet(new Set(allUserSkills));
+
+      // Initialize paths without summaries - they'll be generated immediately
+      // Don't set placeholders to avoid showing short text
       setJobPaths(pathsWithSalaries);
 
       // Generate AI explanation if we have a role from job paths
@@ -946,6 +1017,61 @@ const SkillPathPage = () => {
       }
 
       setLoading(false);
+
+      // Generate summaries and AI skills for each job path in background
+      Promise.all(
+        pathsWithSalaries.map(async (path) => {
+          try {
+            // Get user's top skills for personalized summary
+            const userTopSkills = allSkillsForDisplay.map((s) => s.skill);
+            const [summary, aiSkills] = await Promise.all([
+              generateRoleSummary(
+                path.title,
+                userTopSkills,
+                path.matchPercentage
+              ),
+              generateRequiredSkills(path.title),
+            ]);
+            // Ensure we always have an expanded summary (function should never return empty)
+            const finalSummary =
+              summary && summary.length > 100
+                ? summary
+                : `**${
+                    path.title
+                  }** is an exciting and rewarding career path that offers tremendous opportunities for professional growth and personal fulfillment. This role allows you to work on meaningful projects that make a real impact, using your skills and creativity every day. As a ${path.title.toLowerCase()}, you'll have the chance to collaborate with talented teams, solve interesting challenges, and continuously learn new technologies and methodologies. The field is growing rapidly, with strong demand for skilled professionals, ensuring excellent job security and career advancement opportunities.`;
+
+            return {
+              ...path,
+              summary: finalSummary,
+              aiGeneratedSkills:
+                aiSkills.length > 0 ? aiSkills : path.requiredSkills,
+            };
+          } catch (error) {
+            console.error(`Error generating data for ${path.title}:`, error);
+            // Use expanded fallback, not short placeholder
+            return {
+              ...path,
+              summary: `**${
+                path.title
+              }** is an exciting and rewarding career path that offers tremendous opportunities for professional growth and personal fulfillment. This role allows you to work on meaningful projects that make a real impact, using your skills and creativity every day. As a ${path.title.toLowerCase()}, you'll have the chance to collaborate with talented teams, solve interesting challenges, and continuously learn new technologies and methodologies. The field is growing rapidly, with strong demand for skilled professionals, ensuring excellent job security and career advancement opportunities.`,
+              aiGeneratedSkills: path.requiredSkills,
+            };
+          }
+        })
+      ).then((updatedPaths) => {
+        // Use functional update to ensure we're updating the correct state
+        setJobPaths((prevPaths) => {
+          // Create a map of updated paths by title for quick lookup
+          const updatedMap = new Map(
+            updatedPaths.map((path) => [path.title, path])
+          );
+          // Merge updates with existing paths, preserving any other state
+          return prevPaths.map((prevPath) => {
+            const updated = updatedMap.get(prevPath.title);
+            return updated || prevPath;
+          });
+        });
+      });
 
       // Parallelize all heavy operations (jobs, missing skills, courses)
       Promise.all([
@@ -1150,7 +1276,7 @@ const SkillPathPage = () => {
     });
   };
 
-  // Render skills as a modern horizontal bar chart with primary color and opacity
+  // Render skills as a modern vertical bar chart with primary color and opacity
   const renderSkillsChart = (skills: Record<string, string>, title: string) => {
     const primaryColor = "#19B5FE"; // breneo-blue (primary color)
 
@@ -1160,15 +1286,15 @@ const SkillPathPage = () => {
         const percentage = parseFloat(String(pct).replace("%", ""));
 
         // Calculate opacity based on percentage
-        // If >= 80%, use full opacity (1.0)
+        // If >= 40%, use full opacity (1.0) to make results more visible
         // Otherwise, scale opacity from 0.3 to 1.0 based on percentage
         let opacity: number;
-        if (percentage >= 80) {
-          opacity = 1.0; // Full opacity for strong skills
+        if (percentage >= 40) {
+          opacity = 1.0; // Full opacity for bars 40% and higher
         } else {
-          // Scale from 30% to 80%: opacity ranges from 0.3 to 1.0
-          // Formula: opacity = 0.3 + (percentage / 80) * 0.7
-          opacity = 0.3 + (percentage / 80) * 0.7;
+          // Scale from 0% to 40%: opacity ranges from 0.3 to 1.0
+          // Formula: opacity = 0.3 + (percentage / 40) * 0.7
+          opacity = 0.3 + (percentage / 40) * 0.7;
         }
 
         // Create unique gradient ID for each opacity level
@@ -1199,64 +1325,136 @@ const SkillPathPage = () => {
       },
     };
 
-    // Custom label component to show skill name on the left (Y-axis side)
-    const CustomYAxisLabel = (props: {
+    // Custom label component to show skill name at bottom of chart (below bars)
+    const CustomInsideLabel = (props: {
       x?: number;
       y?: number;
-      payload?: { skill?: string; value?: string };
+      width?: number;
+      height?: number;
+      payload?: { skill?: string };
+      value?: string;
     }) => {
-      const { x, y, payload } = props;
-      const skillName = payload?.skill || payload?.value || "";
+      const { x, y, width, height, payload, value } = props;
+      const skillName = payload?.skill || value || "";
 
-      if (!x || !y || !skillName) {
+      if (!x || !y || !width || !height || !skillName) {
         return null;
       }
 
+      const centerX = x + width / 2;
+      // Position skill name at fixed bottom position of chart
+      // Chart height is 250px, bottom margin is 80px, so bottom is at ~170px
+      // Use a fixed Y position that's always at the bottom regardless of bar height
+      // Added more space between bars and skill names
+      const chartHeight = 250;
+      const bottomMargin = 80;
+      const skillY = chartHeight - bottomMargin + 25; // Fixed position at bottom with more space
+
+      // Split long skill names into multiple lines
+      // Max characters per line based on bar width (approximately 8-10 chars per 50px width)
+      const maxCharsPerLine = Math.max(8, Math.floor(width / 6));
+      const words = skillName.split(" ");
+      const lines: string[] = [];
+      let currentLine = "";
+
+      // Try to split by words first, then by characters if needed
+      for (const word of words) {
+        if (word.length > maxCharsPerLine) {
+          // If a single word is too long, split it by characters
+          if (currentLine) {
+            lines.push(currentLine);
+            currentLine = "";
+          }
+          // Split the long word into chunks
+          for (let i = 0; i < word.length; i += maxCharsPerLine) {
+            lines.push(word.slice(i, i + maxCharsPerLine));
+          }
+        } else if ((currentLine + " " + word).length <= maxCharsPerLine) {
+          currentLine = currentLine ? currentLine + " " + word : word;
+        } else {
+          if (currentLine) {
+            lines.push(currentLine);
+          }
+          currentLine = word;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      // If still too long, split by characters
+      if (
+        lines.length === 0 ||
+        (lines.length === 1 && lines[0].length > maxCharsPerLine * 1.5)
+      ) {
+        lines.length = 0;
+        for (let i = 0; i < skillName.length; i += maxCharsPerLine) {
+          lines.push(skillName.slice(i, i + maxCharsPerLine));
+        }
+      }
+
+      // Limit to 2 lines max
+      const displayLines = lines.slice(0, 2);
+      const lineHeight = 14;
+      const startY = skillY - (displayLines.length - 1) * (lineHeight / 2);
+
       return (
         <text
-          x={x}
-          y={y}
+          x={centerX}
+          y={startY}
           fill="#374151"
-          textAnchor="end"
+          textAnchor="middle"
           fontSize={12}
           fontWeight={600}
           className="dark:fill-gray-200"
-          dx={-10}
         >
-          {skillName}
+          {displayLines.map((line, index) => (
+            <tspan key={index} x={centerX} dy={index === 0 ? 0 : lineHeight}>
+              {line}
+            </tspan>
+          ))}
         </text>
       );
     };
 
-    // Custom label component to show percentage at the end of the bar
-    const CustomEndLabel = (props: {
+    // Custom label component to show percentage at bottom of chart (below bars)
+    const CustomBottomLabel = (props: {
       x?: number;
       y?: number;
       width?: number;
       height?: number;
       value?: number;
+      payload?: { skill?: string };
     }) => {
-      const { x, y, width, height, value } = props;
+      const { x, y, width, height, value, payload } = props;
       const percentage = value || 0;
+      const skillName = payload?.skill || "";
 
       if (!x || !y || !width || !height) {
         return null;
       }
 
-      // Position percentage at the end of the bar (right side)
-      const labelX = x + width + 10;
-      const centerY = y + height / 2;
+      const centerX = x + width / 2;
+      // Position percentage at fixed bottom position of chart
+      // Chart height is 250px, bottom margin is 80px, so bottom is at ~170px
+      // Adjust position based on whether skill name is wrapped to 2 lines
+      // Added more space between skill name and percentage
+      const chartHeight = 250;
+      const bottomMargin = 80;
+      const maxCharsPerLine = Math.max(8, Math.floor(width / 6));
+      const isLongName = skillName.length > maxCharsPerLine * 1.2;
+      // If skill name is wrapped, move percentage down a bit more
+      const percentY = chartHeight - bottomMargin + (isLongName ? 70 : 60);
 
       return (
         <text
-          x={labelX}
-          y={centerY}
+          x={centerX}
+          y={percentY}
           fill="#374151"
-          textAnchor="start"
+          textAnchor="middle"
           fontSize={13}
           fontWeight={700}
           className="dark:fill-gray-200"
-          dy={4}
         >
           {`${percentage.toFixed(0)}%`}
         </text>
@@ -1264,20 +1462,16 @@ const SkillPathPage = () => {
     };
 
     return (
-      <div className="w-full">
-        <ChartContainer
-          config={chartConfig}
-          className="h-auto w-full min-h-[300px]"
-        >
+      <div className="w-full -mb-4">
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
           <BarChart
             data={chartData}
-            layout="vertical"
-            margin={{ top: 20, right: 80, left: 100, bottom: 20 }}
-            barCategoryGap="15%"
+            margin={{ top: 20, right: 10, left: 10, bottom: 80 }}
+            barCategoryGap="25%"
           >
             <defs>
               {chartData.map((entry) => {
-                // Create darker shade for gradient (horizontal gradient now)
+                // Create darker shade for gradient bottom
                 const darkerShade = "#0EA5E9"; // Slightly darker blue
                 return (
                   <linearGradient
@@ -1285,8 +1479,8 @@ const SkillPathPage = () => {
                     id={entry.gradientId}
                     x1="0"
                     y1="0"
-                    x2="1"
-                    y2="0"
+                    x2="0"
+                    y2="1"
                   >
                     <stop
                       offset="0%"
@@ -1302,15 +1496,8 @@ const SkillPathPage = () => {
                 );
               })}
             </defs>
-            <XAxis type="number" domain={[0, 100]} hide={true} />
-            <YAxis
-              type="category"
-              dataKey="skill"
-              width={90}
-              tick={<CustomYAxisLabel />}
-              axisLine={false}
-              tickLine={false}
-            />
+            <XAxis dataKey="skill" hide={true} />
+            <YAxis type="number" domain={[0, 100]} hide={true} />
             <ChartTooltip
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
@@ -1348,7 +1535,7 @@ const SkillPathPage = () => {
             />
             <Bar
               dataKey="percentage"
-              radius={[0, 8, 8, 0]}
+              radius={[8, 8, 8, 8]}
               animationDuration={1000}
               animationEasing="ease-out"
             >
@@ -1361,8 +1548,10 @@ const SkillPathPage = () => {
                   }}
                 />
               ))}
-              {/* Percentage at the end of the bar */}
-              <LabelList content={CustomEndLabel} dataKey="percentage" />
+              {/* Skill name at bottom inside bar */}
+              <LabelList content={CustomInsideLabel} dataKey="skill" />
+              {/* Percentage at bottom inside bar */}
+              <LabelList content={CustomBottomLabel} dataKey="percentage" />
             </Bar>
           </BarChart>
         </ChartContainer>
@@ -1439,93 +1628,104 @@ const SkillPathPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
-        {/* AI-Generated Role Explanation */}
-        {finalRole && roleExplanation && (
-          <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Rocket className="h-5 w-5 text-primary" />
-                Your Recommended Career Path: {finalRole}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-line">
-                  {roleExplanation.split("**").map((part, index) =>
-                    index % 2 === 1 ? (
-                      <strong
-                        key={index}
-                        className="text-primary font-semibold"
-                      >
-                        {part}
-                      </strong>
-                    ) : (
-                      part
-                    )
-                  )}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Skills Breakdown */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Technical Skills */}
-          {Object.keys(techSkills).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="text-xl">⚡</span>
-                  Technical Skills
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 pb-1">
-                {renderSkillsChart(techSkills, "Technical Skills")}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Soft Skills */}
-          {Object.keys(softSkills).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <span className="text-xl">🌟</span>
-                  Soft Skills
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 pb-1">
-                {renderSkillsChart(softSkills, "Soft Skills")}
-              </CardContent>
-            </Card>
-          )}
+        {/* Switcher */}
+        <div className="flex justify-center mb-2">
+          <div className="relative inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-1">
+            <button
+              onClick={() => setActiveView("skills")}
+              className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
+                activeView === "skills"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 font-medium"
+              }`}
+            >
+              Your Skills
+            </button>
+            <button
+              onClick={() => setActiveView("matchedRoles")}
+              className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
+                activeView === "matchedRoles"
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 font-medium"
+              }`}
+            >
+              Matched Roles
+            </button>
+          </div>
         </div>
 
-        <Tabs defaultValue="jobs" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="jobs" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Job Paths
-            </TabsTrigger>
-            <TabsTrigger value="courses" className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              Recommended Courses
-            </TabsTrigger>
-            <TabsTrigger
-              value="missing-skills"
-              className="flex items-center gap-2"
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Missing Skills
-            </TabsTrigger>
-            <TabsTrigger value="next-steps" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Next Steps
-            </TabsTrigger>
-          </TabsList>
+        {/* Skills Chart Section - shown when "Your Skills" is active */}
+        {activeView === "skills" && (
+          <>
+            {/* AI-Generated Role Explanation */}
+            {finalRole && roleExplanation && (
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Rocket className="h-5 w-5 text-primary" />
+                    Your Recommended Career Path: {finalRole}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <p className="text-base leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                      {roleExplanation.split("**").map((part, index) =>
+                        index % 2 === 1 ? (
+                          <strong
+                            key={index}
+                            className="text-primary font-semibold"
+                          >
+                            {part}
+                          </strong>
+                        ) : (
+                          part
+                        )
+                      )}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-          <TabsContent value="jobs" className="space-y-4">
+            {/* Skills Charts */}
+            {(Object.keys(techSkills).length > 0 ||
+              Object.keys(softSkills).length > 0) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Technical Skills Chart */}
+                {Object.keys(techSkills).length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        Technical Skills
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {renderSkillsChart(techSkills, "Technical Skills")}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Soft Skills Chart */}
+                {Object.keys(softSkills).length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        Soft Skills
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {renderSkillsChart(softSkills, "Soft Skills")}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Matched Roles Section - shown when "Matched Roles" is active */}
+        {activeView === "matchedRoles" && (
+          <div className="space-y-4">
             {jobPaths.length > 0 ? (
               jobPaths.map((job, index) => (
                 <Card
@@ -1534,57 +1734,114 @@ const SkillPathPage = () => {
                 >
                   <CardContent className="p-6">
                     <div className="flex flex-col gap-4">
-                      <div>
-                        <CardTitle className="text-xl mb-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <CardTitle className="text-xl flex-1">
                           {job.title}
                         </CardTitle>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            navigate(
+                              `/skill-path/${encodeURIComponent(job.title)}`,
+                              { state: { jobPath: job } }
+                            );
+                          }}
+                        >
+                          View Details
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </Button>
                       </div>
 
-                      {/* Salary Information Card */}
-                      <Card className="border-primary/20">
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base flex items-center gap-2">
-                            <DollarSign className="h-4 w-4 text-primary" />
-                            Salary Information
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="text-2xl font-bold text-primary mb-2">
-                            {job.salaryRange || "Salary data not available"}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Average salary range based on current market data
-                          </p>
-                        </CardContent>
-                      </Card>
+                      {/* Salary and Brief Cards - Side by Side */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Salary Information Card */}
+                        <Card className="border-primary/20 bg-gray-50 dark:bg-gray-800/50">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-primary" />
+                              Salary Information
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="bg-gray-100 dark:bg-gray-700/50 p-4 rounded-lg">
+                              <div className="text-lg font-bold text-primary mb-2">
+                                {job.salaryRange || "Salary data not available"}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Average salary range based on current market
+                                data
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Role Brief Card */}
+                        <Card className="border-primary/20 bg-gray-50 dark:bg-gray-800/50">
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              Role Brief
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="bg-gray-100 dark:bg-gray-700/50 p-4 rounded-lg">
+                              <div className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
+                                {job.summary ? (
+                                  job.summary.split("**").map((part, index) =>
+                                    index % 2 === 1 ? (
+                                      <strong
+                                        key={index}
+                                        className="text-primary font-semibold"
+                                      >
+                                        {part}
+                                      </strong>
+                                    ) : (
+                                      part
+                                    )
+                                  )
+                                ) : (
+                                  <span className="text-muted-foreground italic">
+                                    Generating role brief...
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
 
                       <div>
                         <h4 className="font-medium mb-2">Required Skills</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {job.requiredSkills.map((skill) => (
-                            <Badge
-                              key={skill}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {skill}
-                            </Badge>
-                          ))}
+                        <div className="flex flex-wrap gap-2">
+                          {(job.aiGeneratedSkills || job.requiredSkills).map(
+                            (skill, index) => {
+                              const hasSkill = userSkillsSet.has(
+                                skill.toLowerCase()
+                              );
+                              return (
+                                <div
+                                  key={index}
+                                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors ${
+                                    hasSkill
+                                      ? "bg-green-500 text-white"
+                                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  <div className="flex-shrink-0">
+                                    {hasSkill ? (
+                                      <CheckCircle className="h-4 w-4 text-white" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4" />
+                                    )}
+                                  </div>
+                                  <span className="text-sm font-medium whitespace-nowrap">
+                                    {skill}
+                                  </span>
+                                </div>
+                              );
+                            }
+                          )}
                         </div>
                       </div>
-
-                      <Button
-                        className="w-full"
-                        onClick={() => {
-                          navigate(
-                            `/skill-path/${encodeURIComponent(job.title)}`,
-                            { state: { jobPath: job } }
-                          );
-                        }}
-                      >
-                        View Details
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -1605,319 +1862,8 @@ const SkillPathPage = () => {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
-
-          <TabsContent value="courses" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {courseRecommendations.map((course) => (
-                <Card key={course.id}>
-                  <CardHeader>
-                    <CardTitle className="text-lg">{course.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      by {course.provider}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm mb-3">{course.description}</p>
-                    <div className="flex justify-between items-center mb-3">
-                      <Badge variant="secondary">{course.level}</Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {course.duration}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {course.relevantSkills.slice(0, 3).map((skill) => (
-                        <Badge
-                          key={skill}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                    <Button className="w-full" variant="outline">
-                      Start Course
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="missing-skills" className="space-y-4">
-            {missingSkills.length > 0 ? (
-              <div className="space-y-4">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-2">
-                    Skills Gap Analysis
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Based on your recommended job paths, here are skills you
-                    should consider developing to improve your career prospects.
-                    These skills are required by multiple job positions but are
-                    currently missing from your profile.
-                  </p>
-                </div>
-
-                {missingSkills.map((missingSkill) => (
-                  <Card
-                    key={missingSkill.skill}
-                    className="border-l-4 border-l-orange-500"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            <CardTitle className="text-lg">
-                              {missingSkill.skill}
-                            </CardTitle>
-                            <Badge
-                              variant={
-                                missingSkill.category === "tech"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className={
-                                missingSkill.category === "tech"
-                                  ? "bg-blue-500"
-                                  : ""
-                              }
-                            >
-                              {missingSkill.category === "tech"
-                                ? "Technical"
-                                : "Soft Skill"}
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className={
-                                missingSkill.importance === "high"
-                                  ? "border-red-500 text-red-600"
-                                  : missingSkill.importance === "medium"
-                                  ? "border-orange-500 text-orange-600"
-                                  : "border-gray-500 text-gray-600"
-                              }
-                            >
-                              {missingSkill.importance === "high"
-                                ? "High Priority"
-                                : missingSkill.importance === "medium"
-                                ? "Medium Priority"
-                                : "Low Priority"}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              Required by {missingSkill.frequency} job
-                              {missingSkill.frequency > 1 ? "s" : ""}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            <span className="text-xs text-muted-foreground">
-                              Required by:
-                            </span>
-                            {missingSkill.requiredByJobs.map((job, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="outline"
-                                className="text-xs"
-                              >
-                                {job}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                        <XCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-1" />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Why Important */}
-                      <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-3xl border border-blue-200 dark:border-blue-800">
-                        <div className="flex items-start gap-2">
-                          <Lightbulb className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1 text-blue-900 dark:text-blue-100">
-                              Why This Matters
-                            </h4>
-                            <p className="text-sm text-blue-800 dark:text-blue-200">
-                              This skill is required by {missingSkill.frequency}{" "}
-                              of your recommended job path
-                              {missingSkill.frequency > 1 ? "s" : ""}.
-                              Developing this skill will significantly improve
-                              your career prospects and job match percentage.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Recommended Courses */}
-                      {missingSkill.recommendedCourses.length > 0 ? (
-                        <div>
-                          <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                            <BookOpen className="h-4 w-4 text-primary" />
-                            Recommended Courses to Learn {missingSkill.skill}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {missingSkill.recommendedCourses
-                              .slice(0, 4)
-                              .map((course) => (
-                                <Card
-                                  key={course.id}
-                                  className="border border-gray-200 dark:border-gray-700"
-                                >
-                                  <CardContent className="p-4">
-                                    <h5 className="font-medium text-sm mb-1">
-                                      {course.title}
-                                    </h5>
-                                    <p className="text-xs text-muted-foreground mb-2">
-                                      by {course.provider}
-                                    </p>
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-xs"
-                                      >
-                                        {course.level}
-                                      </Badge>
-                                      <span className="text-xs text-muted-foreground">
-                                        {course.duration}
-                                      </span>
-                                    </div>
-                                    {course.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                                        {course.description}
-                                      </p>
-                                    )}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="w-full text-xs"
-                                      onClick={() =>
-                                        navigate(`/course/${course.id}`)
-                                      }
-                                    >
-                                      View Course
-                                      <ArrowRight className="h-3 w-3 ml-1" />
-                                    </Button>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-gray-50 dark:bg-muted/50 p-4 rounded-3xl text-center">
-                          <p className="text-sm text-muted-foreground">
-                            No courses found for this skill yet. Check back
-                            later or search for "{missingSkill.skill}" courses.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="text-center py-12">
-                  <CheckCircle className="h-16 w-16 mx-auto mb-4 text-green-500" />
-                  <h3 className="text-xl font-semibold mb-2">Great Job!</h3>
-                  <p className="text-muted-foreground">
-                    You have all the key skills needed for your recommended
-                    career paths. Keep building on your strengths!
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="next-steps" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Recommended Certifications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {jobPaths[0]?.certifications.map((cert, index) => (
-                    <div
-                      key={cert}
-                      className="flex items-center gap-3 p-3 border rounded-3xl"
-                    >
-                      <CheckCircle className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <h4 className="font-medium">{cert}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Industry-recognized certification for{" "}
-                          {jobPaths[0]?.title}
-                        </p>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Learn More
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Learning Journey</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
-                      1
-                    </div>
-                    <div>
-                      <h4 className="font-medium">
-                        Complete foundational courses
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Build your core skills (2-3 months)
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-medium">
-                      2
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Build portfolio projects</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Demonstrate your skills (1-2 months)
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-medium">
-                      3
-                    </div>
-                    <div>
-                      <h4 className="font-medium">
-                        Earn relevant certifications
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Validate your expertise (1-2 months)
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm font-medium">
-                      4
-                    </div>
-                    <div>
-                      <h4 className="font-medium">Apply for positions</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Start your career journey
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

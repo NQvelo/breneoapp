@@ -29,18 +29,18 @@ export const CountrySelector: React.FC<CountrySelectorProps> = ({
         variant="outline"
         role="combobox"
         aria-expanded={isOpen}
-        className={`justify-between ${className}`}
+        className={`justify-between shrink-0 ${className}`}
         onClick={() => setIsOpen(true)}
       >
         {selectedCountry ? (
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{selectedCountry.flag}</span>
-            <span>{selectedCountry.dial_code}</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-lg shrink-0">{selectedCountry.flag}</span>
+            <span className="text-muted-foreground whitespace-nowrap">{selectedCountry.dial_code}</span>
           </div>
         ) : (
           placeholder
         )}
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        <ChevronsUpDown className="ml-1.5 h-4 w-4 shrink-0 opacity-50 text-muted-foreground" />
       </Button>
 
       <CountrySelectorModal
