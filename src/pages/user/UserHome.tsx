@@ -303,10 +303,10 @@ const UserHome = () => {
           const response = await apiClient.get(
             `/api/skilltest/results/?user=${user.id}`
           );
-          console.log(
-            "🔍 Checking Django API skill test results:",
-            response.data
-          );
+          // console.log(
+          //   // "🔍 Checking Django API skill test results:",
+          //   response.data
+          // );
 
           let skillTestData = null;
           if (Array.isArray(response.data) && response.data.length > 0) {
@@ -319,7 +319,7 @@ const UserHome = () => {
             skillTestData &&
             (skillTestData.final_role || skillTestData.skills_json)
           ) {
-            console.log("✅ Found skill test results from Django API");
+            // console.log("✅ Found skill test results from Django API");
             setHasCompletedTest(true);
 
             // Extract skills from skills_json
@@ -333,9 +333,9 @@ const UserHome = () => {
             return;
           }
         } catch (apiError) {
-          console.log(
-            "Django API endpoint not available, trying other methods..."
-          );
+          // console.log(
+          //   "Django API endpoint not available, trying other methods..."
+          // );
         }
 
         // Method 2: Try user skills API endpoint
@@ -351,21 +351,21 @@ const UserHome = () => {
             return;
           }
         } catch (apiError) {
-          console.log(
-            "User skills API endpoint not available, trying Supabase..."
-          );
+          // console.log(
+          //   "User skills API endpoint not available, trying Supabase..."
+          // );
         }
 
         // Method 3: Fallback to Supabase: fetch from usertestanswers
         const answers = await getUserTestAnswers(String(user.id));
-        console.log("🔍 Checking test completion:", {
-          userId: user.id,
-          answersCount: answers?.length || 0,
-          hasAnswers: answers && answers.length > 0,
-        });
+        // console.log("🔍 Checking test completion:", {
+        //   userId: user.id,
+        //   answersCount: answers?.length || 0,
+        //   hasAnswers: answers && answers.length > 0,
+        // });
 
         if (answers && answers.length > 0) {
-          console.log("✅ User has completed skill test (from Supabase)");
+          // console.log("✅ User has completed skill test (from Supabase)");
           setHasCompletedTest(true);
           const skillScores = calculateSkillScores(answers);
           const topSkillsData = getTopSkills(skillScores, 5);
@@ -422,7 +422,7 @@ const UserHome = () => {
           );
           setUserHardSkills(hardSkills.length > 0 ? hardSkills : topSkills); // Fallback to all if no match
         } else {
-          console.log("❌ User has not completed skill test");
+          // console.log("❌ User has not completed skill test");
           setHasCompletedTest(false);
         }
       } catch (error) {
@@ -823,14 +823,14 @@ const UserHome = () => {
   };
 
   // Debug logging
-  console.log("🏠 UserHome render:", {
-    user: !!user,
-    userId: user?.id,
-    loadingSkills,
-    hasCompletedTest,
-    jobsCount: displayJobs.length,
-    coursesCount: courses.length,
-  });
+  // console.log("🏠 UserHome render:", {
+  //   user: !!user,
+  //   userId: user?.id,
+  //   loadingSkills,
+  //   hasCompletedTest,
+  //   jobsCount: displayJobs.length,
+  //   coursesCount: courses.length,
+  // });
 
   // Show loading state if auth is still loading
   if (authLoading) {

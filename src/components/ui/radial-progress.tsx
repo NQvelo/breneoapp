@@ -29,14 +29,11 @@ export const RadialProgress = React.forwardRef<
   ) => {
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (value / 100) * circumference;
+    const clampedValue = Math.max(0, Math.min(100, value));
+    const offset = circumference - (clampedValue / 100) * circumference;
 
     // Determine match label if not provided
     const label = matchLabel || (value >= 70 ? "GOOD MATCH" : "FAIR MATCH");
-
-    // Calculate opacity for gradient (transparent based on percentage)
-    // Higher percentage = less transparent (more opaque)
-    const opacity = value / 100;
 
     // Percentage text size classes
     const textSizeClasses = {
@@ -54,8 +51,13 @@ export const RadialProgress = React.forwardRef<
           </span>
         )}
         <div className="relative" style={{ width: size, height: size }}>
-          <svg width={size} height={size} className="transform -rotate-90">
-            {/* Background circle - reduced opacity */}
+          <svg
+            width={size}
+            height={size}
+            className="transform -rotate-90"
+            style={{ overflow: "visible" }}
+          >
+            {/* Background circle */}
             <circle
               cx={size / 2}
               cy={size / 2}
@@ -63,43 +65,20 @@ export const RadialProgress = React.forwardRef<
               fill="none"
               stroke="currentColor"
               strokeWidth={strokeWidth}
-              className="text-gray-200/30 dark:text-gray-700/30"
+              className="text-gray-200/40 dark:text-gray-700/40"
             />
-            {/* Progress circle with gradient - white to transparent */}
-            <defs>
-              <linearGradient
-                id={`gradient-${size}-${Math.round(value)}`}
-                x1="0%"
-                y1="50%"
-                x2="100%"
-                y2="50%"
-                gradientUnits="objectBoundingBox"
-              >
-                <stop offset="0%" stopColor="currentColor" stopOpacity="1" />
-                <stop
-                  offset={`${Math.min(100, Math.round(value))}%`}
-                  stopColor="currentColor"
-                  stopOpacity="1"
-                />
-                <stop
-                  offset={`${Math.min(100, Math.round(value) + 5)}%`}
-                  stopColor="currentColor"
-                  stopOpacity="0"
-                />
-                <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-              </linearGradient>
-            </defs>
+            {/* Progress circle – starts from the top because of -rotate-90 */}
             <circle
               cx={size / 2}
               cy={size / 2}
               r={radius}
               fill="none"
-              stroke={`url(#gradient-${size}-${Math.round(value)})`}
+              stroke="currentColor"
               strokeWidth={strokeWidth}
               strokeDasharray={circumference}
               strokeDashoffset={offset}
               strokeLinecap="round"
-              className="transition-all duration-500"
+              className="transition-all duration-500 ease-out"
             />
           </svg>
           {/* Percentage text in center - bigger */}

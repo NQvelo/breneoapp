@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { RadialProgress } from "@/components/ui/radial-progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -229,6 +230,15 @@ const calculateMatchPercentage = (
 
   // Cap at 100%
   return Math.min(matchPercentage, 100);
+};
+
+// Get textual label for match quality
+const getMatchQualityLabel = (value?: number): string => {
+  if (value === undefined || value <= 0) return "";
+  if (value >= 85) return "Best match";
+  if (value >= 70) return "Good match";
+  if (value >= 50) return "Fair match";
+  return "Poor match";
 };
 
 // Skill icon mapping - maps skill names to appropriate icons
@@ -2190,7 +2200,7 @@ const JobsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 bg-white dark:bg-transparent md:bg-transparent">
+      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
           <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
@@ -2456,489 +2466,113 @@ const JobsPage = () => {
           </div>
         )}
 
-        {(isLoadingInternships || isLoadingRemote) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-5">
-                  <Skeleton className="h-32 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {!isLoadingInternships &&
-          !isLoadingRemote &&
-          internJobs.length === 0 &&
-          remoteJobs.length === 0 && (
-            <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
-              <img
-                src="/lovable-uploads/3dicons-travel-front-color.png"
-                alt="No data found"
-                className="mx-auto h-48 w-48 mb-4 object-contain"
-              />
-              <h4 className="text-lg font-semibold mb-2">No Jobs Found</h4>
-              <p className="text-sm">
-                Try adjusting your search terms or filters
-              </p>
-            </div>
-          )}
-
         {/* Remote Jobs Section */}
-        <>
-          <div className="flex items-center gap-3 mb-6 mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-            <Globe className="h-6 w-6 text-breneo-blue" />
-            <h2 className="text-lg font-bold">Remote Jobs</h2>
-          </div>
-
-          {isLoadingRemote && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-32 md:pb-16">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-5">
-                    <Skeleton className="h-32 w-full" />
-                  </CardContent>
-                </Card>
-              ))}
+        {!isLoadingRemote && remoteJobs.length > 0 && (
+          <section className="mt-10">
+            <div className="flex items-center gap-3 mb-4">
+              <Globe className="h-6 w-6 text-breneo-blue" />
+              <h2 className="text-lg font-bold">Remote Jobs</h2>
             </div>
-          )}
 
-          {remoteError && (
-            <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-4 rounded-md flex items-center gap-3 mb-6">
-              <AlertCircle className="h-5 w-5" />
-              <p>
-                <strong>Error loading remote jobs:</strong>{" "}
-                {(remoteError as Error)?.message || "Unknown error occurred"}
-              </p>
-            </div>
-          )}
-
-          {!isLoadingRemote && !remoteError && remoteJobs.length === 0 && (
-            <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground mb-8">
-              <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h4 className="text-lg font-semibold mb-2">
-                No Remote Jobs Found
-              </h4>
-              <p className="text-sm">
-                {userTopSkills.length > 0
-                  ? "No remote jobs match your skills. Try adjusting your filters or check back later."
-                  : "Complete the skill test to see remote jobs matching your skills, or check back later for available remote positions."}
-              </p>
-            </div>
-          )}
-
-          {!isLoadingRemote && remoteJobs.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-                {remoteJobs.map((job) => (
-                  <Card
-                    key={job.id}
-                    className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
-                  >
-                    <CardContent className="p-5 flex flex-col flex-grow relative">
-                      {/* Company Logo and Info */}
-                      <div className="flex items-start gap-3 mb-4">
-                        <div className="flex-shrink-0 relative w-12 h-12">
-                          {/* Primary: Logo from API - shown first if available */}
-                          {job.company_logo ? (
-                            <img
-                              src={job.company_logo}
-                              alt={`${job.company} logo`}
-                              className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
-                              loading="lazy"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.style.display = "none";
-                                const clearbitLogo =
-                                  target.parentElement?.querySelector(
-                                    ".clearbit-logo"
-                                  ) as HTMLImageElement;
-                                if (clearbitLogo) {
-                                  clearbitLogo.style.display = "block";
-                                  clearbitLogo.style.zIndex = "10";
-                                } else {
-                                  const iconFallback =
-                                    target.parentElement?.querySelector(
-                                      ".logo-fallback"
-                                    ) as HTMLElement;
-                                  if (iconFallback) {
-                                    iconFallback.style.display = "flex";
-                                    iconFallback.style.zIndex = "10";
-                                  }
-                                }
-                              }}
-                            />
-                          ) : null}
-
-                          {/* Fallback 1: Clearbit logo API */}
-                          {job.company && !job.company_logo ? (
-                            <img
-                              src={`https://logo.clearbit.com/${encodeURIComponent(
-                                job.company
-                              )}`}
-                              alt={`${job.company} logo`}
-                              className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
-                              style={{ zIndex: 10 }}
-                              loading="lazy"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.style.display = "none";
-                                const iconFallback =
-                                  target.parentElement?.querySelector(
-                                    ".logo-fallback"
-                                  ) as HTMLElement;
-                                if (iconFallback) {
-                                  iconFallback.style.display = "flex";
-                                  iconFallback.style.zIndex = "10";
-                                }
-                              }}
-                            />
-                          ) : null}
-
-                          {/* Fallback 2: Default icon */}
-                          <div
-                            className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                              job.company_logo ||
-                              (job.company && !job.company_logo)
-                                ? "hidden"
-                                : "flex"
-                            }`}
-                            style={{
-                              zIndex:
-                                job.company_logo ||
-                                (job.company && !job.company_logo)
-                                  ? 0
-                                  : 10,
-                            }}
-                          >
-                            <Briefcase className="h-6 w-6 text-white" />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h3 className="font-semibold text-base truncate">
-                              {job.company}
-                            </h3>
-                            {job.matchPercentage !== undefined && (
-                              <Badge
-                                variant="secondary"
-                                className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
-                              >
-                                {job.matchPercentage}% Match
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">
-                            {job.location}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Job Title */}
-                      <h4 className="font-bold text-lg mb-4 line-clamp-2">
-                        {job.title}
-                      </h4>
-
-                      {/* Job Details */}
-                      <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
-                        {/* Salary */}
-                        <div className="flex items-center gap-2 text-sm">
-                          <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700">{job.salary}</span>
-                        </div>
-
-                        {/* Employment Type */}
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700">
-                            {job.employment_type}
-                          </span>
-                        </div>
-
-                        {/* Work Arrangement */}
-                        {job.work_arrangement && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <span className="text-gray-700">
-                              {job.work_arrangement}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Benefits */}
-                        {job.benefits && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <span className="text-gray-700">
-                              {job.benefits}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 shadow-lg">
-                        <Button
-                          variant="default"
-                          onClick={() => {
-                            if (!job.id || job.id.trim() === "") {
-                              toast.error("Cannot open job: Invalid job ID");
-                              console.error(
-                                "Attempted to navigate to job with invalid ID:",
-                                job
-                              );
-                              return;
-                            }
-                            const encodedId = encodeURIComponent(job.id);
-                            navigate(`/jobs/${encodedId}`);
-                          }}
-                          className="flex-1"
-                          disabled={!job.id || job.id.trim() === ""}
-                        >
-                          View
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => saveJobMutation.mutate(job)}
-                          aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                          className={cn(
-                            "h-9 w-9 p-0 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 bg-gray-200 dark:bg-border/50 hover:!bg-gray-300 dark:hover:!bg-border/70 transition-colors",
-                            job.is_saved ? "text-red-500 dark:text-red-400" : ""
-                          )}
-                        >
-                          <Heart
-                            className={`h-5 w-5 transition-colors ${
-                              job.is_saved
-                                ? "text-red-500 fill-red-500 dark:text-red-400 dark:fill-red-400 animate-heart-pop"
-                                : ""
-                            }`}
-                          />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Load More Button for Remote Jobs */}
-              {hasMoreRemoteJobs && (
-                <div className="flex justify-center mt-6 mb-8">
-                  <Button
-                    onClick={handleLoadMoreRemote}
-                    disabled={isLoadingMoreRemote}
-                    variant="outline"
-                    className="min-w-[200px]"
-                  >
-                    {isLoadingMoreRemote ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Loading...
-                      </>
-                    ) : (
-                      "Load More Remote Jobs"
-                    )}
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
-        </>
-
-        {/* Intern Jobs Section */}
-        {!isLoadingInternships && internJobs.length > 0 && (
-          <>
-            <div className="flex items-center gap-3 mb-6 mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-              <GraduationCap className="h-6 w-6 text-breneo-blue" />
-              <h2 className="text-lg font-bold">Internship Opportunities</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
-              {internJobs.map((job) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {remoteJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
+                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl cursor-pointer"
+                  onClick={() => {
+                    if (!job.id || String(job.id).trim() === "") return;
+                    const encodedId = encodeURIComponent(String(job.id));
+                    navigate(`/jobs/${encodedId}`);
+                  }}
                 >
-                  <CardContent className="p-5 flex flex-col flex-grow relative">
+                  <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
                     {/* Company Logo and Info */}
-                    <div className="flex items-start gap-3 mb-4">
-                      <div className="flex-shrink-0 relative w-12 h-12">
-                        {/* Primary: Logo from API - shown first if available */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="flex-shrink-0 relative w-10 h-10">
                         {job.company_logo ? (
                           <img
                             src={job.company_logo}
                             alt={`${job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
                             loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.style.display = "none";
-                              const clearbitLogo =
-                                target.parentElement?.querySelector(
-                                  ".clearbit-logo"
-                                ) as HTMLImageElement;
-                              if (clearbitLogo) {
-                                clearbitLogo.style.display = "block";
-                                clearbitLogo.style.zIndex = "10";
-                              } else {
-                                const iconFallback =
-                                  target.parentElement?.querySelector(
-                                    ".logo-fallback"
-                                  ) as HTMLElement;
-                                if (iconFallback) {
-                                  iconFallback.style.display = "flex";
-                                  iconFallback.style.zIndex = "10";
-                                }
-                              }
-                            }}
                           />
-                        ) : null}
-
-                        {/* Fallback 1: Clearbit logo API */}
-                        {job.company && !job.company_logo ? (
-                          <img
-                            src={`https://logo.clearbit.com/${encodeURIComponent(
-                              job.company
-                            )}`}
-                            alt={`${job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
-                            style={{ zIndex: 10 }}
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.style.display = "none";
-                              const iconFallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback"
-                                ) as HTMLElement;
-                              if (iconFallback) {
-                                iconFallback.style.display = "flex";
-                                iconFallback.style.zIndex = "10";
-                              }
-                            }}
-                          />
-                        ) : null}
-
-                        {/* Fallback 2: Default icon */}
-                        <div
-                          className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                            job.company_logo ||
-                            (job.company && !job.company_logo)
-                              ? "hidden"
-                              : "flex"
-                          }`}
-                          style={{
-                            zIndex:
-                              job.company_logo ||
-                              (job.company && !job.company_logo)
-                                ? 0
-                                : 10,
-                          }}
-                        >
-                          <Briefcase className="h-6 w-6 text-white" />
-                        </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
+                            <Briefcase className="h-5 w-5 text-white" />
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <h3 className="font-semibold text-base truncate">
-                            {job.company}
-                          </h3>
-                          {job.matchPercentage !== undefined && (
-                            <Badge
-                              variant="secondary"
-                              className="flex-shrink-0 bg-breneo-blue/10 text-breneo-blue border-breneo-blue/20 text-xs font-semibold"
-                            >
-                              {job.matchPercentage}% Match
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500 truncate">
+                        <h3 className="font-semibold text-sm truncate">
+                          {job.company}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-gray-500 truncate">
                           {job.location}
                         </p>
                       </div>
                     </div>
 
                     {/* Job Title */}
-                    <h4 className="font-bold text-lg mb-4 line-clamp-2">
+                    <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
                       {job.title}
                     </h4>
 
-                    {/* Job Details */}
-                    <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
-                      {/* Salary */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{job.salary}</span>
-                      </div>
-
-                      {/* Employment Type */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">
+                    {/* Job Details as chips */}
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {job.employment_type && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800">
                           {job.employment_type}
-                        </span>
-                      </div>
-
-                      {/* Work Arrangement */}
-                      {job.work_arrangement && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700">
-                            {job.work_arrangement}
-                          </span>
-                        </div>
+                        </Badge>
                       )}
-
-                      {/* Benefits */}
-                      {job.benefits && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Tag className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700">{job.benefits}</span>
-                        </div>
+                      {job.work_arrangement && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800">
+                          {job.work_arrangement}
+                        </Badge>
+                      )}
+                      {job.salary && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800">
+                          {job.salary}
+                        </Badge>
                       )}
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 shadow-lg">
+                    {/* Match percentage & Save button */}
+                    <div className="mt-5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <RadialProgress
+                          value={job.matchPercentage ?? 0}
+                          size={48}
+                          strokeWidth={5}
+                          showLabel={false}
+                          percentageTextSize="md"
+                          className="text-breneo-blue"
+                        />
+                        <span className="text-xs font-semibold text-gray-700">
+                          {getMatchQualityLabel(job.matchPercentage)}
+                        </span>
+                      </div>
                       <Button
-                        variant="default"
-                        onClick={() => {
-                          if (!job.id || job.id.trim() === "") {
-                            toast.error("Cannot open job: Invalid job ID");
-                            console.error(
-                              "Attempted to navigate to job with invalid ID:",
-                              job
-                            );
-                            return;
-                          }
-                          const encodedId = encodeURIComponent(job.id);
-                          navigate(`/jobs/${encodedId}`);
+                        variant="secondary"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveJobMutation.mutate(job);
                         }}
-                        className="flex-1"
-                        disabled={!job.id || job.id.trim() === ""}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => saveJobMutation.mutate(job)}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
                         className={cn(
-                          "h-9 w-9 p-0 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 bg-gray-200 dark:bg-border/50 hover:!bg-gray-300 dark:hover:!bg-border/70 transition-colors",
-                          job.is_saved ? "text-red-500 dark:text-red-400" : ""
+                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-10 w-10",
+                          job.is_saved
+                            ? "text-red-500 bg-red-50 hover:bg-red-50/90"
+                            : "text-black"
                         )}
                       >
                         <Heart
-                          className={`h-5 w-5 transition-colors ${
+                          className={cn(
+                            "h-4 w-4 transition-colors",
                             job.is_saved
-                              ? "text-red-500 fill-red-500 dark:text-red-400 dark:fill-red-400 animate-heart-pop"
-                              : ""
-                          }`}
+                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              : "text-black"
+                          )}
                         />
                       </Button>
                     </div>
@@ -2946,28 +2580,7 @@ const JobsPage = () => {
                 </Card>
               ))}
             </div>
-
-            {/* Load More Button for Internship Jobs */}
-            {hasMoreInternshipJobs && (
-              <div className="flex justify-center mt-6 mb-8">
-                <Button
-                  onClick={handleLoadMoreInternship}
-                  disabled={isLoadingMoreInternship}
-                  variant="outline"
-                  className="min-w-[200px]"
-                >
-                  {isLoadingMoreInternship ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    "Load More Internships"
-                  )}
-                </Button>
-              </div>
-            )}
-          </>
+          </section>
         )}
       </div>
 

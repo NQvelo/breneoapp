@@ -696,16 +696,16 @@ const SkillPathPage = () => {
 
   const loadSkillData = useCallback(async () => {
     try {
-      console.log("🚀 Starting loadSkillData");
+      // console.log("🚀 Starting loadSkillData");
       setLoading(true);
 
       // Method 1: Try Django backend skill test results API (same as ProfilePage)
       try {
-        console.log("📡 Attempting Django API call...");
+        // console.log("📡 Attempting Django API call...");
         const response = await apiClient.get(
           `/api/skilltest/results/?user=${user!.id}`
         );
-        console.log("🔍 SkillPathPage - Checking Django API:", response.data);
+        // console.log("🔍 SkillPathPage - Checking Django API:", response.data);
 
         let skillTestData = null;
         if (Array.isArray(response.data) && response.data.length > 0) {
@@ -718,7 +718,7 @@ const SkillPathPage = () => {
           skillTestData &&
           (skillTestData.final_role || skillTestData.skills_json)
         ) {
-          console.log("✅ Found skill test results from Django API");
+          // console.log("✅ Found skill test results from Django API");
           setHasTestAnswers(true);
 
           // Store final_role if available
@@ -887,25 +887,25 @@ const SkillPathPage = () => {
           return;
         }
       } catch (apiError) {
-        console.log("Django API not available, trying Supabase...");
+        // console.log("Django API not available, trying Supabase...");
       }
 
       // Method 2: Fallback to Supabase: fetch from usertestanswers
       const answers = await getUserTestAnswers(user!.id);
-      console.log("🔍 SkillPathPage - Checking Supabase test answers:", {
-        userId: user!.id,
-        answersCount: answers?.length || 0,
-        hasAnswers: answers && answers.length > 0,
-      });
+      // console.log("🔍 SkillPathPage - Checking Supabase test answers:", {
+      //   userId: user!.id,
+      //   answersCount: answers?.length || 0,
+      //   hasAnswers: answers && answers.length > 0,
+      // });
 
       if (!answers || answers.length === 0) {
-        console.log("❌ No test answers found for user");
+        // console.log("❌ No test answers found for user");
         setHasTestAnswers(false);
         setLoading(false);
         return;
       }
 
-      console.log("✅ Test answers found, loading skill path data");
+      // console.log("✅ Test answers found, loading skill path data");
       setHasTestAnswers(true);
 
       // Calculate skill scores
@@ -1121,13 +1121,13 @@ const SkillPathPage = () => {
   ]);
 
   useEffect(() => {
-    console.log("🔍 SkillPathPage useEffect - User:", user?.id);
+    // console.log("🔍 SkillPathPage useEffect - User:", user?.id);
     if (!user) {
-      console.log("❌ No user, redirecting to login");
+      // console.log("❌ No user, redirecting to login");
       navigate("/auth/login");
       return;
     }
-    console.log("✅ User found, loading skill data");
+    // console.log("✅ User found, loading skill data");
     loadSkillData();
     fetchUserCountry();
   }, [user, navigate, loadSkillData, fetchUserCountry]);

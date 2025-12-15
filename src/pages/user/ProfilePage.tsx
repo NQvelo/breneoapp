@@ -69,7 +69,14 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Briefcase, GraduationCap, ArrowRight, MapPin, Heart, Loader2 } from "lucide-react";
+import {
+  Briefcase,
+  GraduationCap,
+  ArrowRight,
+  MapPin,
+  Heart,
+  Loader2,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
@@ -382,16 +389,22 @@ const ProfilePage = () => {
 
           // Check for saved_courses in various possible locations
           if (Array.isArray(data.saved_courses)) {
-            savedCourseIdsList = data.saved_courses.map((id: string | number) => String(id));
+            savedCourseIdsList = data.saved_courses.map((id: string | number) =>
+              String(id)
+            );
           } else if (data.profile && typeof data.profile === "object") {
             const profile = data.profile as Record<string, unknown>;
             if (Array.isArray(profile.saved_courses)) {
-              savedCourseIdsList = profile.saved_courses.map((id: string | number) => String(id));
+              savedCourseIdsList = profile.saved_courses.map(
+                (id: string | number) => String(id)
+              );
             }
           } else if (data.user && typeof data.user === "object") {
             const userData = data.user as Record<string, unknown>;
             if (Array.isArray(userData.saved_courses)) {
-              savedCourseIdsList = userData.saved_courses.map((id: string | number) => String(id));
+              savedCourseIdsList = userData.saved_courses.map(
+                (id: string | number) => String(id)
+              );
             }
           }
         }
@@ -477,11 +490,11 @@ const ProfilePage = () => {
           }
         }
 
-        console.log("📋 ProfilePage - Saved job IDs from API:", savedJobIds);
+        // console.log("📋 ProfilePage - Saved job IDs from API:", savedJobIds);
 
         // If no saved jobs found, return empty array
         if (!savedJobIds || savedJobIds.length === 0) {
-          console.log("📋 ProfilePage - No saved jobs found");
+          // console.log("📋 ProfilePage - No saved jobs found");
           return [];
         }
 
@@ -491,12 +504,19 @@ const ProfilePage = () => {
         // Try to fetch job details for each saved job ID
         const jobPromises = limitedIds.map(async (jobId) => {
           try {
-            console.log(`📋 ProfilePage - Fetching job detail for ID: ${jobId}`);
+            // console.log(
+            //   `📋 ProfilePage - Fetching job detail for ID: ${jobId}`
+            // );
             const jobDetail = await fetchJobDetail(jobId);
-            console.log(`✅ ProfilePage - Successfully fetched job: ${jobId}`, jobDetail);
+            // console.log(
+            //   `✅ ProfilePage - Successfully fetched job: ${jobId}`,
+            //   jobDetail
+            // );
             return {
               id: jobId,
-              title: (jobDetail.job_title || jobDetail.title || "Untitled Job") as string,
+              title: (jobDetail.job_title ||
+                jobDetail.title ||
+                "Untitled Job") as string,
               company: (jobDetail.company_name ||
                 jobDetail.employer_name ||
                 jobDetail.company ||
@@ -528,10 +548,15 @@ const ProfilePage = () => {
                 | undefined,
             } as SavedJob;
           } catch (error) {
-            console.error(`❌ ProfilePage - Error fetching job detail for ID ${jobId}:`, error);
+            console.error(
+              `❌ ProfilePage - Error fetching job detail for ID ${jobId}:`,
+              error
+            );
             // Try fallback: fetch from batch and filter
             try {
-              console.log(`🔄 ProfilePage - Trying fallback batch fetch for ${jobId}`);
+              // console.log(
+              //   `🔄 ProfilePage - Trying fallback batch fetch for ${jobId}`
+              // );
               const batchResponse = await jobService.fetchActiveJobs({
                 query: "",
                 filters: {
@@ -555,17 +580,23 @@ const ProfilePage = () => {
               });
 
               if (foundJob) {
-                console.log(`✅ ProfilePage - Found job ${jobId} in batch`);
+                // console.log(`✅ ProfilePage - Found job ${jobId} in batch`);
                 const jobIdStr = String(foundJob.job_id || foundJob.id || "");
                 return {
                   id: jobIdStr,
-                  title: (foundJob.job_title || foundJob.title || "Untitled Job") as string,
+                  title: (foundJob.job_title ||
+                    foundJob.title ||
+                    "Untitled Job") as string,
                   company: (foundJob.company_name ||
                     foundJob.employer_name ||
                     foundJob.company ||
                     "Unknown Company") as string,
                   location: (foundJob.location ||
-                    [foundJob.job_city, foundJob.job_state, foundJob.job_country]
+                    [
+                      foundJob.job_city,
+                      foundJob.job_state,
+                      foundJob.job_country,
+                    ]
                       .filter(Boolean)
                       .join(", ") ||
                     "Location not specified") as string,
@@ -585,13 +616,17 @@ const ProfilePage = () => {
                   employment_type: (foundJob.employment_type ||
                     foundJob.job_employment_type ||
                     undefined) as string | undefined,
-                  work_arrangement: (foundJob.job_is_remote || foundJob.is_remote ? "Remote" : undefined) as
-                    | string
-                    | undefined,
+                  work_arrangement: (foundJob.job_is_remote ||
+                  foundJob.is_remote
+                    ? "Remote"
+                    : undefined) as string | undefined,
                 } as SavedJob;
               }
             } catch (fallbackError) {
-              console.error(`❌ ProfilePage - Fallback also failed for ${jobId}:`, fallbackError);
+              console.error(
+                `❌ ProfilePage - Fallback also failed for ${jobId}:`,
+                fallbackError
+              );
             }
 
             // Return a minimal job object so it still displays
@@ -612,10 +647,15 @@ const ProfilePage = () => {
           return job.title && job.title !== `Job ${job.id}`;
         });
 
-        console.log(`📋 ProfilePage - Returning ${validJobs.length} valid jobs out of ${jobs.length} total`);
+        // console.log(
+        //   `📋 ProfilePage - Returning ${validJobs.length} valid jobs out of ${jobs.length} total`
+        // );
         return validJobs;
       } catch (error) {
-        console.error("❌ ProfilePage - Error fetching saved jobs from API profile:", error);
+        // console.error(
+        //   "❌ ProfilePage - Error fetching saved jobs from API profile:",
+        //   error
+        // );
         return [];
       }
     },
@@ -786,22 +826,22 @@ const ProfilePage = () => {
           `/api/skilltest/results/?user=${user.id}`
         );
 
-        console.log("🔍 Skill test results response:", response.data);
-        console.log("🔍 Response type:", typeof response.data);
-        console.log("🔍 Is array?", Array.isArray(response.data));
+        // console.log("🔍 Skill test results response:", response.data);
+        // console.log("🔍 Response type:", typeof response.data);
+        // console.log("🔍 Is array?", Array.isArray(response.data));
 
         // Handle different response structures
         if (Array.isArray(response.data) && response.data.length > 0) {
-          console.log("✅ Got array with length:", response.data.length);
+          // console.log("✅ Got array with length:", response.data.length);
           setSkillResults(response.data[0]);
         } else if (response.data && typeof response.data === "object") {
-          console.log("✅ Got object response");
+          // console.log("✅ Got object response");
           setSkillResults(response.data);
         } else {
-          console.log("⚠️ Unexpected response structure");
+          // console.log("⚠️ Unexpected response structure");
         }
       } catch (error) {
-        console.error("❌ Error fetching skill test results:", error);
+        // console.error("❌ Error fetching skill test results:", error);
         setSkillResults(null);
       } finally {
         setLoadingResults(false);
@@ -814,9 +854,9 @@ const ProfilePage = () => {
   // Debug: Log skillResults changes
   useEffect(() => {
     if (skillResults) {
-      console.log("✅ SkillResults updated:", skillResults);
-      console.log("✅ Final role:", skillResults.final_role);
-      console.log("✅ Skills JSON:", skillResults.skills_json);
+      // console.log("✅ SkillResults updated:", skillResults);
+      // console.log("✅ Final role:", skillResults.final_role);
+      // console.log("✅ Skills JSON:", skillResults.skills_json);
     }
   }, [skillResults]);
 
@@ -829,9 +869,9 @@ const ProfilePage = () => {
 
       // Check if we have an access token
       const token = localStorage.getItem("authToken");
-      console.log("🔑 Access token exists:", !!token);
+      // console.log("🔑 Access token exists:", !!token);
       if (token) {
-        console.log("🔑 Token preview:", token.substring(0, 50) + "...");
+        // console.log("🔑 Token preview:", token.substring(0, 50) + "...");
       }
 
       try {
@@ -840,12 +880,12 @@ const ProfilePage = () => {
           ? { Authorization: `Bearer ${token}` }
           : {};
 
-        console.log("🌐 Making authenticated request to /api/profile/");
-        console.log("🌐 Request URL: https://breneo.onrender.com/api/profile/");
-        console.log("🌐 Request Method: GET");
-        console.log("🌐 Request Headers:", requestHeaders);
-        console.log("🌐 Bearer Token being sent:", token ? "✅ YES" : "❌ NO");
-        console.log("🌐 Token length:", token?.length || 0);
+        // console.log("🌐 Making authenticated request to /api/profile/");
+        // console.log("🌐 Request URL: https://breneo.onrender.com/api/profile/");
+        // console.log("🌐 Request Method: GET");
+        // console.log("🌐 Request Headers:", requestHeaders);
+        // console.log("🌐 Bearer Token being sent:", token ? "✅ YES" : "❌ NO");
+        // console.log("🌐 Token length:", token?.length || 0);
 
         // Make the API call with explicit Authorization header
         const response = await apiClient.get("/api/profile/", {
@@ -853,11 +893,11 @@ const ProfilePage = () => {
         });
 
         // Log the raw response
-        console.log("✅ API Request successful!");
-        console.log("📊 Raw API Response:", response);
-        console.log("📊 API Response Status:", response.status);
-        console.log("📊 API Response Headers:", response.headers);
-        console.log("📊 API Response Data:", response.data);
+        // console.log("✅ API Request successful!");
+        // console.log("📊 Raw API Response:", response);
+        // console.log("📊 API Response Status:", response.status);
+        // console.log("📊 API Response Headers:", response.headers);
+        // console.log("📊 API Response Data:", response.data);
 
         // Check if data exists
         if (!response.data) {
@@ -869,31 +909,31 @@ const ProfilePage = () => {
         }
 
         // Log the full profile data structure
-        console.log(
-          "📊 Full Profile Data Structure:",
-          JSON.stringify(response.data, null, 2)
-        );
+        // console.log(
+        //   "📊 Full Profile Data Structure:",
+        //   JSON.stringify(response.data, null, 2)
+        // );
 
         // Set all profile data
         setProfileData(response.data);
 
         // Log all available keys in the response
-        console.log(
-          "📊 All available keys in response.data:",
-          Object.keys(response.data || {})
-        );
+        // console.log(
+        //   "📊 All available keys in response.data:",
+        //   Object.keys(response.data || {})
+        // );
 
         // Log nested structures if they exist
         if (response.data?.profile) {
-          console.log(
-            "📊 Profile object keys:",
-            Object.keys(response.data.profile)
-          );
-          console.log("📊 Profile object:", response.data.profile);
+          // console.log(
+          //   "📊 Profile object keys:",
+          //   Object.keys(response.data.profile)
+          // );
+          // console.log("📊 Profile object:", response.data.profile);
         }
         if (response.data?.user) {
-          console.log("📊 User object keys:", Object.keys(response.data.user));
-          console.log("📊 User object:", response.data.user);
+          // console.log("📊 User object keys:", Object.keys(response.data.user));
+          // console.log("📊 User object:", response.data.user);
         }
 
         // Extract about_me if it exists in the response
@@ -903,7 +943,7 @@ const ProfilePage = () => {
           response.data?.user?.about_me ||
           null;
         setAboutMe(aboutMeValue);
-        console.log("✅ Extracted about_me value:", aboutMeValue);
+        // console.log("✅ Extracted about_me value:", aboutMeValue);
 
         // Initialize aboutMeText with the fetched value
         setAboutMeText(aboutMeValue || "");
@@ -915,7 +955,7 @@ const ProfilePage = () => {
           response.data?.user?.profile_image ||
           null;
         setProfileImage(profileImageValue);
-        console.log("✅ Extracted profile_image value:", profileImageValue);
+        // console.log("✅ Extracted profile_image value:", profileImageValue);
 
         // Extract social links from profile response if available
         const socialLinksFromProfile =
@@ -930,10 +970,10 @@ const ProfilePage = () => {
           socialLinksFromProfile &&
           typeof socialLinksFromProfile === "object"
         ) {
-          console.log(
-            "✅ Found social links in profile response:",
-            socialLinksFromProfile
-          );
+          // console.log(
+          //   "✅ Found social links in profile response:",
+          //   socialLinksFromProfile
+          // );
           setSocialLinks({
             github:
               ((socialLinksFromProfile as Record<string, unknown>)
@@ -957,7 +997,7 @@ const ProfilePage = () => {
         }
 
         // Log all other profile fields that might be useful
-        console.log("📊 Available profile fields:");
+        // console.log("📊 Available profile fields:");
         Object.entries(response.data || {}).forEach(([key, value]) => {
           if (key !== "profile" && key !== "user") {
             console.log(`  - ${key}:`, value);
@@ -965,23 +1005,23 @@ const ProfilePage = () => {
         });
 
         // Summary log of what the API returns
-        console.log("═══════════════════════════════════════════");
-        console.log("📋 SUMMARY: API Response from /api/profile/");
-        console.log("═══════════════════════════════════════════");
-        console.log("🔒 Authentication: Bearer Token ✅");
-        console.log("✅ Response Status:", response.status);
-        console.log("✅ Response Headers:", response.headers);
-        console.log("✅ Full Response Data:", response.data);
-        console.log("✅ All Top-Level Keys:", Object.keys(response.data || {}));
-        console.log("✅ About Me:", aboutMeValue);
-        console.log("✅ Profile Image:", profileImageValue);
-        console.log("✅ User ID from context:", user.id);
-        console.log("═══════════════════════════════════════════");
-        console.log(
-          "✅ SUCCESS: Protected endpoint accessed with Bearer token!"
-        );
-        console.log("✅ Full user profile data retrieved from /api/profile/");
-        console.log("═══════════════════════════════════════════");
+        // console.log("═══════════════════════════════════════════");
+        // console.log("📋 SUMMARY: API Response from /api/profile/");
+        // console.log("═══════════════════════════════════════════");
+        // console.log("🔒 Authentication: Bearer Token ✅");
+        // console.log("✅ Response Status:", response.status);
+        // console.log("✅ Response Headers:", response.headers);
+        // console.log("✅ Full Response Data:", response.data);
+        // console.log("✅ All Top-Level Keys:", Object.keys(response.data || {}));
+        // console.log("✅ About Me:", aboutMeValue);
+        // console.log("✅ Profile Image:", profileImageValue);
+        // console.log("✅ User ID from context:", user.id);
+        // console.log("═══════════════════════════════════════════");
+        // console.log(
+        //   "✅ SUCCESS: Protected endpoint accessed with Bearer token!"
+        // );
+        // console.log("✅ Full user profile data retrieved from /api/profile/");
+        // console.log("═══════════════════════════════════════════");
       } catch (error) {
         console.error("❌ Error fetching profile data:", error);
         if (error && typeof error === "object" && "response" in error) {
@@ -989,9 +1029,9 @@ const ProfilePage = () => {
             response?: { data?: unknown; status?: number };
             message?: string;
           };
-          console.error("❌ Error response:", axiosError.response?.data);
-          console.error("❌ Error status:", axiosError.response?.status);
-          console.error("❌ Error message:", axiosError.message);
+          // console.error("❌ Error response:", axiosError.response?.data);
+          // console.error("❌ Error status:", axiosError.response?.status);
+          // console.error("❌ Error message:", axiosError.message);
         }
         setProfileData(null);
         setAboutMe(null);
@@ -1010,9 +1050,9 @@ const ProfilePage = () => {
 
     // Skip if we just made a manual update (prevent overwriting)
     if (manualSocialLinkUpdateRef.current) {
-      console.log(
-        "⏭️ Skipping social links extraction - manual update in progress"
-      );
+      // console.log(
+      //   "⏭️ Skipping social links extraction - manual update in progress"
+      // );
       return;
     }
 
@@ -1021,10 +1061,10 @@ const ProfilePage = () => {
     try {
       // Extract social links from profile data
       if (profileData) {
-        console.log(
-          "🔍 Extracting social links from profileData:",
-          profileData
-        );
+        // console.log(
+        //   "🔍 Extracting social links from profileData:",
+        //   profileData
+        // );
         const socialLinksFromProfile =
           (profileData as Record<string, unknown>)?.social_links ||
           (
@@ -1048,19 +1088,19 @@ const ProfilePage = () => {
           )?.social_networks ||
           null;
 
-        console.log(
-          "🔍 Extracted socialLinksFromProfile:",
-          socialLinksFromProfile
-        );
+        // console.log(
+        //   "🔍 Extracted socialLinksFromProfile:",
+        //   socialLinksFromProfile
+        // );
 
         if (
           socialLinksFromProfile &&
           typeof socialLinksFromProfile === "object"
         ) {
-          console.log(
-            "✅ Using social links from profile data:",
-            socialLinksFromProfile
-          );
+          // console.log(
+          //   "✅ Using social links from profile data:",
+          //   socialLinksFromProfile
+          // );
           const extractedLinks = {
             github:
               ((socialLinksFromProfile as Record<string, unknown>)
@@ -2098,8 +2138,8 @@ const ProfilePage = () => {
     const tech = skillResults.skills_json.tech || {};
     const soft = skillResults.skills_json.soft || {};
 
-    console.log("🔍 Tech skills:", tech);
-    console.log("🔍 Soft skills:", soft);
+    // console.log("🔍 Tech skills:", tech);
+    // console.log("🔍 Soft skills:", soft);
 
     // Combine both and convert to array
     const allSkills = [
@@ -2115,7 +2155,7 @@ const ProfilePage = () => {
       })),
     ];
 
-    console.log("🔍 All skills before filtering:", allSkills);
+    // console.log("🔍 All skills before filtering:", allSkills);
 
     // Filter skills > 0%, sort by percentage descending, and limit to top 5
     const filtered = allSkills
@@ -2123,7 +2163,7 @@ const ProfilePage = () => {
       .sort((a, b) => b.percentage - a.percentage)
       .slice(0, 5);
 
-    console.log("🔍 Top 5 skills:", filtered);
+    // console.log("🔍 Top 5 skills:", filtered);
 
     return filtered;
   };
@@ -2888,7 +2928,10 @@ const ProfilePage = () => {
               {loadingSavedCourses ? (
                 <div className="px-6 py-4 space-y-4">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-start gap-3 animate-pulse">
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 animate-pulse"
+                    >
                       <Skeleton className="w-12 h-12 rounded-3xl flex-shrink-0" />
                       <div className="flex-1 space-y-2">
                         <Skeleton className="h-4 w-3/4" />
@@ -2905,7 +2948,8 @@ const ProfilePage = () => {
               ) : savedCourses.length > 0 ? (
                 <div>
                   {savedCourses.map((course, index) => {
-                    const isCourseSaved = savedCourseIds?.includes(String(course.id)) ?? false;
+                    const isCourseSaved =
+                      savedCourseIds?.includes(String(course.id)) ?? false;
                     return (
                       <div
                         key={course.id}
@@ -2930,7 +2974,7 @@ const ProfilePage = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4 
+                              <h4
                                 className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
                                 onClick={() => navigate(`/course/${course.id}`)}
                               >
@@ -2957,7 +3001,11 @@ const ProfilePage = () => {
                                     saveCourseMutation.mutate(course.id);
                                   }}
                                   disabled={saveCourseMutation.isPending}
-                                  aria-label={isCourseSaved ? "Unsave course" : "Save course"}
+                                  aria-label={
+                                    isCourseSaved
+                                      ? "Unsave course"
+                                      : "Save course"
+                                  }
                                 >
                                   {saveCourseMutation.isPending ? (
                                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -3033,7 +3081,10 @@ const ProfilePage = () => {
               {loadingSavedJobs ? (
                 <div className="px-6 py-4 space-y-4">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="flex items-start gap-3 animate-pulse">
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 animate-pulse"
+                    >
                       <Skeleton className="w-12 h-12 rounded-3xl flex-shrink-0" />
                       <div className="flex-1 space-y-2">
                         <Skeleton className="h-4 w-3/4" />
@@ -3050,7 +3101,8 @@ const ProfilePage = () => {
               ) : savedJobs.length > 0 ? (
                 <div>
                   {savedJobs.map((job, index) => {
-                    const isJobSaved = savedJobIds?.includes(String(job.id)) ?? false;
+                    const isJobSaved =
+                      savedJobIds?.includes(String(job.id)) ?? false;
                     return (
                       <div
                         key={job.id}
@@ -3086,9 +3138,13 @@ const ProfilePage = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4 
+                              <h4
                                 className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
-                                onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
+                                onClick={() =>
+                                  navigate(
+                                    `/jobs/${encodeURIComponent(job.id)}`
+                                  )
+                                }
                               >
                                 {job.title}
                               </h4>
@@ -3102,7 +3158,9 @@ const ProfilePage = () => {
                                     if (job.url) {
                                       window.open(job.url, "_blank");
                                     } else {
-                                      navigate(`/jobs/${encodeURIComponent(job.id)}`);
+                                      navigate(
+                                        `/jobs/${encodeURIComponent(job.id)}`
+                                      );
                                     }
                                   }}
                                 >
@@ -3117,7 +3175,9 @@ const ProfilePage = () => {
                                     saveJobMutation.mutate(job.id);
                                   }}
                                   disabled={saveJobMutation.isPending}
-                                  aria-label={isJobSaved ? "Unsave job" : "Save job"}
+                                  aria-label={
+                                    isJobSaved ? "Unsave job" : "Save job"
+                                  }
                                 >
                                   {saveJobMutation.isPending ? (
                                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -3138,7 +3198,9 @@ const ProfilePage = () => {
                             </p>
                             <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                               <MapPin className="h-3 w-3" />
-                              <span className="line-clamp-1">{job.location}</span>
+                              <span className="line-clamp-1">
+                                {job.location}
+                              </span>
                             </div>
                             {job.salary && (
                               <p className="text-xs text-gray-600 dark:text-gray-400">

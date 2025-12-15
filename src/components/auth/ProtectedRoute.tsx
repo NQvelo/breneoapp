@@ -62,13 +62,13 @@ export function ProtectedRoute({
     typeof window !== "undefined" && !!localStorage.getItem("authToken");
 
   // Debug logging
-  console.log("🔒 ProtectedRoute check:", {
-    loading,
-    hasUser: !!user,
-    hasApiToken,
-    requiredRole,
-    userRole: user?.user_type || localStorage.getItem("userRole"),
-  });
+  // console.log("🔒 ProtectedRoute check:", {
+  //   loading,
+  //   hasUser: !!user,
+  //   hasApiToken,
+  //   requiredRole,
+  //   userRole: user?.user_type || localStorage.getItem("userRole"),
+  // });
 
   // Show loading screen while checking authentication
   // Only show loading if auth is actually loading, not if user is just null with a token
@@ -102,11 +102,11 @@ export function ProtectedRoute({
       getRole() ||
       "user";
 
-    console.log("🔒 ProtectedRoute role check:", {
-      requiredRole,
-      userRole,
-      matches: userRole === requiredRole,
-    });
+    // console.log("🔒 ProtectedRoute role check:", {
+    //   requiredRole,
+    //   userRole,
+    //   matches: userRole === requiredRole,
+    // });
 
     // ✅ FIX: Direct comparison instead of isRole() to avoid double-calling getRole()
     if (userRole !== requiredRole) {
@@ -114,17 +114,17 @@ export function ProtectedRoute({
       // This is expected behavior, not an error
       if (userRole === "academy") {
         // Academy user trying to access user route - redirect to academy dashboard
-        console.log(
-          "🔄 ProtectedRoute: Academy user accessing user route, redirecting to /academy/dashboard"
-        );
+        // console.log(
+        //   "🔄 ProtectedRoute: Academy user accessing user route, redirecting to /academy/dashboard"
+        // );
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         return <Navigate to={academyPath} replace />;
       } else {
         // Regular user trying to access academy route - redirect to user home
         // Also handles unknown role by defaulting to user home
-        console.log(
-          `🔄 ProtectedRoute: User role '${userRole}' doesn't match required '${requiredRole}', redirecting to /home`
-        );
+        // console.log(
+        //   `🔄 ProtectedRoute: User role '${userRole}' doesn't match required '${requiredRole}', redirecting to /home`
+        // );
         const homePath = getLocalizedPath("/home", language);
         return <Navigate to={homePath} replace />;
       }
@@ -132,6 +132,6 @@ export function ProtectedRoute({
   }
 
   // User is authenticated and has required role (if specified)
-  console.log("✅ ProtectedRoute: Allowing access to route");
+  // console.log("✅ ProtectedRoute: Allowing access to route");
   return <>{children}</>;
 }

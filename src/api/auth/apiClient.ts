@@ -31,18 +31,18 @@ apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = TokenManager.getAccessToken();
 
-    console.log("🔍 Request Interceptor Debug:", {
-      url: config.url,
-      hasToken: !!token,
-      tokenPreview: token ? token.substring(0, 20) + "..." : "none",
-      isExcludedEndpoint:
-        config.url?.includes("/api/login/") ||
-        config.url?.includes("/api/academy/login/") ||
-        config.url?.includes("/api/register/") ||
-        config.url?.includes("/api/refresh/") ||
-        config.url?.includes("/api/verify-code/"),
-      hasExistingAuth: !!config.headers?.Authorization,
-    });
+    // console.log("🔍 Request Interceptor Debug:", {
+    //   url: config.url,
+    //   hasToken: !!token,
+    //   tokenPreview: token ? token.substring(0, 20) + "..." : "none",
+    //   isExcludedEndpoint:
+    //     config.url?.includes("/api/login/") ||
+    //     config.url?.includes("/api/academy/login/") ||
+    //     config.url?.includes("/api/register/") ||
+    //     config.url?.includes("/api/refresh/") ||
+    //     config.url?.includes("/api/verify-code/"),
+    //   hasExistingAuth: !!config.headers?.Authorization,
+    // });
 
     // Only add Bearer token if:
     // 1. Token exists
@@ -57,34 +57,34 @@ apiClient.interceptors.request.use(
       !config.url?.includes("/api/verify-code/") &&
       !config.headers?.Authorization
     ) {
-      console.log("✅ Adding Bearer token to request");
+      // console.log("✅ Adding Bearer token to request");
 
       // Check if token is expired and try to refresh it
       if (TokenManager.isTokenExpired(token)) {
-        console.log("🔄 Token expired, attempting refresh...");
+        // console.log("🔄 Token expired, attempting refresh...");
         const newToken = await TokenManager.refreshAccessToken();
         if (newToken) {
           config.headers.Authorization = `Bearer ${newToken}`;
-          console.log("✅ Token refreshed successfully");
+          // console.log("✅ Token refreshed successfully");
         } else {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log("⚠️ Token refresh failed, using old token");
+          // console.log("⚠️ Token refresh failed, using old token");
         }
       } else {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log("✅ Using existing valid token");
+        // console.log("✅ Using existing valid token");
       }
     } else {
-      console.log("❌ Not adding token:", {
-        noToken: !token,
-        excludedEndpoint:
-          config.url?.includes("/api/login/") ||
-          config.url?.includes("/api/academy/login/") ||
-          config.url?.includes("/api/register/") ||
-          config.url?.includes("/api/refresh/") ||
-          config.url?.includes("/api/verify-code/"),
-        hasExistingAuth: !!config.headers?.Authorization,
-      });
+      // console.log("❌ Not adding token:", {
+      //   noToken: !token,
+      //   excludedEndpoint:
+      //     config.url?.includes("/api/login/") ||
+      //     config.url?.includes("/api/academy/login/") ||
+      //     config.url?.includes("/api/register/") ||
+      //     config.url?.includes("/api/refresh/") ||
+      //     config.url?.includes("/api/verify-code/"),
+      //   hasExistingAuth: !!config.headers?.Authorization,
+      // });
     }
 
     return config;
@@ -122,33 +122,37 @@ apiClient.interceptors.response.use(
       // ✅ CRITICAL FIX: Don't logout on 401 for academy profile endpoints
       // These endpoints might return 401 for legitimate reasons (profile doesn't exist, etc.)
       // Let the component handle the error gracefully
-      const isAcademyProfileEndpoint = originalRequest.url?.includes("/api/academy/profile/");
+      const isAcademyProfileEndpoint = originalRequest.url?.includes(
+        "/api/academy/profile/"
+      );
       const isAcademyEndpoint = originalRequest.url?.includes("/api/academy/");
 
       try {
-        console.log("🔄 Attempting token refresh for 401 error...");
+        // console.log("🔄 Attempting token refresh for 401 error...");
         const newToken = await TokenManager.refreshAccessToken();
-        
+
         // ✅ CRITICAL: Check if tokens still exist after refresh attempt
         // TokenManager might preserve tokens on server errors
         const tokenStillExists = TokenManager.getAccessToken();
-        
+
         if (newToken) {
-          console.log("✅ Token refreshed successfully, retrying request");
+          // console.log("✅ Token refreshed successfully, retrying request");
           // Retry the original request with the new token
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           try {
             const retryResponse = await apiClient(originalRequest);
-            console.log("✅ Retry request succeeded");
+            // console.log("✅ Retry request succeeded");
             return retryResponse;
           } catch (retryError: any) {
             const retryStatus = retryError.response?.status;
-            console.log(`⚠️ Retry request failed with status: ${retryStatus}`);
-            
+            // console.log(`⚠️ Retry request failed with status: ${retryStatus}`);
+
             // If retry still fails with 401, check if it's an academy endpoint
             // For academy endpoints, don't logout - let component handle it
             if (retryStatus === 401 && isAcademyEndpoint) {
-              console.log("⚠️ Academy endpoint returned 401 after token refresh - not logging out, letting component handle it");
+              // console.log(
+              //   "⚠️ Academy endpoint returned 401 after token refresh - not logging out, letting component handle it"
+              // );
               return Promise.reject(retryError);
             }
             // For other endpoints, reject and continue to logout logic below
@@ -157,16 +161,20 @@ apiClient.interceptors.response.use(
         } else if (tokenStillExists) {
           // Token refresh failed but original token still exists
           // This might be a server error (500) - preserve the token and let component handle it
-          console.log("⚠️ Token refresh returned null but original token still exists - might be server error");
-          
+          // console.log(
+          //   "⚠️ Token refresh returned null but original token still exists - might be server error"
+          // );
+
           // For academy endpoints, always let component handle it
           if (isAcademyEndpoint && !inSessionRestoration) {
-            console.log("⚠️ Token refresh failed for academy endpoint but token preserved - not logging out, letting component handle it");
+            // console.log(
+            //   "⚠️ Token refresh failed for academy endpoint but token preserved - not logging out, letting component handle it"
+            // );
             return Promise.reject(error);
           }
-          
+
           // For other endpoints, try using the original token
-          console.log("⚠️ Retrying with original token");
+          // console.log("⚠️ Retrying with original token");
           originalRequest.headers.Authorization = `Bearer ${tokenStillExists}`;
           try {
             return await apiClient(originalRequest);
@@ -176,26 +184,23 @@ apiClient.interceptors.response.use(
           }
         } else {
           // Token refresh failed and token was cleared
-          console.log("⚠️ Token refresh returned null and token was cleared - refresh token may be expired");
+
           // Token refresh failed - check if this is an academy endpoint
           if (isAcademyEndpoint && !inSessionRestoration) {
-            console.log("⚠️ Token refresh failed for academy endpoint - not logging out, letting component handle it");
             return Promise.reject(error);
           }
         }
       } catch (refreshError) {
         console.error("❌ Token refresh threw an error:", refreshError);
-        
+
         // Check if token still exists after error
         const tokenStillExists = TokenManager.getAccessToken();
         if (tokenStillExists && isAcademyEndpoint) {
-          console.log("⚠️ Token still exists after refresh error - preserving for academy endpoint");
           return Promise.reject(error);
         }
-        
+
         // If refresh throws an error and this is an academy endpoint, don't logout
         if (isAcademyEndpoint && !inSessionRestoration) {
-          console.log("⚠️ Token refresh error for academy endpoint - not logging out, letting component handle it");
           return Promise.reject(error);
         }
       }
@@ -219,12 +224,14 @@ apiClient.interceptors.response.use(
         } else {
           // For other errors (404, 403, 500, etc.), just reject and let component handle it
           // Don't logout the user for these errors
-          console.log(`API error ${errorStatus} - not logging out user`);
+          // console.log(`API error ${errorStatus} - not logging out user`);
         }
       } else if (isAcademyProfileEndpoint) {
         // For academy profile endpoints, just reject the error and let component handle it
         // Don't logout - the component knows how to handle 401/404 for academy profiles
-        console.log("⚠️ Academy profile endpoint returned 401 - not logging out, letting component handle it");
+        // console.log(
+        //   "⚠️ Academy profile endpoint returned 401 - not logging out, letting component handle it"
+        // );
         return Promise.reject(error);
       }
       // If it's session restoration, just reject the error and let AuthContext handle it

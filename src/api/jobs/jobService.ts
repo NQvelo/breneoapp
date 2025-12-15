@@ -1,12 +1,12 @@
 /**
  * Job API Service
- * 
+ *
  * Service for fetching active jobs from JSearch API via RapidAPI
  * Filters are only applied when user explicitly changes them in the frontend
  */
 
-import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from './types';
-import { countries } from '@/data/countries';
+import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
+import { countries } from "@/data/countries";
 
 // API Configuration
 const JSEARCH_API_KEY = "329754c88fmsh45bf2cd651b0e37p1ad384jsnab7fd582cddb";
@@ -15,12 +15,14 @@ const JSEARCH_API_HOST = "jsearch.p.rapidapi.com";
 
 // Logo API fallback - using Clearbit Logo API (free tier available)
 // Note: Clearbit Logo API will be discontinued Dec 2025, but works for now
-const getCompanyLogoFromAPI = async (companyName: string): Promise<string | null> => {
+const getCompanyLogoFromAPI = async (
+  companyName: string
+): Promise<string | null> => {
   try {
     // Clean company name for URL
     const cleanName = encodeURIComponent(companyName.trim());
     const logoUrl = `https://logo.clearbit.com/${cleanName}`;
-    
+
     // Test if logo exists by trying to fetch it
     const response = await fetch(logoUrl, { method: "HEAD" });
     if (response.ok) {
@@ -63,7 +65,7 @@ const fetchJobsFromJSearchAPI = async (
   params: JobSearchParams
 ): Promise<ApiJob[]> => {
   const { query, filters, page = 1 } = params;
-  
+
   // Build URL parameters for JSearch API
   const urlParams = new URLSearchParams();
 
@@ -128,18 +130,18 @@ const fetchJobsFromJSearchAPI = async (
   const API_ENDPOINT = `${JSEARCH_API_BASE}/search?${queryString}`;
 
   // Debug logging for filters
-  console.log("🔍 JSearch API Request:", {
-    url: API_ENDPOINT,
-    filters: {
-      countries: filters.countries,
-      jobTypes: filters.jobTypes,
-      isRemote: filters.isRemote,
-      datePosted: filters.datePosted || "all",
-      skills: filters.skills,
-    },
-    query: query,
-    page: page,
-  });
+  // console.log("🔍 JSearch API Request:", {
+  //   url: API_ENDPOINT,
+  //   filters: {
+  //     countries: filters.countries,
+  //     jobTypes: filters.jobTypes,
+  //     isRemote: filters.isRemote,
+  //     datePosted: filters.datePosted || "all",
+  //     skills: filters.skills,
+  //   },
+  //   query: query,
+  //   page: page,
+  // });
 
   const response = await rateLimitedFetch(API_ENDPOINT, {
     method: "GET",
@@ -220,7 +222,9 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   if (!jobId) throw new Error("Job ID is required");
 
   // JSearch API uses job_id parameter for job details (country filter removed)
-  const API_ENDPOINT = `${JSEARCH_API_BASE}/job-details?job_id=${encodeURIComponent(jobId)}`;
+  const API_ENDPOINT = `${JSEARCH_API_BASE}/job-details?job_id=${encodeURIComponent(
+    jobId
+  )}`;
 
   const response = await rateLimitedFetch(API_ENDPOINT, {
     method: "GET",
@@ -245,7 +249,11 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
         try {
           const errorJson = JSON.parse(errorBody);
           // Handle structured error response from JSearch API
-          if (errorJson.errors && Array.isArray(errorJson.errors) && errorJson.errors.length > 0) {
+          if (
+            errorJson.errors &&
+            Array.isArray(errorJson.errors) &&
+            errorJson.errors.length > 0
+          ) {
             const apiError = errorJson.errors[0];
             errorMessage = apiError.message || apiError.error || errorMessage;
             console.error("API Error Details:", apiError);
@@ -265,7 +273,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   const result: unknown = await response.json();
 
   // Log the raw response for debugging
-  console.log("Raw API Response:", JSON.stringify(result, null, 2));
+  // console.log("Raw API Response:", JSON.stringify(result, null, 2));
 
   // Handle JSearch API response structure
   // JSearch returns: { data: [{...job}] } or { data: {...job} } or { data: [] }
@@ -283,19 +291,29 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
           console.warn("API returned empty data array for job ID:", jobId);
           throw new Error(`No job found with ID: ${jobId}`);
         }
-      } else if (typeof resultObj.data === "object" && resultObj.data !== null) {
+      } else if (
+        typeof resultObj.data === "object" &&
+        resultObj.data !== null
+      ) {
         // If data is an object, use it directly
         jobData = resultObj.data as JobDetail;
       }
     } else if (resultObj.job && typeof resultObj.job === "object") {
       jobData = resultObj.job as JobDetail;
-    } else if (resultObj.results && Array.isArray(resultObj.results) && resultObj.results.length > 0) {
+    } else if (
+      resultObj.results &&
+      Array.isArray(resultObj.results) &&
+      resultObj.results.length > 0
+    ) {
       // Some APIs return results array
       jobData = resultObj.results[0] as JobDetail;
     } else {
       // Check if result itself is the job object (has job-like properties)
-      const hasJobProperties = 
-        (resultObj.job_title || resultObj.title || resultObj.job_id || resultObj.id);
+      const hasJobProperties =
+        resultObj.job_title ||
+        resultObj.title ||
+        resultObj.job_id ||
+        resultObj.id;
       if (hasJobProperties) {
         jobData = result as JobDetail;
       }
@@ -303,37 +321,56 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   }
 
   if (!jobData) {
-    console.error("Failed to extract job data from response:", JSON.stringify(result, null, 2));
-    throw new Error(`Invalid response format from API. No job data found for ID: ${jobId}`);
+    console.error(
+      "Failed to extract job data from response:",
+      JSON.stringify(result, null, 2)
+    );
+    throw new Error(
+      `Invalid response format from API. No job data found for ID: ${jobId}`
+    );
   }
-  
+
   // Validate that we have at least some job data
-  const hasAnyJobData = 
-    jobData.job_title || jobData.title || jobData.job_id || jobData.id ||
-    jobData.employer_name || jobData.company_name || jobData.company;
-  
+  const hasAnyJobData =
+    jobData.job_title ||
+    jobData.title ||
+    jobData.job_id ||
+    jobData.id ||
+    jobData.employer_name ||
+    jobData.company_name ||
+    jobData.company;
+
   if (!hasAnyJobData) {
     console.error("Job data exists but has no recognizable fields:", jobData);
-    throw new Error(`Job data received but appears to be empty for ID: ${jobId}`);
+    throw new Error(
+      `Job data received but appears to be empty for ID: ${jobId}`
+    );
   }
 
   // Normalize JSearch API field names to our standard format
   // JSearch uses job_* prefix for many fields
   const normalizedData = { ...jobData } as JobDetail;
-  
+
   // Map JSearch-specific fields to standard fields
   if (!normalizedData.title && (jobData as Record<string, unknown>).job_title) {
-    normalizedData.title = (jobData as Record<string, unknown>).job_title as string;
+    normalizedData.title = (jobData as Record<string, unknown>)
+      .job_title as string;
   }
   if (!normalizedData.job_title && normalizedData.title) {
     normalizedData.job_title = normalizedData.title;
   }
-  
+
   // Handle location fields - JSearch uses job_city, job_state, job_country
   if (!normalizedData.location && !normalizedData.job_location) {
-    const jobCity = (jobData as Record<string, unknown>).job_city as string | undefined;
-    const jobState = (jobData as Record<string, unknown>).job_state as string | undefined;
-    const jobCountry = (jobData as Record<string, unknown>).job_country as string | undefined;
+    const jobCity = (jobData as Record<string, unknown>).job_city as
+      | string
+      | undefined;
+    const jobState = (jobData as Record<string, unknown>).job_state as
+      | string
+      | undefined;
+    const jobCountry = (jobData as Record<string, unknown>).job_country as
+      | string
+      | undefined;
     if (jobCity || jobState || jobCountry) {
       const locationParts = [jobCity, jobState, jobCountry].filter(Boolean);
       normalizedData.location = locationParts.join(", ");
@@ -343,59 +380,81 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
       if (jobCountry) normalizedData.country = jobCountry;
     }
   }
-  
+
   // Handle description
   if (!normalizedData.description && !normalizedData.job_description) {
-    const jobDesc = (jobData as Record<string, unknown>).job_description as string | undefined;
+    const jobDesc = (jobData as Record<string, unknown>).job_description as
+      | string
+      | undefined;
     if (jobDesc) {
       normalizedData.description = jobDesc;
       normalizedData.job_description = jobDesc;
     }
   }
-  
+
   // Handle apply URL
-  if (!normalizedData.apply_url && !normalizedData.job_apply_link && !normalizedData.url) {
-    const jobApplyLink = (jobData as Record<string, unknown>).job_apply_link as string | undefined;
+  if (
+    !normalizedData.apply_url &&
+    !normalizedData.job_apply_link &&
+    !normalizedData.url
+  ) {
+    const jobApplyLink = (jobData as Record<string, unknown>).job_apply_link as
+      | string
+      | undefined;
     if (jobApplyLink) {
       normalizedData.apply_url = jobApplyLink;
       normalizedData.job_apply_link = jobApplyLink;
       normalizedData.url = jobApplyLink;
     }
   }
-  
+
   // Handle employment type
   if (!normalizedData.employment_type && !normalizedData.job_employment_type) {
-    const jobEmpType = (jobData as Record<string, unknown>).job_employment_type as string | undefined;
+    const jobEmpType = (jobData as Record<string, unknown>)
+      .job_employment_type as string | undefined;
     if (jobEmpType) {
       normalizedData.employment_type = jobEmpType;
       normalizedData.job_employment_type = jobEmpType;
     }
   }
-  
+
   // Handle remote flag
-  if (normalizedData.is_remote === undefined && normalizedData.remote === undefined) {
-    const jobIsRemote = (jobData as Record<string, unknown>).job_is_remote as boolean | undefined;
+  if (
+    normalizedData.is_remote === undefined &&
+    normalizedData.remote === undefined
+  ) {
+    const jobIsRemote = (jobData as Record<string, unknown>).job_is_remote as
+      | boolean
+      | undefined;
     if (jobIsRemote !== undefined) {
       normalizedData.is_remote = jobIsRemote;
       normalizedData.remote = jobIsRemote;
     }
   }
-  
+
   // Handle salary fields
   if (!normalizedData.min_salary && !normalizedData.max_salary) {
-    const jobMinSalary = (jobData as Record<string, unknown>).job_min_salary as number | undefined;
-    const jobMaxSalary = (jobData as Record<string, unknown>).job_max_salary as number | undefined;
-    const jobSalaryCurrency = (jobData as Record<string, unknown>).job_salary_currency as string | undefined;
-    const jobSalaryPeriod = (jobData as Record<string, unknown>).job_salary_period as string | undefined;
+    const jobMinSalary = (jobData as Record<string, unknown>).job_min_salary as
+      | number
+      | undefined;
+    const jobMaxSalary = (jobData as Record<string, unknown>).job_max_salary as
+      | number
+      | undefined;
+    const jobSalaryCurrency = (jobData as Record<string, unknown>)
+      .job_salary_currency as string | undefined;
+    const jobSalaryPeriod = (jobData as Record<string, unknown>)
+      .job_salary_period as string | undefined;
     if (jobMinSalary !== undefined) normalizedData.min_salary = jobMinSalary;
     if (jobMaxSalary !== undefined) normalizedData.max_salary = jobMaxSalary;
     if (jobSalaryCurrency) normalizedData.salary_currency = jobSalaryCurrency;
     if (jobSalaryPeriod) normalizedData.salary_period = jobSalaryPeriod;
   }
-  
+
   // Handle company/employer name
   if (!normalizedData.company_name && !normalizedData.employer_name) {
-    const employerName = (jobData as Record<string, unknown>).employer_name as string | undefined;
+    const employerName = (jobData as Record<string, unknown>).employer_name as
+      | string
+      | undefined;
     if (employerName) {
       normalizedData.employer_name = employerName;
       normalizedData.company_name = employerName;
@@ -404,28 +463,30 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
       }
     }
   }
-  
+
   // Handle logo
-  if (!normalizedData.company_logo && !normalizedData.employer_logo && !normalizedData.logo_url) {
-    const employerLogo = (jobData as Record<string, unknown>).employer_logo as string | undefined;
+  if (
+    !normalizedData.company_logo &&
+    !normalizedData.employer_logo &&
+    !normalizedData.logo_url
+  ) {
+    const employerLogo = (jobData as Record<string, unknown>).employer_logo as
+      | string
+      | undefined;
     if (employerLogo) {
       normalizedData.employer_logo = employerLogo;
       normalizedData.company_logo = employerLogo;
       normalizedData.logo_url = employerLogo;
     }
   }
-  
+
   jobData = normalizedData;
 
   // Extract company information from nested company object if it exists
   if (jobData.company && typeof jobData.company === "object") {
     const companyObj = jobData.company as Record<string, unknown>;
     // Merge company object properties into main job data for easier access
-    if (
-      companyObj.name &&
-      !jobData.company_name &&
-      !jobData.employer_name
-    ) {
+    if (companyObj.name && !jobData.company_name && !jobData.employer_name) {
       jobData.company_name = companyObj.name as string;
     }
     if (companyObj.company_name && !jobData.company_name) {
@@ -454,18 +515,15 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
       jobData.company_url = companyObj.website as string;
     }
     // Store full company info
-    jobData.company_info = companyObj as unknown as import('./types').CompanyInfo;
+    jobData.company_info =
+      companyObj as unknown as import("./types").CompanyInfo;
   }
 
   // Also check for employer object
   if (jobData.employer && typeof jobData.employer === "object") {
     const employerObj = jobData.employer as Record<string, unknown>;
     // Extract company name from employer object
-    if (
-      employerObj.name &&
-      !jobData.company_name &&
-      !jobData.employer_name
-    ) {
+    if (employerObj.name && !jobData.company_name && !jobData.employer_name) {
       jobData.company_name = employerObj.name as string;
     }
     if (employerObj.company_name && !jobData.company_name) {
@@ -478,7 +536,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
     ) {
       jobData.employer_name = employerObj.employer_name as string;
     }
-    
+
     // Extract logo from employer object if not already set
     if (!jobData.company_logo && !jobData.employer_logo && !jobData.logo_url) {
       if (employerObj.logo) {
@@ -491,12 +549,16 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
         jobData.logo_url = employerObj.logo_url as string;
       }
     }
-    
+
     if (!jobData.company_info) {
-      jobData.company_info = employerObj as unknown as import('./types').CompanyInfo;
+      jobData.company_info =
+        employerObj as unknown as import("./types").CompanyInfo;
     } else {
       // Merge employer info into company_info
-      jobData.company_info = { ...jobData.company_info, ...employerObj } as import('./types').CompanyInfo;
+      jobData.company_info = {
+        ...jobData.company_info,
+        ...employerObj,
+      } as import("./types").CompanyInfo;
     }
   }
 
@@ -525,14 +587,14 @@ const isJobActive = (job: ApiJob): boolean => {
     job.posted_date ||
     job.job_posted_at_datetime_utc ||
     job.postedAt;
-  
+
   if (postedDateStr) {
     try {
       const postedDate = new Date(postedDateStr as string);
       const daysSincePosted = Math.floor(
         (Date.now() - postedDate.getTime()) / (1000 * 60 * 60 * 24)
       );
-      
+
       // Consider jobs older than 90 days as inactive
       if (daysSincePosted > 90) {
         return false;
@@ -546,7 +608,12 @@ const isJobActive = (job: ApiJob): boolean => {
   // Check for status field
   if (job.status && typeof job.status === "string") {
     const status = (job.status as string).toLowerCase();
-    if (status === "closed" || status === "expired" || status === "inactive" || status === "filled") {
+    if (
+      status === "closed" ||
+      status === "expired" ||
+      status === "inactive" ||
+      status === "filled"
+    ) {
       return false;
     }
   }
@@ -691,4 +758,3 @@ const jobService = {
 };
 
 export default jobService;
-

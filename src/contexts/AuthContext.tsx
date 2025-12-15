@@ -124,17 +124,17 @@ const extractUserFromData = (data: unknown): User | null => {
       const extractedRole = extractRole(dataObj);
       if (extractedRole) {
         userFields.user_type = extractedRole;
-        console.log(
-          "✅ Extracted role/user_type:",
-          extractedRole,
-          "from fields:",
-          {
-            user_type: dataObj.user_type,
-            role: dataObj.role,
-            user_role: dataObj.user_role,
-            roles: dataObj.roles,
-          }
-        );
+        // console.log(
+        //   "✅ Extracted role/user_type:",
+        //   extractedRole,
+        //   "from fields:",
+        //   {
+        //     user_type: dataObj.user_type,
+        //     role: dataObj.role,
+        //     user_role: dataObj.user_role,
+        //     roles: dataObj.roles,
+        //   }
+        // );
       }
 
       return userFields;
@@ -183,28 +183,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       try {
         const token = TokenManager.getAccessToken();
-        console.log("🔑 authToken from TokenManager:", token);
-        console.log(
-          "🔑 authToken from localStorage:",
-          typeof window !== "undefined"
-            ? localStorage.getItem("authToken")
-            : "N/A (SSR)"
-        );
+        // console.log("🔑 authToken from TokenManager:", token);
+        // console.log(
+        //   "🔑 authToken from localStorage:",
+        //   typeof window !== "undefined"
+        //     ? localStorage.getItem("authToken")
+        //     : "N/A (SSR)"
+        // );
 
         if (!token) {
-          console.log("⚠️ No authToken found - ending session restoration");
+          // console.log("⚠️ No authToken found - ending session restoration");
           setLoading(false);
           TokenManager.setSessionRestoration(false);
           return;
         }
 
-        console.log("🔄 Starting session restoration with token");
+        // console.log("🔄 Starting session restoration with token");
 
         // ✅ FIX: Check localStorage first for stored userRole (most reliable during refresh)
         // This was set during login and persists across page refreshes
         const storedRole = localStorage.getItem("userRole");
         if (storedRole) {
-          console.log("✅ Found stored role in localStorage:", storedRole);
+          // console.log("✅ Found stored role in localStorage:", storedRole);
         }
 
         // First, decode JWT to get basic user info
@@ -213,10 +213,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const parts = token.split(".");
           if (parts.length === 3) {
             const payload = JSON.parse(atob(parts[1]));
-            console.log(
-              "🔑 JWT Token payload:",
-              JSON.stringify(payload, null, 2)
-            );
+            // console.log(
+            //   "🔑 JWT Token payload:",
+            //   JSON.stringify(payload, null, 2)
+            // );
 
             const userIdFromToken =
               payload.user_id || payload.sub || payload.id || "";
@@ -244,15 +244,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               user_type: roleFromToken || "user",
               profile_image: payload.profile_image || null,
             };
-            console.log("✅ Created user from JWT token:", jwtUserData, {
-              extractedRole: roleFromToken,
-              payloadFields: {
-                user_type: payload.user_type,
-                role: payload.role,
-                user_role: payload.user_role,
-                roles: payload.roles,
-              },
-            });
+            // console.log("✅ Created user from JWT token:", jwtUserData, {
+            //   extractedRole: roleFromToken,
+            //   payloadFields: {
+            //     user_type: payload.user_type,
+            //     role: payload.role,
+            //     user_role: payload.user_role,
+            //     roles: payload.roles,
+            //   },
+            // });
           }
         } catch (jwtError) {
           console.error("Failed to decode JWT token:", jwtError);
@@ -274,10 +274,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         try {
           const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
-          console.log(
-            "🔍 Profile response raw data:",
-            JSON.stringify(res.data, null, 2)
-          );
+          // console.log(
+          //   "🔍 Profile response raw data:",
+          //   JSON.stringify(res.data, null, 2)
+          // );
 
           // ✅ DEBUG: Check for roles in user_roles array or similar structures
           const responseData = res.data as Record<string, unknown>;
@@ -285,10 +285,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             responseData.user_roles &&
             Array.isArray(responseData.user_roles)
           ) {
-            console.log(
-              "🔍 Found user_roles array in response:",
-              responseData.user_roles
-            );
+            // console.log(
+            //   "🔍 Found user_roles array in response:",
+            //   responseData.user_roles
+            // );
             // Try to find academy role
             const academyRoleEntry = (
               responseData.user_roles as Array<Record<string, unknown>>
@@ -297,33 +297,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 roleEntry.role === "academy" || roleEntry.role === "academy"
             );
             if (academyRoleEntry) {
-              console.log(
-                "✅ Found academy role in user_roles:",
-                academyRoleEntry
-              );
+              // console.log(
+              //   "✅ Found academy role in user_roles:",
+              //   academyRoleEntry
+              // );
               // Add role to response data if not present
               if (!responseData.user_type && !responseData.role) {
                 responseData.user_type = "academy";
-                console.log("✅ Set user_type to 'academy' from user_roles");
+                // console.log("✅ Set user_type to 'academy' from user_roles");
               }
             }
           }
 
           userData = extractUserFromData(res.data);
-          console.log("✅ Restored user data after extraction:", userData, {
-            user_type: userData?.user_type,
-            hasUserData: !!userData,
-          });
+          // console.log("✅ Restored user data after extraction:", userData, {
+          //   user_type: userData?.user_type,
+          //   hasUserData: !!userData,
+          // });
 
           if (userData) {
             // If successfully extracted from profile, use JWT token for ID
             const userIdFromToken = extractUserIdFromToken(token);
             if (userIdFromToken) {
               userData.id = userIdFromToken;
-              console.log("Using user ID from JWT token:", userIdFromToken);
+              // console.log("Using user ID from JWT token:", userIdFromToken);
             } else if (!userData.id && userData.email) {
               userData.id = userData.email;
-              console.log("Using email as ID fallback:", userData.email);
+              // console.log("Using email as ID fallback:", userData.email);
             }
           }
         } catch (error) {
@@ -359,18 +359,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             );
             if (academyCheck.data && academyCheck.status !== 404) {
               hasAcademyProfile = true;
-              console.log(
-                "✅ User has academy profile but no role - treating as academy user"
-              );
+              // console.log(
+              //   "✅ User has academy profile but no role - treating as academy user"
+              // );
             }
           } catch (academyError) {
             // 404 means no academy profile, which is fine - user is not academy
             // Other errors are also fine - we'll default to "user"
-            console.log(
-              "ℹ️ No academy profile found (or error checking):",
-              (academyError as { response?: { status?: number } })?.response
-                ?.status
-            );
+            // console.log(
+            //   "ℹ️ No academy profile found (or error checking):",
+            //   (academyError as { response?: { status?: number } })?.response
+            //     ?.status
+            // );
           }
         }
 
@@ -385,46 +385,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // Upgrade from "user" to the role from API
             userData.user_type = apiRole;
             localStorage.setItem("userRole", apiRole);
-            console.log("✅ Upgrading stored 'user' role to:", apiRole);
+            // console.log("✅ Upgrading stored 'user' role to:", apiRole);
           } else {
             // Use stored role (most reliable)
             userData.user_type = storedRoleFromLogin;
-            console.log(
-              "✅ Using stored role from localStorage:",
-              storedRoleFromLogin
-            );
+            // console.log(
+            //   "✅ Using stored role from localStorage:",
+            //   storedRoleFromLogin
+            // );
           }
         } else if (userData?.user_type) {
           // No stored role, use what we got from API
           localStorage.setItem("userRole", userData.user_type);
-          console.log(
-            "✅ Storing user_type from API response:",
-            userData.user_type
-          );
+          // console.log(
+          //   "✅ Storing user_type from API response:",
+          //   userData.user_type
+          // );
         } else if (hasAcademyProfile) {
           // Fallback: User has academy profile but no role in API response
           userData.user_type = "academy";
           localStorage.setItem("userRole", "academy");
-          console.log(
-            "✅ User has academy profile but no role in API - setting to 'academy'"
-          );
+          // console.log(
+          //   "✅ User has academy profile but no role in API - setting to 'academy'"
+          // );
         } else if (jwtUserData?.user_type && jwtUserData.user_type !== "user") {
           // Fallback to JWT token if API didn't provide user_type and stored role missing
           userData.user_type = jwtUserData.user_type;
           localStorage.setItem("userRole", jwtUserData.user_type);
-          console.log(
-            "✅ Using user_type from JWT token:",
-            jwtUserData.user_type
-          );
+          // console.log(
+          //   "✅ Using user_type from JWT token:",
+          //   jwtUserData.user_type
+          // );
         } else {
           // Last resort: default to "user" only if absolutely nothing is available
           // But DON'T overwrite if we had a stored role that was cleared by mistake
           userData.user_type = userData.user_type || "user";
           localStorage.setItem("userRole", userData.user_type);
-          console.log(
-            "⚠️ No user_type found, defaulting to:",
-            userData.user_type
-          );
+          // console.log(
+          //   "⚠️ No user_type found, defaulting to:",
+          //   userData.user_type
+          // );
         }
 
         // ✅ FIX: Set the user data even if some data is missing
@@ -442,37 +442,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // Only update if we got a new/updated role or if there's no existing role
             if (!existingRole || existingRole !== userData.user_type) {
               localStorage.setItem("userRole", userData.user_type);
-              console.log(
-                "✅ Stored/Updated user_type in localStorage during restoration:",
-                userData.user_type,
-                existingRole ? `(was: ${existingRole})` : "(new)"
-              );
+              // console.log(
+              //   "✅ Stored/Updated user_type in localStorage during restoration:",
+              //   userData.user_type,
+              //   existingRole ? `(was: ${existingRole})` : "(new)"
+              // );
             } else {
-              console.log(
-                "✅ User type already correctly stored in localStorage:",
-                userData.user_type
-              );
+              // console.log(
+              //   "✅ User type already correctly stored in localStorage:",
+              //   userData.user_type
+              // );
             }
           }
 
           setUser(userData);
-          console.log(
-            "✅ Session restored successfully for user:",
-            userData.id,
-            "type:",
-            userData.user_type || "unknown"
-          );
+          // console.log(
+          //   "✅ Session restored successfully for user:",
+          //   userData.id,
+          //   "type:",
+          //   userData.user_type || "unknown"
+          // );
         } else {
-          console.error(
-            "❌ Cannot restore user - missing required data (email or id)"
-          );
+          // console.error(
+          //   "❌ Cannot restore user - missing required data (email or id)"
+          // );
           // ✅ FIX: Don't clear tokens if we have a valid token but just can't restore user data
           // This allows the user to still use the app, and user data might be loaded elsewhere
           // Only clear tokens if we're absolutely sure the token is invalid
           setUser(null);
         }
       } catch (error) {
-        console.error("❌ Failed to restore session:", error);
+        // console.error("❌ Failed to restore session:", error);
         // ✅ FIX: Don't automatically clear tokens on error during session restoration
         // The token might still be valid, and clearing it would force logout
         // Only clear if we're certain the token is invalid (e.g., JWT decode failed)
@@ -530,13 +530,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // If we're on root or a public route, redirect to appropriate dashboard
       if (currentPath === "/" || isPublicRoute) {
         if (userRole === "academy") {
-          console.log(
-            "🔄 Redirecting academy user from public route to /academy/dashboard"
-          );
+          // console.log(
+          //   "🔄 Redirecting academy user from public route to /academy/dashboard"
+          // );
           const academyPath = getLocalizedPath("/academy/dashboard", language);
           navigate(academyPath, { replace: true });
         } else {
-          console.log("🔄 Redirecting user from public route to /home");
+          // console.log("🔄 Redirecting user from public route to /home");
           const homePath = getLocalizedPath("/home", language);
           navigate(homePath, { replace: true });
         }
@@ -564,15 +564,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         pathWithoutLang !== "/academy/register";
 
       // ✅ DEBUG: Log route detection for debugging
-      console.log("🔍 Route detection:", {
-        currentPath,
-        pathWithoutLang,
-        userRole,
-        isAcademyRoute,
-        isAcademyPublicRoute,
-        shouldPreserve:
-          userRole === "academy" && isAcademyRoute && !isAcademyPublicRoute,
-      });
+      // console.log("🔍 Route detection:", {
+      //   currentPath,
+      //   pathWithoutLang,
+      //   userRole,
+      //   isAcademyRoute,
+      //   isAcademyPublicRoute,
+      //   shouldPreserve:
+      //     userRole === "academy" && isAcademyRoute && !isAcademyPublicRoute,
+      // });
 
       const isUserRoute =
         !isAcademyRoute &&
@@ -589,7 +589,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // If user is on a public academy route (view page), allow them to stay
       if (isAcademyPublicRoute) {
-        console.log(`✅ User is on public academy route: ${currentPath}`);
+        // console.log(`✅ User is on public academy route: ${currentPath}`);
         return; // Stay on current route - this is accessible to all authenticated users
       }
 
@@ -597,7 +597,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // This prevents academy users on /academy/profile from being redirected
       if (userRole === "academy" && isAcademyRoute && !isAcademyPublicRoute) {
         // Academy user on a valid academy route - preserve it
-        console.log(`✅ Academy user on valid academy route: ${currentPath}`);
+        // console.log(`✅ Academy user on valid academy route: ${currentPath}`);
         return; // Stay on current route - don't redirect
       }
 
@@ -606,9 +606,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         (userRole === "academy" && isAcademyRoute) ||
         (userRole === "user" && isUserRoute)
       ) {
-        console.log(
-          `✅ User is on valid route for their role (${userRole}): ${currentPath} (pathWithoutLang: ${pathWithoutLang})`
-        );
+        // console.log(
+        //   `✅ User is on valid route for their role (${userRole}): ${currentPath} (pathWithoutLang: ${pathWithoutLang})`
+        // );
         return; // Stay on current route - don't redirect
       }
 
@@ -619,18 +619,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         currentPath.includes("/dashboard") ||
         currentPath.includes("/home")
       ) {
-        console.log(
-          `✅ User is on dashboard/home route: ${currentPath}, not redirecting`
-        );
+        // console.log(
+        //   `✅ User is on dashboard/home route: ${currentPath}, not redirecting`
+        // );
         return; // Stay on dashboard/home route
       }
 
       // Only redirect if user is on the wrong route for their role
       // Don't redirect from public academy routes (view pages)
       if (isAcademyRoute && userRole !== "academy" && !isAcademyPublicRoute) {
-        console.log(
-          "🔄 Non-academy user on academy-only route, redirecting to /home"
-        );
+        // console.log(
+        //   "🔄 Non-academy user on academy-only route, redirecting to /home"
+        // );
         const homePath = getLocalizedPath("/home", language);
         navigate(homePath, { replace: true });
       } else if (
@@ -639,16 +639,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           pathWithoutLang === "/home" ||
           isUserRoute)
       ) {
-        console.log(
-          "🔄 Academy user on user-only route, redirecting to /academy/dashboard"
-        );
+        // console.log(
+        //   "🔄 Academy user on user-only route, redirecting to /academy/dashboard"
+        // );
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         navigate(academyPath, { replace: true });
       } else if (userRole === "academy" && !isAcademyRoute && !isCommonRoute) {
         // Academy user on an unknown/unmatched route - redirect to academy dashboard
-        console.log(
-          `🔄 Academy user on unmatched route (${currentPath}), redirecting to /academy/dashboard`
-        );
+        // console.log(
+        //   `🔄 Academy user on unmatched route (${currentPath}), redirecting to /academy/dashboard`
+        // );
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         navigate(academyPath, { replace: true });
       }
@@ -667,12 +667,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const token = res.data.access || res.data.token; // Handle both JWT 'access' and 'token' fields
       const refreshToken = res.data.refresh; // Get refresh token
 
-      console.log("🔑 Login response - access token:", token);
-      console.log(
-        "🔑 Login response - refresh token:",
-        refreshToken ? "present" : "missing"
-      );
-      console.log("🔑 Login response - full data keys:", Object.keys(res.data));
+      // console.log("🔑 Login response - access token:", token);
+      // console.log(
+      //   "🔑 Login response - refresh token:",
+      //   refreshToken ? "present" : "missing"
+      // );
+      // console.log("🔑 Login response - full data keys:", Object.keys(res.data));
 
       if (!token) {
         throw new Error(
@@ -683,13 +683,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Store both access and refresh tokens
       if (refreshToken) {
         TokenManager.setTokens(token, refreshToken);
-        console.log("🔑 Stored tokens via TokenManager.setTokens");
+        // console.log("🔑 Stored tokens via TokenManager.setTokens");
       } else {
         // Fallback: store only access token if refresh token is not available
         localStorage.setItem("authToken", token);
-        console.log(
-          "🔑 Stored authToken directly in localStorage (no refresh token)"
-        );
+        // console.log(
+        //   "🔑 Stored authToken directly in localStorage (no refresh token)"
+        // );
       }
 
       // Verify token was stored
@@ -697,10 +697,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         typeof window !== "undefined"
           ? localStorage.getItem("authToken")
           : null;
-      console.log(
-        "🔑 Verified stored authToken:",
-        storedToken ? "present" : "missing"
-      );
+      // console.log(
+      //   "🔑 Verified stored authToken:",
+      //   storedToken ? "present" : "missing"
+      // );
 
       // Wait a moment to ensure token is stored before making profile request
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -712,19 +712,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const loginResponseData = extractUserFromData(res.data);
 
       if (loginResponseData && loginResponseData.email) {
-        console.log("User data found in login response:", loginResponseData);
+        // console.log("User data found in login response:", loginResponseData);
         userData = loginResponseData;
       } else {
         // Only fetch from profile endpoint if user data is not in login response
-        console.log(
-          "No user data in login response, fetching from profile endpoint..."
-        );
+        // console.log(
+        //   "No user data in login response, fetching from profile endpoint..."
+        // );
         try {
           const userRes = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
           userData = extractUserFromData(userRes.data);
-          console.log("Logged in user data (from /api/profile/):", userData);
+          // console.log("Logged in user data (from /api/profile/):", userData);
         } catch (profileError) {
-          console.error("Failed to fetch profile:", profileError);
+          // console.error("Failed to fetch profile:", profileError);
           // Don't throw yet - try to use data from login response if available
         }
       }
@@ -737,10 +737,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userIdFromToken = extractUserIdFromToken(token);
       if (userIdFromToken) {
         userData.id = userIdFromToken; // Use the numeric ID from JWT token
-        console.log("Using user ID from JWT token:", userIdFromToken);
+        // console.log("Using user ID from JWT token:", userIdFromToken);
       } else if (!userData.id && userData.email) {
         userData.id = userData.email; // Fallback to email if JWT decoding fails
-        console.log("Using email as ID fallback:", userData.email);
+        // console.log("Using email as ID fallback:", userData.email);
       }
 
       // user_type should already be set from the profile/login response
@@ -755,39 +755,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           );
           if (academyCheck.data && academyCheck.status !== 404) {
             hasAcademyProfile = true;
-            console.log(
-              "✅ User has academy profile but no role - treating as academy user"
-            );
+            // console.log(
+            //   "✅ User has academy profile but no role - treating as academy user"
+            // );
           }
         } catch (academyError) {
           // 404 means no academy profile, which is fine - user is not academy
           // Other errors are also fine - we'll default to "user"
-          console.log(
-            "ℹ️ No academy profile found (or error checking):",
-            (academyError as { response?: { status?: number } })?.response
-              ?.status
-          );
+          // console.log(
+          //   "ℹ️ No academy profile found (or error checking):",
+          //   (academyError as { response?: { status?: number } })?.response
+          //     ?.status
+          // );
         }
 
         if (hasAcademyProfile) {
           userData.user_type = "academy";
-          console.log(
-            "✅ Setting user_type to 'academy' based on academy profile check"
-          );
+          // console.log(
+          //   "✅ Setting user_type to 'academy' based on academy profile check"
+          // );
         } else {
           userData.user_type = "user";
-          console.log(
-            "⚠️ user_type not found in profile and no academy profile - defaulting to 'user'"
-          );
+          // console.log(
+          //   "⚠️ user_type not found in profile and no academy profile - defaulting to 'user'"
+          // );
         }
       } else {
-        console.log("✅ User type from profile:", userData.user_type);
+        // console.log("✅ User type from profile:", userData.user_type);
       }
 
       // ✅ FIX: Store user_type in localStorage for quick access
       if (userData.user_type) {
         localStorage.setItem("userRole", userData.user_type);
-        console.log("✅ Stored user_type in localStorage:", userData.user_type);
+        // console.log("✅ Stored user_type in localStorage:", userData.user_type);
       }
 
       setUser(userData);

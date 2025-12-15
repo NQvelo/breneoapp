@@ -521,8 +521,8 @@ export default function SettingsPage() {
         updateData.last_name = lastName.trim();
       }
 
-      console.log("📤 Updating profile with PATCH method:");
-      console.log("📝 Request payload:", updateData);
+      // console.log("📤 Updating profile with PATCH method:");
+      // console.log("📝 Request payload:", updateData);
 
       // Use the same pattern as phone_number and about_me updates
       const response = await apiClient.patch(
@@ -535,7 +535,7 @@ export default function SettingsPage() {
         }
       );
 
-      console.log("✅ Profile update response:", response.data);
+      // console.log("✅ Profile update response:", response.data);
 
       // Refresh profile data (same pattern as phone_number/about_me)
       const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
@@ -544,7 +544,7 @@ export default function SettingsPage() {
         },
       });
 
-      console.log("✅ Refreshed profile data:", profileResponse.data);
+      // console.log("✅ Refreshed profile data:", profileResponse.data);
 
       // Update local state with new values
       if (profileResponse.data) {

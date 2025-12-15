@@ -399,19 +399,19 @@ const CoursePage = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
+      <div className="px-4 py-4 sm:px-6 sm:py-6 pb-40 sm:pb-44 space-y-6">
         {/* Top Section: Course Info and Image in One Card */}
         <Card className="rounded-3xl mb-6">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <CardContent className="p-4 sm:p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
               {/* Left Side: Course Information */}
               <div className="flex flex-col h-full">
-                <CardTitle className="text-3xl font-bold mb-4 text-black">
+                <CardTitle className="text-2xl sm:text-3xl font-bold mb-4 text-black">
                   {course.title}
                 </CardTitle>
 
                 {/* Tags - Small light gray placeholders */}
-                <div className="flex gap-2 mb-4">
+                <div className="flex flex-wrap gap-2 mb-4">
                   {displayTags.slice(0, 3).map((tag, index) => (
                     <div
                       key={index}
@@ -446,12 +446,12 @@ const CoursePage = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex gap-3 mt-auto">
+                <div className="flex flex-col sm:flex-row gap-3 mt-auto">
                   <Button
                     onClick={handleSaveCourse}
                     disabled={isSaving || !user}
                     variant={isSaved ? "outline" : "default"}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 w-full sm:w-auto justify-center"
                   >
                     {isSaving ? (
                       <>
@@ -470,16 +470,18 @@ const CoursePage = () => {
                       </>
                     )}
                   </Button>
-                  <Button>Enroll Now</Button>
+                  <Button className="w-full sm:w-auto justify-center">
+                    Enroll Now
+                  </Button>
                 </div>
               </div>
 
               {/* Right Side: Course Image */}
-              <div className="w-full h-[300px] flex items-center justify-center overflow-hidden rounded-3xl">
+              <div className="w-full h-48 sm:h-[300px] flex items-center justify-center overflow-hidden rounded-3xl">
                 <img
                   src={course.image}
                   alt={course.title}
-                  className="w-full h-[300px] object-cover rounded-3xl"
+                  className="w-full h-48 sm:h-[300px] object-cover rounded-3xl"
                 />
               </div>
             </div>
