@@ -1630,7 +1630,7 @@ const SkillPathPage = () => {
       <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
         {/* Switcher */}
         <div className="flex justify-center mb-2">
-          <div className="relative inline-flex items-center bg-gray-100 dark:bg-gray-800 rounded-full p-1">
+          <div className="relative inline-flex items-center bg-gray-100 dark:bg-[#242424] rounded-full p-1">
             <button
               onClick={() => setActiveView("skills")}
               className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
@@ -1661,10 +1661,16 @@ const SkillPathPage = () => {
             {finalRole && roleExplanation && (
               <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Rocket className="h-5 w-5 text-primary" />
-                    Your Recommended Career Path: {finalRole}
-                  </CardTitle>
+                  <div className="flex items-center gap-4">
+                    <img
+                      src="/lovable-uploads/3dicons-trophy-iso-color.png"
+                      alt="Trophy"
+                      className="h-12 w-12 flex-shrink-0"
+                    />
+                    <CardTitle className="text-xl">
+                      You Are {finalRole}
+                    </CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="prose prose-sm dark:prose-invert max-w-none">

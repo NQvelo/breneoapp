@@ -940,7 +940,7 @@ const UserHome = () => {
                 onTouchStart={() => setIsSkillPathPressed(true)}
                 onTouchEnd={() => setIsSkillPathPressed(false)}
               >
-                <CardContent className="p-4 md:p-4">
+                <CardContent className="p-4 md:p-4 flex items-center justify-center md:block">
                   <Link to="/skill-path" className="block cursor-pointer group">
                     <div className="flex items-center gap-3 md:gap-4">
                       {/* Left side - Content */}

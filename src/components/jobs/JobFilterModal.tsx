@@ -27,11 +27,14 @@ import { Label } from "@/components/ui/label";
 import { useMobile } from "@/hooks/use-mobile";
 import { countries, Country } from "@/data/countries";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, Search as SearchIcon } from "lucide-react";
-import { LocationDropdown } from "@/components/jobs/LocationDropdown";
-import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
+import { ChevronRight, Search as SearchIcon, ChevronDown } from "lucide-react";
 import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
 
@@ -80,20 +83,74 @@ interface FilterFormProps {
   filters: JobFilterModalProps["filters"];
   onFiltersChange: JobFilterModalProps["onFiltersChange"];
   isMobile?: boolean;
-  onWorkTypeClick?: () => void;
-  onLocationClick?: () => void;
   userTopSkills?: string[];
+  mobileView?: "main" | "workType" | "country";
+  onMobileViewChange?: (view: "main" | "workType" | "country") => void;
+  countrySearchQuery?: string;
+  onCountrySearchChange?: (query: string) => void;
 }
 
 const FilterForm: React.FC<FilterFormProps> = ({
   filters,
   onFiltersChange,
   isMobile = false,
-  onWorkTypeClick,
-  onLocationClick,
   userTopSkills = [],
+  mobileView = "main",
+  onMobileViewChange,
+  countrySearchQuery = "",
+  onCountrySearchChange,
 }) => {
   const { t } = useLanguage();
+  const [isWorkTypeOpen, setIsWorkTypeOpen] = useState(false);
+  const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [internalCountrySearchQuery, setInternalCountrySearchQuery] =
+    useState("");
+
+  // Use external search query if provided, otherwise use internal state
+  const searchQuery =
+    onCountrySearchChange && countrySearchQuery !== undefined
+      ? countrySearchQuery
+      : internalCountrySearchQuery;
+
+  const handleSearchChange = (value: string) => {
+    if (onCountrySearchChange) {
+      onCountrySearchChange(value);
+    } else {
+      setInternalCountrySearchQuery(value);
+    }
+  };
+
+  // Filter countries based on search query
+  const filteredCountries = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return countries;
+    }
+    const query = searchQuery.toLowerCase();
+    return countries.filter(
+      (country) =>
+        country.name.toLowerCase().includes(query) ||
+        country.code.toLowerCase().includes(query)
+    );
+  }, [searchQuery]);
+
+  // Reset search query when leaving country view
+  useEffect(() => {
+    if (isMobile && mobileView !== "country") {
+      if (onCountrySearchChange) {
+        onCountrySearchChange("");
+      } else {
+        setInternalCountrySearchQuery("");
+      }
+    }
+    if (!isMobile && !isLocationOpen) {
+      if (onCountrySearchChange) {
+        onCountrySearchChange("");
+      } else {
+        setInternalCountrySearchQuery("");
+      }
+    }
+  }, [mobileView, isLocationOpen, isMobile, onCountrySearchChange]);
+
   const handleJobTypeChange = (type: string) => {
     const newJobTypes = filters.jobTypes.includes(type)
       ? filters.jobTypes.filter((t) => t !== type)
@@ -114,6 +171,19 @@ const FilterForm: React.FC<FilterFormProps> = ({
     onFiltersChange({
       ...filters,
       countries: newCountries,
+      datePosted: filters.datePosted,
+      skills: filters.skills || [],
+      salaryMin: filters.salaryMin,
+      salaryMax: filters.salaryMax,
+      salaryByAgreement: filters.salaryByAgreement,
+    });
+  };
+
+  const handleRemoteChange = (isRemote: boolean) => {
+    onFiltersChange({
+      ...filters,
+      isRemote: isRemote,
+      countries: filters.countries || [],
       datePosted: filters.datePosted,
       skills: filters.skills || [],
       salaryMin: filters.salaryMin,
@@ -223,6 +293,86 @@ const FilterForm: React.FC<FilterFormProps> = ({
   };
 
   if (isMobile) {
+    // Work Type Picker View
+    if (mobileView === "workType") {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="space-y-3">
+              {jobTypes.map((type) => {
+                const isChecked = filters.jobTypes.includes(type);
+                return (
+                  <label
+                    key={type}
+                    className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-3"
+                  >
+                    <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
+                      {workTypeLabels[type] || type}
+                    </span>
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={() => handleJobTypeChange(type)}
+                      className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                    />
+                  </label>
+                );
+              })}
+              <div className="border-t border-gray-300 dark:border-gray-600 my-2" />
+              <label className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-3">
+                <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
+                  Remote Jobs Only
+                </span>
+                <Checkbox
+                  checked={filters.isRemote || false}
+                  onCheckedChange={(checked) => handleRemoteChange(!!checked)}
+                  className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Country Picker View
+    if (mobileView === "country") {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden -mx-6 px-6">
+            <div className="space-y-2">
+              {filteredCountries.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-500">
+                  No countries found
+                </div>
+              ) : (
+                filteredCountries.map((country) => {
+                  const isChecked = filters.countries.includes(country.code);
+                  return (
+                    <label
+                      key={country.code}
+                      className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-2"
+                    >
+                      <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 truncate">
+                        {country.name}
+                      </span>
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() =>
+                          handleCountryToggle(country.code)
+                        }
+                        className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                      />
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Main Filter View
     return (
       <div className="space-y-4">
         {/* Salary Range Filter - Mobile Style */}
@@ -238,39 +388,31 @@ const FilterForm: React.FC<FilterFormProps> = ({
         </div>
 
         {/* Work Type Filter - Mobile Style */}
-        <div
-          className="bg-white rounded-xl border border-gray-200 p-4 cursor-pointer"
-          onClick={onWorkTypeClick}
-        >
-          <div className="flex items-center justify-between">
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => onMobileViewChange?.("workType")}
+            className="flex items-center justify-between w-full bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+          >
             <span className="text-sm font-medium text-gray-900">
               {t.jobs.workType}
             </span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
-                {getWorkTypeDisplayText()}
-              </span>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </div>
-          </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
         </div>
 
         {/* Location Filter - Mobile Style */}
-        <div
-          className="bg-white rounded-xl border border-gray-200 p-4 cursor-pointer"
-          onClick={onLocationClick}
-        >
-          <div className="flex items-center justify-between">
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => onMobileViewChange?.("country")}
+            className="flex items-center justify-between w-full bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+          >
             <span className="text-sm font-medium text-gray-900">
               {t.jobs.country}
             </span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
-                {getLocationDisplayText()}
-              </span>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </div>
-          </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
         </div>
 
         {/* Skills/Interests Filter - Mobile Style */}
@@ -316,44 +458,6 @@ const FilterForm: React.FC<FilterFormProps> = ({
     );
   }
 
-  const handleLocationChange = (countryCodes: string[]) => {
-    onFiltersChange({
-      ...filters,
-      countries: countryCodes,
-      datePosted: filters.datePosted,
-      skills: filters.skills || [],
-      salaryMin: filters.salaryMin,
-      salaryMax: filters.salaryMax,
-      salaryByAgreement: filters.salaryByAgreement,
-    });
-  };
-
-  const handleWorkTypeChange = (workTypes: string[]) => {
-    onFiltersChange({
-      ...filters,
-      jobTypes: workTypes,
-      countries: filters.countries || [],
-      datePosted: filters.datePosted,
-      skills: filters.skills || [],
-      salaryMin: filters.salaryMin,
-      salaryMax: filters.salaryMax,
-      salaryByAgreement: filters.salaryByAgreement,
-    });
-  };
-
-  const handleRemoteChange = (isRemote: boolean) => {
-    onFiltersChange({
-      ...filters,
-      isRemote: isRemote,
-      countries: filters.countries || [],
-      datePosted: filters.datePosted,
-      skills: filters.skills || [],
-      salaryMin: filters.salaryMin,
-      salaryMax: filters.salaryMax,
-      salaryByAgreement: filters.salaryByAgreement,
-    });
-  };
-
   return (
     <div className="space-y-6">
       {/* Salary Range Filter - Desktop */}
@@ -366,36 +470,6 @@ const FilterForm: React.FC<FilterFormProps> = ({
           salaryByAgreement={filters.salaryByAgreement}
           onSalaryChange={handleSalaryChange}
         />
-      </div>
-
-      {/* Work Type Filter - Desktop */}
-      <div className="space-y-3">
-        <Label className="text-base font-medium dark:text-gray-100">
-          {t.jobs.workType}
-        </Label>
-        <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-          <WorkTypeDropdown
-            selectedWorkTypes={filters.jobTypes || []}
-            onWorkTypesChange={handleWorkTypeChange}
-            placeholder={CHOOSE_LABEL_KA}
-            isRemote={filters.isRemote || false}
-            onRemoteChange={handleRemoteChange}
-          />
-        </div>
-      </div>
-
-      {/* Location Filter - Desktop */}
-      <div className="space-y-3">
-        <Label className="text-base font-medium dark:text-gray-100">
-          {t.jobs.country}
-        </Label>
-        <div className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-          <LocationDropdown
-            selectedLocations={filters.countries || []}
-            onLocationsChange={handleLocationChange}
-            placeholder={CHOOSE_LABEL_KA}
-          />
-        </div>
       </div>
 
       {/* Skills/Interests Filter - Desktop */}
@@ -437,6 +511,140 @@ const FilterForm: React.FC<FilterFormProps> = ({
           </div>
         </div>
       )}
+
+      {/* Work Type Filter - Desktop */}
+      <div className="space-y-3">
+        <Collapsible open={isWorkTypeOpen} onOpenChange={setIsWorkTypeOpen}>
+          <CollapsibleTrigger
+            className={`flex items-center justify-between w-full bg-gray-100 dark:bg-[rgb(55,57,60)] px-4 py-3 hover:bg-gray-200 dark:hover:bg-[rgb(55,57,60)] transition-colors ${
+              isWorkTypeOpen ? "rounded-t-lg" : "rounded-lg"
+            }`}
+          >
+            <Label className="text-base font-medium dark:text-gray-100 cursor-pointer">
+              {t.jobs.workType}
+            </Label>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${
+                isWorkTypeOpen ? "transform rotate-180" : ""
+              }`}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-0">
+            <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-b-lg overflow-hidden flex flex-col">
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {jobTypes.map((type) => {
+                    const isChecked = filters.jobTypes.includes(type);
+                    return (
+                      <label
+                        key={type}
+                        className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2"
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => handleJobTypeChange(type)}
+                          className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                        />
+                        <span className="text-sm text-gray-900 dark:text-gray-100">
+                          {workTypeLabels[type] || type}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="border-t border-gray-300 dark:border-gray-600 my-2" />
+                <label className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2">
+                  <Checkbox
+                    checked={filters.isRemote || false}
+                    onCheckedChange={(checked) => handleRemoteChange(!!checked)}
+                    className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                  />
+                  <span className="text-sm text-gray-900 dark:text-gray-100">
+                    Remote Jobs Only
+                  </span>
+                </label>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      {/* Location Filter - Desktop */}
+      <div className="space-y-3">
+        <Collapsible
+          open={isLocationOpen}
+          onOpenChange={(open) => {
+            setIsLocationOpen(open);
+            if (!open) {
+              handleSearchChange("");
+            }
+          }}
+        >
+          <CollapsibleTrigger
+            className={`flex items-center justify-between w-full bg-gray-100 dark:bg-[rgb(55,57,60)] px-4 py-3 hover:bg-gray-200 dark:hover:bg-[rgb(55,57,60)] transition-colors ${
+              isLocationOpen ? "rounded-t-lg" : "rounded-lg"
+            }`}
+          >
+            <Label className="text-base font-medium dark:text-gray-100 cursor-pointer">
+              {t.jobs.country}
+            </Label>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${
+                isLocationOpen ? "transform rotate-180" : ""
+              }`}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-0">
+            <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-b-lg overflow-hidden flex flex-col">
+              {/* Search Bar - Sticky at top */}
+              <div className="sticky top-0 z-10 bg-gray-100 dark:bg-[rgb(55,57,60)] p-3 border-b border-gray-300 dark:border-gray-600">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search countries..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-9 pr-3 h-9 text-sm bg-white dark:bg-gray-700"
+                  />
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-2">
+                  {filteredCountries.length === 0 ? (
+                    <div className="col-span-2 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                      No countries found
+                    </div>
+                  ) : (
+                    filteredCountries.map((country) => {
+                      const isChecked = filters.countries.includes(
+                        country.code
+                      );
+                      return (
+                        <label
+                          key={country.code}
+                          className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2"
+                        >
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={() =>
+                              handleCountryToggle(country.code)
+                            }
+                            className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                          />
+                          <span className="text-sm text-gray-900 dark:text-gray-100">
+                            {country.name}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
     </div>
   );
 };
@@ -452,9 +660,13 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
 }) => {
   const { t } = useLanguage();
   const isMobile = useMobile();
+  const [mobileView, setMobileView] = useState<"main" | "workType" | "country">(
+    "main"
+  );
   const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
+  const [countrySearchQuery, setCountrySearchQuery] = useState("");
 
   // Filter countries for mobile location picker
   const filteredCountriesMobile = React.useMemo(() => {
@@ -537,198 +749,95 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     if (!isOpen) {
       setShowWorkTypePicker(false);
       setShowLocationPicker(false);
+      setMobileView("main");
+      setCountrySearchQuery("");
     }
   }, [isOpen]);
 
   if (isMobile) {
-    // Work Type Picker View
-    if (showWorkTypePicker) {
-      return (
-        <Drawer
-          open={isOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              setShowWorkTypePicker(false);
-              onClose();
-            }
-          }}
-        >
-          <DrawerContent className="max-h-[90vh] flex flex-col">
-            <DrawerHeader className="flex-shrink-0">
-              <DrawerTitle>{t.jobs.workType}</DrawerTitle>
-            </DrawerHeader>
-            <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
-              <div className="py-4 space-y-3">
-                {jobTypes.map((type) => {
-                  const isChecked = filters.jobTypes.includes(type);
-                  return (
-                    <Label
-                      key={type}
-                      htmlFor={type}
-                      className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 cursor-pointer min-h-[48px] active:bg-gray-50 transition-colors select-none"
-                    >
-                      <span className="flex-1 text-sm font-medium">
-                        {workTypeLabels[type] || type}
-                      </span>
-                      <Checkbox
-                        id={type}
-                        checked={isChecked}
-                        onCheckedChange={(checked) => {
-                          const newTypes = checked
-                            ? [...filters.jobTypes, type]
-                            : filters.jobTypes.filter((t) => t !== type);
-                          handleWorkTypeChange(newTypes);
-                        }}
-                      />
-                    </Label>
-                  );
-                })}
-
-                {/* Remote Jobs Only - Separated with border */}
-                <div className="border-t border-gray-200 my-3" />
-                <Label
-                  htmlFor="remote-mobile"
-                  className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200 cursor-pointer min-h-[48px] active:bg-gray-50 transition-colors select-none"
-                >
-                  <span className="flex-1 text-sm font-medium">
-                    Remote Jobs Only
-                  </span>
-                  <Checkbox
-                    id="remote-mobile"
-                    checked={filters.isRemote}
-                    onCheckedChange={(checked) => {
-                      handleRemoteChange(!!checked);
-                    }}
-                  />
-                </Label>
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
-      );
-    }
-
-    // Location Picker View
-    if (showLocationPicker) {
-      return (
-        <Drawer
-          open={isOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              setShowLocationPicker(false);
-              setLocationSearchQuery("");
-              onClose();
-            }
-          }}
-        >
-          <DrawerContent className="max-h-[90vh] flex flex-col">
-            <DrawerHeader className="flex-shrink-0">
-              <DrawerTitle>Countries</DrawerTitle>
-            </DrawerHeader>
-            {/* Search Input */}
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+    // Main Filter View
+    return (
+      <Drawer open={isOpen} onOpenChange={onClose}>
+        <DrawerContent className="max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
+          <DrawerHeader className={`flex-shrink-0 border-b border-gray-200`}>
+            <DrawerTitle className="text-xl font-bold">
+              {mobileView === "workType"
+                ? t.jobs.workType
+                : mobileView === "country"
+                ? t.jobs.country
+                : SEARCH_TITLE_KA}
+            </DrawerTitle>
+          </DrawerHeader>
+          {mobileView === "country" && (
+            <div className="flex-shrink-0 px-6 py-3 border-b border-gray-200">
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="text"
                   placeholder="Search countries..."
-                  value={locationSearchQuery}
-                  onChange={(e) => setLocationSearchQuery(e.target.value)}
+                  value={countrySearchQuery}
+                  onChange={(e) => setCountrySearchQuery(e.target.value)}
                   className="pl-9 pr-3 h-9 text-sm"
                 />
               </div>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto -mx-4 px-4">
-              <div className="py-4 space-y-2">
-                {filteredCountriesMobile.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-gray-500">
-                    No countries found
-                  </div>
-                ) : (
-                  filteredCountriesMobile.map((country) => {
-                    const isChecked = filters.countries.includes(country.code);
-                    return (
-                      <Label
-                        key={country.code}
-                        htmlFor={country.code}
-                        className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer min-h-[48px] active:bg-gray-50 dark:active:bg-gray-700 transition-colors select-none"
-                      >
-                        <span className="flex-1 text-sm font-medium">
-                          {country.name}
-                        </span>
-                        <Checkbox
-                          id={country.code}
-                          checked={isChecked}
-                          onCheckedChange={(checked) => {
-                            const newCountries = checked
-                              ? [...filters.countries, country.code]
-                              : filters.countries.filter(
-                                  (code) => code !== country.code
-                                );
-                            handleLocationChange(newCountries);
-                          }}
-                        />
-                      </Label>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
-      );
-    }
-
-    // Main Filter View
-    return (
-      <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="max-h-[90vh]">
-          <DrawerHeader>
-            <DrawerTitle className="text-xl font-bold">
-              {SEARCH_TITLE_KA}
-            </DrawerTitle>
-          </DrawerHeader>
-          <div className="px-6 py-6 flex-1 overflow-y-auto">
+          )}
+          <div className="px-6 py-6 flex-1 overflow-y-auto min-h-0">
             <FilterForm
               filters={filters}
               onFiltersChange={onFiltersChange}
               isMobile={true}
-              onWorkTypeClick={() => setShowWorkTypePicker(true)}
-              onLocationClick={() => setShowLocationPicker(true)}
               userTopSkills={userTopSkills}
+              mobileView={mobileView}
+              onMobileViewChange={setMobileView}
+              countrySearchQuery={countrySearchQuery}
+              onCountrySearchChange={setCountrySearchQuery}
             />
           </div>
-          <DrawerFooter>
-            <div
-              className={`flex gap-3 w-full ${
-                onClear ? "justify-between" : "justify-end"
-              }`}
-            >
-              {onClear && (
+          {mobileView === "main" && (
+            <DrawerFooter className="border-t border-gray-200">
+              <div
+                className={`flex gap-3 w-full ${
+                  onClear ? "justify-between" : "justify-end"
+                }`}
+              >
+                {onClear && (
+                  <Button
+                    onClick={() => {
+                      onClear();
+                      setMobileView("main");
+                    }}
+                    variant="ghost"
+                    className="h-12 px-6 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0 rounded-[18px]"
+                  >
+                    {t.common.clear}
+                  </Button>
+                )}
                 <Button
                   onClick={() => {
-                    onClear();
-                    setShowWorkTypePicker(false);
-                    setShowLocationPicker(false);
+                    onApply();
+                    setMobileView("main");
                   }}
-                  variant="ghost"
-                  className="h-12 px-6 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0 rounded-[18px]"
+                  className="h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
                 >
-                  {t.common.clear}
+                  {t.common.apply}
                 </Button>
-              )}
+              </div>
+            </DrawerFooter>
+          )}
+          {(mobileView === "workType" || mobileView === "country") && (
+            <DrawerFooter className="border-t border-gray-200">
               <Button
                 onClick={() => {
-                  onApply();
-                  setShowWorkTypePicker(false);
-                  setShowLocationPicker(false);
+                  setCountrySearchQuery("");
+                  setMobileView("main");
                 }}
-                className="h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
+                className="w-full h-12 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
               >
-                {t.common.apply}
+                Done
               </Button>
-            </div>
-          </DrawerFooter>
+            </DrawerFooter>
+          )}
         </DrawerContent>
       </Drawer>
     );
@@ -736,11 +845,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Filter Jobs</DialogTitle>
         </DialogHeader>
-        <div className="py-4">
+        <div className="py-4 overflow-y-auto flex-1 min-h-0">
           <FilterForm
             filters={filters}
             onFiltersChange={onFiltersChange}
@@ -748,7 +857,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
             userTopSkills={userTopSkills}
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           <div
             className={`flex gap-3 w-full ${
               onClear ? "justify-between" : "justify-end"

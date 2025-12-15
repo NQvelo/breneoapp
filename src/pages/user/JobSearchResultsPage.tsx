@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,14 @@ import {
   ArrowUp,
   SlidersHorizontal,
   ExternalLink,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { useMobile } from "@/hooks/use-mobile";
+import { countries } from "@/data/countries";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
@@ -812,6 +814,55 @@ const JobSearchResultsPage = () => {
     setFilterModalOpen(false);
   };
 
+  // Handle removing a skill filter
+  const handleRemoveSkill = (skillToRemove: string) => {
+    const newFilters = {
+      ...activeFilters,
+      skills: activeFilters.skills.filter((skill) => skill !== skillToRemove),
+    };
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    updateUrlWithFilters(newFilters, searchTerm, 1);
+  };
+
+  // Handle removing a country filter
+  const handleRemoveCountry = (countryCodeToRemove: string) => {
+    const newFilters = {
+      ...activeFilters,
+      countries: activeFilters.countries.filter(
+        (code) => code !== countryCodeToRemove
+      ),
+    };
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    updateUrlWithFilters(newFilters, searchTerm, 1);
+  };
+
+  // Handle removing job type filter
+  const handleRemoveJobType = (jobTypeToRemove: string) => {
+    const newJobTypes = activeFilters.jobTypes.filter(
+      (type) => type !== jobTypeToRemove
+    );
+    const newFilters = {
+      ...activeFilters,
+      jobTypes: newJobTypes,
+    };
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    updateUrlWithFilters(newFilters, searchTerm, 1);
+  };
+
+  // Handle removing remote filter
+  const handleRemoveRemote = () => {
+    const newFilters = {
+      ...activeFilters,
+      isRemote: false,
+    };
+    setActiveFilters(newFilters);
+    setTempFilters(newFilters);
+    updateUrlWithFilters(newFilters, searchTerm, 1);
+  };
+
   const handleNextPage = () => {
     const newPage = page + 1;
     updateUrlWithFilters(activeFilters, searchTerm, newPage);
@@ -828,6 +879,222 @@ const JobSearchResultsPage = () => {
   const isPrevPagePossible = page > 1;
 
   const actualJobsPerPage = transformedJobs.length;
+
+  // Build array of all filter items for active filters display
+  const allFilters = useMemo(() => {
+    const filters: Array<{
+      id: string;
+      label: string;
+      onRemove: () => void;
+      ariaLabel: string;
+    }> = [];
+
+    // Skills
+    activeFilters.skills.forEach((skill) => {
+      filters.push({
+        id: `skill-${skill}`,
+        label: skill,
+        onRemove: () => handleRemoveSkill(skill),
+        ariaLabel: `Remove ${skill} filter`,
+      });
+    });
+
+    // Countries
+    activeFilters.countries.forEach((countryCode) => {
+      const country = countries.find((c) => c.code === countryCode);
+      const countryName = country?.name || countryCode;
+      filters.push({
+        id: `country-${countryCode}`,
+        label: countryName,
+        onRemove: () => handleRemoveCountry(countryCode),
+        ariaLabel: `Remove ${countryName} filter`,
+      });
+    });
+
+    // Job Types
+    activeFilters.jobTypes.forEach((jobType) => {
+      filters.push({
+        id: `jobType-${jobType}`,
+        label: jobTypeLabels[jobType] || jobType,
+        onRemove: () => handleRemoveJobType(jobType),
+        ariaLabel: `Remove ${jobTypeLabels[jobType] || jobType} filter`,
+      });
+    });
+
+    // Remote
+    if (activeFilters.isRemote) {
+      filters.push({
+        id: "remote",
+        label: "Remote",
+        onRemove: handleRemoveRemote,
+        ariaLabel: "Remove Remote filter",
+      });
+    }
+
+    // Date Posted
+    if (activeFilters.datePosted) {
+      const dateLabel =
+        activeFilters.datePosted === "today"
+          ? "Posted Today"
+          : activeFilters.datePosted === "week"
+          ? "Posted This Week"
+          : activeFilters.datePosted === "month"
+          ? "Posted This Month"
+          : `Posted: ${activeFilters.datePosted}`;
+      filters.push({
+        id: "datePosted",
+        label: dateLabel,
+        onRemove: () => {
+          const newFilters = {
+            ...activeFilters,
+            datePosted: undefined,
+          };
+          setActiveFilters(newFilters);
+          setTempFilters(newFilters);
+          updateUrlWithFilters(newFilters, searchTerm, 1);
+        },
+        ariaLabel: "Remove Date Posted filter",
+      });
+    }
+
+    // Salary Range
+    if (
+      activeFilters.salaryMin !== undefined ||
+      activeFilters.salaryMax !== undefined
+    ) {
+      const salaryLabel =
+        activeFilters.salaryMin !== undefined &&
+        activeFilters.salaryMax !== undefined
+          ? `$${activeFilters.salaryMin} - $${activeFilters.salaryMax}`
+          : activeFilters.salaryMin !== undefined
+          ? `Min: $${activeFilters.salaryMin}`
+          : `Max: $${activeFilters.salaryMax}`;
+      filters.push({
+        id: "salaryRange",
+        label: salaryLabel,
+        onRemove: () => {
+          const newFilters = {
+            ...activeFilters,
+            salaryMin: undefined,
+            salaryMax: undefined,
+          };
+          setActiveFilters(newFilters);
+          setTempFilters(newFilters);
+          updateUrlWithFilters(newFilters, searchTerm, 1);
+        },
+        ariaLabel: "Remove Salary filter",
+      });
+    }
+
+    // Salary By Agreement
+    if (activeFilters.salaryByAgreement) {
+      filters.push({
+        id: "salaryByAgreement",
+        label: "Salary By Agreement",
+        onRemove: () => {
+          const newFilters = {
+            ...activeFilters,
+            salaryByAgreement: false,
+          };
+          setActiveFilters(newFilters);
+          setTempFilters(newFilters);
+          updateUrlWithFilters(newFilters, searchTerm, 1);
+        },
+        ariaLabel: "Remove Salary By Agreement filter",
+      });
+    }
+
+    return filters;
+  }, [activeFilters, searchTerm]);
+
+  const filtersContainerRef = useRef<HTMLDivElement>(null);
+  const [visibleFilterCount, setVisibleFilterCount] = useState(
+    allFilters.length
+  );
+  const [shouldShowCount, setShouldShowCount] = useState(false);
+
+  useEffect(() => {
+    if (allFilters.length === 0) {
+      setVisibleFilterCount(0);
+      setShouldShowCount(false);
+      return;
+    }
+
+    // First render all filters to measure height
+    setVisibleFilterCount(allFilters.length);
+
+    const checkHeight = () => {
+      if (!filtersContainerRef.current) return;
+
+      const container = filtersContainerRef.current;
+      const height = container.scrollHeight;
+      // Two lines threshold: approximately 100px
+      // py-2.5 = 20px total (10px top + 10px bottom)
+      // gap-2 = 8px
+      // So one line is ~42px (20px badge + 8px gap), two lines ~84px
+      // Using 100px as threshold for safety
+      const twoLineHeightThreshold = 100;
+
+      if (height > twoLineHeightThreshold) {
+        // Binary search to find how many filters fit in 2 lines
+        let low = 1;
+        let high = allFilters.length;
+        let maxVisible = allFilters.length;
+
+        // Create a test container to measure
+        const testContainer = document.createElement("div");
+        testContainer.className = "flex flex-wrap gap-2";
+        testContainer.style.position = "absolute";
+        testContainer.style.visibility = "hidden";
+        testContainer.style.width = container.offsetWidth + "px";
+        testContainer.style.top = "-9999px";
+        document.body.appendChild(testContainer);
+
+        // Binary search
+        while (low <= high) {
+          const mid = Math.floor((low + high) / 2);
+          testContainer.innerHTML = allFilters
+            .slice(0, mid)
+            .map(
+              (f) =>
+                `<div class="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700"><span class="text-sm font-medium whitespace-nowrap">${f.label}</span><button><svg class="h-4 w-4"></svg></button></div>`
+            )
+            .join("");
+
+          if (testContainer.scrollHeight <= twoLineHeightThreshold) {
+            maxVisible = mid;
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+
+        document.body.removeChild(testContainer);
+
+        if (maxVisible < allFilters.length) {
+          setVisibleFilterCount(maxVisible);
+          setShouldShowCount(true);
+        } else {
+          setVisibleFilterCount(allFilters.length);
+          setShouldShowCount(false);
+        }
+      } else {
+        setVisibleFilterCount(allFilters.length);
+        setShouldShowCount(false);
+      }
+    };
+
+    // Use requestAnimationFrame to ensure DOM is rendered
+    const rafId = requestAnimationFrame(() => {
+      setTimeout(checkHeight, 0);
+    });
+
+    window.addEventListener("resize", checkHeight);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", checkHeight);
+    };
+  }, [allFilters]);
   let startIndex = 1;
   let endIndex = actualJobsPerPage;
 
@@ -942,6 +1209,37 @@ const JobSearchResultsPage = () => {
             })()}
           </div>
         </div>
+
+        {/* Active Filters Section */}
+        {allFilters.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-bold mb-4">Active Filters</h2>
+            <div ref={filtersContainerRef} className="flex flex-wrap gap-2">
+              {allFilters.slice(0, visibleFilterCount).map((filter) => (
+                <div
+                  key={filter.id}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                >
+                  <span className="text-sm font-medium whitespace-nowrap">
+                    {filter.label}
+                  </span>
+                  <button
+                    onClick={filter.onRemove}
+                    className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                    aria-label={filter.ariaLabel}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {shouldShowCount && allFilters.length > visibleFilterCount && (
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                {allFilters.length - visibleFilterCount}+ filters
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Results Header */}
         <div className="flex items-center justify-between mb-6">

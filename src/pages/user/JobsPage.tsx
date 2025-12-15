@@ -2190,7 +2190,7 @@ const JobsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 bg-white dark:bg-transparent md:bg-transparent">
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
           <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
@@ -2259,74 +2259,191 @@ const JobsPage = () => {
           </div>
         </div>
 
-        {/* User Skills Section */}
-        {loadingSkills ? (
-          <div className="mb-8">
-            <h2 className="text-lg font-bold mb-4">Your Skills</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {[...Array(5)].map((_, i) => (
-                <Card key={i} className="border border-gray-200">
-                  <CardContent className="p-4 flex flex-col items-start">
-                    <Skeleton className="h-8 w-8 mb-3 rounded" />
-                    <Skeleton className="h-4 w-24 mb-1" />
-                    <Skeleton className="h-3 w-16" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : userTopSkills.length > 0 ? (
-          <div className="mb-8">
-            <h2 className="text-lg font-bold mb-4">Your Skills</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {userTopSkills.map((skill, index) => {
-                const IconComponent = getSkillIcon(skill);
-                const color = getSkillColor(skill, index);
-                const jobCount =
-                  skillJobCounts.data?.[skill] !== undefined
-                    ? skillJobCounts.data[skill]
-                    : null;
-                const isLoadingCount = skillJobCounts.isLoading;
+        {/* Active Filters Section */}
+        {(() => {
+          const hasActiveFilters =
+            activeFilters.skills.length > 0 ||
+            activeFilters.countries.length > 0 ||
+            activeFilters.jobTypes.length > 0 ||
+            activeFilters.isRemote ||
+            activeFilters.datePosted ||
+            activeFilters.salaryMin !== undefined ||
+            activeFilters.salaryMax !== undefined ||
+            activeFilters.salaryByAgreement;
 
-                return (
-                  <Card
-                    key={skill}
-                    className="cursor-pointer transition-all duration-200 border border-gray-200 hover:border-gray-400 rounded-3xl"
-                    onClick={() => {
-                      // Add skill to filters if not already present
-                      if (!activeFilters.skills.includes(skill)) {
+          if (!hasActiveFilters) return null;
+
+          return (
+            <div className="mb-8">
+              <h2 className="text-lg font-bold mb-4">Active Filters</h2>
+              <div className="flex flex-wrap gap-2">
+                {/* Skills */}
+                {activeFilters.skills.map((skill) => (
+                  <div
+                    key={`skill-${skill}`}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                  >
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      {skill}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveSkill(skill)}
+                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                      aria-label={`Remove ${skill} filter`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Countries */}
+                {activeFilters.countries.map((countryCode) => {
+                  const country = countries.find((c) => c.code === countryCode);
+                  const countryName = country?.name || countryCode;
+                  return (
+                    <div
+                      key={`country-${countryCode}`}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    >
+                      <span className="text-sm font-medium whitespace-nowrap">
+                        {countryName}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveCountry(countryCode)}
+                        className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                        aria-label={`Remove ${countryName} filter`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {/* Job Types */}
+                {activeFilters.jobTypes.map((jobType) => (
+                  <div
+                    key={`jobType-${jobType}`}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                  >
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      {jobTypeLabels[jobType] || jobType}
+                    </span>
+                    <button
+                      onClick={() => handleRemoveJobType(jobType)}
+                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                      aria-label={`Remove ${
+                        jobTypeLabels[jobType] || jobType
+                      } filter`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Remote */}
+                {activeFilters.isRemote && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      Remote
+                    </span>
+                    <button
+                      onClick={handleRemoveRemote}
+                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                      aria-label="Remove Remote filter"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Date Posted */}
+                {activeFilters.datePosted && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      {activeFilters.datePosted === "today"
+                        ? "Posted Today"
+                        : activeFilters.datePosted === "week"
+                        ? "Posted This Week"
+                        : activeFilters.datePosted === "month"
+                        ? "Posted This Month"
+                        : `Posted: ${activeFilters.datePosted}`}
+                    </span>
+                    <button
+                      onClick={() => {
                         const newFilters = {
                           ...activeFilters,
-                          skills: [...activeFilters.skills, skill],
+                          datePosted: undefined,
                         };
                         setActiveFilters(newFilters);
                         setTempFilters(newFilters);
-                        // Redirect to search results page when skill is clicked
                         redirectToSearchResults(newFilters, searchTerm);
-                      }
-                    }}
-                  >
-                    <CardContent className="p-4 flex flex-col items-start">
-                      <IconComponent className={`h-8 w-8 ${color} mb-3`} />
-                      <h3 className="font-semibold text-sm mb-1 line-clamp-2">
-                        {skill}
-                      </h3>
-                      <p className="text-xs text-gray-500">
-                        {isLoadingCount
-                          ? "Loading..."
-                          : jobCount !== null
-                          ? `${jobCount}${jobCount >= 20 ? "+" : ""} Job${
-                              jobCount !== 1 ? "s" : ""
-                            }`
-                          : "Click to filter"}
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      }}
+                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                      aria-label="Remove Date Posted filter"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Salary Range */}
+                {(activeFilters.salaryMin !== undefined ||
+                  activeFilters.salaryMax !== undefined) && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      {activeFilters.salaryMin !== undefined &&
+                      activeFilters.salaryMax !== undefined
+                        ? `$${activeFilters.salaryMin} - $${activeFilters.salaryMax}`
+                        : activeFilters.salaryMin !== undefined
+                        ? `Min: $${activeFilters.salaryMin}`
+                        : `Max: $${activeFilters.salaryMax}`}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newFilters = {
+                          ...activeFilters,
+                          salaryMin: undefined,
+                          salaryMax: undefined,
+                        };
+                        setActiveFilters(newFilters);
+                        setTempFilters(newFilters);
+                        redirectToSearchResults(newFilters, searchTerm);
+                      }}
+                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                      aria-label="Remove Salary filter"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Salary By Agreement */}
+                {activeFilters.salaryByAgreement && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      Salary By Agreement
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newFilters = {
+                          ...activeFilters,
+                          salaryByAgreement: false,
+                        };
+                        setActiveFilters(newFilters);
+                        setTempFilters(newFilters);
+                        redirectToSearchResults(newFilters, searchTerm);
+                      }}
+                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                      aria-label="Remove Salary By Agreement filter"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ) : null}
+          );
+        })()}
 
         {(internshipError || remoteError) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
@@ -2589,16 +2706,14 @@ const JobsPage = () => {
                           onClick={() => saveJobMutation.mutate(job)}
                           aria-label={job.is_saved ? "Unsave job" : "Save job"}
                           className={cn(
-                            "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50",
-                            job.is_saved
-                              ? "text-red-500 border-red-200 bg-red-50"
-                              : ""
+                            "h-9 w-9 p-0 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 bg-gray-200 dark:bg-border/50 hover:!bg-gray-300 dark:hover:!bg-border/70 transition-colors",
+                            job.is_saved ? "text-red-500 dark:text-red-400" : ""
                           )}
                         >
                           <Heart
                             className={`h-5 w-5 transition-colors ${
                               job.is_saved
-                                ? "text-red-500 fill-red-500 animate-heart-pop"
+                                ? "text-red-500 fill-red-500 dark:text-red-400 dark:fill-red-400 animate-heart-pop"
                                 : ""
                             }`}
                           />
@@ -2814,16 +2929,14 @@ const JobsPage = () => {
                         onClick={() => saveJobMutation.mutate(job)}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
                         className={cn(
-                          "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50",
-                          job.is_saved
-                            ? "text-red-500 border-red-200 bg-red-50"
-                            : ""
+                          "h-9 w-9 p-0 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 bg-gray-200 dark:bg-border/50 hover:!bg-gray-300 dark:hover:!bg-border/70 transition-colors",
+                          job.is_saved ? "text-red-500 dark:text-red-400" : ""
                         )}
                       >
                         <Heart
                           className={`h-5 w-5 transition-colors ${
                             job.is_saved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              ? "text-red-500 fill-red-500 dark:text-red-400 dark:fill-red-400 animate-heart-pop"
                               : ""
                           }`}
                         />
