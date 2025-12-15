@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { RadialProgress } from "@/components/ui/radial-progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useMobile } from "@/hooks/use-mobile";
@@ -35,6 +36,7 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { filterATSJobs } from "@/utils/jobFilterUtils";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 // Function to extract skills from job data (same as in JobsPage.tsx)
@@ -169,6 +171,48 @@ const calculateJobRelevanceScore = (
   return score;
 };
 
+// Function to calculate match percentage (same logic as JobsPage / JobSearchResultsPage)
+const calculateMatchPercentage = (
+  userSkills: string[],
+  jobSkills: string[]
+): number => {
+  if (jobSkills.length === 0) {
+    // If no skills found in job, return a base match (e.g., 50%)
+    return 50;
+  }
+
+  if (userSkills.length === 0) {
+    return 0;
+  }
+
+  // Normalize skills for comparison (lowercase, remove extra spaces)
+  const normalizeSkill = (skill: string) =>
+    skill.toLowerCase().trim().replace(/\s+/g, " ");
+
+  const normalizedUserSkills = userSkills.map(normalizeSkill);
+  const normalizedJobSkills = jobSkills.map(normalizeSkill);
+
+  // Find matching skills
+  const matchingSkills = normalizedUserSkills.filter((userSkill) =>
+    normalizedJobSkills.some((jobSkill) => {
+      // Exact match
+      if (userSkill === jobSkill) return true;
+      // Partial match (one skill contains the other)
+      if (userSkill.includes(jobSkill) || jobSkill.includes(userSkill))
+        return true;
+      return false;
+    })
+  );
+
+  // Calculate percentage: (matching skills / job skills) * 100
+  const matchPercentage = Math.round(
+    (matchingSkills.length / normalizedJobSkills.length) * 100
+  );
+
+  // Cap at 100%
+  return Math.min(matchPercentage, 100);
+};
+
 // Function to check if a job is tech-related (for broader filtering)
 const isTechJob = (job: ApiJob): boolean => {
   const textToSearch = [
@@ -230,6 +274,7 @@ interface Job {
   employment_type?: string;
   work_arrangement?: string;
   is_saved: boolean;
+  matchPercentage?: number;
 }
 
 interface Course {
@@ -757,6 +802,10 @@ const UserHome = () => {
           workArrangement = "Hybrid";
         }
 
+        // Calculate skill-based match percentage using all user top skills
+        const jobSkills = extractJobSkills(job);
+        const matchPercentage = calculateMatchPercentage(userTopSkills, jobSkills);
+
         const transformedJob: Job = {
           id: jobId,
           title: jobTitle,
@@ -769,6 +818,7 @@ const UserHome = () => {
           employment_type: employmentType,
           work_arrangement: workArrangement,
           is_saved: savedJobs?.includes(String(jobId)),
+          matchPercentage,
           date: postedDate
             ? new Date(postedDate).toLocaleDateString("en-GB", {
                 day: "2-digit",
@@ -1046,167 +1096,82 @@ const UserHome = () => {
                   {displayJobs.map((job) => (
                     <Card
                       key={job.id}
-                      className="group flex flex-col transition-all duration-200 border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 overflow-hidden flex-shrink-0 snap-start cursor-pointer rounded-3xl w-[calc((100%-2rem)/3)] min-w-[280px]"
+                      className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px]"
                       onClick={() => {
-                        if (job.id) {
-                          navigate(`/jobs/${encodeURIComponent(job.id)}`);
-                        }
+                        if (!job.id || String(job.id).trim() === "") return;
+                        const encodedId = encodeURIComponent(String(job.id));
+                        navigate(`/jobs/${encodedId}`);
                       }}
                     >
-                      <CardContent className="p-4 flex flex-col flex-grow relative">
-                        {/* Company Logo and Info */}
-                        <div className="flex items-start gap-2 mb-2">
+                      <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
+                        {/* Company Logo and Info – copied from JobsPage */}
+                        <div className="flex items-start gap-3 mb-3">
                           <div className="flex-shrink-0 relative w-10 h-10">
-                            {/* Primary: Logo from API */}
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
                                 alt={`${job.company} logo`}
-                                className="w-10 h-10 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
                                 loading="lazy"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.onerror = null;
-                                  target.style.display = "none";
-                                  const clearbitLogo =
-                                    target.parentElement?.querySelector(
-                                      ".clearbit-logo"
-                                    ) as HTMLImageElement;
-                                  if (clearbitLogo) {
-                                    clearbitLogo.style.display = "block";
-                                    clearbitLogo.style.zIndex = "10";
-                                  } else {
-                                    const iconFallback =
-                                      target.parentElement?.querySelector(
-                                        ".logo-fallback"
-                                      ) as HTMLElement;
-                                    if (iconFallback) {
-                                      iconFallback.style.display = "flex";
-                                      iconFallback.style.zIndex = "10";
-                                    }
-                                  }
-                                }}
                               />
-                            ) : null}
-
-                            {/* Fallback 1: Clearbit logo API */}
-                            {job.company && !job.company_logo ? (
-                              <img
-                                src={`https://logo.clearbit.com/${encodeURIComponent(
-                                  job.company
-                                )}`}
-                                alt={`${job.company} logo`}
-                                className="w-10 h-10 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
-                                style={{ zIndex: 10 }}
-                                loading="lazy"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.onerror = null;
-                                  target.style.display = "none";
-                                  const iconFallback =
-                                    target.parentElement?.querySelector(
-                                      ".logo-fallback"
-                                    ) as HTMLElement;
-                                  if (iconFallback) {
-                                    iconFallback.style.display = "flex";
-                                    iconFallback.style.zIndex = "10";
-                                  }
-                                }}
-                              />
-                            ) : null}
-
-                            {/* Fallback 2: Default icon */}
-                            <div
-                              className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                                job.company_logo ||
-                                (job.company && !job.company_logo)
-                                  ? "hidden"
-                                  : "flex"
-                              }`}
-                              style={{
-                                zIndex:
-                                  job.company_logo ||
-                                  (job.company && !job.company_logo)
-                                    ? 0
-                                    : 10,
-                              }}
-                            >
-                              <Briefcase className="h-5 w-5 text-white" />
-                            </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
+                                <Briefcase className="h-5 w-5 text-white" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-sm mb-0.5 truncate">
+                            <h3 className="font-semibold text-sm truncate">
                               {job.company}
                             </h3>
-                            <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
+                            <p className="mt-0.5 text-xs text-gray-500 truncate">
                               {job.location}
                             </p>
                           </div>
                         </div>
 
-                        {/* Divider under company/logo/location */}
-                        <div className="border-t border-gray-100 dark:border-gray-200 mt-2 mb-3 -mx-4" />
-
                         {/* Job Title */}
-                        <h4 className="font-bold text-base mb-3 line-clamp-2 min-h-[3rem]">
+                        <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
                           {job.title}
                         </h4>
 
-                        {/* Spacer to push details to bottom */}
-                        <div className="flex-grow"></div>
-
-                        {/* Job Details - At the bottom */}
-                        <div className="space-y-1.5 mt-auto pb-16 md:pb-0">
-                          {/* Salary */}
-                          {job.salary && (
-                            <div className="flex items-center gap-1.5 text-base">
-                              <DollarSign className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                              <span className="text-gray-700 break-words font-medium">
-                                {job.salary}
-                              </span>
-                            </div>
+                        {/* Job Details as chips (without salary) – same style as JobsPage */}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {job.employment_type && (
+                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                              {job.employment_type}
+                            </Badge>
                           )}
-
-                          {/* Employment Type and Work Arrangement - Inline */}
-                          <div className="flex items-center gap-3 flex-wrap">
-                            {/* Employment Type */}
-                            {job.employment_type && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-700">
-                                  {job.employment_type}
-                                </span>
-                              </div>
-                            )}
-
-                            {/* Work Arrangement */}
-                            {job.work_arrangement && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-700">
-                                  {job.work_arrangement}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          {job.work_arrangement && (
+                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                              {job.work_arrangement}
+                            </Badge>
+                          )}
                         </div>
 
-                        {/* Action Buttons - Slide up on hover and overlap details */}
-                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-card/95 backdrop-blur-sm flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg z-10">
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (job.id) {
-                                navigate(`/jobs/${encodeURIComponent(job.id)}`);
-                              }
-                            }}
-                            variant="default"
-                            size="xs"
-                            className="flex-1 h-10"
-                          >
-                            View Details
-                          </Button>
+                        {/* Match percentage & Save button – exactly like JobsPage remote jobs */}
+                        <div className="mt-7 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <RadialProgress
+                              value={job.matchPercentage ?? 0}
+                              size={44}
+                              strokeWidth={5}
+                              showLabel={false}
+                              percentageTextSize="sm"
+                              className="text-breneo-blue"
+                            />
+                            <span className="text-xs font-semibold text-gray-700">
+                              {job.matchPercentage !== undefined
+                                ? job.matchPercentage >= 85
+                                  ? "Best match"
+                                  : job.matchPercentage >= 70
+                                  ? "Good match"
+                                  : job.matchPercentage >= 50
+                                  ? "Fair match"
+                                  : "Poor match"
+                                : ""}
+                            </span>
+                          </div>
                           <Button
                             variant="secondary"
                             size="icon"
@@ -1214,17 +1179,21 @@ const UserHome = () => {
                               e.stopPropagation();
                               saveJobMutation.mutate(job);
                             }}
-                            aria-label={
-                              job.is_saved ? "Unsave job" : "Save job"
-                            }
-                            className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-10 w-10"
+                            aria-label={job.is_saved ? "Unsave job" : "Save job"}
+                            className={cn(
+                              "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                              job.is_saved
+                                ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                : "text-black dark:text-white"
+                            )}
                           >
                             <Heart
-                              className={`h-4 w-4 transition-colors ${
+                              className={cn(
+                                "h-4 w-4 transition-colors",
                                 job.is_saved
                                   ? "text-red-500 fill-red-500 animate-heart-pop"
-                                  : "text-black"
-                              }`}
+                                  : "text-black dark:text-white"
+                              )}
                             />
                           </Button>
                         </div>
@@ -1323,7 +1292,20 @@ const UserHome = () => {
                                     "/placeholder.svg";
                                 }}
                               />
-                              <div className="absolute top-4 right-4">
+                            </div>
+                            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
+                              <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
+                                {course.title}
+                              </h3>
+
+                              <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {course.duration && (
+                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                                      {course.duration}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <Button
                                   variant="secondary"
                                   size="icon"
@@ -1339,42 +1321,22 @@ const UserHome = () => {
                                       ? "Unsave course"
                                       : "Save course"
                                   }
-                                  className="bg-[#E6E7EB]/80 hover:bg-[#E6E7EB]/90 h-9 w-9 backdrop-blur-sm"
+                                  className={cn(
+                                    "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
+                                    isCourseSaved
+                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      : "text-black dark:text-white"
+                                  )}
                                 >
                                   <Heart
-                                    className={`h-4 w-4 transition-colors ${
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
                                       isCourseSaved
                                         ? "text-red-500 fill-red-500 animate-heart-pop"
-                                        : "text-black/80"
-                                    }`}
+                                        : "text-black dark:text-white"
+                                    )}
                                   />
                                 </Button>
-                              </div>
-                            </div>
-                            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
-                              <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
-                                {course.title}
-                              </h3>
-
-                              <div className="flex items-center gap-3 mt-auto flex-wrap">
-                                {course.duration && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
-                                  >
-                                    <Clock className="h-4 w-4 mr-1.5" />
-                                    {course.duration}
-                                  </Badge>
-                                )}
-                                {course.level && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-sm border-gray-300 dark:border-gray-700 px-2.5 py-1"
-                                  >
-                                    <Award className="h-4 w-4 mr-1.5" />
-                                    {course.level}
-                                  </Badge>
-                                )}
                               </div>
                             </div>
                           </CardContent>

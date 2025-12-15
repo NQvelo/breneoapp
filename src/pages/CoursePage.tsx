@@ -22,6 +22,7 @@ import {
   Calendar,
   Eye,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AcademyProfile {
   id: string;
@@ -410,23 +411,16 @@ const CoursePage = () => {
                   {course.title}
                 </CardTitle>
 
-                {/* Tags - Small light gray placeholders */}
+                {/* Tags - styled like job chips */}
                 <div className="flex flex-wrap gap-2 mb-4">
                   {displayTags.slice(0, 3).map((tag, index) => (
-                    <div
+                    <Badge
                       key={index}
-                      className="h-5 bg-gray-200 rounded px-2 text-xs text-gray-500 flex items-center min-w-[60px]"
+                      className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100"
                     >
                       {tag}
-                    </div>
+                    </Badge>
                   ))}
-                  {displayTags.length === 0 && (
-                    <>
-                      <div className="h-5 bg-gray-200 rounded px-2 w-16"></div>
-                      <div className="h-5 bg-gray-200 rounded px-2 w-16"></div>
-                      <div className="h-5 bg-gray-200 rounded px-2 w-16"></div>
-                    </>
-                  )}
                 </div>
 
                 {/* Academy Name with Logo */}
@@ -450,27 +444,28 @@ const CoursePage = () => {
                   <Button
                     onClick={handleSaveCourse}
                     disabled={isSaving || !user}
-                    variant={isSaved ? "outline" : "default"}
-                    className="flex items-center gap-2 w-full sm:w-auto justify-center"
+                    variant="secondary"
+                    size="icon"
+                    aria-label={isSaved ? "Unsave course" : "Save course"}
+                    className={cn(
+                      "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                      isSaved
+                        ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                        : "text-black dark:text-white"
+                    )}
                   >
                     {isSaving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {isSaved ? "Unsaving..." : "Saving..."}
-                      </>
+                      <Loader2 className="h-4 w-4 animate-spin text-black dark:text-white" />
                     ) : isSaved ? (
-                      <>
-                        <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
-                        Saved
-                      </>
+                      <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
                     ) : (
-                      <>
-                        <Heart className="h-4 w-4" />
-                        Save Course
-                      </>
+                      <Heart className="h-4 w-4 text-black dark:text-white" />
                     )}
                   </Button>
-                  <Button className="w-full sm:w-auto justify-center">
+                  <Button
+                    size="sm"
+                    className="h-10 px-4 text-sm w-full sm:w-auto justify-center"
+                  >
                     Enroll Now
                   </Button>
                 </div>

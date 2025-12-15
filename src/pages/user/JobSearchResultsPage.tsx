@@ -175,6 +175,15 @@ const calculateMatchPercentage = (
   return Math.min(matchPercentage, 100);
 };
 
+// Get textual label for match quality (same as JobsPage)
+const getMatchQualityLabel = (value?: number): string => {
+  if (value === undefined || value <= 0) return "";
+  if (value >= 85) return "Best match";
+  if (value >= 70) return "Good match";
+  if (value >= 50) return "Fair match";
+  return "Poor match";
+};
+
 // Generate AI text explaining why user is a good match
 const generateMatchExplanation = (
   matchPercentage: number,
@@ -1317,111 +1326,153 @@ const JobSearchResultsPage = () => {
                 onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
               >
                 <Card className="border border-gray-200 hover:shadow-md transition-shadow overflow-hidden rounded-lg">
-                  <CardContent className="p-0">
-                    <div className="flex gap-4">
-                      {/* Left Section - Job Details */}
-                      <div className="flex-1 p-4 pr-2 rounded-l-lg">
-                        <div className="flex items-start gap-4">
-                          {/* Company Logo */}
-                          <div className="flex-shrink-0 relative w-12 h-12">
+                  <CardContent
+                    className={
+                      isMobile
+                        ? "px-5 pt-5 pb-4 flex flex-col flex-grow"
+                        : "p-0"
+                    }
+                  >
+                    {isMobile ? (
+                      <>
+                        {/* Company Logo and Info (same as JobsPage) */}
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="flex-shrink-0 relative w-10 h-10">
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
-                                alt={job.company}
-                                className="w-12 h-12 rounded-md object-cover border border-gray-300 absolute inset-0 z-10"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  const fallback =
-                                    target.parentElement?.querySelector(
-                                      ".logo-fallback"
-                                    ) as HTMLElement;
-                                  if (fallback) {
-                                    fallback.style.display = "flex";
-                                    fallback.style.zIndex = "10";
-                                  }
-                                }}
+                                alt={`${job.company} logo`}
+                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                loading="lazy"
                               />
-                            ) : null}
-                            <div
-                              className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center border border-gray-300 logo-fallback absolute inset-0 ${
-                                job.company_logo ? "z-0" : "z-10"
-                              }`}
-                              style={{
-                                display: job.company_logo ? "none" : "flex",
-                              }}
-                            >
-                              <Briefcase className="h-6 w-6 text-breneo-blue" />
-                            </div>
-                          </div>
-
-                          {/* Job Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="mb-1 md:mb-2">
-                              <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
-                                {job.company}
-                              </h3>
-                              <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
-                                {job.title}
-                              </h4>
-                            </div>
-
-                            {/* Mobile: Location, Date, and buttons */}
-                            {isMobile ? (
-                              <div className="space-y-2 mt-1">
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="text-sm text-gray-600">
-                                    {job.location}
-                                  </span>
-                                  <span className="text-xs text-gray-500">
-                                    {formatJobDate(job.datePosted)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      saveJobMutation.mutate(job);
-                                    }}
-                                    className={cn(
-                                      "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 flex-shrink-0",
-                                      job.is_saved
-                                        ? "text-red-500 border-red-200 bg-red-50"
-                                        : ""
-                                    )}
-                                  >
-                                    <Heart
-                                      className={`h-4 w-4 ${
-                                        job.is_saved
-                                          ? "text-red-500 fill-red-500 animate-heart-pop"
-                                          : ""
-                                      }`}
-                                    />
-                                  </Button>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (job.url) {
-                                        window.open(job.url, "_blank");
-                                      } else {
-                                        navigate(
-                                          `/jobs/${encodeURIComponent(job.id)}`
-                                        );
-                                      }
-                                    }}
-                                    className="flex-1"
-                                  >
-                                    Apply Now
-                                    <ExternalLink className="h-4 w-4 ml-2" />
-                                  </Button>
-                                </div>
-                              </div>
                             ) : (
-                              /* Desktop: All details in one row */
+                              <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
+                                <Briefcase className="h-5 w-5 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-sm truncate">
+                              {job.company}
+                            </h3>
+                            <p className="mt-0.5 text-xs text-gray-500 truncate">
+                              {job.location}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Job Title (same as JobsPage) */}
+                        <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+                          {job.title}
+                        </h4>
+
+                        {/* Job Details as chips (same as JobsPage, without salary) */}
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {job.employment_type && (
+                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                              {job.employment_type}
+                            </Badge>
+                          )}
+                          {job.work_arrangement && (
+                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                              {job.work_arrangement}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Match percentage & Save button (same layout as JobsPage) */}
+                        <div className="mt-7 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <RadialProgress
+                              value={job.matchPercentage ?? 0}
+                              size={44}
+                              strokeWidth={5}
+                              showLabel={false}
+                              percentageTextSize="sm"
+                              className="text-breneo-blue"
+                            />
+                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
+                              {getMatchQualityLabel(job.matchPercentage)}
+                            </span>
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              saveJobMutation.mutate(job);
+                            }}
+                            aria-label={
+                              job.is_saved ? "Unsave job" : "Save job"
+                            }
+                            className={cn(
+                              "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                              job.is_saved
+                                ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                : "text-black dark:text-white"
+                            )}
+                          >
+                            <Heart
+                              className={cn(
+                                "h-4 w-4 transition-colors",
+                                job.is_saved
+                                  ? "text-red-500 fill-red-500 animate-heart-pop"
+                                  : "text-black dark:text-white"
+                              )}
+                            />
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex gap-4">
+                        {/* Left Section - Job Details (desktop) */}
+                        <div className="flex-1 p-4 pr-2 rounded-l-lg">
+                          <div className="flex items-start gap-4">
+                            {/* Company Logo */}
+                            <div className="flex-shrink-0 relative w-12 h-12">
+                              {job.company_logo ? (
+                                <img
+                                  src={job.company_logo}
+                                  alt={job.company}
+                                  className="w-12 h-12 rounded-md object-cover border border-gray-300 absolute inset-0 z-10"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                    const fallback =
+                                      target.parentElement?.querySelector(
+                                        ".logo-fallback"
+                                      ) as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = "flex";
+                                      fallback.style.zIndex = "10";
+                                    }
+                                  }}
+                                />
+                              ) : null}
+                              <div
+                                className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center border border-gray-300 logo-fallback absolute inset-0 ${
+                                  job.company_logo ? "z-0" : "z-10"
+                                }`}
+                                style={{
+                                  display: job.company_logo ? "none" : "flex",
+                                }}
+                              >
+                                <Briefcase className="h-6 w-6 text-breneo-blue" />
+                              </div>
+                            </div>
+
+                            {/* Job Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="mb-1 md:mb-2">
+                                <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
+                                  {job.company}
+                                </h3>
+                                <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
+                                  {job.title}
+                                </h4>
+                              </div>
+
+                              {/* Desktop: All details in one row */}
                               <div className="space-y-2">
                                 <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                                   <div className="flex items-center gap-1.5">
@@ -1443,25 +1494,29 @@ const JobSearchResultsPage = () => {
                                   </span>
                                   <div className="flex items-center gap-2">
                                     <Button
-                                      variant="ghost"
-                                      size="sm"
+                                      variant="secondary"
+                                      size="icon"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         saveJobMutation.mutate(job);
                                       }}
+                                      aria-label={
+                                        job.is_saved ? "Unsave job" : "Save job"
+                                      }
                                       className={cn(
-                                        "h-9 w-9 p-0 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50",
+                                        "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                         job.is_saved
-                                          ? "text-red-500 border-red-200 bg-red-50"
-                                          : ""
+                                          ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                          : "text-black dark:text-white"
                                       )}
                                     >
                                       <Heart
-                                        className={`h-4 w-4 ${
+                                        className={cn(
+                                          "h-4 w-4 transition-colors",
                                           job.is_saved
                                             ? "text-red-500 fill-red-500 animate-heart-pop"
-                                            : ""
-                                        }`}
+                                            : "text-black dark:text-white"
+                                        )}
                                       />
                                     </Button>
                                     <Button
@@ -1481,57 +1536,57 @@ const JobSearchResultsPage = () => {
                                       }}
                                     >
                                       Apply Now
-                                      <ExternalLink className="h-4 w-4 ml-2" />
+                                      {/* <ExternalLink className="h-4 w-4 ml-2" /> */}
                                     </Button>
                                   </div>
                                 </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         </div>
+
+                        {/* Right Section - Match Score (desktop only) */}
+                        {job.matchPercentage !== undefined &&
+                          job.matchPercentage > 0 && (
+                            <div className="w-56 flex-shrink-0 p-4 flex flex-col items-center justify-center relative rounded-2xl bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+                              {/* Overflow Menu (optional) */}
+                              <div className="absolute top-3 right-3">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                                >
+                                  <span className="text-lg">⋯</span>
+                                </button>
+                              </div>
+
+                              {/* Radial Progress Bar */}
+                              <div className="mb-3">
+                                <RadialProgress
+                                  value={job.matchPercentage}
+                                  size={60}
+                                  strokeWidth={3}
+                                  showLabel={false}
+                                  percentageTextSize="lg"
+                                  className="justify-center text-green-600"
+                                />
+                              </div>
+
+                              {/* Match Label */}
+                              <div>
+                                <p className="text-base font-bold text-center text-gray-800 dark:text-gray-200">
+                                  {job.matchPercentage >= 70
+                                    ? "GOOD MATCH"
+                                    : job.matchPercentage >= 40
+                                    ? "FAIR MATCH"
+                                    : "POOR MATCH"}
+                                </p>
+                              </div>
+                            </div>
+                          )}
                       </div>
-
-                      {/* Right Section - Match Score */}
-                      {job.matchPercentage !== undefined &&
-                        job.matchPercentage > 0 && (
-                          <div className="w-56 flex-shrink-0 p-4 flex flex-col items-center justify-center relative rounded-2xl bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100">
-                            {/* Overflow Menu (optional) */}
-                            <div className="absolute top-3 right-3">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                                className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                              >
-                                <span className="text-lg">⋯</span>
-                              </button>
-                            </div>
-
-                            {/* Radial Progress Bar */}
-                            <div className="mb-3">
-                              <RadialProgress
-                                value={job.matchPercentage}
-                                size={60}
-                                strokeWidth={3}
-                                showLabel={false}
-                                percentageTextSize="lg"
-                                className="justify-center text-green-600"
-                              />
-                            </div>
-
-                            {/* Match Label */}
-                            <div>
-                              <p className="text-base font-bold text-center text-gray-800 dark:text-gray-200">
-                                {job.matchPercentage >= 70
-                                  ? "GOOD MATCH"
-                                  : job.matchPercentage >= 40
-                                  ? "FAIR MATCH"
-                                  : "POOR MATCH"}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>

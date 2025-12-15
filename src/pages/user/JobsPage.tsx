@@ -2517,34 +2517,29 @@ const JobsPage = () => {
                       {job.title}
                     </h4>
 
-                    {/* Job Details as chips */}
+                    {/* Job Details as chips (without salary) */}
                     <div className="mt-1 flex flex-wrap gap-2">
                       {job.employment_type && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800">
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
                           {job.employment_type}
                         </Badge>
                       )}
                       {job.work_arrangement && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800">
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
                           {job.work_arrangement}
-                        </Badge>
-                      )}
-                      {job.salary && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800">
-                          {job.salary}
                         </Badge>
                       )}
                     </div>
 
                     {/* Match percentage & Save button */}
-                    <div className="mt-5 flex items-center justify-between gap-4">
+                    <div className="mt-7 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <RadialProgress
                           value={job.matchPercentage ?? 0}
-                          size={48}
+                          size={44}
                           strokeWidth={5}
                           showLabel={false}
-                          percentageTextSize="md"
+                          percentageTextSize="sm"
                           className="text-breneo-blue"
                         />
                         <span className="text-xs font-semibold text-gray-700">
@@ -2560,10 +2555,10 @@ const JobsPage = () => {
                         }}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
                         className={cn(
-                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-10 w-10",
+                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                           job.is_saved
-                            ? "text-red-500 bg-red-50 hover:bg-red-50/90"
-                            : "text-black"
+                            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                            : "text-black dark:text-white"
                         )}
                       >
                         <Heart
@@ -2571,7 +2566,7 @@ const JobsPage = () => {
                             "h-4 w-4 transition-colors",
                             job.is_saved
                               ? "text-red-500 fill-red-500 animate-heart-pop"
-                              : "text-black"
+                              : "text-black dark:text-white"
                           )}
                         />
                       </Button>
