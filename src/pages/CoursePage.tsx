@@ -21,6 +21,10 @@ import {
   Award,
   Calendar,
   Eye,
+  DollarSign,
+  RotateCcw,
+  Video,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -400,203 +404,227 @@ const CoursePage = () => {
 
   return (
     <DashboardLayout>
-      <div className="px-4 py-4 sm:px-6 sm:py-6 pb-40 sm:pb-44 space-y-6">
-        {/* Top Section: Course Info and Image in One Card */}
-        <Card className="rounded-3xl mb-6">
-          <CardContent className="p-4 sm:p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-stretch">
-              {/* Left Side: Course Information */}
-              <div className="flex flex-col h-full">
-                <CardTitle className="text-2xl sm:text-3xl font-bold mb-4 text-black">
-                  {course.title}
-                </CardTitle>
-
-                {/* Tags - styled like job chips */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {displayTags.slice(0, 3).map((tag, index) => (
-                    <Badge
-                      key={index}
-                      className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100"
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Academy Name with Logo */}
-                <div className="flex items-center gap-3 mb-4">
-                  <OptimizedAvatar
-                    src={academyImageUrl || undefined}
-                    alt={academyName}
-                    fallback={
-                      academyName ? academyName.charAt(0).toUpperCase() : "A"
-                    }
-                    size="sm"
-                    className="flex-shrink-0 !h-10 !w-10 !rounded-full"
-                  />
-                  <span className="text-gray-600 text-base font-medium">
-                    {academyName}
-                  </span>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 mt-auto">
-                  <Button
-                    onClick={handleSaveCourse}
-                    disabled={isSaving || !user}
-                    variant="secondary"
-                    size="icon"
-                    aria-label={isSaved ? "Unsave course" : "Save course"}
-                    className={cn(
-                      "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
-                      isSaved
-                        ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                        : "text-black dark:text-white"
-                    )}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-black dark:text-white" />
-                    ) : isSaved ? (
-                      <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
-                    ) : (
-                      <Heart className="h-4 w-4 text-black dark:text-white" />
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-10 px-4 text-sm w-full sm:w-auto justify-center"
-                  >
-                    Enroll Now
-                  </Button>
-                </div>
-              </div>
-
-              {/* Right Side: Course Image */}
-              <div className="w-full h-48 sm:h-[300px] flex items-center justify-center overflow-hidden rounded-3xl">
-                <img
-                  src={course.image}
-                  alt={course.title}
-                  className="w-full h-48 sm:h-[300px] object-cover rounded-3xl"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Middle Section: Description and Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Description Section */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">
-              Description
-            </h2>
-            <p className="text-gray-700 leading-relaxed">
-              {course.description || "description here"}
-            </p>
+      <div className="px-4 py-4 sm:px-6 sm:py-6 pb-40 sm:pb-44 mb-16 sm:mb-20 ">
+        {/* Main Content Wrapper */}
+        <div className="max-w-7xl mx-auto pb-20">
+          {/* 1. Cover Image - Outside the main div */}
+          <div className="w-full h-25 overflow-hidden rounded-3xl mb-6 border border-gray-200 dark:border-gray-700">
+            <img
+              src={course.image}
+              alt={course.title}
+              className="w-full h-full object-cover"
+            />
           </div>
 
-          {/* Details Content Card */}
-          <Card className="rounded-3xl">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-xl font-semibold mb-4 text-gray-900">
-                Details content
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-gray-600 flex-shrink-0" />
-                <span className="text-gray-700">{getDurationText()}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Diamond className="h-5 w-5 text-gray-600 flex-shrink-0" />
-                <span className="text-gray-700">100 Points</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Languages className="h-5 w-5 text-gray-600 flex-shrink-0" />
-                <span className="text-gray-700">English</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Award className="h-5 w-5 text-gray-600 flex-shrink-0" />
-                <span className="text-gray-700">Certificate of Completion</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-gray-600 flex-shrink-0" />
-                <span className="text-gray-700">
-                  No due date for this content
+          {/* Main Content Card with Border */}
+          <Card className="rounded-3xl border border-gray-200 dark:border-gray-700">
+            <CardContent className="p-6 sm:p-6 space-y-0">
+              {/* 2. Academy Name */}
+              <div className="flex items-center gap-3 pb-2">
+                <OptimizedAvatar
+                  src={academyImageUrl || undefined}
+                  alt={academyName}
+                  fallback={
+                    academyName ? academyName.charAt(0).toUpperCase() : "A"
+                  }
+                  size="sm"
+                  className="flex-shrink-0 !h-10 !w-10 !rounded-full"
+                />
+                <span className="text-gray-600 text-base font-medium">
+                  {academyName}
                 </span>
+              </div>
+
+              {/* 3. Course Title (smaller font) */}
+              <h1 className="text-xl sm:text-2xl font-bold text-black dark:text-white pb-6">
+                {course.title}
+              </h1>
+
+              {/* 5. Info Cards Section with Registration and Save Buttons */}
+              <div className="border-t border-b border-gray-200 dark:border-gray-700 py-2 px-2 sm:py-4 sm:px-20 ">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
+                  {/* Info Cards */}
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-12 flex-1 w-full sm:w-auto ">
+                    {/* Price Card */}
+                    <div className="flex items-center gap-2 rounded-2xl py-2 flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                        <DollarSign className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          Free
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Course
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Duration Card */}
+                    <div className="flex items-center gap-2  rounded-2xl  py-2 flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                        <RotateCcw className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {course.duration || "2 თვე"}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Duration
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Lectures Card */}
+                    <div className="flex items-center gap-2  rounded-2xl  py-2 flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                        <Video className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {course.topics?.length || 16}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Lectures
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Level Card */}
+                    <div className="flex items-center gap-2  rounded-2xl py-2 flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                        <Users className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {course.level || "All Levels"}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Level
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3 w-full sm:w-auto pb-5 sm:pb-0">
+                    {/* Save button – square */}
+                    <Button
+                      onClick={handleSaveCourse}
+                      disabled={isSaving || !user}
+                      variant="secondary"
+                      size="icon"
+                      aria-label={isSaved ? "Unsave course" : "Save course"}
+                      className={cn(
+                        "h-10 w-10 flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
+                        isSaved
+                          ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                          : "text-black dark:text-white"
+                      )}
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isSaved ? (
+                        <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
+                      ) : (
+                        <Heart className="h-4 w-4" />
+                      )}
+                    </Button>
+
+                    {/* Registration button – full width */}
+                    <Button
+                      size="sm"
+                      className="h-10 w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                    >
+                      რეგისტრაცია
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. Description */}
+              <div className="py-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <img
+                    src="/lovable-uploads/3dicons-notebook-dynamic-color.png"
+                    alt="Notebook"
+                    className="h-12 w-12 object-contain flex-shrink-0"
+                  />
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    What will You learn
+                  </h2>
+                </div>
+                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {course.description || "No description available."}
+                </p>
+              </div>
+
+              {/* About Academy Section */}
+              {academyProfile && (
+                <div className="py-6">
+                  <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
+                    About Academy
+                  </h2>
+                  <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    {/* Academy Logo */}
+                    <div className="flex-shrink-0">
+                      <OptimizedAvatar
+                        src={academyImageUrl || undefined}
+                        alt={academyName}
+                        fallback={
+                          academyName
+                            ? academyName.charAt(0).toUpperCase()
+                            : "A"
+                        }
+                        size="lg"
+                        className="!h-16 !w-16 !rounded-full"
+                      />
+                    </div>
+
+                    {/* Academy Info */}
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                        {academyName}
+                      </h3>
+                      {academyProfile.description ? (
+                        <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
+                          {academyProfile.description}
+                        </p>
+                      ) : (
+                        <p className="text-gray-500 dark:text-gray-500 italic mb-4">
+                          No description available.
+                        </p>
+                      )}
+
+                      {/* View Academy Button */}
+                      <Link to={academyUrl}>
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Academy
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Chips - Moved to bottom */}
+              <div className="flex flex-wrap gap-2 py-6">
+                {displayTags.slice(0, 3).map((tag, index) => (
+                  <Badge
+                    key={index}
+                    className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100"
+                  >
+                    {tag}
+                  </Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Bottom Section: Certificates */}
-        <Card className="rounded-3xl mb-6">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold text-gray-900">
-              Obtain a career. Certificates
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              Complete this course to earn a certificate that demonstrates your
-              skills and knowledge.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* About Academy Section */}
-        {academyProfile && (
-          <Card className="rounded-3xl">
-            <CardHeader>
-              <CardTitle className="text-xl font-semibold text-gray-900 mb-4">
-                About Academy
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4 items-start">
-                {/* Academy Logo */}
-                <div className="flex-shrink-0">
-                  <OptimizedAvatar
-                    src={academyImageUrl || undefined}
-                    alt={academyName}
-                    fallback={
-                      academyName ? academyName.charAt(0).toUpperCase() : "A"
-                    }
-                    size="lg"
-                    className="!h-16 !w-16 !rounded-full"
-                  />
-                </div>
-
-                {/* Academy Info */}
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {academyName}
-                  </h3>
-                  {academyProfile.description ? (
-                    <p className="text-gray-600 leading-relaxed mb-4">
-                      {academyProfile.description}
-                    </p>
-                  ) : (
-                    <p className="text-gray-500 italic mb-4">
-                      No description available.
-                    </p>
-                  )}
-
-                  {/* View Academy Button */}
-                  <Link to={academyUrl}>
-                    <Button
-                      variant="outline"
-                      className="flex items-center gap-2"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View Academy
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DashboardLayout>
   );
