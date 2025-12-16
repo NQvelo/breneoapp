@@ -213,6 +213,58 @@ const calculateMatchPercentage = (
   return Math.min(matchPercentage, 100);
 };
 
+// Function to calculate course match score based on user skills
+const calculateCourseMatchScore = (
+  course: Course,
+  userSkills: string[]
+): number => {
+  // If no user skills, return base score
+  if (!userSkills || userSkills.length === 0) {
+    return 0.5; // Neutral score when no skills available
+  }
+
+  // If course has no required skills, return low score
+  if (!course.required_skills || course.required_skills.length === 0) {
+    return 0.3; // Lower score for courses without skill requirements
+  }
+
+  // Normalize skills for comparison
+  const normalizeSkill = (skill: string) =>
+    skill.toLowerCase().trim().replace(/\s+/g, " ");
+
+  const normalizedUserSkills = userSkills.map(normalizeSkill);
+  const normalizedCourseSkills = course.required_skills.map(normalizeSkill);
+
+  // Count matching skills
+  let matchCount = 0;
+  normalizedCourseSkills.forEach((courseSkill) => {
+    normalizedUserSkills.forEach((userSkill) => {
+      // Exact match - highest score
+      if (userSkill === courseSkill) {
+        matchCount += 2;
+      }
+      // Partial match - medium score
+      else if (
+        courseSkill.includes(userSkill) ||
+        userSkill.includes(courseSkill)
+      ) {
+        matchCount += 1;
+      }
+    });
+  });
+
+  // Calculate match score: (matches / total course skills) * (matches / total user skills)
+  // This gives higher scores to courses that match more of the user's skills
+  const score =
+    matchCount > 0
+      ? (matchCount / normalizedCourseSkills.length) *
+        (matchCount / normalizedUserSkills.length) *
+        10
+      : 0.1;
+
+  return score;
+};
+
 // Function to check if a job is tech-related (for broader filtering)
 const isTechJob = (job: ApiJob): boolean => {
   const textToSearch = [
@@ -286,6 +338,8 @@ interface Course {
   duration: string;
   image: string;
   is_saved?: boolean;
+  required_skills?: string[];
+  match?: number;
 }
 
 // Fetch jobs from job service API - fetch more to have enough for careful filtering
@@ -585,8 +639,54 @@ const UserHome = () => {
       }
       return data || [];
     },
-    enabled: !!user,
+    enabled: !!user && !loadingSkills, // Wait for skills to load
   });
+
+  // Filter and sort courses based on user skills
+  const filteredCourses: Course[] = useMemo(() => {
+    if (!courses || courses.length === 0) {
+      return [];
+    }
+
+    // If user has no skills, show all courses (sorted by created_at)
+    if (!userTopSkills || userTopSkills.length === 0) {
+      return courses.map((course) => ({
+        ...course,
+        match: 0.5, // Neutral match score
+      }));
+    }
+
+    // Calculate match scores for each course
+    const coursesWithScores = courses.map((course) => ({
+      ...course,
+      match: calculateCourseMatchScore(course, userTopSkills),
+    }));
+
+    // Sort by match score (highest first), then by created_at (newest first)
+    coursesWithScores.sort((a, b) => {
+      // First sort by match score
+      if (Math.abs((a.match || 0) - (b.match || 0)) > 0.1) {
+        return (b.match || 0) - (a.match || 0);
+      }
+      // If scores are similar, prioritize courses with required_skills
+      const aHasSkills = a.required_skills && a.required_skills.length > 0;
+      const bHasSkills = b.required_skills && b.required_skills.length > 0;
+      if (aHasSkills && !bHasSkills) return -1;
+      if (!aHasSkills && bHasSkills) return 1;
+      // Finally, sort by created_at (newest first)
+      return 0;
+    });
+
+    // Return top courses (prioritize those with matches, but show some variety)
+    // Show courses with match score > 0.1 first, then fill with others
+    const matchedCourses = coursesWithScores.filter(
+      (c) => (c.match || 0) > 0.1
+    );
+    const otherCourses = coursesWithScores.filter((c) => (c.match || 0) <= 0.1);
+
+    // Combine: matched courses first, then others (up to 20 total)
+    return [...matchedCourses, ...otherCourses].slice(0, 20);
+  }, [courses, userTopSkills]);
 
   // Save/unsave course mutation
   const saveCourseMutation = useMutation({
@@ -1213,7 +1313,7 @@ const UserHome = () => {
                     Top courses picked for you
                   </h2>
                 </div>
-                {!coursesLoading && courses.length > 0 && (
+                {!coursesLoading && filteredCourses.length > 0 && (
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
@@ -1255,7 +1355,7 @@ const UserHome = () => {
                     </Card>
                   ))}
                 </div>
-              ) : courses.length === 0 ? (
+              ) : filteredCourses.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <GraduationCap className="h-12 w-12 text-gray-400 mx-auto mb-3" />
@@ -1269,7 +1369,7 @@ const UserHome = () => {
                   ref={coursesScrollRef}
                   className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
                 >
-                  {courses.map((course) => {
+                  {filteredCourses.map((course) => {
                     const isCourseSaved = savedCourses.includes(
                       String(course.id)
                     );

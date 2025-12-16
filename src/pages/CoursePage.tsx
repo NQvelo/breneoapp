@@ -27,6 +27,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface AcademyProfile {
   id: string;
@@ -42,6 +43,7 @@ const CoursePage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
+  const t = useTranslation();
 
   const { data: course, isLoading } = useQuery({
     queryKey: ["course", courseId],
@@ -408,7 +410,7 @@ const CoursePage = () => {
         {/* Main Content Wrapper */}
         <div className="max-w-7xl mx-auto pb-20">
           {/* 1. Cover Image - Outside the main div */}
-          <div className="w-full h-25 overflow-hidden rounded-3xl mb-6 border border-gray-200 dark:border-gray-700">
+          <div className="w-full h-40 sm:h-80 overflow-hidden rounded-3xl mb-6 border border-gray-200 dark:border-gray-700">
             <img
               src={course.image}
               alt={course.title}
@@ -536,7 +538,7 @@ const CoursePage = () => {
                       size="sm"
                       className="h-10 w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
                     >
-                      რეგისტრაცია
+                      {t.courses.enroll}
                     </Button>
                   </div>
                 </div>

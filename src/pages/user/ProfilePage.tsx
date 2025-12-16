@@ -69,6 +69,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import {
   Briefcase,
   GraduationCap,
@@ -128,6 +129,8 @@ interface SavedCourse {
   duration: string;
   image: string;
   description: string;
+  academy_id?: string | null;
+  academy_logo?: string | null;
 }
 
 /**
@@ -421,7 +424,7 @@ const ProfilePage = () => {
         const { data: coursesData, error: coursesError } = await supabase
           .from("courses")
           .select(
-            "id, title, provider, category, level, duration, image, description"
+            "id, title, provider, category, level, duration, image, description, academy_id"
           )
           .in("id", limitedIds);
 
@@ -433,7 +436,66 @@ const ProfilePage = () => {
           return [];
         }
 
+        // Get unique academy_ids
+        const uniqueAcademyIds = [
+          ...new Set(
+            coursesData
+              ?.map((c) => c.academy_id)
+              .filter((id): id is string => !!id) || []
+          ),
+        ];
+
+        // Fetch academy profiles from Django API
+        const academyProfilesMap = new Map<string, string | null>();
+
+        if (uniqueAcademyIds.length > 0) {
+          await Promise.all(
+            uniqueAcademyIds.map(async (academyId) => {
+              try {
+                const response = await apiClient.get(
+                  `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`
+                );
+
+                if (response.data) {
+                  const responseData = response.data as Record<string, unknown>;
+                  const profileData =
+                    (responseData.profile_data as Record<string, unknown>) ||
+                    responseData;
+
+                  const getStringField = (
+                    field: string,
+                    source: Record<string, unknown> = profileData
+                  ) => {
+                    const value = source[field];
+                    return typeof value === "string" ? value : undefined;
+                  };
+
+                  const logoUrl =
+                    getStringField("logo_url", profileData) ||
+                    getStringField("logoUrl", profileData) ||
+                    getStringField("logo", profileData) ||
+                    getStringField("logo_url", responseData) ||
+                    getStringField("logoUrl", responseData) ||
+                    null;
+
+                  academyProfilesMap.set(academyId, logoUrl);
+                }
+              } catch (error) {
+                console.debug(
+                  `Could not fetch academy profile for ${academyId}`
+                );
+                academyProfilesMap.set(academyId, null);
+              }
+            })
+          );
+        }
+
         return (coursesData || []).map((course) => {
+          const academyLogo =
+            course.academy_id && academyProfilesMap.has(course.academy_id)
+              ? academyProfilesMap.get(course.academy_id) || null
+              : null;
+
           return {
             id: course.id,
             title: course.title || "",
@@ -443,6 +505,8 @@ const ProfilePage = () => {
             duration: course.duration || "",
             image: normalizeImagePath(course.image),
             description: course.description || "",
+            academy_id: course.academy_id || null,
+            academy_logo: academyLogo ? normalizeImagePath(academyLogo) : null,
           } as SavedCourse;
         });
       } catch (error) {
@@ -2961,16 +3025,22 @@ const ProfilePage = () => {
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex-shrink-0">
-                            <img
-                              src={normalizeImagePath(course.image)}
-                              alt={course.title}
-                              className="w-12 h-12 rounded-3xl object-cover cursor-pointer"
-                              onClick={() => navigate(`/course/${course.id}`)}
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = "/lovable-uploads/no_photo.png";
-                              }}
-                            />
+                            {course.academy_logo ? (
+                              <img
+                                src={course.academy_logo}
+                                alt={`${course.provider} logo`}
+                                className="w-12 h-12 rounded-3xl object-cover cursor-pointer border border-gray-200 dark:border-gray-700"
+                                onClick={() => navigate(`/course/${course.id}`)}
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = "/lovable-uploads/no_photo.png";
+                                }}
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-3xl bg-breneo-accent flex items-center justify-center cursor-pointer">
+                                <GraduationCap className="h-6 w-6 text-white" />
+                              </div>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2 mb-1">
@@ -2982,20 +3052,20 @@ const ProfilePage = () => {
                               </h4>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-7 border-breneo-blue text-breneo-blue hover:bg-breneo-blue hover:text-white"
+                                  variant="secondary"
+                                  size="icon"
+                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     navigate(`/course/${course.id}`);
                                   }}
+                                  aria-label="View course"
                                 >
-                                  View
+                                  <ExternalLink className="h-4 w-4 text-black dark:text-white" />
                                 </Button>
                                 <Button
                                   variant="secondary"
-                                  size="sm"
-                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-7 w-7 p-0 rounded-full"
+                                  size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     saveCourseMutation.mutate(course.id);
@@ -3006,16 +3076,23 @@ const ProfilePage = () => {
                                       ? "Unsave course"
                                       : "Save course"
                                   }
+                                  className={cn(
+                                    "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
+                                    isCourseSaved
+                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      : "text-black dark:text-white"
+                                  )}
                                 >
                                   {saveCourseMutation.isPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Heart
-                                      className={`h-3 w-3 transition-colors ${
+                                      className={cn(
+                                        "h-4 w-4 transition-colors",
                                         isCourseSaved
                                           ? "text-red-500 fill-red-500 animate-heart-pop"
-                                          : "text-black"
-                                      }`}
+                                          : "text-black dark:text-white"
+                                      )}
                                     />
                                   )}
                                 </Button>
@@ -3150,9 +3227,9 @@ const ProfilePage = () => {
                               </h4>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-7 border-breneo-blue text-breneo-blue hover:bg-breneo-blue hover:text-white"
+                                  variant="secondary"
+                                  size="icon"
+                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (job.url) {
@@ -3163,13 +3240,13 @@ const ProfilePage = () => {
                                       );
                                     }
                                   }}
+                                  aria-label="View job"
                                 >
-                                  View
+                                  <ExternalLink className="h-4 w-4 text-black dark:text-white" />
                                 </Button>
                                 <Button
                                   variant="secondary"
-                                  size="sm"
-                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 h-7 w-7 p-0 rounded-full"
+                                  size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     saveJobMutation.mutate(job.id);
@@ -3178,16 +3255,23 @@ const ProfilePage = () => {
                                   aria-label={
                                     isJobSaved ? "Unsave job" : "Save job"
                                   }
+                                  className={cn(
+                                    "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
+                                    isJobSaved
+                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      : "text-black dark:text-white"
+                                  )}
                                 >
                                   {saveJobMutation.isPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Heart
-                                      className={`h-3 w-3 transition-colors ${
+                                      className={cn(
+                                        "h-4 w-4 transition-colors",
                                         isJobSaved
                                           ? "text-red-500 fill-red-500 animate-heart-pop"
-                                          : "text-black"
-                                      }`}
+                                          : "text-black dark:text-white"
+                                      )}
                                     />
                                   )}
                                 </Button>

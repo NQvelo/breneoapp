@@ -37,6 +37,7 @@ import { CourseFilterModal } from "@/components/courses/CourseFilterModal";
 import { countries } from "@/data/countries";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { useMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 // Session storage keys
 const COURSES_FILTERS_STORAGE_KEY = "coursesFilters";
@@ -920,21 +921,33 @@ const CoursesPage = () => {
       },
     });
 
+    const isCourseSaved = savedCourses?.includes(String(course.id));
+
     return (
       <Button
+        variant="secondary"
         size="icon"
-        variant="outline"
-        className="h-10 w-10 rounded-3xl border-gray-300"
-        onClick={() => saveCourseMutation.mutate(String(course.id))}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          saveCourseMutation.mutate(String(course.id));
+        }}
         disabled={saveCourseMutation.isPending}
-        aria-label={course.is_saved ? "Unsave course" : "Save course"}
+        aria-label={isCourseSaved ? "Unsave course" : "Save course"}
+        className={cn(
+          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
+          isCourseSaved
+            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+            : "text-black dark:text-white"
+        )}
       >
         <Heart
-          className={`h-5 w-5 transition-colors ${
-            course.is_saved
+          className={cn(
+            "h-4 w-4 transition-colors",
+            isCourseSaved
               ? "text-red-500 fill-red-500 animate-heart-pop"
-              : "text-gray-400 hover:text-black"
-          }`}
+              : "text-black dark:text-white"
+          )}
         />
       </Button>
     );
@@ -1057,125 +1070,48 @@ const CoursesPage = () => {
   };
 
   const renderCourseCard = (course: Course) => {
-    const academyProfileName = course.academy_profile_data?.academy_name || "";
-    const academyName =
-      academyProfileName || course.provider || "Unknown Academy";
-    const academyId = course.academy_id;
-    const academyUrl = academyId
-      ? `/academy/${academyId}`
-      : `/academy/${createAcademySlug(academyName)}`;
-
     return (
-      <Card className="flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 h-full rounded-3xl">
-        <CardContent className="p-5 flex flex-col flex-grow">
-          {/* Course Image */}
-          <div className="relative h-40 overflow-hidden rounded-3xl mb-4 bg-gradient-to-br from-gray-100 to-gray-200">
-            <img
-              src={
-                course.image &&
-                !course.image.startsWith("http") &&
-                !course.image.startsWith("/")
-                  ? `/${course.image}`
-                  : course.image || "/lovable-uploads/no_photo.png"
-              }
-              alt={course.title}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                // Prevent infinite loop - only set fallback if not already set
-                if (!target.src.includes("/lovable-uploads/no_photo.png")) {
-                  target.onerror = null; // Remove error handler to prevent loop
-                  target.src = "/lovable-uploads/no_photo.png";
-                } else {
-                  // Already trying to load fallback, stop retrying
-                  target.onerror = null;
+      <Link to={`/course/${course.id}`} className="block">
+        <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col">
+          <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
+            <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
+              <img
+                src={
+                  course.image &&
+                  !course.image.startsWith("http") &&
+                  !course.image.startsWith("/")
+                    ? `/${course.image}`
+                    : course.image || "/placeholder.svg"
                 }
-              }}
-            />
-            <div className="absolute top-3 right-3">
-              <Badge
-                variant="secondary"
-                className="bg-white/90 backdrop-blur-sm text-gray-900 font-semibold shadow-md"
-              >
-                {course.match}% Match
-              </Badge>
+                alt={course.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 origin-center"
+                style={{ transformOrigin: "center center" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/placeholder.svg";
+                }}
+              />
             </div>
-          </div>
+            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
+              <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
+                {course.title}
+              </h3>
 
-          {/* Academy/Provider Info */}
-          <div className="flex items-start gap-3 mb-3">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
-                <GraduationCap className="h-5 w-5 text-white" />
+              <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {course.duration && (
+                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                      {course.duration}
+                    </Badge>
+                  )}
+                </div>
+                <div onClick={(e) => e.preventDefault()}>
+                  <SaveCourseButton course={course} />
+                </div>
               </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <Link
-                to={academyUrl}
-                className="block group/link"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="font-semibold text-sm mb-1 truncate group-hover/link:text-breneo-accent transition-colors">
-                  {academyName}
-                </h3>
-              </Link>
-              <p className="text-xs text-gray-500 truncate">
-                {course.category}
-              </p>
-            </div>
-          </div>
-
-          {/* Course Title */}
-          <h4
-            className="font-bold text-lg mb-3 line-clamp-2 cursor-pointer hover:text-breneo-accent transition-colors"
-            onClick={() => navigate(`/course/${course.id}`)}
-          >
-            {course.title}
-          </h4>
-
-          {/* Course Details */}
-          <div className="space-y-2 mb-4 flex-grow">
-            {/* Level */}
-            <div className="flex items-center gap-2 text-sm">
-              <TrendingUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <span className="text-gray-700">{course.level}</span>
-            </div>
-
-            {/* Duration */}
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <span className="text-gray-700">{course.duration}</span>
-            </div>
-
-            {/* Required Skills */}
-            {course.required_skills && course.required_skills.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {course.required_skills.slice(0, 3).map((skill) => (
-                  <Badge key={skill} variant="secondary" className="text-xs">
-                    {skill}
-                  </Badge>
-                ))}
-                {course.required_skills.length > 3 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{course.required_skills.length - 3}
-                  </Badge>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 mt-auto pt-4 border-t border-gray-100">
-            <Button
-              onClick={() => navigate(`/course/${course.id}`)}
-              className="flex-1 bg-black text-white hover:bg-gray-800 rounded-3xl"
-            >
-              View Course
-            </Button>
-            <SaveCourseButton course={course} />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </Link>
     );
   };
 
