@@ -419,8 +419,8 @@ const CoursePage = () => {
           </div>
 
           {/* Main Content Card with Border */}
-          <Card className="rounded-3xl border border-gray-200 dark:border-gray-700">
-            <CardContent className="p-6 sm:p-6 space-y-0">
+          <Card className=" rounded-3xl border-0 bg-transparent sm:border sm:border-border sm:bg-white dark:sm:bg-background">
+            <CardContent className="p-2 sm:p-6 space-y-0">
               {/* 2. Academy Name */}
               <div className="flex items-center gap-3 pb-2">
                 <OptimizedAvatar
@@ -510,33 +510,30 @@ const CoursePage = () => {
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-3 w-full sm:w-auto pb-5 sm:pb-0">
-                    {/* Save button – square */}
                     <Button
                       onClick={handleSaveCourse}
                       disabled={isSaving || !user}
                       variant="secondary"
                       size="icon"
-                      aria-label={isSaved ? "Unsave course" : "Save course"}
                       className={cn(
-                        "h-10 w-10 flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
+                        "aspect-square bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A]",
                         isSaved
-                          ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                          : "text-black dark:text-white"
+                          ? "text-white-500 bg-[#E6E7EB] dark:bg-[#474747] "
+                          : "text-black dark:text-white "
                       )}
                     >
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : isSaved ? (
-                        <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-heart-pop" />
+                        <Heart className="h-4 w-4 fill-red-500 text-red-500" />
                       ) : (
                         <Heart className="h-4 w-4" />
                       )}
                     </Button>
 
-                    {/* Registration button – full width */}
                     <Button
-                      size="sm"
-                      className="h-10 w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                      size="default"
+                      className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
                     >
                       {t.courses.enroll}
                     </Button>

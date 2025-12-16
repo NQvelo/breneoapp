@@ -233,6 +233,9 @@ export const en = {
     past: "Past",
     register: "Register",
     registered: "Registered",
+    comingsoon: "Coming Soon",
+    comingsoondescription:
+      "We’re adding a brand new page to Breneo very soon! Stay tuned for fresh features and updates that will make your experience even better.",
   },
   // Beta Version
   beta: {

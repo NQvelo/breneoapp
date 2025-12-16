@@ -305,7 +305,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     {!collapsed && (
                       <span
                         className={cn(
-                          "font-medium text-base transition-colors duration-200 flex items-center gap-5",
+                          "font-medium text-base transition-colors duration-200 flex items-center gap-3",
                           isActive
                             ? "text-breneo-blue"
                             : "text-gray-600 group-hover:text-breneo-blue"
@@ -313,7 +313,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                       >
                         {item.label}
                         {item.href === "/webinars" && (
-                          <Badge className="bg-breneo-blue text-white border-0 px-4 py-0.8 text-[12px] font-semibold hidden md:inline-flex">
+                          <Badge className="bg-breneo-blue text-white border-0 px-3 py-0.8 text-[12px] font-semibold hidden md:inline-flex">
                             Soon
                           </Badge>
                         )}
