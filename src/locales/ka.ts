@@ -234,4 +234,9 @@ export const ka = {
     register: "რეგისტრაცია",
     registered: "დარეგისტრირებულია",
   },
+  // Beta Version
+  beta: {
+    title: "ბეტა ვერსია",
+    message: "ეს არის ბეტა ვერსია და ჩვენ ვმუშაობთ განახლებებზე.",
+  },
 };

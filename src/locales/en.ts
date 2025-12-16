@@ -234,4 +234,10 @@ export const en = {
     register: "Register",
     registered: "Registered",
   },
+  // Beta Version
+  beta: {
+    title: "You’re using the beta version",
+    message:
+      "Some features may be limited or change as we continue improving the platform. We appreciate your feedback. it helps us build a better experience.",
+  },
 };

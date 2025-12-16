@@ -7,6 +7,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { RadialProgress } from "@/components/ui/radial-progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerClose,
+} from "@/components/ui/drawer";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useMobile } from "@/hooks/use-mobile";
@@ -384,6 +399,7 @@ const UserHome = () => {
   const coursesScrollRef = useRef<HTMLDivElement>(null);
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
+  const [isBetaModalOpen, setIsBetaModalOpen] = useState(false);
 
   // Fetch user's top skills from skill test results
   useEffect(() => {
@@ -534,6 +550,11 @@ const UserHome = () => {
 
     fetchUserSkills();
   }, [user]);
+
+  // Open beta modal when component mounts
+  useEffect(() => {
+    setIsBetaModalOpen(true);
+  }, []);
 
   // Fetch saved jobs
   const { data: savedJobs = [] } = useQuery<string[]>({
@@ -904,7 +925,10 @@ const UserHome = () => {
 
         // Calculate skill-based match percentage using all user top skills
         const jobSkills = extractJobSkills(job);
-        const matchPercentage = calculateMatchPercentage(userTopSkills, jobSkills);
+        const matchPercentage = calculateMatchPercentage(
+          userTopSkills,
+          jobSkills
+        );
 
         const transformedJob: Job = {
           id: jobId,
@@ -1279,7 +1303,9 @@ const UserHome = () => {
                               e.stopPropagation();
                               saveJobMutation.mutate(job);
                             }}
-                            aria-label={job.is_saved ? "Unsave job" : "Save job"}
+                            aria-label={
+                              job.is_saved ? "Unsave job" : "Save job"
+                            }
                             className={cn(
                               "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                               job.is_saved
@@ -1450,6 +1476,70 @@ const UserHome = () => {
           </div>
         </div>
       </div>
+
+      {/* Beta Version Modal */}
+      {isMobile ? (
+        <Drawer open={isBetaModalOpen} onOpenChange={setIsBetaModalOpen}>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader>
+              <DrawerTitle className="text-xl font-bold">
+                {t.beta.title}
+              </DrawerTitle>
+            </DrawerHeader>
+            <div className="px-6 pb-2">
+              <div className="flex-1 px-6 pb-4 flex flex-col items-center justify-center">
+                <img
+                  src="/lovable-uploads/3dicons-rocket-front-color.png"
+                  alt="Rocket"
+                  className="w-32 h-32 md:w-40 md:h-40 object-contain mt-4"
+                />
+              </div>
+              <DrawerDescription className="text-base">
+                {t.beta.message}
+              </DrawerDescription>
+            </div>
+
+            <div className="p-4">
+              <DrawerClose asChild>
+                <Button variant="default" className="w-full">
+                  {t.common.close}
+                </Button>
+              </DrawerClose>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={isBetaModalOpen} onOpenChange={setIsBetaModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">
+                {t.beta.title}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col items-center justify-center py-4">
+              <img
+                src="/lovable-uploads/3dicons-rocket-front-color.png"
+                alt="Rocket"
+                className="w-32 h-32 md:w-40 md:h-40 object-contain"
+              />
+            </div>
+            <div className="px-0 pb-2">
+              <DialogDescription className="text-base">
+                {t.beta.message}
+              </DialogDescription>
+            </div>
+
+            <div className="flex justify-end pt-4">
+              <Button
+                variant="default"
+                onClick={() => setIsBetaModalOpen(false)}
+              >
+                {t.common.close}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 };
