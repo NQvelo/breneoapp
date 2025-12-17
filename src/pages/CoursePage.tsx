@@ -419,10 +419,10 @@ const CoursePage = () => {
           </div>
 
           {/* Main Content Card with Border */}
-          <Card className=" rounded-3xl border-0 bg-transparent sm:border sm:border-border sm:bg-white dark:sm:bg-background">
-            <CardContent className="p-2 sm:p-6 space-y-0">
+          <Card className=" rounded-3xl border-0 bg-transparent sm:border sm:border-border sm:bg-white sm:dark:bg-white">
+            <CardContent className="p-0 sm:p-6 space-y-0 ">
               {/* 2. Academy Name */}
-              <div className="flex items-center gap-3 pb-2">
+              <div className="flex items-center gap-3 pb-2 ">
                 <OptimizedAvatar
                   src={academyImageUrl || undefined}
                   alt={academyName}
@@ -443,73 +443,105 @@ const CoursePage = () => {
               </h1>
 
               {/* 5. Info Cards Section with Registration and Save Buttons */}
-              <div className="border-t border-b border-gray-200 dark:border-gray-700 py-2 px-2 sm:py-4 sm:px-20 ">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
+              <div className=" dark:border-gray-700 py-0 px-0 sm:py-5 sm:px-0 bg-white dark:bg-white rounded-3xl py-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 sm:gap-6">
                   {/* Info Cards */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-12 flex-1 w-full sm:w-auto ">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-12 flex-1 w-full sm:w-auto  rounded-2xl sm:rounded-none p-0 sm:p-0">
                     {/* Price Card */}
-                    <div className="flex items-center gap-2 rounded-2xl py-2 flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                        <DollarSign className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                          <DollarSign className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        </div>
+                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           Free
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Course
-                        </span>
+                        <div className="hidden sm:flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            Free
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Course
+                          </span>
+                        </div>
                       </div>
+                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
+                        Course
+                      </span>
                     </div>
 
                     {/* Duration Card */}
-                    <div className="flex items-center gap-2  rounded-2xl  py-2 flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                        <RotateCcw className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                          <RotateCcw className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        </div>
+                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           {course.duration || "2 თვე"}
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Duration
-                        </span>
+                        <div className="hidden sm:flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {course.duration || "2 თვე"}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Duration
+                          </span>
+                        </div>
                       </div>
+                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
+                        Duration
+                      </span>
                     </div>
 
                     {/* Lectures Card */}
-                    <div className="flex items-center gap-2  rounded-2xl  py-2 flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                        <Video className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                          <Video className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        </div>
+                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           {course.topics?.length || 16}
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Lectures
-                        </span>
+                        <div className="hidden sm:flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {course.topics?.length || 16}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Lectures
+                          </span>
+                        </div>
                       </div>
+                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
+                        Lectures
+                      </span>
                     </div>
 
                     {/* Level Card */}
-                    <div className="flex items-center gap-2  rounded-2xl py-2 flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-breneo-blue/20 dark:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                        <Users className="h-4 w-4 text-breneo-blue dark:text-breneo-blue" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
+                          <Users className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        </div>
+                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           {course.level || "All Levels"}
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          Level
-                        </span>
+                        <div className="hidden sm:flex flex-col">
+                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {course.level || "All Levels"}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Level
+                          </span>
+                        </div>
                       </div>
+                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
+                        Level
+                      </span>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-3 w-full sm:w-auto pb-5 sm:pb-0">
+                  <div className="flex items-center gap-3 w-full sm:w-auto pb-0 sm:pb-0">
                     <Button
                       onClick={handleSaveCourse}
                       disabled={isSaving || !user}

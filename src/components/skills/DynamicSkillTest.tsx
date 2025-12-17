@@ -709,13 +709,13 @@ export function DynamicSkillTest({
       //   total_questions_value: resultsToSave.total_questions,
       // });
 
-      // Wait 5 seconds before saving and redirecting
+      // Wait 10 seconds before saving and redirecting
       setTimeout(() => {
-        console.log("✅ 5 seconds passed, saving results now");
+        console.log("✅ 10 seconds passed, saving results now");
         setIsCalculatingResults(false);
         setPhase("finished");
         saveTestResults(resultsToSave);
-      }, 5000);
+      }, 10000);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [techDone, softDone, results, user]);
