@@ -49,7 +49,7 @@ const ProgressBar = ({
     const isActive = stage >= step.index;
     const isCompleted = stage > step.index;
     return (
-      <div className="flex-1 flex flex-col items-center min-w-[80px] md:min-w-[120px]">
+      <div className="flex-1 flex flex-col items-center min-w-[70px] md:min-w-[120px]">
         <div
           className={`h-2 md:h-3 w-full rounded-full transition-all duration-500 flex items-center justify-center ${
             isCompleted
@@ -247,7 +247,7 @@ const SkillTestPage = () => {
               <DrawerFooter className="flex flex-col gap-2">
                 <Button
                   onClick={handleStayHere}
-                  className="w-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90"
+                  className="w-full bg-primary hover:opacity-90"
                 >
                   Stay Here
                 </Button>
@@ -273,7 +273,7 @@ const SkillTestPage = () => {
               <DialogFooter className="flex flex-col gap-2">
                 <Button
                   onClick={handleStayHere}
-                  className="w-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90"
+                  className="w-full bg-primary hover:opacity-90"
                 >
                   Stay Here
                 </Button>
@@ -390,7 +390,7 @@ const SkillTestPage = () => {
             <DrawerFooter className="flex flex-col gap-2">
               <Button
                 onClick={handleStayHere}
-                className="w-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90"
+                className="w-full bg-primary hover:opacity-90"
               >
                 Stay Here
               </Button>
@@ -416,7 +416,7 @@ const SkillTestPage = () => {
             <DialogFooter className="flex flex-col gap-2">
               <Button
                 onClick={handleStayHere}
-                className="w-full bg-gradient-to-br from-[#01bfff] to-[#0088cc] hover:opacity-90"
+                className="w-full bg-primary hover:opacity-90"
               >
                 Stay Here
               </Button>

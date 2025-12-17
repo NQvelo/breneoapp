@@ -1045,7 +1045,7 @@ const UserHome = () => {
       {isMobile && (
         <div className="mb-4 px-4 md:hidden">
           <h1 className="text-xl font-semibold text-foreground">
-            Welcome,{" "}
+            {t.auth.welcome},{" "}
             <span className="font-bold">
               {user?.first_name || user?.email?.split("@")[0] || "User"}
             </span>
