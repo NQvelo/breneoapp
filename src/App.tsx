@@ -14,7 +14,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { FontSizeProvider } from "./contexts/FontSizeContext";
 import { AppRoutes } from "./routes/AppRoutes";
-import { BetaVersionModal } from "./components/common/BetaVersionModal";
 
 const queryClient = new QueryClient();
 
@@ -35,7 +34,6 @@ const App = () => (
         <FontSizeProvider>
           <LanguageProvider>
             <AuthProvider>
-              <BetaVersionModal />
               <AppRoutes />
             </AuthProvider>
           </LanguageProvider>

@@ -53,6 +53,7 @@ import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { filterATSJobs } from "@/utils/jobFilterUtils";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 
 // Function to extract skills from job data (same as in JobsPage.tsx)
 const extractJobSkills = (job: ApiJob): string[] => {
@@ -1041,6 +1042,7 @@ const UserHome = () => {
 
   return (
     <DashboardLayout>
+      <BetaVersionModal />
       {/* Mobile Welcome Message */}
       {isMobile && (
         <div className="mb-4 px-4 md:hidden">
@@ -1476,70 +1478,6 @@ const UserHome = () => {
           </div>
         </div>
       </div>
-
-      {/* Beta Version Modal */}
-      {isMobile ? (
-        <Drawer open={isBetaModalOpen} onOpenChange={setIsBetaModalOpen}>
-          <DrawerContent className="max-h-[85vh]">
-            <DrawerHeader>
-              <DrawerTitle className="text-xl font-bold">
-                {t.beta.title}
-              </DrawerTitle>
-            </DrawerHeader>
-            <div className="px-6 pb-2">
-              <div className="flex-1 px-6 pb-4 flex flex-col items-center justify-center">
-                <img
-                  src="/lovable-uploads/3dicons-rocket-front-color.png"
-                  alt="Rocket"
-                  className="w-32 h-32 md:w-40 md:h-40 object-contain mt-4"
-                />
-              </div>
-              <DrawerDescription className="text-base">
-                {t.beta.message}
-              </DrawerDescription>
-            </div>
-
-            <div className="p-4">
-              <DrawerClose asChild>
-                <Button variant="default" className="w-full">
-                  {t.common.close}
-                </Button>
-              </DrawerClose>
-            </div>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog open={isBetaModalOpen} onOpenChange={setIsBetaModalOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-bold">
-                {t.beta.title}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col items-center justify-center py-4">
-              <img
-                src="/lovable-uploads/3dicons-rocket-front-color.png"
-                alt="Rocket"
-                className="w-32 h-32 md:w-40 md:h-40 object-contain"
-              />
-            </div>
-            <div className="px-0 pb-2">
-              <DialogDescription className="text-base">
-                {t.beta.message}
-              </DialogDescription>
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <Button
-                variant="default"
-                onClick={() => setIsBetaModalOpen(false)}
-              >
-                {t.common.close}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </DashboardLayout>
   );
 };

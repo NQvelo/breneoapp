@@ -28,8 +28,8 @@ export const BetaVersionModal: React.FC = () => {
   const { t } = useLanguage();
 
   useEffect(() => {
-    // Check if modal has been shown before
-    const hasBeenShown = localStorage.getItem(BETA_MODAL_SHOWN_KEY);
+    // Check if modal has been shown in this session
+    const hasBeenShown = sessionStorage.getItem(BETA_MODAL_SHOWN_KEY);
     if (!hasBeenShown) {
       // Small delay to ensure the app is fully loaded
       const timer = setTimeout(() => {
@@ -41,8 +41,8 @@ export const BetaVersionModal: React.FC = () => {
 
   const handleClose = () => {
     setIsOpen(false);
-    // Mark as shown so it doesn't appear again
-    localStorage.setItem(BETA_MODAL_SHOWN_KEY, "true");
+    // Mark as shown in this session so it doesn't appear again
+    sessionStorage.setItem(BETA_MODAL_SHOWN_KEY, "true");
   };
 
   if (isMobile) {
@@ -50,24 +50,30 @@ export const BetaVersionModal: React.FC = () => {
       <Drawer open={isOpen} onOpenChange={handleClose}>
         <DrawerContent className="max-h-[85vh]">
           <DrawerHeader>
-            <DrawerTitle className="text-xl font-semibold">
-              {t.beta?.title || "Beta Version"}
+            <DrawerTitle className="text-xl font-bold">
+              {t.beta.title}
             </DrawerTitle>
-            <DrawerDescription className="text-base mt-2">
-              {t.beta?.message || "This is a beta version and we are working on updates."}
-            </DrawerDescription>
           </DrawerHeader>
-          <DrawerFooter className="pt-4">
+          <div className="px-6 pb-2">
+            <div className="flex-1 px-6 pb-4 flex flex-col items-center justify-center">
+              <img
+                src="/lovable-uploads/3dicons-rocket-front-color.png"
+                alt="Rocket"
+                className="w-32 h-32 md:w-40 md:h-40 object-contain mt-4"
+              />
+            </div>
+            <DrawerDescription className="text-base">
+              {t.beta.message}
+            </DrawerDescription>
+          </div>
+
+          <div className="p-4">
             <DrawerClose asChild>
-              <Button 
-                onClick={handleClose} 
-                className="w-full"
-                size="lg"
-              >
-                {t.common?.close || "Close"}
+              <Button variant="default" className="w-full">
+                {t.common.close}
               </Button>
             </DrawerClose>
-          </DrawerFooter>
+          </div>
         </DrawerContent>
       </Drawer>
     );
@@ -77,24 +83,29 @@ export const BetaVersionModal: React.FC = () => {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            {t.beta?.title || "Beta Version"}
+          <DialogTitle className="text-xl font-bold">
+            {t.beta.title}
           </DialogTitle>
-          <DialogDescription className="text-base mt-2">
-            {t.beta?.message || "This is a beta version and we are working on updates."}
-          </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="pt-4">
-          <Button 
-            onClick={handleClose} 
-            className="w-full sm:w-auto"
-            size="lg"
-          >
-            {t.common?.close || "Close"}
+        <div className="flex flex-col items-center justify-center py-4">
+          <img
+            src="/lovable-uploads/3dicons-rocket-front-color.png"
+            alt="Rocket"
+            className="w-32 h-32 md:w-40 md:h-40 object-contain"
+          />
+        </div>
+        <div className="px-0 pb-2">
+          <DialogDescription className="text-base">
+            {t.beta.message}
+          </DialogDescription>
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button variant="default" onClick={handleClose}>
+            {t.common.close}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
 };
-

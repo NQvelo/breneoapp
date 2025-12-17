@@ -83,6 +83,7 @@ import {
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
+import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 
 // Updated Job interface for the new API
 interface Job {
@@ -2200,6 +2201,8 @@ const JobsPage = () => {
 
   return (
     <DashboardLayout>
+      <BetaVersionModal />
+
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
