@@ -79,6 +79,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
@@ -306,6 +307,7 @@ const ProfilePage = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
+  const [progressValue, setProgressValue] = useState(0);
 
   // Initialize profile image from user context on mount
   useEffect(() => {
@@ -562,11 +564,9 @@ const ProfilePage = () => {
           return [];
         }
 
-        // Limit to 6 for display
-        const limitedIds = savedJobIds.slice(0, 6);
-
+        // Fetch all saved jobs (no limit)
         // Try to fetch job details for each saved job ID
-        const jobPromises = limitedIds.map(async (jobId) => {
+        const jobPromises = savedJobIds.map(async (jobId) => {
           try {
             // console.log(
             //   `📋 ProfilePage - Fetching job detail for ID: ${jobId}`
@@ -725,6 +725,31 @@ const ProfilePage = () => {
     },
     enabled: !!user?.id,
   });
+
+  // Animate progress bar when loading saved jobs
+  useEffect(() => {
+    if (!loadingSavedJobs) {
+      setProgressValue(0);
+      return;
+    }
+
+    let interval: NodeJS.Timeout;
+    let currentProgress = 0;
+
+    const animate = () => {
+      currentProgress += Math.random() * 15;
+      if (currentProgress > 90) {
+        currentProgress = 90; // Don't complete until loading is done
+      }
+      setProgressValue(currentProgress);
+    };
+
+    interval = setInterval(animate, 200);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loadingSavedJobs]);
 
   // Save course mutation
   const saveCourseMutation = useMutation({
@@ -3156,24 +3181,14 @@ const ProfilePage = () => {
             </CardHeader>
             <CardContent className="p-0">
               {loadingSavedJobs ? (
-                <div className="px-6 py-4 space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 animate-pulse"
-                    >
-                      <Skeleton className="w-12 h-12 rounded-3xl flex-shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                        <Skeleton className="h-3 w-2/3" />
-                        <div className="flex items-center gap-2 mt-2">
-                          <Skeleton className="h-7 w-20" />
-                          <Skeleton className="h-7 w-7 rounded-full" />
-                        </div>
-                      </div>
+                <div className="px-6 py-8 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>Loading saved jobs...</span>
+                      <span className="text-breneo-blue">Please wait</span>
                     </div>
-                  ))}
+                    <Progress value={progressValue} className="h-2" />
+                  </div>
                 </div>
               ) : savedJobs.length > 0 ? (
                 <div>
@@ -3296,17 +3311,6 @@ const ProfilePage = () => {
                       </div>
                     );
                   })}
-                  {savedJobs.length >= 6 && (
-                    <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-                      <Button
-                        variant="link"
-                        className="text-breneo-blue p-0 h-auto font-normal text-sm w-full justify-center hover:underline"
-                        onClick={() => navigate("/jobs")}
-                      >
-                        View All Saved Jobs
-                      </Button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-center py-4 text-gray-500 text-sm px-6">

@@ -1078,20 +1078,48 @@ const JobsPage = () => {
     });
   }, [activeFilters]);
 
-  // Fetch latest regular jobs filtered like JobSearchResultsPage
+  // Fetch latest regular jobs without any filters - just get all jobs
   const {
     data: jobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading,
     error,
   } = useQuery({
-    queryKey: [
-      "latestJobs",
-      regularJobsPage,
-      filtersKey,
-      userTopSkills.join(","),
-    ],
-    queryFn: () =>
-      fetchLatestJobs(regularJobsPage, activeFilters, userTopSkills),
+    queryKey: ["latestJobs", regularJobsPage],
+    queryFn: async () => {
+      // Fetch all jobs without any filters
+      const response = await jobService.fetchActiveJobs({
+        query: "", // No search query
+        filters: {
+          country: undefined,
+          countries: [], // No country filter
+          jobTypes: [], // No job type filter
+          isRemote: undefined, // No remote filter
+          datePosted: undefined, // No date filter
+          skills: [], // No skills filter
+          salaryMin: undefined,
+          salaryMax: undefined,
+          salaryByAgreement: undefined,
+        },
+        page: regularJobsPage,
+        pageSize: 50, // Fetch more to ensure we have enough after filtering
+      });
+
+      if (!response || !Array.isArray(response.jobs)) {
+        return { jobs: [], hasMore: false, total: 0 };
+      }
+
+      // Filter out jobs without valid IDs
+      const validJobs = response.jobs.filter((job) => {
+        const jobId = job.job_id || job.id;
+        return jobId && jobId.trim() !== "";
+      });
+
+      return {
+        jobs: validJobs,
+        hasMore: response.hasMore ?? false,
+        total: validJobs.length,
+      };
+    },
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -1533,63 +1561,55 @@ const JobsPage = () => {
     }
   }, [jobs, savedJobs, userTopSkills]);
 
-  // Filter by hard skills only, sort by match percentage (highest first), limit to 6
+  // Sort by date (newest first) and limit to 9 jobs
   const regularJobs = useMemo(() => {
-    // No filtering by job type - show all jobs, only filter by hard skills
-    const filtered = transformedJobs;
+    console.log(
+      "📅 Processing latest jobs - total jobs:",
+      transformedJobs.length
+    );
 
-    // Calculate match percentages for jobs with hard skills only
-    const jobsWithHardSkills = filtered
-      .map((job): Job | null => {
-        // Find the original job data to extract skills
-        const originalJob = allRegularJobs.find(
-          (j) => (j.job_id || j.id) === job.id
-        );
+    // Get all transformed jobs
+    const allJobs = transformedJobs;
 
-        if (!originalJob) {
-          return null;
+    // Sort by date posted (newest first)
+    const sorted = [...allJobs].sort((a, b) => {
+      // Extract date posted from original job data
+      const jobA = allRegularJobs.find((j) => (j.job_id || j.id) === a.id);
+      const jobB = allRegularJobs.find((j) => (j.job_id || j.id) === b.id);
+
+      const dateA =
+        jobA?.posted_at || jobA?.date_posted || jobA?.fetched_at || "";
+      const dateB =
+        jobB?.posted_at || jobB?.date_posted || jobB?.fetched_at || "";
+
+      // If both have dates, compare them
+      if (dateA && dateB) {
+        try {
+          const timeA = new Date(dateA as string).getTime();
+          const timeB = new Date(dateB as string).getTime();
+          return timeB - timeA; // Newest first (descending)
+        } catch (e) {
+          // If date parsing fails, keep original order
+          return 0;
         }
-
-        const jobSkills = extractJobSkills(originalJob);
-        // Filter to only hard skills (exclude soft skills)
-        const jobHardSkills = filterHardSkills(jobSkills);
-
-        // CRITICAL: Only show jobs that have at least one hard skill
-        // This is a safety check to ensure no jobs without hard skills slip through
-        if (jobHardSkills.length === 0) {
-          return null; // Exclude jobs with no hard skills
-        }
-
-        // Recalculate match percentage based on filter hard skills only
-        const hardSkillsMatchPercentage =
-          filterHardSkillsList.length > 0
-            ? calculateMatchPercentage(filterHardSkillsList, jobHardSkills)
-            : 50; // Default match if no filter skills available
-
-        const result: Job = {
-          ...job,
-          matchPercentage: hardSkillsMatchPercentage,
-        };
-        return result;
-      })
-      .filter((job) => job !== null) as Job[]; // Filter out null jobs
-
-    // Show all jobs with hard skills (matching is used for sorting, not filtering)
-    const jobsWithMatches = jobsWithHardSkills;
-
-    // Sort by match percentage (highest first), then by job ID for stability
-    const sorted = jobsWithMatches.sort((a, b) => {
-      const aMatch = a.matchPercentage ?? 0;
-      const bMatch = b.matchPercentage ?? 0;
-      if (bMatch !== aMatch) {
-        return bMatch - aMatch;
       }
-      return (a.id || "").localeCompare(b.id || "");
+
+      // If one doesn't have a date, put it at the end
+      if (!dateA && dateB) return 1;
+      if (dateA && !dateB) return -1;
+
+      // If neither has a date, keep original order
+      return 0;
     });
 
-    // Limit to 6 jobs
-    return sorted.slice(0, 6);
-  }, [transformedJobs, allRegularJobs, filterHardSkillsList]);
+    // Return first 9 jobs
+    const latestJobs = sorted.slice(0, 9);
+    console.log(
+      `✅ Displaying ${latestJobs.length} latest jobs (sorted by date)`
+    );
+
+    return latestJobs;
+  }, [transformedJobs, allRegularJobs]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
   const transformedInternshipJobs = React.useMemo(() => {
@@ -1968,6 +1988,9 @@ const JobsPage = () => {
 
   // Debug logging
   useEffect(() => {
+    console.log(
+      "🌐 Job API Endpoint: https://breneo-job-aggregator.onrender.com/api/"
+    );
     console.log("📊 JobsPage State:", {
       isLoading,
       isLoadingInternships,
@@ -2458,15 +2481,151 @@ const JobsPage = () => {
           );
         })()}
 
-        {(internshipError || remoteError) && (
+        {(internshipError || remoteError || error) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
             <AlertCircle className="h-5 w-5" />
             <p>
               <strong>Error:</strong>{" "}
-              {(internshipError as Error)?.message ||
+              {(error as Error)?.message ||
+                (internshipError as Error)?.message ||
                 (remoteError as Error)?.message}
             </p>
           </div>
+        )}
+
+        {/* Latest Jobs Section */}
+        {!isLoading && regularJobs.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <Clock className="h-6 w-6 text-breneo-blue" />
+              <h2 className="text-lg font-bold">Latest Jobs</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {regularJobs.map((job) => (
+                <Card
+                  key={job.id}
+                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl cursor-pointer"
+                  onClick={() => {
+                    if (!job.id || String(job.id).trim() === "") return;
+                    const encodedId = encodeURIComponent(String(job.id));
+                    navigate(`/jobs/${encodedId}`);
+                  }}
+                >
+                  <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
+                    {/* Company Logo and Info */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="flex-shrink-0 relative w-10 h-10">
+                        {job.company_logo ? (
+                          <img
+                            src={job.company_logo}
+                            alt={`${job.company} logo`}
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
+                            <Briefcase className="h-5 w-5 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">
+                          {job.company}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-gray-500 truncate">
+                          {job.location}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Job Title */}
+                    <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+                      {job.title}
+                    </h4>
+
+                    {/* Job Details as chips (without salary) */}
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {job.employment_type && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                          {job.employment_type}
+                        </Badge>
+                      )}
+                      {job.work_arrangement && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                          {job.work_arrangement}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Match percentage & Save button */}
+                    <div className="mt-7 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <RadialProgress
+                          value={job.matchPercentage ?? 0}
+                          size={44}
+                          strokeWidth={5}
+                          showLabel={false}
+                          percentageTextSize="sm"
+                          className="text-breneo-blue"
+                        />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
+                          {getMatchQualityLabel(job.matchPercentage)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveJobMutation.mutate(job);
+                        }}
+                        aria-label={job.is_saved ? "Unsave job" : "Save job"}
+                        className={cn(
+                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                          job.is_saved
+                            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                            : "text-black dark:text-white"
+                        )}
+                      >
+                        <Heart
+                          className={cn(
+                            "h-4 w-4 transition-colors",
+                            job.is_saved
+                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              : "text-black dark:text-white"
+                          )}
+                        />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Loading state for latest jobs */}
+        {isLoading && (
+          <section className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <Clock className="h-6 w-6 text-breneo-blue" />
+              <h2 className="text-lg font-bold">Latest Jobs</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(9)].map((_, i) => (
+                <Card key={i} className="border border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                      <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                      <div className="h-4 bg-gray-200 rounded w-full"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Remote Jobs Section */}

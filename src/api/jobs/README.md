@@ -1,22 +1,24 @@
 ni# Jobs API Service
 
-A comprehensive service for fetching active jobs from multiple job APIs on the internet.
+A comprehensive service for fetching active jobs from Breneo Job Aggregator API.
 
 ## Overview
 
-This service provides a unified interface to fetch job listings from various job APIs, including:
+This service provides a unified interface to fetch job listings from the Breneo Job Aggregator API, which aggregates jobs from multiple platforms including:
 
-- **Bing Jobs API** (via RapidAPI) - Primary source
-- **JSearch API** - Planned support
-- **Adzuna API** - Planned support
+- **Breneo** - Native platform jobs
+- **Greenhouse** - Jobs from companies using Greenhouse
+- **Lever** - Jobs from companies using Lever
+- **Spotify** - Jobs from Spotify and similar platforms
 
 ## Features
 
-- ✅ Fetch active jobs with search queries and filters
+- ✅ Fetch active jobs from Breneo Job Aggregator API
 - ✅ Fetch detailed job information by job ID
-- ✅ Support for multiple job APIs
+- ✅ Support for multiple job platforms through aggregator
 - ✅ Rate limiting to prevent API quota exhaustion
 - ✅ Automatic deduplication of job listings
+- ✅ Client-side filtering for search queries, location, remote, job types, and date posted
 - ✅ TypeScript type definitions for all job data structures
 
 ## Usage
@@ -121,24 +123,24 @@ interface JobFilters {
 }
 ```
 
-## Supported APIs
+## API Configuration
 
-### Bing Jobs API (Primary)
+### Breneo Job Aggregator API
 
-- **Provider:** RapidAPI
-- **Endpoint:** `https://jobs-api14.p.rapidapi.com/v2/bing`
+- **Endpoint:** `https://breneo-job-aggregator.onrender.com/api/`
 - **Status:** ✅ Active
-- **Rate Limit:** 1 request per second (enforced)
+- **Rate Limit:** 1 request per second (enforced client-side)
+- **Authentication:** No API key required
+- **Response Format:** JSON array of job objects
 
-### JSearch API (Planned)
+### Supported Job Platforms
 
-- **Status:** 🚧 Not yet implemented
-- **Planned Features:** Additional job sources
+The aggregator fetches jobs from multiple platforms:
 
-### Adzuna API (Planned)
-
-- **Status:** 🚧 Not yet implemented
-- **Planned Features:** International job listings
+- **Breneo** - Native platform jobs
+- **Greenhouse** - Company career pages using Greenhouse
+- **Lever** - Company career pages using Lever
+- **Other Platforms** - Additional integrations as configured in the aggregator
 
 ## Rate Limiting
 
@@ -165,11 +167,13 @@ All types are exported from `@/api/jobs/types`:
 
 ## Configuration
 
-API keys and endpoints are configured in `jobService.ts`. To use different APIs:
+The API endpoint is configured in `jobService.ts`:
 
-1. Update the API key constants
-2. Implement the fetch function for the new API
-3. Add the new function to the service exports
+```typescript
+const JOB_API_BASE = "https://breneo-job-aggregator.onrender.com/api/";
+```
+
+No API key is required for the Breneo Job Aggregator API. All filtering is performed client-side after fetching the full job list from the aggregator.
 
 ## Examples
 

@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -258,15 +264,6 @@ const JobSearchResultsPage = () => {
   const searchTerm = searchParams.get("search") || "";
   const page = parseInt(searchParams.get("page") || "1", 10);
 
-  // Debug log
-  useEffect(() => {
-    console.log("🔍 JobSearchResultsPage loaded:", {
-      searchTerm,
-      page,
-      searchParams: searchParams.toString(),
-    });
-  }, [searchTerm, page, searchParams]);
-
   const [activeFilters, setActiveFilters] = useState<JobFilters>(() => {
     const countriesParam = searchParams.get("countries");
     const skillsParam = searchParams.get("skills");
@@ -291,6 +288,20 @@ const JobSearchResultsPage = () => {
       salaryByAgreement: salaryByAgreementParam === "true",
     };
   });
+
+  // Debug log
+  useEffect(() => {
+    console.log("🔍 JobSearchResultsPage loaded:", {
+      searchTerm,
+      page,
+      searchParams: searchParams.toString(),
+      activeFilters,
+      userTopSkills,
+    });
+    console.log(
+      "🌐 Job API Endpoint: https://breneo-job-aggregator.onrender.com/api/"
+    );
+  }, [searchTerm, page, searchParams, activeFilters, userTopSkills]);
 
   // Sync activeFilters when URL params change
   useEffect(() => {
@@ -757,40 +768,39 @@ const JobSearchResultsPage = () => {
     },
   });
 
-  const updateUrlWithFilters = (
-    filters: JobFilters,
-    search: string,
-    pageNum: number
-  ) => {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (pageNum > 1) params.set("page", String(pageNum));
-    if (filters.countries.length > 0) {
-      params.set("countries", filters.countries.join(","));
-    }
-    if (filters.skills.length > 0) {
-      params.set("skills", filters.skills.join(","));
-    }
-    if (filters.jobTypes.length > 0) {
-      params.set("jobTypes", filters.jobTypes.join(","));
-    }
-    if (filters.isRemote) {
-      params.set("isRemote", "true");
-    }
-    if (filters.datePosted) {
-      params.set("datePosted", filters.datePosted);
-    }
-    if (filters.salaryMin !== undefined) {
-      params.set("salaryMin", String(filters.salaryMin));
-    }
-    if (filters.salaryMax !== undefined) {
-      params.set("salaryMax", String(filters.salaryMax));
-    }
-    if (filters.salaryByAgreement) {
-      params.set("salaryByAgreement", "true");
-    }
-    setSearchParams(params, { replace: true });
-  };
+  const updateUrlWithFilters = useCallback(
+    (filters: JobFilters, search: string, pageNum: number) => {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (pageNum > 1) params.set("page", String(pageNum));
+      if (filters.countries.length > 0) {
+        params.set("countries", filters.countries.join(","));
+      }
+      if (filters.skills.length > 0) {
+        params.set("skills", filters.skills.join(","));
+      }
+      if (filters.jobTypes.length > 0) {
+        params.set("jobTypes", filters.jobTypes.join(","));
+      }
+      if (filters.isRemote) {
+        params.set("isRemote", "true");
+      }
+      if (filters.datePosted) {
+        params.set("datePosted", filters.datePosted);
+      }
+      if (filters.salaryMin !== undefined) {
+        params.set("salaryMin", String(filters.salaryMin));
+      }
+      if (filters.salaryMax !== undefined) {
+        params.set("salaryMax", String(filters.salaryMax));
+      }
+      if (filters.salaryByAgreement) {
+        params.set("salaryByAgreement", "true");
+      }
+      setSearchParams(params, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   const handleSearch = (value: string) => {
     const newPage = 1;
@@ -824,45 +834,54 @@ const JobSearchResultsPage = () => {
   };
 
   // Handle removing a skill filter
-  const handleRemoveSkill = (skillToRemove: string) => {
-    const newFilters = {
-      ...activeFilters,
-      skills: activeFilters.skills.filter((skill) => skill !== skillToRemove),
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    updateUrlWithFilters(newFilters, searchTerm, 1);
-  };
+  const handleRemoveSkill = useCallback(
+    (skillToRemove: string) => {
+      const newFilters = {
+        ...activeFilters,
+        skills: activeFilters.skills.filter((skill) => skill !== skillToRemove),
+      };
+      setActiveFilters(newFilters);
+      setTempFilters(newFilters);
+      updateUrlWithFilters(newFilters, searchTerm, 1);
+    },
+    [activeFilters, searchTerm, updateUrlWithFilters]
+  );
 
   // Handle removing a country filter
-  const handleRemoveCountry = (countryCodeToRemove: string) => {
-    const newFilters = {
-      ...activeFilters,
-      countries: activeFilters.countries.filter(
-        (code) => code !== countryCodeToRemove
-      ),
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    updateUrlWithFilters(newFilters, searchTerm, 1);
-  };
+  const handleRemoveCountry = useCallback(
+    (countryCodeToRemove: string) => {
+      const newFilters = {
+        ...activeFilters,
+        countries: activeFilters.countries.filter(
+          (code) => code !== countryCodeToRemove
+        ),
+      };
+      setActiveFilters(newFilters);
+      setTempFilters(newFilters);
+      updateUrlWithFilters(newFilters, searchTerm, 1);
+    },
+    [activeFilters, searchTerm, updateUrlWithFilters]
+  );
 
   // Handle removing job type filter
-  const handleRemoveJobType = (jobTypeToRemove: string) => {
-    const newJobTypes = activeFilters.jobTypes.filter(
-      (type) => type !== jobTypeToRemove
-    );
-    const newFilters = {
-      ...activeFilters,
-      jobTypes: newJobTypes,
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    updateUrlWithFilters(newFilters, searchTerm, 1);
-  };
+  const handleRemoveJobType = useCallback(
+    (jobTypeToRemove: string) => {
+      const newJobTypes = activeFilters.jobTypes.filter(
+        (type) => type !== jobTypeToRemove
+      );
+      const newFilters = {
+        ...activeFilters,
+        jobTypes: newJobTypes,
+      };
+      setActiveFilters(newFilters);
+      setTempFilters(newFilters);
+      updateUrlWithFilters(newFilters, searchTerm, 1);
+    },
+    [activeFilters, searchTerm, updateUrlWithFilters]
+  );
 
   // Handle removing remote filter
-  const handleRemoveRemote = () => {
+  const handleRemoveRemote = useCallback(() => {
     const newFilters = {
       ...activeFilters,
       isRemote: false,
@@ -870,7 +889,7 @@ const JobSearchResultsPage = () => {
     setActiveFilters(newFilters);
     setTempFilters(newFilters);
     updateUrlWithFilters(newFilters, searchTerm, 1);
-  };
+  }, [activeFilters, searchTerm, updateUrlWithFilters]);
 
   const handleNextPage = () => {
     const newPage = page + 1;
@@ -1014,7 +1033,15 @@ const JobSearchResultsPage = () => {
     }
 
     return filters;
-  }, [activeFilters, searchTerm]);
+  }, [
+    activeFilters,
+    searchTerm,
+    handleRemoveSkill,
+    handleRemoveCountry,
+    handleRemoveJobType,
+    handleRemoveRemote,
+    updateUrlWithFilters,
+  ]);
 
   const filtersContainerRef = useRef<HTMLDivElement>(null);
   const [visibleFilterCount, setVisibleFilterCount] = useState(
