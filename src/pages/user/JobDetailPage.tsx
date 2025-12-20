@@ -147,9 +147,9 @@ const JobDetailPage = () => {
   const [qualifications, setQualifications] = useState<string | null>(null);
   const [isExtractingQualifications, setIsExtractingQualifications] =
     useState(false);
-  const [qualificationsError, setQualificationsError] = useState<
-    string | null
-  >(null);
+  const [qualificationsError, setQualificationsError] = useState<string | null>(
+    null
+  );
 
   // Skills comparison state
   const [jobSkills, setJobSkills] = useState<string[]>([]);
@@ -199,7 +199,9 @@ const JobDetailPage = () => {
       } catch (error) {
         console.error("Error extracting responsibilities:", error);
         setResponsibilitiesError(
-          error instanceof Error ? error.message : "Failed to extract responsibilities"
+          error instanceof Error
+            ? error.message
+            : "Failed to extract responsibilities"
         );
         setResponsibilities(null);
       } finally {
@@ -228,7 +230,9 @@ const JobDetailPage = () => {
       } catch (error) {
         console.error("Error extracting qualifications:", error);
         setQualificationsError(
-          error instanceof Error ? error.message : "Failed to extract qualifications"
+          error instanceof Error
+            ? error.message
+            : "Failed to extract qualifications"
         );
         setQualifications(null);
         setQualificationSkills([]);
@@ -518,7 +522,6 @@ const JobDetailPage = () => {
     };
   }, [jobDetail, isMobile]); // Re-attach when job detail loads or mobile state changes
 
-
   // Save/unsave job mutation
   const saveJobMutation = useMutation({
     mutationFn: async () => {
@@ -683,61 +686,105 @@ const JobDetailPage = () => {
       jobDetailAny.employer_name &&
       typeof jobDetailAny.employer_name === "string"
     ) {
-      return jobDetailAny.employer_name.trim();
+      return String(jobDetailAny.employer_name).trim();
     }
 
     // Check if company is a string
     if (typeof jobDetail.company === "string" && jobDetail.company.trim()) {
-      return jobDetail.company.trim();
+      return String(jobDetail.company).trim();
     }
 
     // Check company_info object first (most detailed)
     if (jobDetail.company_info) {
       const companyInfo = jobDetail.company_info as CompanyInfo;
-      if (companyInfo.name && companyInfo.name.trim()) {
-        return companyInfo.name.trim();
+      if (
+        companyInfo.name &&
+        typeof companyInfo.name === "string" &&
+        companyInfo.name.trim()
+      ) {
+        return String(companyInfo.name).trim();
       }
-      if (companyInfo.company_name && companyInfo.company_name.trim()) {
-        return companyInfo.company_name.trim();
+      if (
+        companyInfo.company_name &&
+        typeof companyInfo.company_name === "string" &&
+        companyInfo.company_name.trim()
+      ) {
+        return String(companyInfo.company_name).trim();
       }
-      if (companyInfo.employer_name && companyInfo.employer_name.trim()) {
-        return companyInfo.employer_name.trim();
+      if (
+        companyInfo.employer_name &&
+        typeof companyInfo.employer_name === "string" &&
+        companyInfo.employer_name.trim()
+      ) {
+        return String(companyInfo.employer_name).trim();
       }
     }
 
     // Check root level fields
-    if (jobDetail.company_name && jobDetail.company_name.trim()) {
-      return jobDetail.company_name.trim();
+    if (
+      jobDetail.company_name &&
+      typeof jobDetail.company_name === "string" &&
+      jobDetail.company_name.trim()
+    ) {
+      return String(jobDetail.company_name).trim();
     }
-    if (jobDetail.employer_name && jobDetail.employer_name.trim()) {
-      return jobDetail.employer_name.trim();
+    if (
+      jobDetail.employer_name &&
+      typeof jobDetail.employer_name === "string" &&
+      jobDetail.employer_name.trim()
+    ) {
+      return String(jobDetail.employer_name).trim();
     }
 
     // Check nested company object
     if (jobDetail.company && typeof jobDetail.company === "object") {
       const companyObj = jobDetail.company as CompanyInfo;
-      if (companyObj.name && companyObj.name.trim()) {
-        return companyObj.name.trim();
+      if (
+        companyObj.name &&
+        typeof companyObj.name === "string" &&
+        companyObj.name.trim()
+      ) {
+        return String(companyObj.name).trim();
       }
-      if (companyObj.company_name && companyObj.company_name.trim()) {
-        return companyObj.company_name.trim();
+      if (
+        companyObj.company_name &&
+        typeof companyObj.company_name === "string" &&
+        companyObj.company_name.trim()
+      ) {
+        return String(companyObj.company_name).trim();
       }
-      if (companyObj.employer_name && companyObj.employer_name.trim()) {
-        return companyObj.employer_name.trim();
+      if (
+        companyObj.employer_name &&
+        typeof companyObj.employer_name === "string" &&
+        companyObj.employer_name.trim()
+      ) {
+        return String(companyObj.employer_name).trim();
       }
     }
 
     // Check employer object
     if (jobDetail.employer && typeof jobDetail.employer === "object") {
       const employerObj = jobDetail.employer as CompanyInfo;
-      if (employerObj.name && employerObj.name.trim()) {
-        return employerObj.name.trim();
+      if (
+        employerObj.name &&
+        typeof employerObj.name === "string" &&
+        employerObj.name.trim()
+      ) {
+        return String(employerObj.name).trim();
       }
-      if (employerObj.company_name && employerObj.company_name.trim()) {
-        return employerObj.company_name.trim();
+      if (
+        employerObj.company_name &&
+        typeof employerObj.company_name === "string" &&
+        employerObj.company_name.trim()
+      ) {
+        return String(employerObj.company_name).trim();
       }
-      if (employerObj.employer_name && employerObj.employer_name.trim()) {
-        return employerObj.employer_name.trim();
+      if (
+        employerObj.employer_name &&
+        typeof employerObj.employer_name === "string" &&
+        employerObj.employer_name.trim()
+      ) {
+        return String(employerObj.employer_name).trim();
       }
     }
 
@@ -763,30 +810,68 @@ const JobDetailPage = () => {
     if (!jobDetail) return "Location not specified";
     const jobDetailAny = jobDetail as Record<string, unknown>;
 
-    // Check standard location fields
-    if (jobDetail.location || jobDetail.job_location) {
-      return (
-        jobDetail.location || jobDetail.job_location || "Location not specified"
-      );
+    // Helper to stringify various location shapes
+    const stringFrom = (val: unknown) => {
+      if (!val && val !== 0) return "";
+      if (typeof val === "string") return val;
+      if (typeof val === "number") return String(val);
+      if (Array.isArray(val)) return val.map((v) => String(v)).join(", ");
+      if (typeof val === "object") {
+        // Try common object fields
+        const obj = val as Record<string, unknown>;
+        return (
+          (obj.city as string) ||
+          (obj.name as string) ||
+          (obj.label as string) ||
+          Object.values(obj)
+            .filter(Boolean)
+            .slice(0, 3)
+            .map((v) => String(v))
+            .join(", ") ||
+          ""
+        );
+      }
+      return String(val);
+    };
+
+    // 1) Prefer explicit location fields (string/array/object)
+    const locationField = jobDetail.location ?? jobDetail.job_location;
+    if (locationField) {
+      const s = stringFrom(locationField);
+      if (s) return s;
     }
 
-    // Check JSearch-specific fields: job_city, job_state, job_country
-    const jobCity = (jobDetailAny.job_city as string) || jobDetail.city;
-    const jobState = (jobDetailAny.job_state as string) || jobDetail.state;
-    const jobCountry =
-      (jobDetailAny.job_country as string) || jobDetail.country;
+    // 2) JSearch-specific or root city/state/country fields
+    const parts = [] as string[];
+    const city =
+      jobDetailAny.job_city ?? jobDetail.city ?? (jobDetailAny.city as unknown);
+    const state =
+      jobDetailAny.job_state ??
+      jobDetail.state ??
+      (jobDetailAny.state as unknown);
+    const country =
+      jobDetailAny.job_country ??
+      jobDetail.country ??
+      (jobDetailAny.country as unknown);
 
-    if (jobCity || jobState || jobCountry) {
-      const locationParts = [jobCity, jobState, jobCountry].filter(Boolean);
-      return locationParts.join(", ") || "Location not specified";
-    }
+    const cityStr = stringFrom(city);
+    const stateStr = stringFrom(state);
+    const countryStr = stringFrom(country);
 
-    // Fallback to combined city, state, country
-    const combined = `${jobDetail.city || ""} ${jobDetail.state || ""} ${
-      jobDetail.country || ""
-    }`.trim();
+    if (cityStr) parts.push(cityStr);
+    if (stateStr) parts.push(stateStr);
+    if (countryStr) parts.push(countryStr);
 
-    return combined || "Location not specified";
+    if (parts.length > 0) return parts.join(", ");
+
+    // 3) Fallback to composing any city/state/country values
+    const fallback = [jobDetail.city, jobDetail.state, jobDetail.country]
+      .map((v) => stringFrom(v))
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    return fallback || "Location not specified";
   };
 
   // Get company logo - check all possible logo fields
@@ -799,39 +884,126 @@ const JobDetailPage = () => {
       jobDetailAny.employer_logo &&
       typeof jobDetailAny.employer_logo === "string"
     ) {
-      return jobDetailAny.employer_logo;
+      const logoUrl = String(jobDetailAny.employer_logo);
+      // Validate URL
+      try {
+        const url = new URL(logoUrl);
+        if (url.protocol.startsWith("http")) {
+          return logoUrl;
+        }
+      } catch {
+        // Invalid URL, continue checking other fields
+      }
     }
 
     // Check root level fields first
-    if (jobDetail.company_logo) return jobDetail.company_logo;
-    if (jobDetail.employer_logo) return jobDetail.employer_logo;
-    if (jobDetail.logo_url) return jobDetail.logo_url;
+    if (jobDetail.company_logo && typeof jobDetail.company_logo === "string") {
+      const logoUrl = String(jobDetail.company_logo);
+      try {
+        const url = new URL(logoUrl);
+        if (url.protocol.startsWith("http")) {
+          return logoUrl;
+        }
+      } catch {
+        // Invalid URL, continue
+      }
+    }
+    if (
+      jobDetail.employer_logo &&
+      typeof jobDetail.employer_logo === "string"
+    ) {
+      const logoUrl = String(jobDetail.employer_logo);
+      try {
+        const url = new URL(logoUrl);
+        if (url.protocol.startsWith("http")) {
+          return logoUrl;
+        }
+      } catch {
+        // Invalid URL, continue
+      }
+    }
+    if (jobDetail.logo_url && typeof jobDetail.logo_url === "string") {
+      const logoUrl = String(jobDetail.logo_url);
+      try {
+        const url = new URL(logoUrl);
+        if (url.protocol.startsWith("http")) {
+          return logoUrl;
+        }
+      } catch {
+        // Invalid URL, continue
+      }
+    }
 
     // Check company_info object
     if (jobDetail.company_info) {
       const companyInfo = jobDetail.company_info as CompanyInfo;
-      if (companyInfo.logo) return companyInfo.logo;
-      if (companyInfo.company_logo) return companyInfo.company_logo;
-      if (companyInfo.employer_logo) return companyInfo.employer_logo;
-      if (companyInfo.logo_url) return companyInfo.logo_url;
+      const logoFields = [
+        companyInfo.logo,
+        companyInfo.company_logo,
+        companyInfo.employer_logo,
+        companyInfo.logo_url,
+      ];
+      for (const logoField of logoFields) {
+        if (logoField && typeof logoField === "string") {
+          const logoUrl = String(logoField);
+          try {
+            const url = new URL(logoUrl);
+            if (url.protocol.startsWith("http")) {
+              return logoUrl;
+            }
+          } catch {
+            // Invalid URL, continue
+          }
+        }
+      }
     }
 
     // Check nested company object
     if (jobDetail.company && typeof jobDetail.company === "object") {
       const companyObj = jobDetail.company as CompanyInfo;
-      if (companyObj.logo) return companyObj.logo;
-      if (companyObj.company_logo) return companyObj.company_logo;
-      if (companyObj.employer_logo) return companyObj.employer_logo;
-      if (companyObj.logo_url) return companyObj.logo_url;
+      const logoFields = [
+        companyObj.logo,
+        companyObj.company_logo,
+        companyObj.employer_logo,
+        companyObj.logo_url,
+      ];
+      for (const logoField of logoFields) {
+        if (logoField && typeof logoField === "string") {
+          const logoUrl = String(logoField);
+          try {
+            const url = new URL(logoUrl);
+            if (url.protocol.startsWith("http")) {
+              return logoUrl;
+            }
+          } catch {
+            // Invalid URL, continue
+          }
+        }
+      }
     }
 
     // Check employer object
     if (jobDetail.employer && typeof jobDetail.employer === "object") {
       const employerObj = jobDetail.employer as CompanyInfo;
-      if (employerObj.logo) return employerObj.logo;
-      if (employerObj.company_logo) return employerObj.company_logo;
-      if (employerObj.employer_logo) return employerObj.employer_logo;
-      if (employerObj.logo_url) return employerObj.logo_url;
+      const logoFields = [
+        employerObj.logo,
+        employerObj.company_logo,
+        employerObj.employer_logo,
+        employerObj.logo_url,
+      ];
+      for (const logoField of logoFields) {
+        if (logoField && typeof logoField === "string") {
+          const logoUrl = String(logoField);
+          try {
+            const url = new URL(logoUrl);
+            if (url.protocol.startsWith("http")) {
+              return logoUrl;
+            }
+          } catch {
+            // Invalid URL, continue
+          }
+        }
+      }
     }
 
     return undefined;
@@ -1349,15 +1521,29 @@ const JobDetailPage = () => {
                 <div className="flex flex-col md:flex-row md:items-start gap-6">
                   {/* Left Side: Job Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-col gap-1 mb-3">
-                      {getCompanyName() && (
-                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
-                          {getCompanyName()}
-                        </p>
+                    <div className="flex items-center gap-4 mb-3">
+                      {getCompanyLogo() ? (
+                        <img
+                          src={getCompanyLogo()}
+                          alt={getCompanyName() || "Company logo"}
+                          className="h-12 w-12 rounded-md object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 flex-shrink-0">
+                          <Building2 className="h-6 w-6" />
+                        </div>
                       )}
-                      <h1 className="text-lg md:text-2xl font-semibold text-gray-900 dark:text-white">
-                        {getJobTitle()}
-                      </h1>
+
+                      <div className="flex flex-col min-w-0">
+                        {getCompanyName() && (
+                          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 truncate">
+                            {getCompanyName()}
+                          </p>
+                        )}
+                        <h1 className="text-lg md:text-2xl font-semibold text-gray-900 dark:text-white truncate">
+                          {getJobTitle()}
+                        </h1>
+                      </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-4 mb-4">
                       <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
@@ -1381,18 +1567,16 @@ const JobDetailPage = () => {
                         <span>{getWorkArrangement()}</span>
                       </div>
                       {jobDetail.date_posted || jobDetail.posted_date ? (
-                        <Badge
-                          variant="secondary"
-                          className="flex items-center gap-1"
-                        >
-                          <Calendar className="h-3 w-3" />
-                          Posted:{" "}
-                          {formatDate(
-                            jobDetail.date_posted || jobDetail.posted_date
-                          ) ||
-                            jobDetail.date_posted ||
-                            jobDetail.posted_date}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap text-sm md:text-base font-medium text-gray-700 dark:text-gray-200">
+                          <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0 text-gray-700 dark:text-gray-200" />
+                          <span>
+                            {formatDate(
+                              jobDetail.date_posted || jobDetail.posted_date
+                            ) ||
+                              jobDetail.date_posted ||
+                              jobDetail.posted_date}
+                          </span>
+                        </div>
                       ) : null}
                     </div>
                   </div>
@@ -1480,7 +1664,6 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-
               {/* Responsibilities Section */}
               <div className="pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -1491,20 +1674,20 @@ const JobDetailPage = () => {
                 </div>
 
                 {isExtractingResponsibilities ? (
-                    <Card>
-                      <CardContent className="p-6">
-                        <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                          <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                          <p className="text-sm">
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                        <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                        <p className="text-sm">
                           AI is extracting responsibilities from the job
                           description...
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ) : responsibilitiesError ? (
                   <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
-                      <CardContent className="p-6">
+                    <CardContent className="p-6">
                       <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
                         <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                         <div>
@@ -1512,8 +1695,8 @@ const JobDetailPage = () => {
                             Failed to extract responsibilities
                           </p>
                           <p className="text-xs">{responsibilitiesError}</p>
-                            </div>
                         </div>
+                      </div>
                     </CardContent>
                   </Card>
                 ) : responsibilities ? (
@@ -1521,26 +1704,24 @@ const JobDetailPage = () => {
                     className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line"
                     style={{ whiteSpace: "pre-line" }}
                   >
-                    {responsibilities
-                      .split("\n")
-                      .map((line, index) => {
-                        const trimmedLine = line.trim();
-                        if (!trimmedLine) return null;
-                        
-                        if (/^[•\-*]\s/.test(trimmedLine)) {
-                          return (
-                            <div key={index} className="mb-2 ml-4">
-                              {trimmedLine}
-                            </div>
-                          );
-                        }
-                        
+                    {responsibilities.split("\n").map((line, index) => {
+                      const trimmedLine = line.trim();
+                      if (!trimmedLine) return null;
+
+                      if (/^[•\-*]\s/.test(trimmedLine)) {
                         return (
-                          <p key={index} className="mb-2">
+                          <div key={index} className="mb-2 ml-4">
                             {trimmedLine}
-                          </p>
+                          </div>
                         );
-                      })}
+                      }
+
+                      return (
+                        <p key={index} className="mb-2">
+                          {trimmedLine}
+                        </p>
+                      );
+                    })}
                   </div>
                 ) : (
                   <Card>
@@ -1548,9 +1729,9 @@ const JobDetailPage = () => {
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         No responsibilities information available for this job.
                       </p>
-                      </CardContent>
-                    </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Qualifications Section */}
@@ -1591,67 +1772,72 @@ const JobDetailPage = () => {
                 ) : qualifications ? (
                   <div className="space-y-4">
                     {/* Skills Match Section - Moved here from top */}
-                    {user && (qualificationSkills.length > 0 || jobSkills.length > 0) && (
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <h3 className="text-base font-semibold">
-                              Skills Match
-                            </h3>
-                          </div>
-
-                          {isLoadingUserSkills ? (
-                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>Loading your skills...</span>
+                    {user &&
+                      (qualificationSkills.length > 0 ||
+                        jobSkills.length > 0) && (
+                        <Card>
+                          <CardContent className="p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <h3 className="text-base font-semibold">
+                                Skills Match
+                              </h3>
                             </div>
-                          ) : userSkills.size === 0 ? (
-                            <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 mb-4">
-                              <AlertCircle className="h-4 w-4" />
-                              <span>
-                                You haven't taken the skill test yet.{" "}
-                                <button
-                                  onClick={() => navigate("/skill-test")}
-                                  className="underline hover:no-underline font-medium"
-                                >
-                                  Take the skill test
-                                </button>{" "}
-                                to see your skill match.
-                              </span>
-                            </div>
-                          ) : null}
 
-                          <div className="flex flex-wrap gap-2">
-                            {(qualificationSkills.length > 0 ? qualificationSkills : jobSkills).map((skill, index) => {
-                              const hasSkill = userSkills.has(
-                                skill.toLowerCase()
-                              );
-                                    return (
-                                      <div
-                                        key={index}
-                                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors ${
-                                    hasSkill
-                                      ? "bg-green-500 text-white"
-                                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                  }`}
-                                >
-                                  <div className="flex-shrink-0">
-                                    {hasSkill ? (
-                                      <ThumbsUp className="h-4 w-4 text-white" />
-                                    ) : (
-                                      <XCircle className="h-4 w-4" />
-                                    )}
-                                        </div>
-                                  <span className="text-sm font-medium whitespace-nowrap">
-                                    {skill}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
+                            {isLoadingUserSkills ? (
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Loading your skills...</span>
+                              </div>
+                            ) : userSkills.size === 0 ? (
+                              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 mb-4">
+                                <AlertCircle className="h-4 w-4" />
+                                <span>
+                                  You haven't taken the skill test yet.{" "}
+                                  <button
+                                    onClick={() => navigate("/skill-test")}
+                                    className="underline hover:no-underline font-medium"
+                                  >
+                                    Take the skill test
+                                  </button>{" "}
+                                  to see your skill match.
+                                </span>
+                              </div>
+                            ) : null}
+
+                            <div className="flex flex-wrap gap-2">
+                              {(qualificationSkills.length > 0
+                                ? qualificationSkills
+                                : jobSkills
+                              ).map((skill, index) => {
+                                const hasSkill = userSkills.has(
+                                  skill.toLowerCase()
+                                );
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors ${
+                                      hasSkill
+                                        ? "bg-green-500 text-white"
+                                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                    }`}
+                                  >
+                                    <div className="flex-shrink-0">
+                                      {hasSkill ? (
+                                        <ThumbsUp className="h-4 w-4 text-white" />
+                                      ) : (
+                                        <XCircle className="h-4 w-4" />
+                                      )}
+                                    </div>
+                                    <span className="text-sm font-medium whitespace-nowrap">
+                                      {skill}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
                     {/* Qualifications List */}
                     <div>
@@ -1659,37 +1845,35 @@ const JobDetailPage = () => {
                         className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line"
                         style={{ whiteSpace: "pre-line" }}
                       >
-                        {qualifications
-                          .split("\n")
-                          .map((line, index) => {
-                            const trimmedLine = line.trim();
-                            if (!trimmedLine) return null;
-                            
-                            if (/^[•\-*]\s/.test(trimmedLine)) {
-                              return (
-                                <div key={index} className="mb-2 ml-4">
-                                  {trimmedLine}
-                                </div>
-                              );
-                            }
-                            
+                        {qualifications.split("\n").map((line, index) => {
+                          const trimmedLine = line.trim();
+                          if (!trimmedLine) return null;
+
+                          if (/^[•\-*]\s/.test(trimmedLine)) {
                             return (
-                              <p key={index} className="mb-2">
+                              <div key={index} className="mb-2 ml-4">
                                 {trimmedLine}
-                              </p>
+                              </div>
                             );
-                          })}
+                          }
+
+                          return (
+                            <p key={index} className="mb-2">
+                              {trimmedLine}
+                            </p>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
-                        ) : (
+                ) : (
                   <Card>
                     <CardContent className="p-6">
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
                         No qualifications information available for this job.
-                          </p>
-                      </CardContent>
-                    </Card>
+                      </p>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
 

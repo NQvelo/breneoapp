@@ -38,6 +38,7 @@ const rateLimitedFetch = async (
  * Interface for Breneo Job Aggregator API response
  */
 interface BreneoJobApiResponse {
+  company_logo: string;
   id: number;
   title: string;
   company: string;
@@ -62,6 +63,8 @@ const mapBreneoJobToApiJob = (job: BreneoJobApiResponse): ApiJob => {
     title: job.title,
     job_title: job.title,
     company: job.company,
+    company_logo: job.company_logo,
+    companyLogo: job.company_logo,
     company_name: job.company,
     employer_name: job.company,
     location: job.location,
@@ -417,6 +420,8 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
     title: job.title,
     job_title: job.title,
     company: job.company,
+    company_logo: job.company_logo,
+    companyLogo: job.company_logo,
     company_name: job.company,
     employer_name: job.company,
     location: job.location,

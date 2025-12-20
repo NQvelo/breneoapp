@@ -54,6 +54,7 @@ interface Job {
   id: string;
   title: string;
   company: string;
+  company_name?: string;
   location: string;
   url: string;
   company_logo?: string;
@@ -587,18 +588,102 @@ const JobSearchResultsPage = () => {
           job.apply_url ||
           "";
 
-        let companyLogo: string | undefined =
-          job.employer_logo || job.company_logo || job.logo || job.logo_url;
+        // Extract company logo - check all possible fields (same as JobsPage)
+        let companyLogo: string | undefined = undefined;
 
-        if (companyLogo) {
+        // Helper function to validate and set logo URL
+        const setLogoIfValid = (logoValue: unknown): boolean => {
+          if (!logoValue) return false;
+          const logoUrl = String(logoValue).trim();
+          if (!logoUrl) return false;
           try {
-            const url = new URL(companyLogo);
-            if (!url.protocol.startsWith("http")) {
-              companyLogo = undefined;
+            const url = new URL(logoUrl);
+            // Only allow http/https protocols
+            if (url.protocol.startsWith("http")) {
+              companyLogo = logoUrl;
+              // Debug logging in development
+              if (process.env.NODE_ENV === "development") {
+                console.log("✅ Found valid logo URL:", logoUrl);
+              }
+              return true;
             }
-          } catch {
-            companyLogo = undefined;
+          } catch (error) {
+            // Invalid URL
+            if (process.env.NODE_ENV === "development") {
+              console.warn("⚠️ Invalid logo URL:", logoUrl, error);
+            }
           }
+          return false;
+        };
+
+        // Check root level fields first - prioritize company_logo field
+        // Use Record type to access fields that might not be in the type definition
+        const jobAny = job as Record<string, unknown>;
+
+        // Check company_logo first (most common field name)
+        if (!companyLogo && jobAny.company_logo) {
+          setLogoIfValid(jobAny.company_logo);
+        }
+        if (!companyLogo && job.company_logo) {
+          setLogoIfValid(job.company_logo);
+        }
+        if (!companyLogo && jobAny.companyLogo) {
+          setLogoIfValid(jobAny.companyLogo);
+        }
+        if (!companyLogo && job.companyLogo) {
+          setLogoIfValid(job.companyLogo);
+        }
+        if (!companyLogo && jobAny.employer_logo) {
+          setLogoIfValid(jobAny.employer_logo);
+        }
+        if (!companyLogo && job.employer_logo) {
+          setLogoIfValid(job.employer_logo);
+        }
+        if (!companyLogo && jobAny.logo) {
+          setLogoIfValid(jobAny.logo);
+        }
+        if (!companyLogo && job.logo) {
+          setLogoIfValid(job.logo);
+        }
+        if (!companyLogo && jobAny.logo_url) {
+          setLogoIfValid(jobAny.logo_url);
+        }
+        if (!companyLogo && job.logo_url) {
+          setLogoIfValid(job.logo_url);
+        }
+        // Check additional possible field variations
+        if (!companyLogo && jobAny.employerLogo) {
+          setLogoIfValid(jobAny.employerLogo);
+        }
+        if (!companyLogo && jobAny.companyLogoUrl) {
+          setLogoIfValid(jobAny.companyLogoUrl);
+        }
+        if (!companyLogo && jobAny.logoUrl) {
+          setLogoIfValid(jobAny.logoUrl);
+        }
+
+        // Check nested company object if it exists
+        if (!companyLogo && job.company && typeof job.company === "object") {
+          const companyObj = job.company as Record<string, unknown>;
+          if (companyObj.logo) setLogoIfValid(companyObj.logo);
+          if (!companyLogo && companyObj.logo_url)
+            setLogoIfValid(companyObj.logo_url);
+          if (!companyLogo && companyObj.company_logo)
+            setLogoIfValid(companyObj.company_logo);
+          if (!companyLogo && companyObj.employer_logo)
+            setLogoIfValid(companyObj.employer_logo);
+        }
+
+        // Check employer object if it exists separately
+        if (!companyLogo && job.employer && typeof job.employer === "object") {
+          const employerObj = job.employer as Record<string, unknown>;
+          if (employerObj.logo) setLogoIfValid(employerObj.logo);
+          if (!companyLogo && employerObj.logo_url)
+            setLogoIfValid(employerObj.logo_url);
+          if (!companyLogo && employerObj.company_logo)
+            setLogoIfValid(employerObj.company_logo);
+          if (!companyLogo && employerObj.employer_logo)
+            setLogoIfValid(employerObj.employer_logo);
         }
 
         let salary = "By agreement";
@@ -695,6 +780,13 @@ const JobSearchResultsPage = () => {
           id: jobId,
           title: jobTitle,
           company: companyName,
+          // Prefer the raw API `company_name` when available so UI shows exact field
+          company_name:
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (job as Record<string, any>).company_name ||
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (job as Record<string, any>).employer_name ||
+            (typeof job.company === "string" ? job.company : undefined),
           location: String(location),
           url: applyLink,
           company_logo: companyLogo,
@@ -1368,19 +1460,48 @@ const JobSearchResultsPage = () => {
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
-                                alt={`${job.company} logo`}
+                                alt={`${job.company_name || job.company} logo`}
                                 className="w-10 h-10 rounded-full object-cover border border-gray-200"
                                 loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  console.warn(
+                                    "❌ Logo failed to load:",
+                                    job.company_logo,
+                                    target.src
+                                  );
+                                  target.style.display = "none";
+                                  const fallback =
+                                    target.nextElementSibling as HTMLElement;
+                                  if (fallback) {
+                                    fallback.style.display = "flex";
+                                  }
+                                }}
+                                onLoad={() => {
+                                  // Logo loaded successfully
+                                  if (process.env.NODE_ENV === "development") {
+                                    console.log(
+                                      "✅ Logo loaded successfully:",
+                                      job.company_logo
+                                    );
+                                  }
+                                }}
                               />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
-                                <Briefcase className="h-5 w-5 text-white" />
-                              </div>
-                            )}
+                            ) : null}
+                            <div
+                              className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center ${
+                                job.company_logo
+                                  ? "hidden absolute inset-0"
+                                  : ""
+                              }`}
+                            >
+                              <Briefcase className="h-5 w-5 text-white" />
+                            </div>
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">
-                              {job.company}
+                              {job.company_name || job.company}
                             </h3>
                             <p className="mt-0.5 text-xs text-gray-500 truncate">
                               {job.location}
@@ -1460,10 +1581,17 @@ const JobSearchResultsPage = () => {
                               {job.company_logo ? (
                                 <img
                                   src={job.company_logo}
-                                  alt={job.company}
+                                  alt={job.company_name || job.company}
                                   className="w-12 h-12 rounded-md object-cover border border-gray-300 absolute inset-0 z-10"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
+                                    console.warn(
+                                      "❌ Logo failed to load:",
+                                      job.company_logo,
+                                      target.src
+                                    );
                                     target.style.display = "none";
                                     const fallback =
                                       target.parentElement?.querySelector(
@@ -1472,6 +1600,17 @@ const JobSearchResultsPage = () => {
                                     if (fallback) {
                                       fallback.style.display = "flex";
                                       fallback.style.zIndex = "10";
+                                    }
+                                  }}
+                                  onLoad={() => {
+                                    // Logo loaded successfully
+                                    if (
+                                      process.env.NODE_ENV === "development"
+                                    ) {
+                                      console.log(
+                                        "✅ Logo loaded successfully:",
+                                        job.company_logo
+                                      );
                                     }
                                   }}
                                 />
@@ -1492,7 +1631,7 @@ const JobSearchResultsPage = () => {
                             <div className="flex-1 min-w-0">
                               <div className="mb-1 md:mb-2">
                                 <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
-                                  {job.company}
+                                  {job.company_name || job.company}
                                 </h3>
                                 <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
                                   {job.title}

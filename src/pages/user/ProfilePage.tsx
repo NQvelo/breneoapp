@@ -3209,7 +3209,7 @@ const ProfilePage = () => {
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
-                                alt={`${job.company} logo`}
+                                alt={`${job.company_name || job.company} logo`}
                                 className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
@@ -3293,7 +3293,7 @@ const ProfilePage = () => {
                               </div>
                             </div>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                              {job.company}
+                              {job.company_name || job.company}
                             </p>
                             <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                               <MapPin className="h-3 w-3" />

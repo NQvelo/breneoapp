@@ -90,6 +90,7 @@ interface Job {
   id: string;
   title: string;
   company: string;
+  company_name?: string;
   location: string;
   url: string;
   company_logo?: string;
@@ -1376,16 +1377,29 @@ const JobsPage = () => {
             return null;
           }
 
-          const jobTitle =
-            job.job_title || job.title || job.position || "Untitled Position";
-          const companyName =
-            (companyObj?.name as string) ||
-            (companyObj?.company_name as string) ||
-            job.companyName || // LinkedIn API field
-            job.employer_name ||
-            job.company_name ||
-            (typeof job.company === "string" ? job.company : null) ||
-            "Unknown Company";
+          const jobTitle = String(
+            job.job_title || job.title || job.position || "Untitled Position"
+          );
+          const companyName = String(
+            (companyObj?.name && typeof companyObj.name === "string"
+              ? companyObj.name
+              : null) ||
+              (companyObj?.company_name &&
+              typeof companyObj.company_name === "string"
+                ? companyObj.company_name
+                : null) ||
+              (job.companyName && typeof job.companyName === "string"
+                ? job.companyName
+                : null) ||
+              (job.employer_name && typeof job.employer_name === "string"
+                ? job.employer_name
+                : null) ||
+              (job.company_name && typeof job.company_name === "string"
+                ? job.company_name
+                : null) ||
+              (typeof job.company === "string" ? job.company : null) ||
+              "Unknown Company"
+          );
           const jobCity =
             job.job_city || job.city || (companyObj?.city as string) || "";
           const jobState =
@@ -1395,12 +1409,90 @@ const JobsPage = () => {
             job.country ||
             (companyObj?.country as string) ||
             "";
-          const locationString =
-            job.jobLocation || // LinkedIn API field
-            job.location ||
-            (companyObj?.location as string) ||
-            [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-            "Location not specified";
+
+          // Robust location extraction: handle strings, objects, arrays, and nested fields
+          const getLocationStringFromJob = (
+            j: Record<string, any>,
+            co: Record<string, any> | null
+          ): string => {
+            // Remote override
+            if (j?.job_is_remote || j?.is_remote || j?.remote === true) {
+              return "Remote";
+            }
+
+            const tryString = (v: any) =>
+              v && typeof v === "string" && v.trim() ? v.trim() : null;
+
+            const tryObjectName = (obj: any) => {
+              if (!obj || typeof obj !== "object") return null;
+              if (tryString(obj.display_name)) return obj.display_name;
+              if (tryString(obj.name)) return obj.name;
+              if (tryString(obj.location)) return obj.location;
+              if (tryString(obj.address)) return obj.address;
+              // Try common city/state/country combination
+              const parts = [
+                obj.city || obj.town || obj.region || obj.state,
+                obj.country,
+              ]
+                .filter(Boolean)
+                .map((s) => String(s));
+              if (parts.length) return parts.join(", ");
+              return null;
+            };
+
+            // locations array (some APIs return multiple locations)
+            if (Array.isArray(j.locations) && j.locations.length > 0) {
+              for (const loc of j.locations) {
+                const s = tryString(loc) || tryObjectName(loc);
+                if (s) return s;
+              }
+            }
+
+            // Try common string fields first
+            const candidates = [
+              j.jobLocation,
+              j.location,
+              j.location_name,
+              j.job_location,
+              j.work_location,
+              j.address,
+            ];
+            for (const c of candidates) {
+              const s = tryString(c);
+              if (s) return s;
+            }
+
+            // Try location object shapes
+            const objLocation =
+              tryObjectName(j.location) ||
+              tryObjectName(j.locationData) ||
+              tryObjectName(j.job_location) ||
+              null;
+            if (objLocation) return objLocation;
+
+            // Company object location
+            if (co) {
+              const compLoc =
+                tryString(co.location) ||
+                tryString(co.address) ||
+                tryObjectName(co.location) ||
+                null;
+              if (compLoc) return compLoc;
+            }
+
+            // Fallback to city/state/country fields
+            const fallback = [jobCity, jobState, jobCountry]
+              .filter(Boolean)
+              .map((s) => String(s))
+              .join(", ");
+            if (fallback) return fallback;
+
+            return "Location not specified";
+          };
+
+          const locationString = String(
+            getLocationStringFromJob(job as Record<string, any>, companyObj)
+          );
           const applyLink =
             job.applyUrl || // LinkedIn API field
             job.jobUrl || // LinkedIn API field
@@ -1414,23 +1506,187 @@ const JobsPage = () => {
           // Extract company logo - check all possible fields
           let companyLogo: string | undefined = undefined;
 
-          // Check root level fields first
-          if (job.companyLogo) companyLogo = job.companyLogo; // LinkedIn API field
-          if (!companyLogo && job.employer_logo)
-            companyLogo = job.employer_logo;
-          if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
-          if (!companyLogo && job.logo) companyLogo = job.logo;
-          if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
+          // Prefer top-level `company_logo` if present (many APIs provide this)
+          if (
+            !companyLogo &&
+            typeof job.company_logo === "string" &&
+            job.company_logo.trim()
+          ) {
+            companyLogo = job.company_logo.trim();
+          }
+
+          // Helper function to validate and set logo URL
+          const setLogoIfValid = (logoValue: unknown): boolean => {
+            if (!logoValue) return false;
+
+            // If array, try each item
+            if (Array.isArray(logoValue)) {
+              for (const v of logoValue) {
+                if (setLogoIfValid(v)) return true;
+              }
+              return false;
+            }
+
+            // If object, probe common fields
+            if (typeof logoValue === "object") {
+              const obj = logoValue as Record<string, any>;
+              const candidates = [
+                obj.url,
+                obj.src,
+                obj.href,
+                obj.logo,
+                obj.image,
+                obj.path,
+                obj.file,
+                obj.thumbnail,
+              ];
+              for (const c of candidates) {
+                if (setLogoIfValid(c)) return true;
+              }
+              return false;
+            }
+
+            // Treat as string
+            const logoUrl = String(logoValue).trim();
+            if (!logoUrl) {
+              if (process.env.NODE_ENV === "development")
+                console.debug("Logo candidate empty string, skipping");
+              return false;
+            }
+
+            if (process.env.NODE_ENV === "development")
+              console.debug("Trying logo candidate:", logoUrl);
+
+            // Accept data URIs and blob URLs
+            if (logoUrl.startsWith("data:") || logoUrl.startsWith("blob:")) {
+              companyLogo = logoUrl;
+              if (process.env.NODE_ENV === "development")
+                console.debug("Accepted data/blob logo for job", jobId);
+              return true;
+            }
+
+            // Protocol-relative URLs
+            if (logoUrl.startsWith("//")) {
+              companyLogo = `https:${logoUrl}`;
+              if (process.env.NODE_ENV === "development")
+                console.debug(
+                  "Accepted protocol-relative logo for job",
+                  jobId,
+                  logoUrl
+                );
+              return true;
+            }
+
+            // Absolute http(s)
+            if (
+              logoUrl.startsWith("http://") ||
+              logoUrl.startsWith("https://")
+            ) {
+              companyLogo = logoUrl;
+              if (process.env.NODE_ENV === "development")
+                console.debug("Accepted http(s) logo for job", jobId, logoUrl);
+              return true;
+            }
+
+            // Relative path - accept and leave resolution to browser/app
+            if (
+              logoUrl.startsWith("/") ||
+              logoUrl.startsWith("./") ||
+              logoUrl.startsWith("../")
+            ) {
+              companyLogo = logoUrl;
+              if (process.env.NODE_ENV === "development")
+                console.debug(
+                  "Accepted relative-path logo for job",
+                  jobId,
+                  logoUrl
+                );
+              return true;
+            }
+
+            if (process.env.NODE_ENV === "development")
+              console.debug(
+                "Rejected logo candidate (unsupported format)",
+                logoUrl
+              );
+
+            return false;
+          };
+
+          // Check root level fields first - prioritize company_logo field
+          // Use Record type to access fields that might not be in the type definition
+          const jobAny = job as Record<string, unknown>;
+
+          // Debug: Log available logo fields in development
+          if (process.env.NODE_ENV === "development" && !companyLogo) {
+            const logoFields = Object.keys(jobAny).filter(
+              (key) =>
+                key.toLowerCase().includes("logo") ||
+                key.toLowerCase().includes("company")
+            );
+            if (logoFields.length > 0) {
+              console.log(
+                "🔍 Checking logo fields for job:",
+                jobId,
+                logoFields
+              );
+              logoFields.forEach((field) => {
+                console.log(`  - ${field}:`, jobAny[field]);
+              });
+            }
+          }
+
+          // Check company_logo first (most common field name)
+          if (!companyLogo && jobAny.company_logo) {
+            setLogoIfValid(jobAny.company_logo);
+          }
+          if (!companyLogo && job.company_logo) {
+            setLogoIfValid(job.company_logo);
+          }
+          if (!companyLogo && jobAny.companyLogo) {
+            setLogoIfValid(jobAny.companyLogo);
+          }
+          if (!companyLogo && job.companyLogo) {
+            setLogoIfValid(job.companyLogo);
+          }
+          if (!companyLogo && jobAny.employer_logo) {
+            setLogoIfValid(jobAny.employer_logo);
+          }
+          if (!companyLogo && job.employer_logo) {
+            setLogoIfValid(job.employer_logo);
+          }
+          if (!companyLogo && jobAny.logo) {
+            setLogoIfValid(jobAny.logo);
+          }
+          if (!companyLogo && job.logo) {
+            setLogoIfValid(job.logo);
+          }
+          if (!companyLogo && jobAny.logo_url) {
+            setLogoIfValid(jobAny.logo_url);
+          }
+          if (!companyLogo && job.logo_url) {
+            setLogoIfValid(job.logo_url);
+          }
+          // Check additional possible field variations
+          if (!companyLogo && jobAny.employerLogo) {
+            setLogoIfValid(jobAny.employerLogo);
+          }
+          if (!companyLogo && jobAny.companyLogoUrl) {
+            setLogoIfValid(jobAny.companyLogoUrl);
+          }
+          if (!companyLogo && jobAny.logoUrl) {
+            setLogoIfValid(jobAny.logoUrl);
+          }
 
           // Check nested company object
           if (!companyLogo && companyObj) {
-            if (companyObj.logo) companyLogo = companyObj.logo as string;
+            if (companyObj.logo) setLogoIfValid(companyObj.logo);
             if (!companyLogo && companyObj.logo_url)
-              companyLogo = companyObj.logo_url as string;
+              setLogoIfValid(companyObj.logo_url);
             if (!companyLogo && companyObj.company_logo)
-              companyLogo = companyObj.company_logo as string;
+              setLogoIfValid(companyObj.company_logo);
             if (!companyLogo && companyObj.employer_logo)
-              companyLogo = companyObj.employer_logo as string;
+              setLogoIfValid(companyObj.employer_logo);
           }
 
           // Check employer object if it exists separately
@@ -1440,28 +1696,13 @@ const JobsPage = () => {
             typeof job.employer === "object"
           ) {
             const employerObj = job.employer as Record<string, unknown>;
-            if (employerObj.logo) companyLogo = employerObj.logo as string;
+            if (employerObj.logo) setLogoIfValid(employerObj.logo);
             if (!companyLogo && employerObj.logo_url)
-              companyLogo = employerObj.logo_url as string;
+              setLogoIfValid(employerObj.logo_url);
             if (!companyLogo && employerObj.company_logo)
-              companyLogo = employerObj.company_logo as string;
+              setLogoIfValid(employerObj.company_logo);
             if (!companyLogo && employerObj.employer_logo)
-              companyLogo = employerObj.employer_logo as string;
-          }
-
-          // Validate logo URL if found - check if it's a valid URL format
-          if (companyLogo) {
-            try {
-              // Check if it's a valid URL
-              const url = new URL(companyLogo);
-              // Only allow http/https protocols
-              if (!url.protocol.startsWith("http")) {
-                companyLogo = undefined;
-              }
-            } catch {
-              // Invalid URL, remove it
-              companyLogo = undefined;
-            }
+              setLogoIfValid(employerObj.employer_logo);
           }
 
           // Format salary - handle both numeric and string formats
@@ -1543,6 +1784,10 @@ const JobsPage = () => {
             id: jobId,
             title: jobTitle,
             company: companyName,
+            company_name:
+              (job as Record<string, any>).company_name ||
+              (job as Record<string, any>).employer_name ||
+              (typeof job.company === "string" ? job.company : undefined),
             location: locationString,
             url: applyLink,
             company_logo: companyLogo,
@@ -1655,12 +1900,22 @@ const JobsPage = () => {
             job.country ||
             (companyObj?.country as string) ||
             "";
-          const locationString =
-            job.jobLocation || // LinkedIn API field
-            job.location ||
-            (companyObj?.location as string) ||
-            [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-            "Location not specified";
+          const locationString = String(
+            (job.jobLocation && typeof job.jobLocation === "string"
+              ? job.jobLocation
+              : null) ||
+              (job.location && typeof job.location === "string"
+                ? job.location
+                : null) ||
+              (companyObj?.location && typeof companyObj.location === "string"
+                ? companyObj.location
+                : null) ||
+              [jobCity, jobState, jobCountry]
+                .filter(Boolean)
+                .map((s) => String(s))
+                .join(", ") ||
+              "Location not specified"
+          );
           const applyLink =
             job.applyUrl ||
             job.jobUrl ||
@@ -1674,30 +1929,124 @@ const JobsPage = () => {
 
           // Extract company logo (same logic as regular jobs)
           let companyLogo: string | undefined = undefined;
-          if (job.companyLogo) companyLogo = job.companyLogo;
-          if (!companyLogo && job.employer_logo)
-            companyLogo = job.employer_logo;
-          if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
-          if (!companyLogo && job.logo) companyLogo = job.logo;
-          if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
-          if (!companyLogo && companyObj) {
-            if (companyObj.logo) companyLogo = companyObj.logo as string;
-            if (!companyLogo && companyObj.logo_url)
-              companyLogo = companyObj.logo_url as string;
-            if (!companyLogo && companyObj.company_logo)
-              companyLogo = companyObj.company_logo as string;
-            if (!companyLogo && companyObj.employer_logo)
-              companyLogo = companyObj.employer_logo as string;
+
+          // Prefer top-level `company_logo` if present
+          if (
+            !companyLogo &&
+            typeof job.company_logo === "string" &&
+            job.company_logo.trim()
+          ) {
+            companyLogo = job.company_logo.trim();
           }
-          if (companyLogo) {
-            try {
-              const url = new URL(companyLogo);
-              if (!url.protocol.startsWith("http")) {
-                companyLogo = undefined;
-              }
-            } catch {
-              companyLogo = undefined;
+
+          // Prefer top-level `company_logo` if present
+          if (
+            !companyLogo &&
+            typeof job.company_logo === "string" &&
+            job.company_logo.trim()
+          ) {
+            companyLogo = job.company_logo.trim();
+          }
+
+          // Helper function to validate and set logo URL
+          const setLogoIfValid = (logoValue: unknown): boolean => {
+            if (!logoValue) return false;
+
+            if (Array.isArray(logoValue)) {
+              for (const v of logoValue) if (setLogoIfValid(v)) return true;
+              return false;
             }
+
+            if (typeof logoValue === "object") {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const obj = logoValue as Record<string, any>;
+              const candidates = [
+                obj.url,
+                obj.src,
+                obj.href,
+                obj.logo,
+                obj.image,
+                obj.path,
+                obj.file,
+                obj.thumbnail,
+              ];
+              for (const c of candidates) if (setLogoIfValid(c)) return true;
+              return false;
+            }
+
+            const logoUrl = String(logoValue).trim();
+            if (!logoUrl) return false;
+
+            if (logoUrl.startsWith("data:") || logoUrl.startsWith("blob:")) {
+              companyLogo = logoUrl;
+              return true;
+            }
+            if (logoUrl.startsWith("//")) {
+              companyLogo = `https:${logoUrl}`;
+              return true;
+            }
+            if (
+              logoUrl.startsWith("http://") ||
+              logoUrl.startsWith("https://")
+            ) {
+              companyLogo = logoUrl;
+              return true;
+            }
+            if (
+              logoUrl.startsWith("/") ||
+              logoUrl.startsWith("./") ||
+              logoUrl.startsWith("../")
+            ) {
+              companyLogo = logoUrl;
+              return true;
+            }
+
+            return false;
+          };
+
+          // Check root level fields first (check all possible logo field names)
+          if (!companyLogo && job.companyLogo) setLogoIfValid(job.companyLogo);
+          if (!companyLogo && job.employer_logo)
+            setLogoIfValid(job.employer_logo);
+          if (!companyLogo && job.company_logo)
+            setLogoIfValid(job.company_logo);
+          if (!companyLogo && job.logo) setLogoIfValid(job.logo);
+          if (!companyLogo && job.logo_url) setLogoIfValid(job.logo_url);
+          // Check additional possible fields
+          const jobAny = job as Record<string, unknown>;
+          if (!companyLogo && jobAny.companyLogo)
+            setLogoIfValid(jobAny.companyLogo);
+          if (!companyLogo && jobAny.employerLogo)
+            setLogoIfValid(jobAny.employerLogo);
+          if (!companyLogo && jobAny.companyLogoUrl)
+            setLogoIfValid(jobAny.companyLogoUrl);
+          if (!companyLogo && jobAny.logoUrl) setLogoIfValid(jobAny.logoUrl);
+
+          // Check nested company object
+          if (!companyLogo && companyObj) {
+            if (companyObj.logo) setLogoIfValid(companyObj.logo);
+            if (!companyLogo && companyObj.logo_url)
+              setLogoIfValid(companyObj.logo_url);
+            if (!companyLogo && companyObj.company_logo)
+              setLogoIfValid(companyObj.company_logo);
+            if (!companyLogo && companyObj.employer_logo)
+              setLogoIfValid(companyObj.employer_logo);
+          }
+
+          // Check employer object if it exists separately
+          if (
+            !companyLogo &&
+            job.employer &&
+            typeof job.employer === "object"
+          ) {
+            const employerObj = job.employer as Record<string, unknown>;
+            if (employerObj.logo) setLogoIfValid(employerObj.logo);
+            if (!companyLogo && employerObj.logo_url)
+              setLogoIfValid(employerObj.logo_url);
+            if (!companyLogo && employerObj.company_logo)
+              setLogoIfValid(employerObj.company_logo);
+            if (!companyLogo && employerObj.employer_logo)
+              setLogoIfValid(employerObj.employer_logo);
           }
 
           // Format salary (same logic as regular jobs)
@@ -1778,6 +2127,10 @@ const JobsPage = () => {
             id: jobId,
             title: jobTitle,
             company: companyName,
+            company_name:
+              (job as Record<string, any>).company_name ||
+              (job as Record<string, any>).employer_name ||
+              (typeof job.company === "string" ? job.company : undefined),
             location: locationString,
             url: applyLink,
             company_logo: companyLogo,
@@ -1844,12 +2197,22 @@ const JobsPage = () => {
             job.country ||
             (companyObj?.country as string) ||
             "";
-          const locationString =
-            job.jobLocation ||
-            job.location ||
-            (companyObj?.location as string) ||
-            [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-            "Remote";
+          const locationString = String(
+            (job.jobLocation && typeof job.jobLocation === "string"
+              ? job.jobLocation
+              : null) ||
+              (job.location && typeof job.location === "string"
+                ? job.location
+                : null) ||
+              (companyObj?.location && typeof companyObj.location === "string"
+                ? companyObj.location
+                : null) ||
+              [jobCity, jobState, jobCountry]
+                .filter(Boolean)
+                .map((s) => String(s))
+                .join(", ") ||
+              "Remote"
+          );
           const applyLink =
             job.applyUrl ||
             job.jobUrl ||
@@ -1863,30 +2226,105 @@ const JobsPage = () => {
 
           // Extract company logo (same logic as regular jobs)
           let companyLogo: string | undefined = undefined;
-          if (job.companyLogo) companyLogo = job.companyLogo;
-          if (!companyLogo && job.employer_logo)
-            companyLogo = job.employer_logo;
-          if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
-          if (!companyLogo && job.logo) companyLogo = job.logo;
-          if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
-          if (!companyLogo && companyObj) {
-            if (companyObj.logo) companyLogo = companyObj.logo as string;
-            if (!companyLogo && companyObj.logo_url)
-              companyLogo = companyObj.logo_url as string;
-            if (!companyLogo && companyObj.company_logo)
-              companyLogo = companyObj.company_logo as string;
-            if (!companyLogo && companyObj.employer_logo)
-              companyLogo = companyObj.employer_logo as string;
-          }
-          if (companyLogo) {
-            try {
-              const url = new URL(companyLogo);
-              if (!url.protocol.startsWith("http")) {
-                companyLogo = undefined;
-              }
-            } catch {
-              companyLogo = undefined;
+
+          // Helper function to validate and set logo URL
+          const setLogoIfValid = (logoValue: unknown): boolean => {
+            if (!logoValue) return false;
+
+            if (Array.isArray(logoValue)) {
+              for (const v of logoValue) if (setLogoIfValid(v)) return true;
+              return false;
             }
+
+            if (typeof logoValue === "object") {
+              const obj = logoValue as Record<string, any>;
+              const candidates = [
+                obj.url,
+                obj.src,
+                obj.href,
+                obj.logo,
+                obj.image,
+                obj.path,
+                obj.file,
+                obj.thumbnail,
+              ];
+              for (const c of candidates) if (setLogoIfValid(c)) return true;
+              return false;
+            }
+
+            const logoUrl = String(logoValue).trim();
+            if (!logoUrl) return false;
+
+            if (logoUrl.startsWith("data:") || logoUrl.startsWith("blob:")) {
+              companyLogo = logoUrl;
+              return true;
+            }
+            if (logoUrl.startsWith("//")) {
+              companyLogo = `https:${logoUrl}`;
+              return true;
+            }
+            if (
+              logoUrl.startsWith("http://") ||
+              logoUrl.startsWith("https://")
+            ) {
+              companyLogo = logoUrl;
+              return true;
+            }
+            if (
+              logoUrl.startsWith("/") ||
+              logoUrl.startsWith("./") ||
+              logoUrl.startsWith("../")
+            ) {
+              companyLogo = logoUrl;
+              return true;
+            }
+
+            return false;
+          };
+
+          // Check root level fields first (check all possible logo field names)
+          if (!companyLogo && job.companyLogo) setLogoIfValid(job.companyLogo);
+          if (!companyLogo && job.employer_logo)
+            setLogoIfValid(job.employer_logo);
+          if (!companyLogo && job.company_logo)
+            setLogoIfValid(job.company_logo);
+          if (!companyLogo && job.logo) setLogoIfValid(job.logo);
+          if (!companyLogo && job.logo_url) setLogoIfValid(job.logo_url);
+          // Check additional possible fields
+          const jobAny = job as Record<string, unknown>;
+          if (!companyLogo && jobAny.companyLogo)
+            setLogoIfValid(jobAny.companyLogo);
+          if (!companyLogo && jobAny.employerLogo)
+            setLogoIfValid(jobAny.employerLogo);
+          if (!companyLogo && jobAny.companyLogoUrl)
+            setLogoIfValid(jobAny.companyLogoUrl);
+          if (!companyLogo && jobAny.logoUrl) setLogoIfValid(jobAny.logoUrl);
+
+          // Check nested company object
+          if (!companyLogo && companyObj) {
+            if (companyObj.logo) setLogoIfValid(companyObj.logo);
+            if (!companyLogo && companyObj.logo_url)
+              setLogoIfValid(companyObj.logo_url);
+            if (!companyLogo && companyObj.company_logo)
+              setLogoIfValid(companyObj.company_logo);
+            if (!companyLogo && companyObj.employer_logo)
+              setLogoIfValid(companyObj.employer_logo);
+          }
+
+          // Check employer object if it exists separately
+          if (
+            !companyLogo &&
+            job.employer &&
+            typeof job.employer === "object"
+          ) {
+            const employerObj = job.employer as Record<string, unknown>;
+            if (employerObj.logo) setLogoIfValid(employerObj.logo);
+            if (!companyLogo && employerObj.logo_url)
+              setLogoIfValid(employerObj.logo_url);
+            if (!companyLogo && employerObj.company_logo)
+              setLogoIfValid(employerObj.company_logo);
+            if (!companyLogo && employerObj.employer_logo)
+              setLogoIfValid(employerObj.employer_logo);
           }
 
           // Format salary (same logic as regular jobs)
@@ -1960,6 +2398,12 @@ const JobsPage = () => {
             id: jobId,
             title: jobTitle,
             company: companyName,
+            company_name:
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (job as Record<string, any>).company_name ||
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (job as Record<string, any>).employer_name ||
+              (typeof job.company === "string" ? job.company : undefined),
             location: locationString,
             url: applyLink,
             company_logo: companyLogo,
@@ -2320,7 +2764,7 @@ const JobsPage = () => {
                     className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                   >
                     <span className="text-sm font-medium whitespace-nowrap">
-                      {skill}
+                      {String(skill)}
                     </span>
                     <button
                       onClick={() => handleRemoveSkill(skill)}
@@ -2335,7 +2779,9 @@ const JobsPage = () => {
                 {/* Countries */}
                 {activeFilters.countries.map((countryCode) => {
                   const country = countries.find((c) => c.code === countryCode);
-                  const countryName = country?.name || countryCode;
+                  const countryName = country?.name
+                    ? String(country.name)
+                    : String(countryCode);
                   return (
                     <div
                       key={`country-${countryCode}`}
@@ -2356,25 +2802,28 @@ const JobsPage = () => {
                 })}
 
                 {/* Job Types */}
-                {activeFilters.jobTypes.map((jobType) => (
-                  <div
-                    key={`jobType-${jobType}`}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-                  >
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      {jobTypeLabels[jobType] || jobType}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveJobType(jobType)}
-                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                      aria-label={`Remove ${
-                        jobTypeLabels[jobType] || jobType
-                      } filter`}
+                {activeFilters.jobTypes.map((jobType) => {
+                  const jobTypeLabel = jobTypeLabels[jobType]
+                    ? String(jobTypeLabels[jobType])
+                    : String(jobType);
+                  return (
+                    <div
+                      key={`jobType-${jobType}`}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                     >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+                      <span className="text-sm font-medium whitespace-nowrap">
+                        {jobTypeLabel}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveJobType(jobType)}
+                        className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
+                        aria-label={`Remove ${jobTypeLabel} filter`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
 
                 {/* Remote */}
                 {activeFilters.isRemote && (
@@ -2519,19 +2968,46 @@ const JobsPage = () => {
                         {job.company_logo ? (
                           <img
                             src={job.company_logo}
-                            alt={`${job.company} logo`}
-                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                            alt={`${job.company_name || job.company} logo`}
+                            className="w-10 h-10 rounded-md object-cover flex-shrink-0 border border-gray-200"
                             loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              console.warn(
+                                "❌ Logo failed to load:",
+                                job.company_logo,
+                                target.src
+                              );
+                              target.style.display = "none";
+                              const fallback =
+                                target.nextElementSibling as HTMLElement;
+                              if (fallback) {
+                                fallback.style.display = "flex";
+                              }
+                            }}
+                            onLoad={() => {
+                              // Logo loaded successfully
+                              if (process.env.NODE_ENV === "development") {
+                                console.log(
+                                  "✅ Logo loaded successfully:",
+                                  job.company_logo
+                                );
+                              }
+                            }}
                           />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
-                            <Briefcase className="h-5 w-5 text-white" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div
+                          className={`w-10 h-10 rounded-md bg-breneo-accent flex items-center justify-center ${
+                            job.company_logo ? "hidden absolute inset-0" : ""
+                          }`}
+                        >
+                          <Briefcase className="h-5 w-5 text-white" />
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">
-                          {job.company}
+                          {job.company_name || job.company}
                         </h3>
                         <p className="mt-0.5 text-xs text-gray-500 truncate">
                           {job.location}
@@ -2654,19 +3130,46 @@ const JobsPage = () => {
                         {job.company_logo ? (
                           <img
                             src={job.company_logo}
-                            alt={`${job.company} logo`}
+                            alt={`${job.company_name || job.company} logo`}
                             className="w-10 h-10 rounded-full object-cover border border-gray-200"
                             loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              console.warn(
+                                "❌ Logo failed to load:",
+                                job.company_logo,
+                                target.src
+                              );
+                              target.style.display = "none";
+                              const fallback =
+                                target.nextElementSibling as HTMLElement;
+                              if (fallback) {
+                                fallback.style.display = "flex";
+                              }
+                            }}
+                            onLoad={() => {
+                              // Logo loaded successfully
+                              if (process.env.NODE_ENV === "development") {
+                                console.log(
+                                  "✅ Logo loaded successfully:",
+                                  job.company_logo
+                                );
+                              }
+                            }}
                           />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
-                            <Briefcase className="h-5 w-5 text-white" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div
+                          className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center ${
+                            job.company_logo ? "hidden absolute inset-0" : ""
+                          }`}
+                        >
+                          <Briefcase className="h-5 w-5 text-white" />
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">
-                          {job.company}
+                          {job.company_name || job.company}
                         </h3>
                         <p className="mt-0.5 text-xs text-gray-500 truncate">
                           {job.location}

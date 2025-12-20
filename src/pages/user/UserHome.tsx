@@ -1236,7 +1236,7 @@ const UserHome = () => {
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
-                                alt={`${job.company} logo`}
+                                alt={`${job.company_name || job.company} logo`}
                                 className="w-10 h-10 rounded-full object-cover border border-gray-200"
                                 loading="lazy"
                               />
@@ -1248,7 +1248,7 @@ const UserHome = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">
-                              {job.company}
+                              {job.company_name || job.company}
                             </h3>
                             <p className="mt-0.5 text-xs text-gray-500 truncate">
                               {job.location}

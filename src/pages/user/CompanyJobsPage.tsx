@@ -118,7 +118,8 @@ const fetchCompanyJobs = async (
         normalizedJobCompany === normalizedSearchCompany ||
         normalizedJobCompany.includes(normalizedSearchCompany) ||
         normalizedSearchCompany.includes(normalizedJobCompany) ||
-        normalizedJobCompany.replace(/\s+/g, "") === normalizedSearchCompany.replace(/\s+/g, "")
+        normalizedJobCompany.replace(/\s+/g, "") ===
+          normalizedSearchCompany.replace(/\s+/g, "")
       );
     });
 
@@ -151,7 +152,9 @@ const fetchCompanyJobs = async (
 
     // If no jobs found with company name search, try a broader search
     if (validJobs.length === 0 && page === 1) {
-      console.log(`⚠️ No jobs found with company name search, trying broader search...`);
+      console.log(
+        `⚠️ No jobs found with company name search, trying broader search...`
+      );
       try {
         const broaderResponse = await jobService.fetchActiveJobs({
           query: "", // Empty query to get all jobs
@@ -198,7 +201,8 @@ const fetchCompanyJobs = async (
               normalizedJobCompany === normalizedSearchCompany ||
               normalizedJobCompany.includes(normalizedSearchCompany) ||
               normalizedSearchCompany.includes(normalizedJobCompany) ||
-              normalizedJobCompany.replace(/\s+/g, "") === normalizedSearchCompany.replace(/\s+/g, "")
+              normalizedJobCompany.replace(/\s+/g, "") ===
+                normalizedSearchCompany.replace(/\s+/g, "")
             );
           });
 
@@ -207,7 +211,9 @@ const fetchCompanyJobs = async (
             return jobId && jobId.trim() !== "";
           });
 
-          console.log(`✅ Broader search found ${broaderValidJobs.length} jobs for ${companyName}`);
+          console.log(
+            `✅ Broader search found ${broaderValidJobs.length} jobs for ${companyName}`
+          );
 
           return {
             jobs: broaderValidJobs,
@@ -241,9 +247,7 @@ const CompanyJobsPage = () => {
   const [hasMore, setHasMore] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  const decodedCompanyName = companyName
-    ? decodeURIComponent(companyName)
-    : "";
+  const decodedCompanyName = companyName ? decodeURIComponent(companyName) : "";
 
   // Fetch saved jobs
   const { data: savedJobs = [] } = useQuery<string[]>({
@@ -584,7 +588,7 @@ const CompanyJobsPage = () => {
                         {job.company_logo ? (
                           <img
                             src={job.company_logo}
-                            alt={`${job.company} logo`}
+                            alt={`${job.company_name || job.company} logo`}
                             className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
                             loading="lazy"
                             onError={(e) => {
@@ -608,7 +612,7 @@ const CompanyJobsPage = () => {
                             src={`https://logo.clearbit.com/${encodeURIComponent(
                               job.company
                             )}`}
-                            alt={`${job.company} logo`}
+                            alt={`${job.company_name || job.company} logo`}
                             className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
                             style={{ zIndex: 10 }}
                             loading="lazy"
@@ -648,7 +652,7 @@ const CompanyJobsPage = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-base truncate">
-                          {job.company}
+                          {job.company_name || job.company}
                         </h3>
                         <p className="text-xs text-gray-500 truncate">
                           {job.location}
@@ -751,4 +755,3 @@ const CompanyJobsPage = () => {
 };
 
 export default CompanyJobsPage;
-
