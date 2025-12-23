@@ -47,7 +47,7 @@ import {
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { useTranslation } from "@/contexts/LanguageContext";
-import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
+// Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
 
 interface Job {
@@ -79,9 +79,8 @@ const jobTypeLabels: Record<string, string> = {
 const extractJobSkills = (job: ApiJob): string[] => {
   const skills: string[] = [];
   const textToSearch = [
-    job.job_title || job.title || "",
-    job.description || "",
-    job.job_description || "",
+    job.title || job.job_title || "",
+    job.description || job.job_description || "",
     job.job_required_experience || job.required_experience || "",
   ]
     .join(" ")
@@ -153,32 +152,93 @@ const extractJobSkills = (job: ApiJob): string[] => {
   return [...new Set(skills)];
 };
 
+// Function to calculate match percentage with enhanced job title matching
 const calculateMatchPercentage = (
   userSkills: string[],
-  jobSkills: string[]
+  jobSkills: string[],
+  jobTitle?: string
 ): number => {
-  if (jobSkills.length === 0) return 50;
-  if (userSkills.length === 0) return 0;
+  if (userSkills.length === 0) {
+    return 0;
+  }
 
+  // Normalize skills for comparison (lowercase, remove spaces)
   const normalizeSkill = (skill: string) =>
     skill.toLowerCase().trim().replace(/\s+/g, " ");
 
   const normalizedUserSkills = userSkills.map(normalizeSkill);
   const normalizedJobSkills = jobSkills.map(normalizeSkill);
+  const normalizedJobTitle = jobTitle
+    ? normalizeSkill(jobTitle)
+    : "";
 
-  const matchingSkills = normalizedUserSkills.filter((userSkill) =>
+  // Check if user skills appear directly in job title (high priority match)
+  const titleMatches: string[] = [];
+  normalizedUserSkills.forEach((userSkill) => {
+    // Check if user skill appears in job title
+    if (normalizedJobTitle && normalizedJobTitle.includes(userSkill)) {
+      titleMatches.push(userSkill);
+    }
+    // Also check if any word in job title contains the user skill
+    const titleWords = normalizedJobTitle.split(/\s+/);
+    if (titleWords.some((word) => word.includes(userSkill) || userSkill.includes(word))) {
+      if (!titleMatches.includes(userSkill)) {
+        titleMatches.push(userSkill);
+      }
+    }
+  });
+
+  // Find matching skills in job description/requirements
+  const descriptionMatches = normalizedUserSkills.filter((userSkill) =>
     normalizedJobSkills.some((jobSkill) => {
+      // Exact match
       if (userSkill === jobSkill) return true;
+      // Partial match (one skill contains the other)
       if (userSkill.includes(jobSkill) || jobSkill.includes(userSkill))
         return true;
       return false;
     })
   );
 
-  const matchPercentage = Math.round(
-    (matchingSkills.length / normalizedJobSkills.length) * 100
+  // Combine matches (title matches are more important)
+  const allMatches = new Set([...titleMatches, ...descriptionMatches]);
+
+  // Calculate match percentage with weighted scoring
+  // If job has skills extracted, use them as denominator
+  // Otherwise, use user skills as denominator
+  const denominator = normalizedJobSkills.length > 0 
+    ? normalizedJobSkills.length 
+    : normalizedUserSkills.length;
+
+  // Base match: (matching skills / denominator) * 100
+  let matchPercentage = Math.round(
+    (allMatches.size / Math.max(denominator, 1)) * 100
   );
 
+  // Boost match if user skills appear in job title (add up to 30% bonus)
+  if (titleMatches.length > 0) {
+    const titleMatchBonus = Math.min(
+      (titleMatches.length / normalizedUserSkills.length) * 30,
+      30
+    );
+    matchPercentage = Math.min(matchPercentage + titleMatchBonus, 100);
+  }
+
+  // If no skills found in job but user has skills, return lower match
+  if (normalizedJobSkills.length === 0) {
+    // If title matches exist, give some credit
+    if (titleMatches.length > 0) {
+      matchPercentage = Math.min(
+        Math.round((titleMatches.length / normalizedUserSkills.length) * 100),
+        70
+      );
+    } else {
+      // No matches at all - return low match
+      matchPercentage = 20;
+    }
+  }
+
+  // Cap at 100%
   return Math.min(matchPercentage, 100);
 };
 
@@ -434,11 +494,26 @@ const JobSearchResultsPage = () => {
         skills: allInterestsSelected ? [] : filters.skills,
       };
 
+      // Check if any filters are applied
+      const hasFilters = 
+        filtersForAPI.countries.length > 0 ||
+        filtersForAPI.jobTypes.length > 0 ||
+        filtersForAPI.isRemote ||
+        filtersForAPI.datePosted ||
+        filtersForAPI.skills.length > 0 ||
+        filtersForAPI.salaryMin !== undefined ||
+        filtersForAPI.salaryMax !== undefined ||
+        filtersForAPI.salaryByAgreement ||
+        (searchTerm && searchTerm.trim() !== "");
+
+      // If no filters, fetch many more jobs to display all available
+      const pageSize = hasFilters ? 50 : 200;
+
       const response = await jobService.fetchActiveJobs({
         query: searchTerm || "",
         filters: filtersForAPI,
         page,
-        pageSize: 12,
+        pageSize, // Fetch more jobs when no filters to show all available jobs
       });
 
       if (!response || !Array.isArray(response.jobs)) {
@@ -446,7 +521,7 @@ const JobSearchResultsPage = () => {
       }
 
       let validJobs = response.jobs.filter((job) => {
-        const jobId = job.job_id || job.id;
+        const jobId = String(job.id || "");
         return jobId && jobId.trim() !== "";
       });
 
@@ -546,14 +621,12 @@ const JobSearchResultsPage = () => {
     retry: 1,
   });
 
-  // Filter to only tech jobs from allowed ATS platforms
+  // No filtering - display all jobs from API
   const jobs = useMemo(() => {
-    const allJobs = jobsData.jobs || [];
-    const techJobs = filterTechJobs(allJobs);
-    return filterATSJobs(techJobs);
+    return jobsData.jobs || [];
   }, [jobsData.jobs]);
   const hasMore = jobsData.hasMore || false;
-  const totalJobs = jobs.length; // Update total to reflect filtered count
+  const totalJobs = jobsData.total || jobs.length; // Use API total if available
 
   // Transform jobs
   const transformedJobs: Job[] = useMemo(() => {
@@ -561,14 +634,15 @@ const JobSearchResultsPage = () => {
 
     return jobs
       .map((job: ApiJob): Job | null => {
-        const jobId = job.job_id || job.id || "";
+        // Ensure jobId is always a string - use only id field (not job_id or external_job_id)
+        const jobId = String(job.id || "");
         if (!jobId || jobId.trim() === "") return null;
 
         const jobTitle =
-          job.job_title || job.title || job.position || "Untitled Position";
+          job.title || job.job_title || job.position || "Untitled Position";
         const companyName =
-          job.employer_name ||
           job.company_name ||
+          job.employer_name ||
           (typeof job.company === "string" ? job.company : null) ||
           "Unknown Company";
 
@@ -582,10 +656,10 @@ const JobSearchResultsPage = () => {
           "Location not specified";
 
         const applyLink =
+          job.apply_url ||
           job.job_apply_link ||
           job.apply_link ||
           job.url ||
-          job.apply_url ||
           "";
 
         // Extract company logo - check all possible fields (same as JobsPage)
@@ -749,16 +823,18 @@ const JobSearchResultsPage = () => {
         const jobSkills = extractJobSkills(job);
         const matchPercentage = calculateMatchPercentage(
           userTopSkills,
-          jobSkills
+          jobSkills,
+          jobTitle
         );
 
-        // Extract date posted - try all possible date fields from API
-        // JSearch API typically uses: job_posted_at_datetime_utc, date_posted, or posted_date
+        // Extract date posted - new API uses posted_at or fetched_at
         const jobRecord = job as Record<string, unknown>;
         const datePosted =
-          (job.job_posted_at_datetime_utc as string | undefined) || // JSearch API primary field
+          (job.posted_at as string | undefined) ||
+          (job.fetched_at as string | undefined) ||
           (job.date_posted as string | undefined) ||
           (job.posted_date as string | undefined) ||
+          (job.job_posted_at_datetime_utc as string | undefined) ||
           (job.postedAt as string | undefined) ||
           (job.job_posted_at as string | undefined) ||
           (jobRecord.job_publish_timestamp as string | undefined) ||
@@ -782,8 +858,7 @@ const JobSearchResultsPage = () => {
           company: companyName,
           // Prefer the raw API `company_name` when available so UI shows exact field
           company_name:
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (job as Record<string, any>).company_name ||
+            job.company_name ||
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (job as Record<string, any>).employer_name ||
             (typeof job.company === "string" ? job.company : undefined),

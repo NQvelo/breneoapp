@@ -50,7 +50,7 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
-import { filterATSJobs } from "@/utils/jobFilterUtils";
+// Removed filterATSJobs import - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
@@ -59,9 +59,8 @@ import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 const extractJobSkills = (job: ApiJob): string[] => {
   const skills: string[] = [];
   const textToSearch = [
-    job.job_title || job.title || "",
-    job.description || "",
-    job.job_description || "",
+    job.title || job.job_title || "",
+    job.description || job.job_description || "",
     job.job_required_experience || job.required_experience || "",
   ]
     .join(" ")
@@ -187,29 +186,46 @@ const calculateJobRelevanceScore = (
   return score;
 };
 
-// Function to calculate match percentage (same logic as JobsPage / JobSearchResultsPage)
+// Function to calculate match percentage with enhanced job title matching
 const calculateMatchPercentage = (
   userSkills: string[],
-  jobSkills: string[]
+  jobSkills: string[],
+  jobTitle?: string
 ): number => {
-  if (jobSkills.length === 0) {
-    // If no skills found in job, return a base match (e.g., 50%)
-    return 50;
-  }
-
   if (userSkills.length === 0) {
     return 0;
   }
 
-  // Normalize skills for comparison (lowercase, remove extra spaces)
+  // Normalize skills for comparison (lowercase, remove spaces)
   const normalizeSkill = (skill: string) =>
     skill.toLowerCase().trim().replace(/\s+/g, " ");
 
   const normalizedUserSkills = userSkills.map(normalizeSkill);
   const normalizedJobSkills = jobSkills.map(normalizeSkill);
+  const normalizedJobTitle = jobTitle ? normalizeSkill(jobTitle) : "";
 
-  // Find matching skills
-  const matchingSkills = normalizedUserSkills.filter((userSkill) =>
+  // Check if user skills appear directly in job title (high priority match)
+  const titleMatches: string[] = [];
+  normalizedUserSkills.forEach((userSkill) => {
+    // Check if user skill appears in job title
+    if (normalizedJobTitle && normalizedJobTitle.includes(userSkill)) {
+      titleMatches.push(userSkill);
+    }
+    // Also check if any word in job title contains the user skill
+    const titleWords = normalizedJobTitle.split(/\s+/);
+    if (
+      titleWords.some(
+        (word) => word.includes(userSkill) || userSkill.includes(word)
+      )
+    ) {
+      if (!titleMatches.includes(userSkill)) {
+        titleMatches.push(userSkill);
+      }
+    }
+  });
+
+  // Find matching skills in job description/requirements
+  const descriptionMatches = normalizedUserSkills.filter((userSkill) =>
     normalizedJobSkills.some((jobSkill) => {
       // Exact match
       if (userSkill === jobSkill) return true;
@@ -220,10 +236,44 @@ const calculateMatchPercentage = (
     })
   );
 
-  // Calculate percentage: (matching skills / job skills) * 100
-  const matchPercentage = Math.round(
-    (matchingSkills.length / normalizedJobSkills.length) * 100
+  // Combine matches (title matches are more important)
+  const allMatches = new Set([...titleMatches, ...descriptionMatches]);
+
+  // Calculate match percentage with weighted scoring
+  // If job has skills extracted, use them as denominator
+  // Otherwise, use user skills as denominator
+  const denominator =
+    normalizedJobSkills.length > 0
+      ? normalizedJobSkills.length
+      : normalizedUserSkills.length;
+
+  // Base match: (matching skills / denominator) * 100
+  let matchPercentage = Math.round(
+    (allMatches.size / Math.max(denominator, 1)) * 100
   );
+
+  // Boost match if user skills appear in job title (add up to 30% bonus)
+  if (titleMatches.length > 0) {
+    const titleMatchBonus = Math.min(
+      (titleMatches.length / normalizedUserSkills.length) * 30,
+      30
+    );
+    matchPercentage = Math.min(matchPercentage + titleMatchBonus, 100);
+  }
+
+  // If no skills found in job but user has skills, return lower match
+  if (normalizedJobSkills.length === 0) {
+    // If title matches exist, give some credit
+    if (titleMatches.length > 0) {
+      matchPercentage = Math.min(
+        Math.round((titleMatches.length / normalizedUserSkills.length) * 100),
+        70
+      );
+    } else {
+      // No matches at all - return low match
+      matchPercentage = 20;
+    }
+  }
 
   // Cap at 100%
   return Math.min(matchPercentage, 100);
@@ -284,9 +334,8 @@ const calculateCourseMatchScore = (
 // Function to check if a job is tech-related (for broader filtering)
 const isTechJob = (job: ApiJob): boolean => {
   const textToSearch = [
-    job.job_title || job.title || "",
-    job.description || "",
-    job.job_description || "",
+    job.title || job.job_title || "",
+    job.description || job.job_description || "",
     job.job_required_experience || job.required_experience || "",
   ]
     .join(" ")
@@ -334,6 +383,7 @@ interface Job {
   id: string;
   title: string;
   company: string;
+  company_name?: string;
   location: string;
   date: string;
   logo?: string;
@@ -358,22 +408,22 @@ interface Course {
   match?: number;
 }
 
-// Fetch jobs from job service API - fetch more to have enough for careful filtering
-const fetchJobs = async (userHardSkills: string[] = []) => {
+// Fetch jobs from job service API - no filtering
+const fetchJobs = async () => {
   try {
-    // Use user hard skills if available, but be lenient
+    // No filters - fetch all jobs
     const filters: JobFilters = {
       country: "",
       countries: [], // No country filter
       jobTypes: [], // No job type filter
       isRemote: false, // No remote filter
       datePosted: undefined, // No date filter
-      skills: userHardSkills.length > 0 ? userHardSkills : [], // Filter by user hard skills if available
+      skills: [], // No skills filter
     };
 
-    // Fetch jobs using the job service - fetch more jobs for better filtering
+    // Fetch jobs using the job service - no filtering
     const response = await jobService.fetchActiveJobs({
-      query: userHardSkills.length > 0 ? "" : "developer", // Use skills filter if available, otherwise use default query
+      query: "", // No query filter
       filters,
       page: 1,
       pageSize: 50, // Fetch more jobs to have enough for careful filtering and sorting
@@ -591,15 +641,15 @@ const UserHome = () => {
     enabled: !!user,
   });
 
-  // Fetch jobs - filtered by user hard skills
+  // Fetch jobs - no filtering
   const {
     data: jobs = [],
     isLoading: jobsLoading,
     error: jobsError,
   } = useQuery({
-    queryKey: ["home-jobs", userHardSkills.join(",")],
-    queryFn: () => fetchJobs(userHardSkills),
-    enabled: !!user && !loadingSkills, // Wait for skills to load
+    queryKey: ["home-jobs"],
+    queryFn: () => fetchJobs(),
+    enabled: !!user, // Fetch when user is available
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -767,51 +817,56 @@ const UserHome = () => {
   });
 
   // Transform jobs - handle empty or undefined arrays
-  // Carefully filter and sort by relevance, then take up to 10
+  // Sort by match percentage (highest first), then take top 9
   const transformedJobs: Job[] = useMemo(() => {
-    // Step 1: Filter to only allowed ATS platforms first (ensures only jobs from approved platforms are shown)
-    // This checks all apply links in the job object against the allowed ATS domains list
-    let filteredJobs = filterATSJobs(jobs || []);
+    // No filtering - display all jobs
+    const filteredJobs = jobs || [];
 
-    // Step 2: Filter to tech jobs if user has hard skills, otherwise show all
-    if (userHardSkills.length > 0) {
-      // Show tech jobs and jobs that match user skills
-      filteredJobs = filteredJobs.filter((job: ApiJob) => {
-        // Show if it's a tech job OR if it matches user skills
-        return (
-          isTechJob(job) ||
-          calculateJobRelevanceScore(job, userHardSkills) > 0.1
-        );
-      });
-    }
+    // Transform all jobs first to calculate match percentages
+    const jobsWithMatchPercentage = filteredJobs.map((job: ApiJob) => {
+      const jobSkills = extractJobSkills(job);
+      const jobTitle = job.title || job.job_title || job.position || "";
+      const matchPercentage = calculateMatchPercentage(
+        userTopSkills,
+        jobSkills,
+        jobTitle
+      );
+      return { job, matchPercentage };
+    });
 
-    // Step 2: Calculate relevance scores and sort by relevance (highest first)
-    const jobsWithScores = filteredJobs.map((job: ApiJob) => ({
-      job,
-      score: calculateJobRelevanceScore(job, userHardSkills),
-    }));
-
-    // Sort by relevance score (highest first), then by tech job status
-    jobsWithScores.sort((a, b) => {
-      // First sort by relevance score
-      if (Math.abs(a.score - b.score) > 0.1) {
-        return b.score - a.score;
+    // Sort by match percentage (highest first), then by date as tiebreaker
+    jobsWithMatchPercentage.sort((a, b) => {
+      // First, sort by match percentage (highest first)
+      if (a.matchPercentage !== b.matchPercentage) {
+        return b.matchPercentage - a.matchPercentage;
       }
-      // If scores are similar, prioritize tech jobs
-      const aIsTech = isTechJob(a.job);
-      const bIsTech = isTechJob(b.job);
-      if (aIsTech && !bIsTech) return -1;
-      if (!aIsTech && bIsTech) return 1;
+
+      // If match percentages are equal, sort by date (newest first)
+      const dateA =
+        a.job.posted_at || a.job.fetched_at || a.job.date_posted || "";
+      const dateB =
+        b.job.posted_at || b.job.fetched_at || b.job.date_posted || "";
+
+      if (dateA && dateB) {
+        try {
+          const timeA = new Date(dateA as string).getTime();
+          const timeB = new Date(dateB as string).getTime();
+          return timeB - timeA; // Newest first
+        } catch (e) {
+          return 0;
+        }
+      }
+
       return 0;
     });
 
-    // Step 3: Take top 10 most relevant jobs
-    const topJobs = jobsWithScores.slice(0, 10).map((item) => item.job);
+    // Step 3: Take top 9 jobs with highest match percentage
+    const topJobs = jobsWithMatchPercentage.slice(0, 9).map((item) => item.job);
 
     return topJobs
       .map((job: ApiJob) => {
-        // Extract job ID - check all possible fields
-        const jobId = job.job_id || job.id || "";
+        // Extract job ID - use only id field (not job_id or external_job_id)
+        const jobId = job.id || "";
         if (!jobId) {
           console.warn("Skipping job without valid ID:", job);
           return null;
@@ -819,12 +874,12 @@ const UserHome = () => {
 
         // Extract job title - check all possible fields
         const jobTitle =
-          job.job_title || job.title || job.position || "Untitled Position";
+          job.title || job.job_title || job.position || "Untitled Position";
 
         // Extract company name - check all possible fields
         const companyName =
-          job.employer_name ||
           job.company_name ||
+          job.employer_name ||
           (typeof job.company === "string" ? job.company : null) ||
           "Unknown Company";
 
@@ -848,8 +903,10 @@ const UserHome = () => {
               (job.company as { company_logo?: string }).company_logo
             : undefined);
 
-        // Extract date posted
+        // Extract date posted - new API uses posted_at or fetched_at
         const postedDate =
+          job.posted_at ||
+          job.fetched_at ||
           job.date_posted ||
           job.posted_date ||
           job.job_posted_at_datetime_utc ||
@@ -928,13 +985,15 @@ const UserHome = () => {
         const jobSkills = extractJobSkills(job);
         const matchPercentage = calculateMatchPercentage(
           userTopSkills,
-          jobSkills
+          jobSkills,
+          jobTitle
         );
 
         const transformedJob: Job = {
           id: jobId,
           title: jobTitle,
           company: companyName,
+          company_name: companyName,
           location:
             typeof location === "string" ? location : "Location not specified",
           logo,
@@ -945,7 +1004,7 @@ const UserHome = () => {
           is_saved: savedJobs?.includes(String(jobId)),
           matchPercentage,
           date: postedDate
-            ? new Date(postedDate).toLocaleDateString("en-GB", {
+            ? new Date(String(postedDate)).toLocaleDateString("en-GB", {
                 day: "2-digit",
                 month: "short",
                 year: "numeric",
@@ -958,11 +1017,10 @@ const UserHome = () => {
         };
         return transformedJob;
       })
-      .filter((job): job is Job => job !== null) // Filter out null jobs
-      .slice(0, 10); // Take up to 10 jobs
-  }, [jobs, savedJobs, userHardSkills]);
+      .filter((job): job is Job => job !== null); // Filter out null jobs (already limited to 9 above)
+  }, [jobs, savedJobs, userTopSkills]);
 
-  // Display up to 10 jobs
+  // Display up to 9 jobs (already sorted by match percentage)
   const displayJobs = transformedJobs;
 
   // Scroll functions for jobs

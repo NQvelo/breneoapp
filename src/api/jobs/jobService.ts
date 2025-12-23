@@ -9,7 +9,7 @@ import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
 import { countries } from "@/data/countries";
 
 // API Configuration
-const JOB_API_BASE = "https://breneo-job-aggregator.onrender.com/api/";
+const JOB_API_BASE = "https://breneo-job-aggregator.onrender.com/api/search";
 
 // Rate limiter: ensures only 1 request per second
 let lastRequestTime = 0;
@@ -38,10 +38,10 @@ const rateLimitedFetch = async (
  * Interface for Breneo Job Aggregator API response
  */
 interface BreneoJobApiResponse {
-  company_logo: string;
   id: number;
   title: string;
-  company: string;
+  company_name: string;
+  company_logo?: string;
   location: string;
   description: string;
   apply_url: string;
@@ -50,7 +50,20 @@ interface BreneoJobApiResponse {
   posted_at: string | null;
   fetched_at: string;
   is_active: boolean;
-  raw: unknown;
+  raw?: {
+    absolute_url?: string;
+    location?: {
+      name?: string;
+    };
+    id?: number;
+    updated_at?: string;
+    requisition_id?: string;
+    title?: string;
+    company_name?: string;
+    first_published?: string;
+    language?: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -59,14 +72,14 @@ interface BreneoJobApiResponse {
 const mapBreneoJobToApiJob = (job: BreneoJobApiResponse): ApiJob => {
   const baseJob: ApiJob = {
     id: String(job.id),
-    job_id: job.external_job_id || String(job.id),
+    job_id: String(job.id), // Use only id field, not external_job_id
     title: job.title,
     job_title: job.title,
-    company: job.company,
+    company: job.company_name,
     company_logo: job.company_logo,
     companyLogo: job.company_logo,
-    company_name: job.company,
-    employer_name: job.company,
+    company_name: job.company_name,
+    employer_name: job.company_name,
     location: job.location,
     job_location: job.location,
     description: job.description,
@@ -76,6 +89,8 @@ const mapBreneoJobToApiJob = (job: BreneoJobApiResponse): ApiJob => {
     url: job.apply_url,
     date_posted: job.posted_at || job.fetched_at,
     posted_date: job.posted_at || job.fetched_at,
+    posted_at: job.posted_at || job.fetched_at,
+    fetched_at: job.fetched_at,
     status: job.is_active ? "active" : "inactive",
   };
 
@@ -88,16 +103,103 @@ const mapBreneoJobToApiJob = (job: BreneoJobApiResponse): ApiJob => {
 };
 
 /**
+ * Response from Breneo API with pagination info
+ */
+interface BreneoApiResponse {
+  jobs: ApiJob[];
+  pagination?: {
+    page?: number;
+    num_pages?: number;
+    total_pages?: number;
+    total_results?: number;
+    has_next?: boolean;
+    has_previous?: boolean;
+  };
+}
+
+/**
  * Fetch jobs from Breneo Job Aggregator API
- * The API returns all jobs, we'll filter them on the frontend
+ * The API returns filtered jobs based on query parameters
+ * Returns jobs and pagination info from the API
  */
 const fetchJobsFromBreneoAPI = async (
   params: JobSearchParams
-): Promise<ApiJob[]> => {
-  const { query, filters, page = 1 } = params;
+): Promise<BreneoApiResponse> => {
+  const { query, filters, page = 1, pageSize = 12 } = params;
 
-  // Build the API endpoint - try with and without trailing slash
-  const API_ENDPOINT = JOB_API_BASE;
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+
+  // Add query/search term
+  // Check if we have any filters applied
+  const hasFilters =
+    filters.countries.length > 0 ||
+    filters.jobTypes.length > 0 ||
+    filters.isRemote ||
+    filters.datePosted ||
+    filters.skills.length > 0;
+
+  const searchQuery = query && query.trim() ? query.trim() : "";
+
+  if (searchQuery) {
+    // User provided a query - use it
+    queryParams.set("query", searchQuery);
+  } else if (hasFilters) {
+    // No query but has filters - use a broad default to get jobs that match filters
+    queryParams.set("query", "developer");
+  } else {
+    // No query and no filters - try empty string to get ALL jobs from API
+    // If API doesn't accept empty, it will return an error and we can handle it
+    queryParams.set("query", "");
+  }
+
+  // Add page
+  queryParams.set("page", String(page));
+
+  // Add num_pages (how many pages to fetch per request)
+  // When no filters/query, fetch MANY pages to get all jobs
+  // When filters are applied, fetch enough to cover pageSize
+  let pagesToFetch: number;
+  if (!searchQuery && !hasFilters) {
+    // No query and no filters - fetch maximum pages to get all jobs
+    pagesToFetch = 100; // Fetch up to 100 pages to get all available jobs
+  } else {
+    // Has query or filters - calculate based on pageSize
+    pagesToFetch = Math.max(
+      1,
+      Math.min(100, Math.ceil((pageSize || 200) / 20))
+    );
+  }
+
+  queryParams.set("num_pages", String(pagesToFetch));
+
+  console.log(
+    `📄 Fetching ${pagesToFetch} pages of jobs (pageSize: ${
+      pageSize || 200
+    }, query: "${
+      searchQuery || "(empty - all jobs)"
+    }", hasFilters: ${hasFilters})`
+  );
+
+  // Add country filter (use first country if multiple, or default to 'us')
+  if (filters.countries.length > 0) {
+    queryParams.set("country", filters.countries[0].toLowerCase());
+  } else {
+    queryParams.set("country", "us"); // Default to US
+  }
+
+  // Add date_posted filter
+  queryParams.set("date_posted", filters.datePosted || "all");
+
+  // Build the API endpoint with query parameters
+  const API_ENDPOINT = `${JOB_API_BASE}?${queryParams.toString()}`;
+
+  // Debug: Log the full API endpoint URL for troubleshooting
+  console.log("🔗 Full API Endpoint URL:", API_ENDPOINT);
+  console.log(
+    "🔗 Query Parameters:",
+    Object.fromEntries(queryParams.entries())
+  );
 
   console.log("🔍 Breneo Job API Request:", {
     url: API_ENDPOINT,
@@ -113,6 +215,8 @@ const fetchJobsFromBreneoAPI = async (
   });
 
   try {
+    console.log("🌐 Making API request to:", API_ENDPOINT);
+
     const response = await rateLimitedFetch(API_ENDPOINT, {
       method: "GET",
       headers: {
@@ -126,6 +230,10 @@ const fetchJobsFromBreneoAPI = async (
       response.status,
       response.statusText
     );
+    console.log("✅ API Response Headers:", {
+      contentType: response.headers.get("content-type"),
+      contentLength: response.headers.get("content-length"),
+    });
 
     if (response.status === 429) {
       throw new Error(
@@ -157,21 +265,100 @@ const fetchJobsFromBreneoAPI = async (
       throw new Error(errorMessage);
     }
 
-    const result: unknown = await response.json();
+    // Get response text first to see what we're actually getting
+    const responseText = await response.text();
+    console.log("📦 API Response text length:", responseText.length);
     console.log(
-      "📦 API Response received, type:",
-      Array.isArray(result) ? "Array" : typeof result
+      "📦 API Response text preview (first 500 chars):",
+      responseText.substring(0, 500)
     );
 
-    // Breneo API returns an array of jobs directly
+    let result: unknown;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("❌ Failed to parse API response as JSON:", parseError);
+      console.error("❌ Full response text:", responseText);
+      throw new Error(
+        `Invalid JSON response from API: ${responseText.substring(0, 200)}`
+      );
+    }
+
+    console.log(
+      "📦 API Response parsed, type:",
+      Array.isArray(result) ? "Array" : typeof result
+    );
+    console.log("📦 API Response preview:", {
+      isArray: Array.isArray(result),
+      hasResults: result && typeof result === "object" && "results" in result,
+      keys: result && typeof result === "object" ? Object.keys(result) : [],
+      arrayLength: Array.isArray(result) ? result.length : null,
+      firstItem: Array.isArray(result) && result.length > 0 ? result[0] : null,
+    });
+
+    // Breneo API returns an array of jobs directly OR { results: [...], pagination: {...} }
     let jobsArray: ApiJob[] = [];
+    let paginationInfo: BreneoApiResponse["pagination"] = undefined;
 
     if (Array.isArray(result)) {
+      // Legacy format: direct array
       const breneoJobs = result as BreneoJobApiResponse[];
-      console.log(`📊 Received ${breneoJobs.length} total jobs from API`);
+      console.log(
+        `📊 Received ${breneoJobs.length} total jobs from API (legacy array format)`
+      );
+
+      if (breneoJobs.length === 0) {
+        console.warn("⚠️ API returned empty array");
+        console.log("🔍 Full API response:", JSON.stringify(result, null, 2));
+        return { jobs: [], pagination: undefined };
+      }
 
       // Filter only active jobs
-      const activeJobs = breneoJobs.filter((job) => job.is_active);
+      const activeJobs = breneoJobs.filter((job) => job.is_active !== false);
+      console.log(`✅ ${activeJobs.length} active jobs after filtering`);
+
+      // Map to ApiJob format
+      jobsArray = activeJobs.map(mapBreneoJobToApiJob);
+      console.log(`🎯 Mapped ${jobsArray.length} jobs to ApiJob format`);
+    } else if (result && typeof result === "object" && "results" in result) {
+      // Handle new API response format: { results: [...], pagination: {...}, filters: {...} }
+      const paginatedResult = result as {
+        results: BreneoJobApiResponse[];
+        pagination?: {
+          page?: number;
+          num_pages?: number;
+          total_pages?: number;
+          total_results?: number;
+          has_next?: boolean;
+          has_previous?: boolean;
+        };
+        filters?: {
+          query?: string;
+          country?: string;
+          date_posted?: string;
+        };
+      };
+      const breneoJobs = paginatedResult.results || [];
+      console.log(
+        `📊 Received ${breneoJobs.length} jobs from paginated API response`
+      );
+      console.log("📊 Pagination info:", paginatedResult.pagination);
+      console.log("📊 Applied filters:", paginatedResult.filters);
+
+      if (breneoJobs.length === 0) {
+        console.warn("⚠️ API returned empty results array");
+        console.log("🔍 Full API response:", JSON.stringify(result, null, 2));
+        return {
+          jobs: [],
+          pagination: paginatedResult.pagination,
+        };
+      }
+
+      // Extract pagination info
+      paginationInfo = paginatedResult.pagination;
+
+      // Filter only active jobs
+      const activeJobs = breneoJobs.filter((job) => job.is_active !== false);
       console.log(`✅ ${activeJobs.length} active jobs after filtering`);
 
       // Map to ApiJob format
@@ -179,37 +366,85 @@ const fetchJobsFromBreneoAPI = async (
       console.log(`🎯 Mapped ${jobsArray.length} jobs to ApiJob format`);
     } else {
       console.error("❌ Unexpected API response format:", result);
+      console.error("❌ Full response:", JSON.stringify(result, null, 2));
       throw new Error(
-        "Invalid response format from API - expected array of jobs"
+        "Invalid response format from API - expected array of jobs or object with results array"
       );
     }
 
     if (jobsArray.length === 0) {
-      console.warn("⚠️ No jobs returned from API");
-      return [];
+      console.warn("⚠️ No jobs returned from API after processing");
+      console.warn("⚠️ This could mean:");
+      console.warn("  1. API returned empty array");
+      console.warn("  2. All jobs were filtered out (is_active = false)");
+      console.warn("  3. Response format doesn't match expected structure");
+      console.log("🔍 Full API response:", JSON.stringify(result, null, 2));
+      return { jobs: [], pagination: paginationInfo };
     }
 
     console.log(`🔧 Starting frontend filtering for ${jobsArray.length} jobs`);
 
+    // Check if any filters are actually applied
+    const hasAnyFilters =
+      filters.countries.length > 0 ||
+      filters.jobTypes.length > 0 ||
+      filters.isRemote ||
+      (filters.datePosted && filters.datePosted !== "all") ||
+      filters.skills.length > 0;
+
     // Apply frontend filters
     let filteredJobs = jobsArray;
 
-    // Filter by search query (title, company, description, location)
-    if (query && query.trim()) {
-      const searchTerms = query.toLowerCase().trim().split(" ");
-      filteredJobs = filteredJobs.filter((job) => {
-        const searchableText = [
-          job.title || job.job_title || "",
-          job.company || job.company_name || job.employer_name || "",
-          job.description || job.job_description || "",
-          job.location || job.job_location || "",
-        ]
-          .join(" ")
-          .toLowerCase();
+    // Client-side search filtering: match search query against job title and company name
+    // This ensures partial word matching works for every word in the search term
+    if (searchQuery && searchQuery.trim()) {
+      const searchTerms = searchQuery
+        .toLowerCase()
+        .trim()
+        .split(/\s+/)
+        .filter((term) => term.length > 0);
 
-        return searchTerms.every((term) => searchableText.includes(term));
-      });
+      if (searchTerms.length > 0) {
+        filteredJobs = filteredJobs.filter((job) => {
+          // Get job title and company name
+          const jobTitle = String(
+            job.title || job.job_title || job.position || ""
+          ).toLowerCase();
+          const companyName = String(
+            job.company_name ||
+              job.employer_name ||
+              (typeof job.company === "string" ? job.company : "") ||
+              ""
+          ).toLowerCase();
+
+          // Check if ALL search terms match in either job title or company name
+          // This allows partial word matching - each word in the search can match anywhere
+          return searchTerms.every((term) => {
+            return (
+              jobTitle.includes(term) ||
+              companyName.includes(term) ||
+              // Also check if any word in title/company contains the search term
+              jobTitle.split(/\s+/).some((word) => word.includes(term)) ||
+              companyName.split(/\s+/).some((word) => word.includes(term))
+            );
+          });
+        });
+        console.log(
+          `🔍 Client-side search filtering: ${filteredJobs.length} jobs match "${searchQuery}"`
+        );
+      }
     }
+
+    // If no filters are applied and no search query, skip additional client-side filtering
+    if (!hasAnyFilters && (!searchQuery || !searchQuery.trim())) {
+      console.log(
+        "✅ No filters or search query - returning all jobs without additional client-side filtering"
+      );
+      return { jobs: filteredJobs, pagination: paginationInfo };
+    }
+
+    // Note: Search query is now handled by the API endpoint, but we can still filter client-side if needed
+    // The API handles the main query filtering, so we only do additional filtering here if necessary
 
     // Filter by country/location
     if (filters.countries.length > 0) {
@@ -332,7 +567,7 @@ const fetchJobsFromBreneoAPI = async (
           : null,
     });
 
-    return filteredJobs;
+    return { jobs: filteredJobs, pagination: paginationInfo };
   } catch (error) {
     console.error("❌ Error in fetchJobsFromBreneoAPI:", error);
     // Log more details about the error
@@ -355,93 +590,171 @@ const fetchJobsFromBreneoAPI = async (
 export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   if (!jobId) throw new Error("Job ID is required");
 
-  // Fetch all jobs and find the specific one
-  const API_ENDPOINT = JOB_API_BASE;
+  console.log("🔍 Fetching job detail for ID:", jobId);
 
-  const response = await rateLimitedFetch(API_ENDPOINT, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  // Use the new job-details endpoint with the "id" field (not external_job_id)
+  // In development, use relative path to go through Vite proxy
+  // In production, use the full URL
+  const isDevelopment = import.meta.env.DEV;
+  const JOB_DETAIL_API_BASE = isDevelopment
+    ? "/api/job-details" // Relative path goes through Vite proxy to http://127.0.0.1:8000
+    : "http://127.0.0.1:8000/api/job-details"; // Direct URL in production
 
-  if (response.status === 429) {
-    throw new Error(
-      "You have exceeded your API request limit. Please try again later."
-    );
-  }
+  const queryParams = new URLSearchParams();
+  queryParams.set("job_id", jobId); // Use the "id" field from the job
 
-  if (!response.ok) {
-    let errorMessage = `Failed to fetch job details: ${response.status} ${response.statusText}`;
-    try {
-      const errorBody = await response.text();
-      console.error("API Error Response:", errorBody);
-      if (errorBody) {
-        try {
-          const errorJson = JSON.parse(errorBody);
-          if (errorJson.message) {
-            errorMessage = errorJson.message;
-          } else if (errorJson.error) {
-            errorMessage = errorJson.error;
-          }
-          console.error("API Error Details:", errorJson);
-        } catch (parseError) {
-          errorMessage = `${errorMessage} - ${errorBody}`;
-        }
-      }
-    } catch (e) {
-      console.error("Could not read error response body:", e);
+  const API_ENDPOINT = `${JOB_DETAIL_API_BASE}?${queryParams.toString()}`;
+
+  console.log(`🔍 Fetching job details from: ${API_ENDPOINT}`);
+
+  try {
+    const response = await rateLimitedFetch(API_ENDPOINT, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (response.status === 429) {
+      throw new Error(
+        "You have exceeded your API request limit. Please try again later."
+      );
     }
-    throw new Error(errorMessage);
+
+    if (!response.ok) {
+      let errorMessage = `Failed to fetch job details: ${response.status} ${response.statusText}`;
+      try {
+        const errorBody = await response.text();
+        console.error("API Error Response:", errorBody);
+        if (errorBody) {
+          try {
+            const errorJson = JSON.parse(errorBody);
+            if (errorJson.message) {
+              errorMessage = errorJson.message;
+            } else if (errorJson.error) {
+              errorMessage = errorJson.error;
+            }
+            console.error("API Error Details:", errorJson);
+          } catch (parseError) {
+            errorMessage = `${errorMessage} - ${errorBody}`;
+          }
+        }
+      } catch (e) {
+        console.error("Could not read error response body:", e);
+      }
+      throw new Error(errorMessage);
+    }
+
+    const result: unknown = await response.json();
+
+    // Handle different response formats
+    let jobData: BreneoJobApiResponse | null = null;
+
+    if (Array.isArray(result) && result.length > 0) {
+      // If response is an array, take the first item
+      jobData = result[0] as BreneoJobApiResponse;
+    } else if (result && typeof result === "object") {
+      // If response is an object, check for common wrapper fields
+      if (
+        "results" in result &&
+        Array.isArray((result as { results: unknown[] }).results)
+      ) {
+        const results = (result as { results: BreneoJobApiResponse[] }).results;
+        if (results.length > 0) {
+          jobData = results[0];
+        }
+      } else if ("data" in result) {
+        // Check for "data" wrapper
+        const data = (result as { data: unknown }).data;
+        if (data && typeof data === "object") {
+          jobData = data as BreneoJobApiResponse;
+        }
+      } else {
+        // Assume the object itself is the job data
+        jobData = result as BreneoJobApiResponse;
+      }
+    }
+
+    if (!jobData) {
+      console.error("❌ Job not found or invalid response format:", result);
+      throw new Error(`No job found with ID: ${jobId}`);
+    }
+
+    console.log("✅ Found job:", {
+      id: jobData.id,
+      title: jobData.title,
+      company: jobData.company_name,
+    });
+
+    // Map to JobDetail format using new API structure
+    let jobDetail: JobDetail = {
+      id: String(jobData.id),
+      job_id: String(jobData.id), // Use only id field, not external_job_id
+      title: jobData.title,
+      job_title: jobData.title,
+      company: jobData.company_name,
+      company_logo: jobData.company_logo,
+      companyLogo: jobData.company_logo,
+      company_name: jobData.company_name,
+      employer_name: jobData.company_name,
+      location: jobData.location,
+      job_location: jobData.location,
+      description: jobData.description || "",
+      job_description: jobData.description || "",
+      apply_url: jobData.apply_url,
+      job_apply_link: jobData.apply_url,
+      url: jobData.apply_url,
+      date_posted: jobData.posted_at || jobData.fetched_at,
+      posted_date: jobData.posted_at || jobData.fetched_at,
+      posted_at: jobData.posted_at || jobData.fetched_at,
+      fetched_at: jobData.fetched_at,
+    };
+
+    // Include raw data from the original API if it's an object
+    if (
+      jobData.raw &&
+      typeof jobData.raw === "object" &&
+      !Array.isArray(jobData.raw)
+    ) {
+      jobDetail = { ...jobDetail, ...(jobData.raw as Record<string, unknown>) };
+    }
+
+    // Include all other fields from the API response
+    Object.keys(jobData).forEach((key) => {
+      if (!(key in jobDetail)) {
+        (jobDetail as Record<string, unknown>)[key] = (
+          jobData as Record<string, unknown>
+        )[key];
+      }
+    });
+
+    console.log("✅ Processed job detail:", jobDetail);
+    return jobDetail;
+  } catch (error) {
+    console.error("❌ Error fetching job details:", error);
+
+    // Provide more helpful error messages
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      const isDevelopment = import.meta.env.DEV;
+      if (isDevelopment) {
+        throw new Error(
+          "Failed to connect to job details API. Please ensure the backend server is running at http://127.0.0.1:8000"
+        );
+      } else {
+        throw new Error(
+          "Failed to connect to job details API. Please check your network connection."
+        );
+      }
+    }
+
+    // Re-throw the original error if it's already an Error instance
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    // Wrap unknown errors
+    throw new Error(`Failed to fetch job details: ${String(error)}`);
   }
-
-  const result: unknown = await response.json();
-
-  if (!Array.isArray(result)) {
-    console.error("Unexpected API response format:", result);
-    throw new Error("Invalid response format from API");
-  }
-
-  const breneoJobs = result as BreneoJobApiResponse[];
-
-  // Find the job by ID or external_job_id
-  const job = breneoJobs.find(
-    (j) => String(j.id) === jobId || j.external_job_id === jobId
-  );
-
-  if (!job) {
-    throw new Error(`No job found with ID: ${jobId}`);
-  }
-
-  // Map to JobDetail format
-  let jobDetail: JobDetail = {
-    id: String(job.id),
-    job_id: job.external_job_id || String(job.id),
-    title: job.title,
-    job_title: job.title,
-    company: job.company,
-    company_logo: job.company_logo,
-    companyLogo: job.company_logo,
-    company_name: job.company,
-    employer_name: job.company,
-    location: job.location,
-    job_location: job.location,
-    description: job.description,
-    job_description: job.description,
-    apply_url: job.apply_url,
-    job_apply_link: job.apply_url,
-    url: job.apply_url,
-    date_posted: job.posted_at || job.fetched_at,
-    posted_date: job.posted_at || job.fetched_at,
-  };
-
-  // Include raw data from the original API if it's an object
-  if (job.raw && typeof job.raw === "object" && !Array.isArray(job.raw)) {
-    jobDetail = { ...jobDetail, ...(job.raw as Record<string, unknown>) };
-  }
-
-  console.log("Processed job detail:", jobDetail);
-  return jobDetail;
 };
 
 /**
@@ -465,18 +778,22 @@ export const fetchActiveJobs = async (
     // Add skills to query ONLY if skills are provided and not empty
     // Note: The caller should handle the "all interests selected" case by passing empty skills array
     if (params.filters.skills.length > 0) {
+      // Combine skills into query - API will search for jobs matching these skills
       queryParts.push(...params.filters.skills);
     }
 
-    // If no query parts, use empty string to get all jobs
+    // If no query parts, use empty string to get all jobs (or use a default search term)
     const query = queryParts.length > 0 ? queryParts.join(" ") : "";
 
     // Fetch jobs from Breneo API (filtering is done in fetchJobsFromBreneoAPI)
-    const allJobs = await fetchJobsFromBreneoAPI({
+    const apiResponse = await fetchJobsFromBreneoAPI({
       ...params,
       query,
       filters: params.filters,
     });
+
+    const allJobs = apiResponse.jobs;
+    const apiPagination = apiResponse.pagination;
 
     // Remove duplicates based on job_id
     const seenJobIds = new Set<string>();
@@ -499,29 +816,43 @@ export const fetchActiveJobs = async (
       }
     }
 
-    // Paginate results
-    const pageSize = params.pageSize || 12;
-    const page = params.page || 1;
-    const startIndex = (page - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedJobs = uniqueJobs.slice(startIndex, endIndex);
+    // Use API pagination info if available, otherwise use client-side pagination
+    let paginatedJobs: ApiJob[];
+    let hasMore: boolean;
+    let total: number;
 
-    console.log(
-      `Fetched ${uniqueJobs.length} unique jobs, showing ${paginatedJobs.length} on page ${page}`
-    );
+    if (apiPagination) {
+      // Use API pagination info - API already paginated, use all unique jobs from this page
+      paginatedJobs = uniqueJobs; // API already paginated, use all unique jobs
+      hasMore = apiPagination.has_next ?? false;
+      total = apiPagination.total_results ?? uniqueJobs.length;
+      console.log(
+        `Using API pagination: ${uniqueJobs.length} unique jobs, hasMore: ${hasMore}, total: ${total}`
+      );
+    } else {
+      // Fallback to client-side pagination
+      const pageSize = params.pageSize || 12;
+      const page = params.page || 1;
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      paginatedJobs = uniqueJobs.slice(startIndex, endIndex);
+      hasMore = endIndex < uniqueJobs.length;
+      total = uniqueJobs.length;
+      console.log(
+        `Client-side pagination: Fetched ${uniqueJobs.length} unique jobs, showing ${paginatedJobs.length} on page ${page}`
+      );
+    }
+
     if (paginatedJobs.length > 0) {
       console.log("Sample job structure:", paginatedJobs[0]);
     }
 
-    // Determine if there are more pages available
-    const hasMore = endIndex < uniqueJobs.length;
-
     return {
       jobs: paginatedJobs,
-      page: page,
-      pageSize: pageSize,
+      page: apiPagination?.page ?? params.page ?? 1,
+      pageSize: params.pageSize || 12,
       hasMore: hasMore,
-      total: uniqueJobs.length,
+      total: total,
     };
   } catch (error) {
     console.error("Error fetching jobs:", error);
@@ -535,7 +866,8 @@ export const fetchActiveJobs = async (
 export const fetchJobsFromJSearch = async (
   params: JobSearchParams
 ): Promise<ApiJob[]> => {
-  return fetchJobsFromBreneoAPI(params);
+  const response = await fetchJobsFromBreneoAPI(params);
+  return response.jobs;
 };
 
 /**
@@ -554,6 +886,135 @@ export const fetchJobsFromMultipleSources = async (
   }
 };
 
+// Test function for console debugging
+export const testFetchJobs = async (
+  query: string = "developer",
+  page: number = 1
+) => {
+  console.log("🧪 Testing job fetch with:", { query, page });
+
+  try {
+    const params: JobSearchParams = {
+      query,
+      filters: {
+        country: undefined,
+        countries: [],
+        jobTypes: [],
+        isRemote: false,
+        datePosted: undefined,
+        skills: [],
+        salaryMin: undefined,
+        salaryMax: undefined,
+        salaryByAgreement: undefined,
+      },
+      page,
+      pageSize: 50,
+    };
+
+    const result = await fetchActiveJobs(params);
+    console.log("✅ Test fetch successful:", {
+      jobsCount: result.jobs.length,
+      hasMore: result.hasMore,
+      total: result.total,
+      firstJob: result.jobs[0] || null,
+    });
+
+    return result;
+  } catch (error) {
+    console.error("❌ Test fetch failed:", error);
+    throw error;
+  }
+};
+
+// Direct API test function - tests raw API endpoint
+export const testDirectAPI = async (
+  query: string = "developer",
+  page: number = 1,
+  numPages: number = 1
+) => {
+  console.log("🧪 Testing direct API call with:", { query, page, numPages });
+
+  const queryParams = new URLSearchParams();
+  queryParams.set("query", query);
+  queryParams.set("page", String(page));
+  queryParams.set("num_pages", String(numPages));
+  queryParams.set("country", "us");
+  queryParams.set("date_posted", "all");
+
+  const url = `${JOB_API_BASE}?${queryParams.toString()}`;
+  console.log("🌐 API URL:", url);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    });
+
+    console.log("📡 Response status:", response.status, response.statusText);
+    console.log("📡 Response headers:", {
+      contentType: response.headers.get("content-type"),
+      contentLength: response.headers.get("content-length"),
+    });
+
+    const text = await response.text();
+    console.log("📦 Response text length:", text.length);
+    console.log("📦 Response text preview:", text.substring(0, 500));
+
+    const json = JSON.parse(text);
+    console.log("✅ Parsed JSON:", {
+      isArray: Array.isArray(json),
+      type: typeof json,
+      length: Array.isArray(json) ? json.length : null,
+      keys:
+        typeof json === "object" && json !== null ? Object.keys(json) : null,
+      firstItem: Array.isArray(json) && json.length > 0 ? json[0] : null,
+    });
+
+    return json;
+  } catch (error) {
+    console.error("❌ Direct API test failed:", error);
+    throw error;
+  }
+};
+
+// Make test function available on window for console access
+if (typeof window !== "undefined") {
+  interface WindowWithJobService extends Window {
+    testFetchJobs?: typeof testFetchJobs;
+    testDirectAPI?: typeof testDirectAPI;
+    jobService?: {
+      fetchActiveJobs: typeof fetchActiveJobs;
+      fetchJobDetail: typeof fetchJobDetail;
+      fetchJobsFromBreneoAPI: typeof fetchJobsFromBreneoAPI;
+      testFetchJobs: typeof testFetchJobs;
+      testDirectAPI: typeof testDirectAPI;
+    };
+  }
+
+  const win = window as WindowWithJobService;
+  win.testFetchJobs = testFetchJobs;
+  win.testDirectAPI = testDirectAPI;
+  win.jobService = {
+    fetchActiveJobs,
+    fetchJobDetail,
+    fetchJobsFromBreneoAPI,
+    testFetchJobs,
+    testDirectAPI,
+  };
+  console.log("🔧 Job service test functions available:");
+  console.log(
+    "  - window.testFetchJobs(query, page) - Test through service layer"
+  );
+  console.log(
+    "  - window.testDirectAPI(query, page, numPages) - Test raw API endpoint"
+  );
+  console.log("  - window.jobService.fetchActiveJobs(params)");
+  console.log("  - window.jobService.fetchJobsFromBreneoAPI(params)");
+}
+
 // Default export
 const jobService = {
   fetchActiveJobs,
@@ -561,6 +1022,8 @@ const jobService = {
   fetchJobsFromBreneoAPI,
   fetchJobsFromJSearch,
   fetchJobsFromMultipleSources,
+  testFetchJobs,
+  testDirectAPI,
 };
 
 export default jobService;

@@ -609,12 +609,12 @@ const JobDetailPage = () => {
     if (!jobDetail) return "";
     const jobDetailAny = jobDetail as Record<string, unknown>;
 
-    // Check JSearch-specific job_apply_link field first
+    // Check new API structure - apply_url is primary field
     if (
-      jobDetailAny.job_apply_link &&
-      typeof jobDetailAny.job_apply_link === "string"
+      jobDetail.apply_url &&
+      typeof jobDetail.apply_url === "string"
     ) {
-      return jobDetailAny.job_apply_link;
+      return jobDetail.apply_url;
     }
 
     // Check all possible apply URL fields in order of preference
@@ -622,6 +622,9 @@ const JobDetailPage = () => {
       jobDetail.apply_url ||
       jobDetail.job_apply_link ||
       jobDetail.url ||
+      (jobDetailAny.job_apply_link && typeof jobDetailAny.job_apply_link === "string"
+        ? jobDetailAny.job_apply_link
+        : null) ||
       jobDetail.applyUrl ||
       jobDetail.applyLink ||
       jobDetail.application_url ||
@@ -681,17 +684,35 @@ const JobDetailPage = () => {
     if (!jobDetail) return "";
     const jobDetailAny = jobDetail as Record<string, unknown>;
 
-    // Check JSearch-specific employer_name field first
+    // Check new API structure - company_name is primary field
     if (
-      jobDetailAny.employer_name &&
-      typeof jobDetailAny.employer_name === "string"
+      jobDetail.company_name &&
+      typeof jobDetail.company_name === "string" &&
+      jobDetail.company_name.trim()
     ) {
-      return String(jobDetailAny.employer_name).trim();
+      return String(jobDetail.company_name).trim();
     }
 
     // Check if company is a string
     if (typeof jobDetail.company === "string" && jobDetail.company.trim()) {
       return String(jobDetail.company).trim();
+    }
+
+    // Check employer_name as fallback
+    if (
+      jobDetail.employer_name &&
+      typeof jobDetail.employer_name === "string" &&
+      jobDetail.employer_name.trim()
+    ) {
+      return String(jobDetail.employer_name).trim();
+    }
+
+    // Check JSearch-specific employer_name field
+    if (
+      jobDetailAny.employer_name &&
+      typeof jobDetailAny.employer_name === "string"
+    ) {
+      return String(jobDetailAny.employer_name).trim();
     }
 
     // Check company_info object first (most detailed)
@@ -795,11 +816,12 @@ const JobDetailPage = () => {
   // Get job title
   const getJobTitle = () => {
     if (!jobDetail) return "Untitled Position";
-    // Check all possible title fields including JSearch format
+    // Check all possible title fields - new API uses 'title' as primary
     const jobDetailAny = jobDetail as Record<string, unknown>;
     return (
       jobDetail.title ||
       jobDetail.job_title ||
+      (jobDetailAny.title as string) ||
       (jobDetailAny.job_title as string) ||
       "Untitled Position"
     );
@@ -1566,13 +1588,18 @@ const JobDetailPage = () => {
                         <Briefcase className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                         <span>{getWorkArrangement()}</span>
                       </div>
-                      {jobDetail.date_posted || jobDetail.posted_date ? (
+                      {jobDetail.posted_at || jobDetail.fetched_at || jobDetail.date_posted || jobDetail.posted_date ? (
                         <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap text-sm md:text-base font-medium text-gray-700 dark:text-gray-200">
                           <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0 text-gray-700 dark:text-gray-200" />
                           <span>
                             {formatDate(
-                              jobDetail.date_posted || jobDetail.posted_date
+                              jobDetail.posted_at || 
+                              jobDetail.fetched_at || 
+                              jobDetail.date_posted || 
+                              jobDetail.posted_date
                             ) ||
+                              jobDetail.posted_at ||
+                              jobDetail.fetched_at ||
                               jobDetail.date_posted ||
                               jobDetail.posted_date}
                           </span>

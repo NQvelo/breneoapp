@@ -14,6 +14,14 @@ export default defineConfig(({ mode }) => ({
     proxy:
       mode === "development"
         ? {
+            // Proxy job-details requests to localhost:8000
+            "/api/job-details": {
+              target: "https://breneo-job-aggregator.onrender.com/",
+              changeOrigin: true,
+              secure: false,
+              rewrite: (path) => path, // Keep the path as-is
+            },
+            // Proxy all other /api requests to breneo.onrender.com
             "/api": {
               target: "https://breneo.onrender.com",
               changeOrigin: true,
@@ -38,7 +46,8 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: "Breneo - AI-Powered Learning & Job Matching Platform",
         short_name: "Breneo",
-        description: "Breneo helps users assess their skills, explore job offers, and follow personalized learning paths with AI technology.",
+        description:
+          "Breneo helps users assess their skills, explore job offers, and follow personalized learning paths with AI technology.",
         theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",

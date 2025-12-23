@@ -82,7 +82,7 @@ import {
   filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
-import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
+// Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 
 // Updated Job interface for the new API
@@ -117,8 +117,7 @@ const extractJobSkills = (job: ApiJob): string[] => {
   const skills: string[] = [];
   const textToSearch = [
     job.job_title || job.title || "",
-    job.description || "",
-    job.job_description || "",
+    job.description || job.job_description || "",
     job.job_required_experience || job.required_experience || "",
   ]
     .join(" ")
@@ -192,16 +191,12 @@ const extractJobSkills = (job: ApiJob): string[] => {
   return [...new Set(skills)]; // Remove duplicates
 };
 
-// Function to calculate match percentage
+// Function to calculate match percentage with enhanced job title matching
 const calculateMatchPercentage = (
   userSkills: string[],
-  jobSkills: string[]
+  jobSkills: string[],
+  jobTitle?: string
 ): number => {
-  if (jobSkills.length === 0) {
-    // If no skills found in job, return a base match (e.g., 50%)
-    return 50;
-  }
-
   if (userSkills.length === 0) {
     return 0;
   }
@@ -212,9 +207,30 @@ const calculateMatchPercentage = (
 
   const normalizedUserSkills = userSkills.map(normalizeSkill);
   const normalizedJobSkills = jobSkills.map(normalizeSkill);
+  const normalizedJobTitle = jobTitle ? normalizeSkill(jobTitle) : "";
 
-  // Find matching skills
-  const matchingSkills = normalizedUserSkills.filter((userSkill) =>
+  // Check if user skills appear directly in job title (high priority match)
+  const titleMatches: string[] = [];
+  normalizedUserSkills.forEach((userSkill) => {
+    // Check if user skill appears in job title
+    if (normalizedJobTitle && normalizedJobTitle.includes(userSkill)) {
+      titleMatches.push(userSkill);
+    }
+    // Also check if any word in job title contains the user skill
+    const titleWords = normalizedJobTitle.split(/\s+/);
+    if (
+      titleWords.some(
+        (word) => word.includes(userSkill) || userSkill.includes(word)
+      )
+    ) {
+      if (!titleMatches.includes(userSkill)) {
+        titleMatches.push(userSkill);
+      }
+    }
+  });
+
+  // Find matching skills in job description/requirements
+  const descriptionMatches = normalizedUserSkills.filter((userSkill) =>
     normalizedJobSkills.some((jobSkill) => {
       // Exact match
       if (userSkill === jobSkill) return true;
@@ -225,10 +241,44 @@ const calculateMatchPercentage = (
     })
   );
 
-  // Calculate percentage: (matching skills / job skills) * 100
-  const matchPercentage = Math.round(
-    (matchingSkills.length / normalizedJobSkills.length) * 100
+  // Combine matches (title matches are more important)
+  const allMatches = new Set([...titleMatches, ...descriptionMatches]);
+
+  // Calculate match percentage with weighted scoring
+  // If job has skills extracted, use them as denominator
+  // Otherwise, use user skills as denominator
+  const denominator =
+    normalizedJobSkills.length > 0
+      ? normalizedJobSkills.length
+      : normalizedUserSkills.length;
+
+  // Base match: (matching skills / denominator) * 100
+  let matchPercentage = Math.round(
+    (allMatches.size / Math.max(denominator, 1)) * 100
   );
+
+  // Boost match if user skills appear in job title (add up to 30% bonus)
+  if (titleMatches.length > 0) {
+    const titleMatchBonus = Math.min(
+      (titleMatches.length / normalizedUserSkills.length) * 30,
+      30
+    );
+    matchPercentage = Math.min(matchPercentage + titleMatchBonus, 100);
+  }
+
+  // If no skills found in job but user has skills, return lower match
+  if (normalizedJobSkills.length === 0) {
+    // If title matches exist, give some credit
+    if (titleMatches.length > 0) {
+      matchPercentage = Math.min(
+        Math.round((titleMatches.length / normalizedUserSkills.length) * 100),
+        70
+      );
+    } else {
+      // No matches at all - return low match
+      matchPercentage = 20;
+    }
+  }
 
   // Cap at 100%
   return Math.min(matchPercentage, 100);
@@ -559,7 +609,7 @@ const fetchInternshipJobs = async (
         salaryByAgreement: undefined,
       },
       page: page,
-      pageSize: 12, // Fetch 12 jobs per page
+      pageSize: 50, // Fetch more jobs per page
     });
 
     // Validate that we got jobs back
@@ -570,7 +620,7 @@ const fetchInternshipJobs = async (
 
     // Filter out jobs without valid IDs
     const validJobs = response.jobs.filter((job) => {
-      const jobId = job.job_id || job.id;
+      const jobId = String(job.id || "");
       return jobId && jobId.trim() !== "";
     });
 
@@ -578,7 +628,7 @@ const fetchInternshipJobs = async (
     return {
       jobs: validJobs,
       hasMore: response.hasMore ?? false,
-      total: validJobs.length,
+      total: response.total || validJobs.length,
     };
   } catch (error) {
     console.error("Error fetching internship jobs:", error);
@@ -631,7 +681,7 @@ const fetchLatestJobs = async (
 
     // Filter out jobs without valid IDs
     let validJobs = response.jobs.filter((job) => {
-      const jobId = job.job_id || job.id;
+      const jobId = job.id || "";
       return jobId && jobId.trim() !== "";
     });
 
@@ -720,27 +770,22 @@ const fetchRemoteJobs = async (
       userTopSkills
     );
 
-    // Build query: use skills if available, otherwise use "remote" as search term
-    const searchQuery =
-      userTopSkills.length > 0
-        ? "" // Will combine skills in jobService
-        : "remote"; // Use "remote" as search term when no skills
-
+    // Use "remote" as search term
     const response = await jobService.fetchActiveJobs({
-      query: searchQuery,
+      query: "remote", // Search for remote jobs
       filters: {
         country: undefined, // No single country filter
         countries: [], // No country filtering - show remote jobs from all countries
         jobTypes: [], // No job type filtering (will exclude interns client-side)
         isRemote: true, // Filter for remote jobs only
         datePosted: undefined,
-        skills: userTopSkills.length > 0 ? userTopSkills : [], // Pass empty array if no skills (jobService handles this correctly)
+        skills: [], // No skills filter
         salaryMin: undefined,
         salaryMax: undefined,
         salaryByAgreement: undefined,
       },
       page: page,
-      pageSize: 12, // Fetch 12 jobs per page
+      pageSize: 50, // Fetch more jobs per page
     });
 
     console.log(`📊 fetchRemoteJobs response:`, {
@@ -757,7 +802,7 @@ const fetchRemoteJobs = async (
 
     // Filter out jobs without valid IDs
     const validJobs = response.jobs.filter((job) => {
-      const jobId = job.job_id || job.id;
+      const jobId = String(job.id || "");
       return jobId && jobId.trim() !== "";
     });
 
@@ -769,7 +814,7 @@ const fetchRemoteJobs = async (
     return {
       jobs: validJobs,
       hasMore: response.hasMore ?? false,
-      total: validJobs.length,
+      total: response.total || validJobs.length,
     };
   } catch (error) {
     console.error("❌ Error fetching remote jobs:", error);
@@ -1079,17 +1124,17 @@ const JobsPage = () => {
     });
   }, [activeFilters]);
 
-  // Fetch latest regular jobs without any filters - just get all jobs
+  // Fetch latest regular jobs without filtering - always fetch page 1 for 9 latest jobs
   const {
     data: jobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["latestJobs", regularJobsPage],
+    queryKey: ["latestJobs"], // Removed regularJobsPage since we always fetch page 1
     queryFn: async () => {
-      // Fetch all jobs without any filters
+      // Fetch all jobs without any filters to get the latest jobs
       const response = await jobService.fetchActiveJobs({
-        query: "", // No search query
+        query: "", // No query filter - get all jobs
         filters: {
           country: undefined,
           countries: [], // No country filter
@@ -1101,8 +1146,8 @@ const JobsPage = () => {
           salaryMax: undefined,
           salaryByAgreement: undefined,
         },
-        page: regularJobsPage,
-        pageSize: 50, // Fetch more to ensure we have enough after filtering
+        page: 1, // Always fetch first page for latest jobs
+        pageSize: 200, // Fetch many jobs to display all available jobs
       });
 
       if (!response || !Array.isArray(response.jobs)) {
@@ -1111,7 +1156,7 @@ const JobsPage = () => {
 
       // Filter out jobs without valid IDs
       const validJobs = response.jobs.filter((job) => {
-        const jobId = job.job_id || job.id;
+        const jobId = String(job.id || "");
         return jobId && jobId.trim() !== "";
       });
 
@@ -1149,14 +1194,14 @@ const JobsPage = () => {
     enabled: true, // Always fetch jobs
   });
 
-  // Fetch remote jobs filtered by user skills
+  // Fetch remote jobs
   const {
     data: remoteJobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading: isLoadingRemote,
     error: remoteError,
   } = useQuery({
-    queryKey: ["remoteJobs", remoteJobsPage, userTopSkills.join(",")],
-    queryFn: () => fetchRemoteJobs(remoteJobsPage, userTopSkills),
+    queryKey: ["remoteJobs", remoteJobsPage],
+    queryFn: () => fetchRemoteJobs(remoteJobsPage, []),
     refetchOnWindowFocus: false,
     refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
     refetchOnReconnect: false,
@@ -1164,50 +1209,35 @@ const JobsPage = () => {
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     retry: 1,
     retryDelay: 1000,
-    enabled: !loadingSkills, // Always fetch remote jobs (will filter by skills if available)
+    enabled: true, // Always fetch remote jobs
   });
 
-  // Update all regular jobs when new data arrives - filter to only tech jobs from allowed ATS (same as JobSearchResultsPage)
+  // Update all regular jobs when new data arrives - always replace since we only fetch page 1
   useEffect(() => {
     if (jobsData.jobs && jobsData.jobs.length > 0) {
-      const techJobs = filterTechJobs(jobsData.jobs);
-      const atsJobs = filterATSJobs(techJobs);
-      if (regularJobsPage === 1) {
-        // First page - replace all jobs
-        setAllRegularJobs(atsJobs);
-      } else {
-        // Subsequent pages - append new jobs (avoid duplicates)
-        setAllRegularJobs((prev) => {
-          const existingIds = new Set(prev.map((j) => j.job_id || j.id));
-          const newJobs = atsJobs.filter(
-            (j) => !existingIds.has(j.job_id || j.id)
-          );
-          return [...prev, ...newJobs];
-        });
-      }
+      // Always replace jobs since we're only fetching page 1 for latest jobs
+      setAllRegularJobs(jobsData.jobs);
       setHasMoreRegularJobs(jobsData.hasMore);
       setIsLoadingMoreRegular(false);
-    } else if (regularJobsPage === 1) {
-      // No jobs on first page
+    } else {
+      // No jobs
       setAllRegularJobs([]);
       setHasMoreRegularJobs(false);
     }
-  }, [jobsData, regularJobsPage]);
+  }, [jobsData]);
 
-  // Update all internship jobs when new data arrives - filter to only tech jobs from allowed ATS
+  // Update all internship jobs when new data arrives - no filtering
   useEffect(() => {
     if (internshipJobsData.jobs && internshipJobsData.jobs.length > 0) {
-      const techJobs = filterTechJobs(internshipJobsData.jobs);
-      const atsJobs = filterATSJobs(techJobs);
       if (internshipJobsPage === 1) {
         // First page - replace all jobs
-        setAllInternshipJobs(atsJobs);
+        setAllInternshipJobs(internshipJobsData.jobs);
       } else {
         // Subsequent pages - append new jobs (avoid duplicates)
         setAllInternshipJobs((prev) => {
-          const existingIds = new Set(prev.map((j) => j.job_id || j.id));
-          const newJobs = atsJobs.filter(
-            (j) => !existingIds.has(j.job_id || j.id)
+          const existingIds = new Set(prev.map((j) => j.id || j.job_id));
+          const newJobs = internshipJobsData.jobs.filter(
+            (j) => !existingIds.has(j.id || j.job_id)
           );
           return [...prev, ...newJobs];
         });
@@ -1221,20 +1251,18 @@ const JobsPage = () => {
     }
   }, [internshipJobsData, internshipJobsPage]);
 
-  // Update all remote jobs when new data arrives - filter to only tech jobs from allowed ATS
+  // Update all remote jobs when new data arrives - no filtering
   useEffect(() => {
     if (remoteJobsData.jobs && remoteJobsData.jobs.length > 0) {
-      const techJobs = filterTechJobs(remoteJobsData.jobs);
-      const atsJobs = filterATSJobs(techJobs);
       if (remoteJobsPage === 1) {
         // First page - replace all jobs
-        setAllRemoteJobs(atsJobs);
+        setAllRemoteJobs(remoteJobsData.jobs);
       } else {
         // Subsequent pages - append new jobs (avoid duplicates)
         setAllRemoteJobs((prev) => {
-          const existingIds = new Set(prev.map((j) => j.job_id || j.id));
-          const newJobs = atsJobs.filter(
-            (j) => !existingIds.has(j.job_id || j.id)
+          const existingIds = new Set(prev.map((j) => j.id || j.job_id));
+          const newJobs = remoteJobsData.jobs.filter(
+            (j) => !existingIds.has(j.id || j.job_id)
           );
           return [...prev, ...newJobs];
         });
@@ -1369,7 +1397,8 @@ const JobsPage = () => {
               : null;
 
           // Extract fields with fallbacks for different API formats
-          const jobId = job.job_id || job.id || "";
+          // Ensure jobId is always a string - use only id field (not job_id or external_job_id)
+          const jobId = String(job.id || "");
 
           // Skip jobs without valid IDs - they can't be opened
           if (!jobId || jobId.trim() === "") {
@@ -1378,24 +1407,22 @@ const JobsPage = () => {
           }
 
           const jobTitle = String(
-            job.job_title || job.title || job.position || "Untitled Position"
+            job.title || job.job_title || job.position || "Untitled Position"
           );
           const companyName = String(
-            (companyObj?.name && typeof companyObj.name === "string"
-              ? companyObj.name
-              : null) ||
+            job.company_name ||
               (companyObj?.company_name &&
               typeof companyObj.company_name === "string"
                 ? companyObj.company_name
+                : null) ||
+              (companyObj?.name && typeof companyObj.name === "string"
+                ? companyObj.name
                 : null) ||
               (job.companyName && typeof job.companyName === "string"
                 ? job.companyName
                 : null) ||
               (job.employer_name && typeof job.employer_name === "string"
                 ? job.employer_name
-                : null) ||
-              (job.company_name && typeof job.company_name === "string"
-                ? job.company_name
                 : null) ||
               (typeof job.company === "string" ? job.company : null) ||
               "Unknown Company"
@@ -1494,12 +1521,12 @@ const JobsPage = () => {
             getLocationStringFromJob(job as Record<string, any>, companyObj)
           );
           const applyLink =
-            job.applyUrl || // LinkedIn API field
-            job.jobUrl || // LinkedIn API field
+            job.apply_url ||
             job.job_apply_link ||
             job.apply_link ||
             job.url ||
-            job.apply_url ||
+            job.applyUrl ||
+            job.jobUrl ||
             job.company_url ||
             (companyObj?.url as string) ||
             "";
@@ -1777,7 +1804,8 @@ const JobsPage = () => {
           const jobSkills = extractJobSkills(job);
           const matchPercentage = calculateMatchPercentage(
             userTopSkills,
-            jobSkills
+            jobSkills,
+            jobTitle
           );
 
           return {
@@ -1806,7 +1834,7 @@ const JobsPage = () => {
     }
   }, [jobs, savedJobs, userTopSkills]);
 
-  // Sort by date (newest first) and limit to 9 jobs
+  // Sort by match percentage (highest first) - display top 9 jobs
   const regularJobs = useMemo(() => {
     console.log(
       "📅 Processing latest jobs - total jobs:",
@@ -1816,16 +1844,24 @@ const JobsPage = () => {
     // Get all transformed jobs
     const allJobs = transformedJobs;
 
-    // Sort by date posted (newest first)
+    // Sort by match percentage (highest first), then by date posted (newest first) as tiebreaker
     const sorted = [...allJobs].sort((a, b) => {
-      // Extract date posted from original job data
-      const jobA = allRegularJobs.find((j) => (j.job_id || j.id) === a.id);
-      const jobB = allRegularJobs.find((j) => (j.job_id || j.id) === b.id);
+      // First, sort by match percentage (highest first)
+      const matchA = a.matchPercentage ?? 0;
+      const matchB = b.matchPercentage ?? 0;
+
+      if (matchA !== matchB) {
+        return matchB - matchA; // Higher match percentage first
+      }
+
+      // If match percentages are equal, sort by date posted (newest first)
+      const jobA = allRegularJobs.find((j) => (j.id || j.job_id) === a.id);
+      const jobB = allRegularJobs.find((j) => (j.id || j.job_id) === b.id);
 
       const dateA =
-        jobA?.posted_at || jobA?.date_posted || jobA?.fetched_at || "";
+        jobA?.posted_at || jobA?.fetched_at || jobA?.date_posted || "";
       const dateB =
-        jobB?.posted_at || jobB?.date_posted || jobB?.fetched_at || "";
+        jobB?.posted_at || jobB?.fetched_at || jobB?.date_posted || "";
 
       // If both have dates, compare them
       if (dateA && dateB) {
@@ -1847,13 +1883,13 @@ const JobsPage = () => {
       return 0;
     });
 
-    // Return first 9 jobs
-    const latestJobs = sorted.slice(0, 9);
+    // Return top 9 jobs (sorted by match percentage, highest first)
+    const top9Jobs = sorted.slice(0, 9);
     console.log(
-      `✅ Displaying ${latestJobs.length} latest jobs (sorted by date)`
+      `✅ Displaying ${top9Jobs.length} jobs (sorted by match percentage, highest first)`
     );
 
-    return latestJobs;
+    return top9Jobs;
   }, [transformedJobs, allRegularJobs]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
@@ -1873,7 +1909,8 @@ const JobsPage = () => {
               : null;
 
           // Extract fields with fallbacks for different API formats
-          const jobId = job.job_id || job.id || "";
+          // Ensure jobId is always a string - use only id field (not job_id or external_job_id)
+          const jobId = String(job.id || "");
 
           // Skip jobs without valid IDs - they can't be opened
           if (!jobId || jobId.trim() === "") {
@@ -1882,13 +1919,13 @@ const JobsPage = () => {
           }
 
           const jobTitle =
-            job.job_title || job.title || job.position || "Untitled Position";
+            job.title || job.job_title || job.position || "Untitled Position";
           const companyName =
-            (companyObj?.name as string) ||
+            job.company_name ||
             (companyObj?.company_name as string) ||
+            (companyObj?.name as string) ||
             job.companyName ||
             job.employer_name ||
-            job.company_name ||
             (typeof job.company === "string" ? job.company : null) ||
             "Unknown Company";
           const jobCity =
@@ -2120,7 +2157,8 @@ const JobsPage = () => {
           const jobSkills = extractJobSkills(job);
           const matchPercentage = calculateMatchPercentage(
             userTopSkills,
-            jobSkills
+            jobSkills,
+            jobTitle
           );
 
           return {
@@ -2170,7 +2208,8 @@ const JobsPage = () => {
               : null;
 
           // Extract fields with fallbacks for different API formats
-          const jobId = job.job_id || job.id || "";
+          // Ensure jobId is always a string - use only id field (not job_id or external_job_id)
+          const jobId = String(job.id || "");
 
           // Skip jobs without valid IDs - they can't be opened
           if (!jobId || jobId.trim() === "") {
@@ -2179,13 +2218,13 @@ const JobsPage = () => {
           }
 
           const jobTitle =
-            job.job_title || job.title || job.position || "Untitled Position";
+            job.title || job.job_title || job.position || "Untitled Position";
           const companyName =
-            (companyObj?.name as string) ||
+            job.company_name ||
             (companyObj?.company_name as string) ||
+            (companyObj?.name as string) ||
             job.companyName ||
             job.employer_name ||
-            job.company_name ||
             (typeof job.company === "string" ? job.company : null) ||
             "Unknown Company";
           const jobCity =
@@ -2391,7 +2430,8 @@ const JobsPage = () => {
           const jobSkills = extractJobSkills(job);
           const matchPercentage = calculateMatchPercentage(
             userTopSkills,
-            jobSkills
+            jobSkills,
+            jobTitle
           );
 
           return {
