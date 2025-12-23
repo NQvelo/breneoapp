@@ -14,9 +14,8 @@ export default defineConfig(({ mode }) => ({
     proxy:
       mode === "development"
         ? {
-            // Proxy job-details requests to localhost:8000
             "/api/job-details": {
-              target: "https://breneo-job-aggregator.onrender.com/",
+              target: "https://breneo-job-aggregator.onrender.com",
               changeOrigin: true,
               secure: false,
               rewrite: (path) => path, // Keep the path as-is

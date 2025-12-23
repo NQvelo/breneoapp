@@ -598,7 +598,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   const isDevelopment = import.meta.env.DEV;
   const JOB_DETAIL_API_BASE = isDevelopment
     ? "/api/job-details" // Relative path goes through Vite proxy to http://127.0.0.1:8000
-    : "http://127.0.0.1:8000/api/job-details"; // Direct URL in production
+    : "https://breneo-job-aggregator.onrender.com/api/job-details"; // Direct URL in production
 
   const queryParams = new URLSearchParams();
   queryParams.set("job_id", jobId); // Use the "id" field from the job
