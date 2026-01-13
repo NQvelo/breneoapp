@@ -35,7 +35,7 @@ interface AIMarketInsight {
   chartData: Array<{ year: string; popularity: number }>;
 }
 
-const JOB_API_BASE = "https://breneo-job-aggregator.onrender.com/api/";
+const JOB_API_BASE = "https://breneo-job-aggregator-k7ti.onrender.com/api/";
 
 /**
  * Fetch job market statistics for a skill/job title

@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -84,8 +90,7 @@ export default function AcademySettingsPage() {
 
     if (savedSoundEffects !== null)
       setSoundEffects(savedSoundEffects === "true");
-    if (savedAnimations !== null)
-      setAnimations(savedAnimations === "true");
+    if (savedAnimations !== null) setAnimations(savedAnimations === "true");
     if (savedMotivationalMessages !== null)
       setMotivationalMessages(savedMotivationalMessages === "true");
     if (savedListeningExercises !== null)
@@ -352,11 +357,6 @@ export default function AcademySettingsPage() {
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isEditing) {
-      setIsEditing(true);
-      return;
-    }
-
     const hasChanges =
       academyName !== (academyProfile?.academy_name || "") ||
       phoneNumber !== (user?.phone_number || "") ||
@@ -364,7 +364,7 @@ export default function AcademySettingsPage() {
       contactEmail !== (academyProfile?.contact_email || "");
 
     if (!hasChanges) {
-      setIsEditing(false);
+      toast.info("No changes to save.");
       return;
     }
 
@@ -447,6 +447,11 @@ export default function AcademySettingsPage() {
 
       toast.success("Profile updated successfully!");
       setIsEditing(false);
+
+      // Reload to update user context with new phone number
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err: unknown) {
       console.error("Error updating profile:", err);
       let errorMessage = "Failed to update profile.";
@@ -577,6 +582,68 @@ export default function AcademySettingsPage() {
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Preferences</h1>
 
+            {/* Profile Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile Information</CardTitle>
+                <CardDescription>
+                  Update your academy name and phone number
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleProfileSave(e);
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="academyName">Academy Name</Label>
+                    <Input
+                      id="academyName"
+                      value={academyName}
+                      onChange={(e) => {
+                        setIsEditing(true);
+                        setAcademyName(e.target.value);
+                      }}
+                      placeholder="Enter your academy name"
+                      disabled={profileLoading}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        setIsEditing(true);
+                        const value = e.target.value;
+                        setPhoneNumber(value);
+                        if (value) {
+                          validatePhoneNumber(value);
+                        } else {
+                          setPhoneError("");
+                        }
+                      }}
+                      placeholder="Enter your phone number"
+                      disabled={profileLoading}
+                    />
+                    {phoneError && (
+                      <p className="text-sm text-destructive">{phoneError}</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <Button type="submit" disabled={profileLoading}>
+                    {profileLoading ? "Saving..." : "Save Changes"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
             {/* Lesson experience section */}
             <div className="space-y-4">
               <div>
@@ -585,9 +652,12 @@ export default function AcademySettingsPage() {
                 </h2>
                 <Separator />
               </div>
-        <div className="space-y-6">
+              <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="sound-effects" className="text-base font-normal">
+                  <Label
+                    htmlFor="sound-effects"
+                    className="text-base font-normal"
+                  >
                     Sound effects
                   </Label>
                   <Switch
@@ -652,9 +722,7 @@ export default function AcademySettingsPage() {
                   onValueChange={(value) => setTheme(value as "light" | "dark")}
                 >
                   <SelectTrigger id="dark-mode" className="w-32">
-                    <SelectValue>
-                      {darkModeValue}
-                    </SelectValue>
+                    <SelectValue>{darkModeValue}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="light">OFF</SelectItem>
@@ -668,7 +736,7 @@ export default function AcademySettingsPage() {
           {/* Right Column - Sidebar Navigation */}
           <div className="space-y-4">
             <PWAInstallCard />
-            
+
             {/* Account Section */}
             <Card>
               <CardHeader>
@@ -701,8 +769,8 @@ export default function AcademySettingsPage() {
                 >
                   Privacy settings
                 </Link>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
             {/* Subscription Section */}
             <Card>

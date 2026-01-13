@@ -21,7 +21,8 @@ import {
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
-import { useNavigate } from "react-router-dom";
+import { useTranslation } from "@/contexts/LanguageContext";
+import { useNavigate, Link } from "react-router-dom";
 import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -79,12 +80,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
-import { jobService } from "@/api/jobs";
-import { filterATSJobs } from "@/utils/jobFilterUtils";
 
 interface SkillTestResult {
   final_role?: string;
@@ -293,6 +291,7 @@ const ProfilePage = () => {
   const isMobile = useMobile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const t = useTranslation();
 
   // State for skill test results
   const [skillResults, setSkillResults] = useState<SkillTestResult | null>(
@@ -307,7 +306,6 @@ const ProfilePage = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
-  const [progressValue, setProgressValue] = useState(0);
 
   // Initialize profile image from user context on mount
   useEffect(() => {
@@ -358,6 +356,8 @@ const ProfilePage = () => {
   // Ref to track manual updates to prevent useEffect from overwriting
   const manualSocialLinkUpdateRef = useRef(false);
   const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to track if we've already processed the current profileData
+  const processedProfileDataRef = useRef<string | null>(null);
 
   // Fetch saved course IDs from API profile endpoint
   const { data: savedCourseIds = [] } = useQuery<string[]>({
@@ -519,237 +519,6 @@ const ProfilePage = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch saved jobs from API profile endpoint
-  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery({
-    queryKey: ["savedJobs", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      try {
-        // Fetch profile data from API
-        const response = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-
-        // Extract saved_jobs array from profile response
-        let savedJobIds: string[] = [];
-
-        if (response.data && typeof response.data === "object") {
-          const data = response.data as Record<string, unknown>;
-
-          // Check for saved_jobs in various possible locations
-          if (Array.isArray(data.saved_jobs)) {
-            savedJobIds = data.saved_jobs.map((id: string | number) =>
-              String(id)
-            );
-          } else if (data.profile && typeof data.profile === "object") {
-            const profile = data.profile as Record<string, unknown>;
-            if (Array.isArray(profile.saved_jobs)) {
-              savedJobIds = profile.saved_jobs.map((id: string | number) =>
-                String(id)
-              );
-            }
-          } else if (data.user && typeof data.user === "object") {
-            const userData = data.user as Record<string, unknown>;
-            if (Array.isArray(userData.saved_jobs)) {
-              savedJobIds = userData.saved_jobs.map((id: string | number) =>
-                String(id)
-              );
-            }
-          }
-        }
-
-        // console.log("📋 ProfilePage - Saved job IDs from API:", savedJobIds);
-
-        // If no saved jobs found, return empty array
-        if (!savedJobIds || savedJobIds.length === 0) {
-          // console.log("📋 ProfilePage - No saved jobs found");
-          return [];
-        }
-
-        // Fetch all saved jobs (no limit)
-        // Try to fetch job details for each saved job ID
-        const jobPromises = savedJobIds.map(async (jobId) => {
-          try {
-            // console.log(
-            //   `📋 ProfilePage - Fetching job detail for ID: ${jobId}`
-            // );
-            const jobDetail = await fetchJobDetail(jobId);
-            // console.log(
-            //   `✅ ProfilePage - Successfully fetched job: ${jobId}`,
-            //   jobDetail
-            // );
-            return {
-              id: jobId,
-              title: (jobDetail.job_title ||
-                jobDetail.title ||
-                "Untitled Job") as string,
-              company: (jobDetail.company_name ||
-                jobDetail.employer_name ||
-                jobDetail.company ||
-                "Unknown Company") as string,
-              location: (jobDetail.location ||
-                jobDetail.job_location ||
-                [jobDetail.city, jobDetail.state, jobDetail.country]
-                  .filter(Boolean)
-                  .join(", ") ||
-                "Location not specified") as string,
-              url: (jobDetail.job_apply_link ||
-                jobDetail.url ||
-                jobDetail.apply_url ||
-                "") as string,
-              company_logo: (jobDetail.company_logo ||
-                jobDetail.employer_logo ||
-                jobDetail.logo_url ||
-                undefined) as string | undefined,
-              salary: (jobDetail.min_salary && jobDetail.max_salary
-                ? `${jobDetail.min_salary}-${jobDetail.max_salary} ${
-                    jobDetail.salary_currency || ""
-                  }`
-                : jobDetail.salary || undefined) as string | undefined,
-              employment_type: (jobDetail.employment_type ||
-                jobDetail.job_employment_type ||
-                undefined) as string | undefined,
-              work_arrangement: (jobDetail.is_remote ? "Remote" : undefined) as
-                | string
-                | undefined,
-            } as SavedJob;
-          } catch (error) {
-            console.error(
-              `❌ ProfilePage - Error fetching job detail for ID ${jobId}:`,
-              error
-            );
-            // Try fallback: fetch from batch and filter
-            try {
-              // console.log(
-              //   `🔄 ProfilePage - Trying fallback batch fetch for ${jobId}`
-              // );
-              const batchResponse = await jobService.fetchActiveJobs({
-                query: "",
-                filters: {
-                  country: "",
-                  countries: [],
-                  jobTypes: [],
-                  isRemote: false,
-                  datePosted: undefined,
-                  skills: [],
-                },
-                page: 1,
-                pageSize: 100,
-              });
-
-              // Filter to only allowed ATS platforms
-              const allowedATSJobs = filterATSJobs(batchResponse.jobs);
-
-              const foundJob = allowedATSJobs.find((job) => {
-                const foundId = String(job.job_id || job.id || "");
-                return foundId === String(jobId);
-              });
-
-              if (foundJob) {
-                // console.log(`✅ ProfilePage - Found job ${jobId} in batch`);
-                const jobIdStr = String(foundJob.job_id || foundJob.id || "");
-                return {
-                  id: jobIdStr,
-                  title: (foundJob.job_title ||
-                    foundJob.title ||
-                    "Untitled Job") as string,
-                  company: (foundJob.company_name ||
-                    foundJob.employer_name ||
-                    foundJob.company ||
-                    "Unknown Company") as string,
-                  location: (foundJob.location ||
-                    [
-                      foundJob.job_city,
-                      foundJob.job_state,
-                      foundJob.job_country,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") ||
-                    "Location not specified") as string,
-                  url: (foundJob.job_apply_link ||
-                    foundJob.url ||
-                    foundJob.apply_url ||
-                    "") as string,
-                  company_logo: (foundJob.company_logo ||
-                    foundJob.employer_logo ||
-                    foundJob.logo_url ||
-                    undefined) as string | undefined,
-                  salary: (foundJob.job_min_salary && foundJob.job_max_salary
-                    ? `${foundJob.job_min_salary}-${foundJob.job_max_salary} ${
-                        foundJob.job_salary_currency || ""
-                      }`
-                    : foundJob.salary || undefined) as string | undefined,
-                  employment_type: (foundJob.employment_type ||
-                    foundJob.job_employment_type ||
-                    undefined) as string | undefined,
-                  work_arrangement: (foundJob.job_is_remote ||
-                  foundJob.is_remote
-                    ? "Remote"
-                    : undefined) as string | undefined,
-                } as SavedJob;
-              }
-            } catch (fallbackError) {
-              console.error(
-                `❌ ProfilePage - Fallback also failed for ${jobId}:`,
-                fallbackError
-              );
-            }
-
-            // Return a minimal job object so it still displays
-            return {
-              id: jobId,
-              title: `Job ${jobId}`,
-              company: "Details unavailable",
-              location: "",
-              url: "",
-            } as SavedJob;
-          }
-        });
-
-        const jobs = await Promise.all(jobPromises);
-        // Filter out jobs with "Details unavailable" if they have no other info
-        const validJobs = jobs.filter((job) => {
-          // Keep jobs that have at least a title that's not just "Job {id}"
-          return job.title && job.title !== `Job ${job.id}`;
-        });
-
-        // console.log(
-        //   `📋 ProfilePage - Returning ${validJobs.length} valid jobs out of ${jobs.length} total`
-        // );
-        return validJobs;
-      } catch (error) {
-        // console.error(
-        //   "❌ ProfilePage - Error fetching saved jobs from API profile:",
-        //   error
-        // );
-        return [];
-      }
-    },
-    enabled: !!user?.id,
-  });
-
-  // Animate progress bar when loading saved jobs
-  useEffect(() => {
-    if (!loadingSavedJobs) {
-      setProgressValue(0);
-      return;
-    }
-
-    let interval: NodeJS.Timeout;
-    let currentProgress = 0;
-
-    const animate = () => {
-      currentProgress += Math.random() * 15;
-      if (currentProgress > 90) {
-        currentProgress = 90; // Don't complete until loading is done
-      }
-      setProgressValue(currentProgress);
-    };
-
-    interval = setInterval(animate, 200);
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [loadingSavedJobs]);
 
   // Save course mutation
   const saveCourseMutation = useMutation({
@@ -802,7 +571,7 @@ const ProfilePage = () => {
     },
   });
 
-  // Fetch saved job IDs for checking if jobs are saved
+  // Fetch saved job IDs
   const { data: savedJobIds = [] } = useQuery<string[]>({
     queryKey: ["savedJobIds", user?.id],
     queryFn: async () => {
@@ -810,9 +579,90 @@ const ProfilePage = () => {
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
         const savedJobsArray = profileResponse.data?.saved_jobs || [];
-        return savedJobsArray.map((id: string | number) => String(id));
+        
+        // Handle both array of IDs and array of objects
+        if (!Array.isArray(savedJobsArray)) return [];
+        
+        return savedJobsArray
+          .map((item: unknown) => {
+            if (typeof item === "string" || typeof item === "number") {
+              return String(item);
+            }
+            if (item && typeof item === "object") {
+              const obj = item as Record<string, unknown>;
+              if (obj.id) return String(obj.id);
+              if (obj.job_id) return String(obj.job_id);
+            }
+            return null;
+          })
+          .filter((id): id is string => id !== null);
       } catch (error) {
         console.error("Error fetching saved job IDs:", error);
+        return [];
+      }
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch saved jobs with details
+  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<SavedJob[]>({
+    queryKey: ["savedJobs", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedJobsArray = profileResponse.data?.saved_jobs || [];
+        
+        if (!Array.isArray(savedJobsArray) || savedJobsArray.length === 0) {
+          return [];
+        }
+
+        // Extract job IDs
+        const jobIds = savedJobsArray
+          .map((item: unknown) => {
+            if (typeof item === "string" || typeof item === "number") {
+              return String(item);
+            }
+            if (item && typeof item === "object") {
+              const obj = item as Record<string, unknown>;
+              if (obj.id) return String(obj.id);
+              if (obj.job_id) return String(obj.job_id);
+            }
+            return null;
+          })
+          .filter((id): id is string => id !== null);
+
+        // Fetch job details for each ID
+        const jobPromises = jobIds.map(async (jobId) => {
+          try {
+            const jobDetail = await fetchJobDetail(jobId);
+            return {
+              id: jobId,
+              title: (jobDetail.job_title || jobDetail.title || "Untitled Job") as string,
+              company: (jobDetail.company_name || jobDetail.employer_name || jobDetail.company || "Unknown Company") as string,
+              location: (jobDetail.location || jobDetail.job_location || [
+                jobDetail.city,
+                jobDetail.state,
+                jobDetail.country
+              ].filter(Boolean).join(", ") || "Location not specified") as string,
+              url: (jobDetail.job_apply_link || jobDetail.url || jobDetail.apply_url || "") as string,
+              company_logo: (jobDetail.company_logo || jobDetail.employer_logo || jobDetail.logo_url) as string | undefined,
+              salary: (jobDetail.min_salary && jobDetail.max_salary
+                ? `${jobDetail.min_salary}-${jobDetail.max_salary} ${jobDetail.salary_currency || ""}`
+                : jobDetail.salary) as string | undefined,
+              employment_type: (jobDetail.employment_type || jobDetail.job_employment_type) as string | undefined,
+              work_arrangement: (jobDetail.is_remote ? "Remote" : undefined) as string | undefined,
+            } as SavedJob;
+          } catch (error) {
+            console.error(`Error fetching job detail for ID ${jobId}:`, error);
+            return null;
+          }
+        });
+
+        const jobs = await Promise.all(jobPromises);
+        return jobs.filter((job): job is SavedJob => job !== null && job.title !== `Job ${job.id}`);
+      } catch (error) {
+        console.error("Error fetching saved jobs:", error);
         return [];
       }
     },
@@ -825,24 +675,14 @@ const ProfilePage = () => {
       if (!user?.id) {
         throw new Error("Please log in to save jobs.");
       }
-      const endpoint = `${API_ENDPOINTS.JOBS.SAVE_JOB}${jobId}/`;
-      await apiClient.post(endpoint);
+      await apiClient.post(`${API_ENDPOINTS.JOBS.SAVE_JOB}${jobId}/`);
     },
     onMutate: async (jobId: string) => {
-      await queryClient.cancelQueries({
-        queryKey: ["savedJobs", user?.id],
-      });
-      await queryClient.cancelQueries({
-        queryKey: ["savedJobIds", user?.id],
-      });
-      const previousSavedJobs = queryClient.getQueryData<string[]>([
-        "savedJobs",
-        user?.id,
-      ]);
-      const previousSavedJobIds = queryClient.getQueryData<string[]>([
-        "savedJobIds",
-        user?.id,
-      ]);
+      await queryClient.cancelQueries({ queryKey: ["savedJobIds", user?.id] });
+      await queryClient.cancelQueries({ queryKey: ["savedJobs", user?.id] });
+      
+      const previousSavedJobIds = queryClient.getQueryData<string[]>(["savedJobIds", user?.id]);
+      
       queryClient.setQueryData<string[]>(["savedJobIds", user?.id], (prev) => {
         if (!prev) return prev;
         const idString = String(jobId);
@@ -850,31 +690,25 @@ const ProfilePage = () => {
           ? prev.filter((j) => j !== idString)
           : [...prev, idString];
       });
-      return { previousSavedJobs, previousSavedJobIds };
+      
+      return { previousSavedJobIds };
     },
     onError: (error, jobId, context) => {
       if (context?.previousSavedJobIds && user?.id) {
-        queryClient.setQueryData(
-          ["savedJobIds", user?.id],
-          context.previousSavedJobIds
-        );
+        queryClient.setQueryData(["savedJobIds", user?.id], context.previousSavedJobIds);
       }
       console.error("Error updating saved jobs:", error);
       toast.error("Failed to update saved jobs. Please try again.");
     },
     onSuccess: (_, jobId) => {
-      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["savedJobIds", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      const savedJobsList = queryClient.getQueryData<string[]>([
-        "savedJobIds",
-        user?.id,
-      ]);
+      
+      const savedJobsList = queryClient.getQueryData<string[]>(["savedJobIds", user?.id]);
       const isCurrentlySaved = savedJobsList?.includes(String(jobId));
       toast.success(
-        isCurrentlySaved
-          ? "Removed from saved jobs."
-          : "Job saved to your profile."
+        isCurrentlySaved ? "Removed from saved jobs." : "Job saved to your profile."
       );
     },
   });
@@ -1145,6 +979,21 @@ const ProfilePage = () => {
       return;
     }
 
+    // Create a stable reference key for the current profileData
+    const profileDataKey = profileData ? JSON.stringify({
+      social_links: (profileData as Record<string, unknown>)?.social_links,
+      profile_social_links: (profileData as Record<string, unknown>)?.profile?.social_links,
+      user_social_links: (profileData as Record<string, unknown>)?.user?.social_links,
+    }) : null;
+
+    // Skip if we've already processed this exact profileData
+    if (processedProfileDataRef.current === profileDataKey) {
+      return;
+    }
+
+    // Mark this profileData as processed
+    processedProfileDataRef.current = profileDataKey;
+
     setLoadingSocialLinks(true);
 
     try {
@@ -1211,7 +1060,16 @@ const ProfilePage = () => {
                 .behance as string) || "",
           };
           console.log("✅ Setting social links to:", extractedLinks);
-          setSocialLinks(extractedLinks);
+          // Only update if links have actually changed
+          setSocialLinks((prev) => {
+            const hasChanged = Object.keys(extractedLinks).some(
+              (key) => prev[key as keyof SocialLinks] !== extractedLinks[key as keyof typeof extractedLinks]
+            );
+            if (!hasChanged) {
+              return prev; // Return previous to prevent unnecessary re-render
+            }
+            return extractedLinks;
+          });
         } else {
           // No social links in profile - only set empty if we don't have any links
           console.log("⚠️ No social links found in profile data");
@@ -1276,7 +1134,9 @@ const ProfilePage = () => {
     } finally {
       setLoadingSocialLinks(false);
     }
-  }, [user, profileData]);
+    // The ref check inside prevents duplicate processing even if profileData object reference changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, profileData]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -2805,6 +2665,39 @@ const ProfilePage = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Skill Test Card */}
+            <Card
+              className="bg-white transition-all w-auto flex-shrink-0 rounded-3xl border-0"
+              style={{
+                boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
+              }}
+            >
+              <CardContent className="p-4 md:p-4">
+                <Link to="/skill-test" className="block cursor-pointer group">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    {/* Left side - Content */}
+                    <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                      <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
+                        {t.home.skillTestTitle}
+                      </h3>
+                      <p className="text-sm md:text-sm text-gray-900">
+                        {t.home.skillTestSubtitle}
+                      </p>
+                    </div>
+
+                    {/* Right side - Illustration / Icon */}
+                    <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
+                      <img
+                        src="/lovable-uploads/3dicons-target-front-color.png"
+                        alt="Skill test target"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  </div>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -3182,24 +3075,19 @@ const ProfilePage = () => {
             <CardContent className="p-0">
               {loadingSavedJobs ? (
                 <div className="px-6 py-8 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
-                      <span>Loading saved jobs...</span>
-                      <span className="text-breneo-blue">Please wait</span>
-                    </div>
-                    <Progress value={progressValue} className="h-2" />
+                  <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+                    Loading saved jobs...
                   </div>
                 </div>
               ) : savedJobs.length > 0 ? (
                 <div>
-                  {savedJobs.map((job, index) => {
-                    const isJobSaved =
-                      savedJobIds?.includes(String(job.id)) ?? false;
+                  {savedJobs.slice(0, 5).map((job, index) => {
+                    const isJobSaved = savedJobIds?.includes(String(job.id)) ?? false;
                     return (
                       <div
                         key={job.id}
                         className={`px-6 py-4 ${
-                          index < savedJobs.length - 1
+                          index < Math.min(savedJobs.length, 5) - 1
                             ? "border-b border-gray-200 dark:border-gray-700"
                             : ""
                         } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
@@ -3209,15 +3097,13 @@ const ProfilePage = () => {
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
-                                alt={`${job.company_name || job.company} logo`}
+                                alt={`${job.company} logo`}
                                 className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
                                   target.style.display = "none";
                                   if (target.nextElementSibling) {
-                                    (
-                                      target.nextElementSibling as HTMLElement
-                                    ).style.display = "flex";
+                                    (target.nextElementSibling as HTMLElement).style.display = "flex";
                                   }
                                 }}
                               />
@@ -3232,11 +3118,7 @@ const ProfilePage = () => {
                             <div className="flex items-start justify-between gap-2 mb-1">
                               <h4
                                 className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
-                                onClick={() =>
-                                  navigate(
-                                    `/jobs/${encodeURIComponent(job.id)}`
-                                  )
-                                }
+                                onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
                               >
                                 {job.title}
                               </h4>
@@ -3250,9 +3132,7 @@ const ProfilePage = () => {
                                     if (job.url) {
                                       window.open(job.url, "_blank");
                                     } else {
-                                      navigate(
-                                        `/jobs/${encodeURIComponent(job.id)}`
-                                      );
+                                      navigate(`/jobs/${encodeURIComponent(job.id)}`);
                                     }
                                   }}
                                   aria-label="View job"
@@ -3267,9 +3147,7 @@ const ProfilePage = () => {
                                     saveJobMutation.mutate(job.id);
                                   }}
                                   disabled={saveJobMutation.isPending}
-                                  aria-label={
-                                    isJobSaved ? "Unsave job" : "Save job"
-                                  }
+                                  aria-label={isJobSaved ? "Unsave job" : "Save job"}
                                   className={cn(
                                     "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
                                     isJobSaved
@@ -3284,7 +3162,7 @@ const ProfilePage = () => {
                                       className={cn(
                                         "h-4 w-4 transition-colors",
                                         isJobSaved
-                                          ? "text-red-500 fill-red-500 animate-heart-pop"
+                                          ? "text-red-500 fill-red-500"
                                           : "text-black dark:text-white"
                                       )}
                                     />
@@ -3293,13 +3171,11 @@ const ProfilePage = () => {
                               </div>
                             </div>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                              {job.company_name || job.company}
+                              {job.company}
                             </p>
                             <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                               <MapPin className="h-3 w-3" />
-                              <span className="line-clamp-1">
-                                {job.location}
-                              </span>
+                              <span className="line-clamp-1">{job.location}</span>
                             </div>
                             {job.salary && (
                               <p className="text-xs text-gray-600 dark:text-gray-400">
@@ -3311,6 +3187,17 @@ const ProfilePage = () => {
                       </div>
                     );
                   })}
+                  {savedJobs.length > 5 && (
+                    <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                      <Button
+                        variant="link"
+                        className="text-breneo-blue p-0 h-auto font-normal text-sm w-full justify-center hover:underline"
+                        onClick={() => navigate("/jobs")}
+                      >
+                        View All Saved Jobs
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-4 text-gray-500 text-sm px-6">
@@ -3326,6 +3213,7 @@ const ProfilePage = () => {
               )}
             </CardContent>
           </Card>
+
         </div>
       </div>
 

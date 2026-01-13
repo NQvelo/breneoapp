@@ -40,10 +40,13 @@ import UserNotificationsPage from "@/pages/NotificationsPage";
 
 // Academy pages (Academy-only)
 import AcademyDashboard from "@/pages/academy/AcademyDashboard";
+import AcademyHomePage from "@/pages/academy/AcademyHomePage";
+import AcademyCoursesPage from "@/pages/academy/AcademyCoursesPage";
 import AcademyProfile from "@/pages/academy/AcademyProfilePage";
 import AcademySettings from "@/pages/academy/AcademySettings";
 import AcademyPage from "@/pages/academy/AcademyPage";
 import AcademyRegistrationPage from "@/pages/academy/AcademyRegistrationPage";
+import AddCoursePage from "@/pages/academy/AddCoursePage";
 
 // Common pages (Available to all authenticated users)
 import TermsOfUse from "@/pages/TermsOfUse";
@@ -197,13 +200,19 @@ export const AppRoutes = () => {
       {createLocalizedRoute(
         "/academy/home",
         <ProtectedRoute requiredRole="academy">
-          <AcademyDashboard />
+          <AcademyHomePage />
         </ProtectedRoute>
       )}
       {createLocalizedRoute(
         "/academy/dashboard",
         <ProtectedRoute requiredRole="academy">
-          <AcademyDashboard />
+          <AcademyHomePage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/academy/courses",
+        <ProtectedRoute requiredRole="academy">
+          <AcademyCoursesPage />
         </ProtectedRoute>
       )}
       {createLocalizedRoute(
@@ -216,6 +225,18 @@ export const AppRoutes = () => {
         "/academy/settings",
         <ProtectedRoute requiredRole="academy">
           <AcademySettings />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/academy/courses/add",
+        <ProtectedRoute requiredRole="academy">
+          <AddCoursePage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/academy/courses/edit/:courseId",
+        <ProtectedRoute requiredRole="academy">
+          <AddCoursePage />
         </ProtectedRoute>
       )}
 

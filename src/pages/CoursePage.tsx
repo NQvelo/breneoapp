@@ -25,6 +25,7 @@ import {
   RotateCcw,
   Video,
   Users,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
@@ -563,12 +564,32 @@ const CoursePage = () => {
                       )}
                     </Button>
 
-                    <Button
-                      size="default"
-                      className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
-                    >
-                      {t.courses.enroll}
-                    </Button>
+                    {(course as { registration_link?: string })
+                      .registration_link ? (
+                      <a
+                        href={
+                          (course as { registration_link?: string })
+                            .registration_link
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto"
+                      >
+                        <Button
+                          size="default"
+                          className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                        >
+                          {t.courses.enroll}
+                        </Button>
+                      </a>
+                    ) : (
+                      <Button
+                        size="default"
+                        className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                      >
+                        {t.courses.enroll}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

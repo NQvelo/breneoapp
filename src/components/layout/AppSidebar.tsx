@@ -100,6 +100,11 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
           label: t.nav.home,
           href: "/academy/home",
         },
+        {
+          icon: LibraryBig,
+          label: t.nav.courses,
+          href: "/academy/courses",
+        },
       ]
     : [
         { icon: Home, label: t.nav.home, href: "/home" },

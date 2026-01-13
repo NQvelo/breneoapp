@@ -54,6 +54,11 @@ import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
+import {
+  calculateMatchPercentage,
+  getMatchQualityLabel,
+} from "@/utils/jobMatchUtils";
+import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 
 // Function to extract skills from job data (same as in JobsPage.tsx)
 const extractJobSkills = (job: ApiJob): string[] => {
@@ -186,98 +191,7 @@ const calculateJobRelevanceScore = (
   return score;
 };
 
-// Function to calculate match percentage with enhanced job title matching
-const calculateMatchPercentage = (
-  userSkills: string[],
-  jobSkills: string[],
-  jobTitle?: string
-): number => {
-  if (userSkills.length === 0) {
-    return 0;
-  }
-
-  // Normalize skills for comparison (lowercase, remove spaces)
-  const normalizeSkill = (skill: string) =>
-    skill.toLowerCase().trim().replace(/\s+/g, " ");
-
-  const normalizedUserSkills = userSkills.map(normalizeSkill);
-  const normalizedJobSkills = jobSkills.map(normalizeSkill);
-  const normalizedJobTitle = jobTitle ? normalizeSkill(jobTitle) : "";
-
-  // Check if user skills appear directly in job title (high priority match)
-  const titleMatches: string[] = [];
-  normalizedUserSkills.forEach((userSkill) => {
-    // Check if user skill appears in job title
-    if (normalizedJobTitle && normalizedJobTitle.includes(userSkill)) {
-      titleMatches.push(userSkill);
-    }
-    // Also check if any word in job title contains the user skill
-    const titleWords = normalizedJobTitle.split(/\s+/);
-    if (
-      titleWords.some(
-        (word) => word.includes(userSkill) || userSkill.includes(word)
-      )
-    ) {
-      if (!titleMatches.includes(userSkill)) {
-        titleMatches.push(userSkill);
-      }
-    }
-  });
-
-  // Find matching skills in job description/requirements
-  const descriptionMatches = normalizedUserSkills.filter((userSkill) =>
-    normalizedJobSkills.some((jobSkill) => {
-      // Exact match
-      if (userSkill === jobSkill) return true;
-      // Partial match (one skill contains the other)
-      if (userSkill.includes(jobSkill) || jobSkill.includes(userSkill))
-        return true;
-      return false;
-    })
-  );
-
-  // Combine matches (title matches are more important)
-  const allMatches = new Set([...titleMatches, ...descriptionMatches]);
-
-  // Calculate match percentage with weighted scoring
-  // If job has skills extracted, use them as denominator
-  // Otherwise, use user skills as denominator
-  const denominator =
-    normalizedJobSkills.length > 0
-      ? normalizedJobSkills.length
-      : normalizedUserSkills.length;
-
-  // Base match: (matching skills / denominator) * 100
-  let matchPercentage = Math.round(
-    (allMatches.size / Math.max(denominator, 1)) * 100
-  );
-
-  // Boost match if user skills appear in job title (add up to 30% bonus)
-  if (titleMatches.length > 0) {
-    const titleMatchBonus = Math.min(
-      (titleMatches.length / normalizedUserSkills.length) * 30,
-      30
-    );
-    matchPercentage = Math.min(matchPercentage + titleMatchBonus, 100);
-  }
-
-  // If no skills found in job but user has skills, return lower match
-  if (normalizedJobSkills.length === 0) {
-    // If title matches exist, give some credit
-    if (titleMatches.length > 0) {
-      matchPercentage = Math.min(
-        Math.round((titleMatches.length / normalizedUserSkills.length) * 100),
-        70
-      );
-    } else {
-      // No matches at all - return low match
-      matchPercentage = 20;
-    }
-  }
-
-  // Cap at 100%
-  return Math.min(matchPercentage, 100);
-};
+// calculateMatchPercentage is now imported from @/utils/jobMatchUtils
 
 // Function to calculate course match score based on user skills
 const calculateCourseMatchScore = (
@@ -382,7 +296,7 @@ const isTechJob = (job: ApiJob): boolean => {
 interface Job {
   id: string;
   title: string;
-  company: string;
+  company: string | { name?: string } | null;
   company_name?: string;
   location: string;
   date: string;
@@ -615,7 +529,27 @@ const UserHome = () => {
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
         const savedJobsArray = profileResponse.data?.saved_jobs || [];
-        return savedJobsArray.map((id: string | number) => String(id));
+
+        // Handle both array of IDs and array of objects
+        if (!Array.isArray(savedJobsArray)) return [];
+
+        return savedJobsArray
+          .map((item: unknown) => {
+            // If it's already a string or number, convert to string
+            if (typeof item === "string" || typeof item === "number") {
+              return String(item);
+            }
+            // If it's an object, try to extract the ID
+            if (item && typeof item === "object") {
+              const obj = item as Record<string, unknown>;
+              // Try common ID field names
+              if (obj.id) return String(obj.id);
+              if (obj.job_id) return String(obj.job_id);
+              if (obj.jobId) return String(obj.jobId);
+            }
+            return null;
+          })
+          .filter((id): id is string => id !== null);
       } catch (error) {
         console.error("Error fetching saved jobs:", error);
         return [];
@@ -632,7 +566,27 @@ const UserHome = () => {
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
         const savedCoursesArray = profileResponse.data?.saved_courses || [];
-        return savedCoursesArray.map((id: string | number) => String(id));
+
+        // Handle both array of IDs and array of objects
+        if (!Array.isArray(savedCoursesArray)) return [];
+
+        return savedCoursesArray
+          .map((item: unknown) => {
+            // If it's already a string or number, convert to string
+            if (typeof item === "string" || typeof item === "number") {
+              return String(item);
+            }
+            // If it's an object, try to extract the ID
+            if (item && typeof item === "object") {
+              const obj = item as Record<string, unknown>;
+              // Try common ID field names
+              if (obj.id) return String(obj.id);
+              if (obj.course_id) return String(obj.course_id);
+              if (obj.courseId) return String(obj.courseId);
+            }
+            return null;
+          })
+          .filter((id): id is string => id !== null);
       } catch (error) {
         console.error("Error fetching saved courses:", error);
         return [];
@@ -1020,8 +974,47 @@ const UserHome = () => {
       .filter((job): job is Job => job !== null); // Filter out null jobs (already limited to 9 above)
   }, [jobs, savedJobs, userTopSkills]);
 
+  // State to store fetched logos
+  const [jobLogos, setJobLogos] = useState<Record<string, string>>({});
+
+  // Fetch missing company logos from API
+  useEffect(() => {
+    const fetchMissingLogos = async () => {
+      const jobsNeedingLogos = transformedJobs.filter(
+        (job) => !job.company_logo && job.company_name
+      );
+
+      if (jobsNeedingLogos.length === 0) return;
+
+      // Fetch logos for jobs without them
+      const logoPromises = jobsNeedingLogos.map(async (job) => {
+        const logo = await getCompanyLogo(job.company_name || "", undefined);
+        return { jobId: job.id, logo };
+      });
+
+      const logoResults = await Promise.all(logoPromises);
+      const newLogos: Record<string, string> = {};
+
+      logoResults.forEach(({ jobId, logo }) => {
+        if (logo) {
+          newLogos[jobId] = logo;
+        }
+      });
+
+      if (Object.keys(newLogos).length > 0) {
+        setJobLogos((prev) => ({ ...prev, ...newLogos }));
+      }
+    };
+
+    fetchMissingLogos();
+  }, [transformedJobs]);
+
   // Display up to 9 jobs (already sorted by match percentage)
-  const displayJobs = transformedJobs;
+  // Merge fetched logos into jobs
+  const displayJobs = transformedJobs.map((job) => ({
+    ...job,
+    company_logo: job.company_logo || jobLogos[job.id] || undefined,
+  }));
 
   // Scroll functions for jobs
   const scrollJobs = (direction: "left" | "right") => {
@@ -1294,19 +1287,27 @@ const UserHome = () => {
                             {job.company_logo ? (
                               <img
                                 src={job.company_logo}
-                                alt={`${job.company_name || job.company} logo`}
-                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                alt={`${
+                                  job.company_name ||
+                                  (typeof job.company === "string"
+                                    ? job.company
+                                    : job.company?.name || "Company")
+                                } logo`}
+                                className="w-10 h-10 rounded-md object-cover border border-gray-200"
                                 loading="lazy"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center">
+                              <div className="w-10 h-10 rounded-md bg-breneo-accent flex items-center justify-center">
                                 <Briefcase className="h-5 w-5 text-white" />
                               </div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">
-                              {job.company_name || job.company}
+                              {job.company_name ||
+                                (typeof job.company === "string"
+                                  ? job.company
+                                  : job.company?.name || "Company")}
                             </h3>
                             <p className="mt-0.5 text-xs text-gray-500 truncate">
                               {job.location}

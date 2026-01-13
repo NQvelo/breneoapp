@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
       mode === "development"
         ? {
             "/api/job-details": {
-              target: "https://breneo-job-aggregator.onrender.com",
+              target: "https://breneo-job-aggregator-k7ti.onrender.com/",
               changeOrigin: true,
               secure: false,
               rewrite: (path) => path, // Keep the path as-is
@@ -93,7 +93,35 @@ export default defineConfig(({ mode }) => ({
           "**/lovable-uploads/full-shot-student-library.jpg",
         ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        // Handle SPA routing - fallback to index.html for navigation requests
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [
+          // Don't fallback for API routes
+          /^\/api\/.*/,
+          // Don't fallback for static assets
+          /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff|woff2|ttf|eot)$/,
+        ],
+        // Skip waiting and claim clients for faster updates
+        skipWaiting: true,
+        clientsClaim: true,
+        // Don't precache routes - handle them at runtime
+        dontCacheBustURLsMatching: /\.\w{8}\./,
         runtimeCaching: [
+          {
+            // Handle navigation requests (SPA routes)
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "pages-cache",
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24, // 24 hours
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/i,
             handler: "CacheFirst",
@@ -102,6 +130,18 @@ export default defineConfig(({ mode }) => ({
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+          {
+            // Handle manifest.webmanifest requests
+            urlPattern: /manifest\.webmanifest$/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "manifest-cache",
+              expiration: {
+                maxEntries: 1,
+                maxAgeSeconds: 60 * 60 * 24, // 24 hours
               },
             },
           },
@@ -139,6 +179,8 @@ export default defineConfig(({ mode }) => ({
         enabled: true,
         type: "module",
       },
+      // Additional options to handle missing routes gracefully
+      injectRegister: "auto",
     }),
   ].filter(Boolean),
   resolve: {

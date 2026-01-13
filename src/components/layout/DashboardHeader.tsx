@@ -34,6 +34,13 @@ const isSkillPathPage = (pathname: string): boolean => {
   return pathname.includes("/skill-path");
 };
 
+// Helper function to check if current path is a course add/edit page
+const isCourseAddEditPage = (pathname: string): boolean => {
+  // Match patterns like /academy/courses/add, /academy/courses/edit/:courseId
+  const courseAddEditPattern = /^(\/(en|ka))?\/academy\/courses\/(add|edit\/[^/]+)$/;
+  return courseAddEditPattern.test(pathname);
+};
+
 // Helper function to get the page title from the pathname
 const getPageTitle = (
   pathname: string,
@@ -100,6 +107,21 @@ export function DashboardHeader({
   const isJobDetail = isJobDetailPage(currentPath);
   const isCourseDetail = isCourseDetailPage(currentPath);
   const isSkillPath = isSkillPathPage(currentPath);
+  const isCourseAddEdit = isCourseAddEditPage(currentPath);
+  
+  // Get course add/edit page title
+  const getCourseAddEditTitle = () => {
+    if (isCourseAddEdit) {
+      if (currentPath.includes("/edit/")) {
+        return "Edit Course";
+      } else if (currentPath.includes("/add")) {
+        return "Add Course";
+      }
+    }
+    return null;
+  };
+  
+  const courseAddEditTitle = getCourseAddEditTitle();
 
   const currentLanguageText = language === "ka" ? "GEO" : "EN";
 
@@ -120,17 +142,24 @@ export function DashboardHeader({
     >
       <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">
         <div className="hidden md:flex items-center space-x-3">
-          {isJobDetail || isCourseDetail || isSkillPath ? (
-            <Button
-              variant="ghost"
-              onClick={() => navigate(-1)}
-              className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
-                         text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
-                         text-sm font-medium flex items-center gap-2 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>{t.common.back}</span>
-            </Button>
+          {isJobDetail || isCourseDetail || isSkillPath || isCourseAddEdit ? (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => navigate(-1)}
+                className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                           text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
+                           text-sm font-medium flex items-center gap-2 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>{t.common.back}</span>
+              </Button>
+              {courseAddEditTitle && (
+                <h1 className="text-2xl font-semibold text-foreground ml-4">
+                  {courseAddEditTitle}
+                </h1>
+              )}
+            </>
           ) : (
             pageTitle && (
               <h1 className="text-2xl font-semibold text-foreground">

@@ -11,11 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Plus,
-  Edit,
-  BookOpen,
-} from "lucide-react";
+import { Plus, Edit, BookOpen } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,7 +47,7 @@ interface AcademyProfile {
   logo_url: string | null;
 }
 
-const AcademyDashboard = () => {
+const AcademyCoursesPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -91,11 +87,16 @@ const AcademyDashboard = () => {
         setAcademyProfile(academyProfile);
         console.log("✅ Academy profile loaded from API:", academyProfile);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to load academy profile:", error);
       // If 404, academy profile doesn't exist yet
-      if (error.response?.status === 404) {
-        toast.error("Please set up your academy profile first");
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as { response?: { status?: number } };
+        if (axiosError.response?.status === 404) {
+          toast.error("Please set up your academy profile first");
+        } else {
+          toast.error("Failed to load academy profile");
+        }
       } else {
         toast.error("Failed to load academy profile");
       }
@@ -129,9 +130,11 @@ const AcademyDashboard = () => {
       })) as Course[];
 
       setCourses(coursesData);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error fetching courses:", error);
-      toast.error(error.message || "Failed to load courses");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load courses";
+      toast.error(errorMessage);
     }
   }, [academyProfile]);
 
@@ -177,7 +180,6 @@ const AcademyDashboard = () => {
       <div className="space-y-6">
         <div className="bg-white rounded-3xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            {/* <h2 className="text-xl font-semibold">Course Management</h2> */}
             <span className="text-md font-semibold">
               You have {courses.length} Courses
             </span>
@@ -249,4 +251,4 @@ const AcademyDashboard = () => {
   );
 };
 
-export default AcademyDashboard;
+export default AcademyCoursesPage;

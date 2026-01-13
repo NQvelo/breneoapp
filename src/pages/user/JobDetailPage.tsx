@@ -896,8 +896,108 @@ const JobDetailPage = () => {
     return fallback || "Location not specified";
   };
 
-  // Get company logo - check all possible logo fields
+  // Fetch company details from API
+  const [companyDetails, setCompanyDetails] = useState<CompanyInfo | null>(null);
+  const [isLoadingCompanyDetails, setIsLoadingCompanyDetails] = useState(false);
+  const [companyLogoFromAPI, setCompanyLogoFromAPI] = useState<string | undefined>(undefined);
+
+  // Fetch company details when company name is available
+  useEffect(() => {
+    const fetchCompanyDetails = async () => {
+      if (!jobDetail) {
+        setCompanyDetails(null);
+        setCompanyLogoFromAPI(undefined);
+        return;
+      }
+
+      const companyName = getCompanyName();
+      if (!companyName || !companyName.trim()) {
+        setCompanyDetails(null);
+        setCompanyLogoFromAPI(undefined);
+        return;
+      }
+
+      setIsLoadingCompanyDetails(true);
+      try {
+        // Fetch from the company API endpoint
+        const encodedCompanyName = encodeURIComponent(companyName.trim());
+        const companyApiUrl = `https://breneo-job-aggregator-k7ti.onrender.com/api/companies/${encodedCompanyName}`;
+        
+        console.log("🔍 Fetching company details from:", companyApiUrl);
+        
+        const response = await fetch(companyApiUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("✅ Company details fetched:", data);
+          
+          // Extract company info from response
+          const companyInfo: CompanyInfo = {
+            name: data.name || data.company_name || companyName,
+            company_name: data.company_name || data.name || companyName,
+            logo: data.logo || data.company_logo || data.logo_url,
+            company_logo: data.company_logo || data.logo || data.logo_url,
+            logo_url: data.logo_url || data.logo || data.company_logo,
+            website: data.website || data.company_url || data.website_url,
+            company_url: data.company_url || data.website || data.website_url,
+            description: data.description || data.company_description,
+            company_description: data.company_description || data.description,
+            size: data.size || data.company_size,
+            company_size: data.company_size || data.size,
+            industry: data.industry || data.company_industry,
+            company_industry: data.company_industry || data.industry,
+            founded: data.founded || data.company_founded,
+            company_founded: data.company_founded || data.founded,
+            headquarters: data.headquarters || data.company_headquarters,
+            company_headquarters: data.company_headquarters || data.headquarters,
+            ...data, // Include any other fields
+          };
+
+          setCompanyDetails(companyInfo);
+          
+          // Set logo from API if available
+          const logoUrl = companyInfo.logo || companyInfo.company_logo || companyInfo.logo_url;
+          if (logoUrl && typeof logoUrl === "string") {
+            try {
+              const url = new URL(logoUrl);
+              if (url.protocol.startsWith("http")) {
+                setCompanyLogoFromAPI(logoUrl);
+              }
+            } catch {
+              // Invalid URL, don't set
+            }
+          }
+        } else {
+          console.log("⚠️ Company details not found or API error:", response.status);
+          setCompanyDetails(null);
+          setCompanyLogoFromAPI(undefined);
+        }
+      } catch (error) {
+        console.error("❌ Error fetching company details:", error);
+        setCompanyDetails(null);
+        setCompanyLogoFromAPI(undefined);
+      } finally {
+        setIsLoadingCompanyDetails(false);
+      }
+    };
+
+    fetchCompanyDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobDetail]);
+
+  // Get company logo - check API first, then fallback to job detail fields
   const getCompanyLogo = () => {
+    // First, check if we have logo from company API
+    if (companyLogoFromAPI) {
+      return companyLogoFromAPI;
+    }
+
     if (!jobDetail) return undefined;
     const jobDetailAny = jobDetail as Record<string, unknown>;
 
@@ -1031,8 +1131,11 @@ const JobDetailPage = () => {
     return undefined;
   };
 
-  // Get company website
+  // Get company website - prioritize API data, then fallback to job detail
   const getCompanyWebsite = (): string | undefined => {
+    if (companyDetails?.website || companyDetails?.company_url || companyDetails?.website_url) {
+      return companyDetails.website || companyDetails.company_url || companyDetails.website_url;
+    }
     if (!jobDetail) return undefined;
     const website =
       (jobDetail.company_info as CompanyInfo)?.website ||
@@ -1042,8 +1145,11 @@ const JobDetailPage = () => {
     return typeof website === "string" ? website : undefined;
   };
 
-  // Get company description
+  // Get company description - prioritize API data, then fallback to job detail
   const getCompanyDescription = () => {
+    if (companyDetails?.description || companyDetails?.company_description) {
+      return companyDetails.description || companyDetails.company_description;
+    }
     if (!jobDetail) return undefined;
     return (
       (jobDetail.company_info as CompanyInfo)?.description ||
@@ -1052,8 +1158,11 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get company size
+  // Get company size - prioritize API data, then fallback to job detail
   const getCompanySize = () => {
+    if (companyDetails?.size || companyDetails?.company_size) {
+      return companyDetails.size || companyDetails.company_size;
+    }
     if (!jobDetail) return undefined;
     return (
       (jobDetail.company_info as CompanyInfo)?.size ||
@@ -1062,8 +1171,11 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get company industry
+  // Get company industry - prioritize API data, then fallback to job detail
   const getCompanyIndustry = () => {
+    if (companyDetails?.industry || companyDetails?.company_industry) {
+      return companyDetails.industry || companyDetails.company_industry;
+    }
     if (!jobDetail) return undefined;
     return (
       (jobDetail.company_info as CompanyInfo)?.industry ||
@@ -1072,8 +1184,11 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get company founded year
+  // Get company founded year - prioritize API data, then fallback to job detail
   const getCompanyFounded = () => {
+    if (companyDetails?.founded || companyDetails?.company_founded) {
+      return companyDetails.founded || companyDetails.company_founded;
+    }
     if (!jobDetail) return undefined;
     return (
       (jobDetail.company_info as CompanyInfo)?.founded ||
@@ -1082,8 +1197,11 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get company headquarters
+  // Get company headquarters - prioritize API data, then fallback to job detail
   const getCompanyHeadquarters = () => {
+    if (companyDetails?.headquarters || companyDetails?.company_headquarters) {
+      return companyDetails.headquarters || companyDetails.company_headquarters;
+    }
     if (!jobDetail) return undefined;
     return (
       (jobDetail.company_info as CompanyInfo)?.headquarters ||
@@ -1593,15 +1711,15 @@ const JobDetailPage = () => {
                           <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0 text-gray-700 dark:text-gray-200" />
                           <span>
                             {formatDate(
-                              jobDetail.posted_at || 
+                              String(jobDetail.posted_at || 
                               jobDetail.fetched_at || 
                               jobDetail.date_posted || 
-                              jobDetail.posted_date
+                              jobDetail.posted_date || "")
                             ) ||
-                              jobDetail.posted_at ||
+                              String(jobDetail.posted_at ||
                               jobDetail.fetched_at ||
                               jobDetail.date_posted ||
-                              jobDetail.posted_date}
+                              jobDetail.posted_date || "")}
                           </span>
                         </div>
                       ) : null}
@@ -2039,6 +2157,203 @@ const JobDetailPage = () => {
                   </div>
                 </div>
               )}
+
+              {/* Company Details Section - Modernized and Moved to Bottom */}
+              <div className="pt-8 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Company Details
+                  </h2>
+                </div>
+
+                {isLoadingCompanyDetails ? (
+                  <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                        <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                        <p className="text-sm">Loading company information...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Company Header Card - Modern Design */}
+                    <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl overflow-hidden">
+                      <CardContent className="p-6">
+                        <div className="flex items-start gap-4">
+                          {/* Company Logo */}
+                          <div className="flex-shrink-0 relative">
+                            {getCompanyLogo() ? (
+                              <img
+                                src={getCompanyLogo()}
+                                alt={getCompanyName() || "Company logo"}
+                                className="h-20 w-20 rounded-2xl object-cover border border-gray-200 dark:border-gray-700 shadow-sm"
+                                onError={(e) => {
+                                  // Hide image on error
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                  const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                                  if (fallback) {
+                                    fallback.style.display = "flex";
+                                  }
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className={`h-20 w-20 rounded-2xl bg-gradient-to-br from-breneo-accent to-breneo-blue flex items-center justify-center text-white shadow-sm ${
+                                getCompanyLogo() ? "hidden" : "flex"
+                              }`}
+                            >
+                              <Building2 className="h-10 w-10" />
+                            </div>
+                          </div>
+
+                          {/* Company Info */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 truncate">
+                              {getCompanyName() || "Company Name Not Available"}
+                            </h3>
+                            {getCompanyWebsite() && (
+                              <a
+                                href={getCompanyWebsite()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 text-sm text-breneo-accent hover:text-breneo-blue transition-colors font-medium"
+                              >
+                                <Globe className="h-4 w-4" />
+                                Visit Website
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Company Description */}
+                    {getCompanyDescription() && (
+                      <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl">
+                        <CardContent className="p-6">
+                          <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-breneo-accent" />
+                            About {getCompanyName()}
+                          </h4>
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
+                              {getCompanyDescription()}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Company Information Grid - Modern Card Style */}
+                    {(getCompanySize() ||
+                      getCompanyIndustry() ||
+                      getCompanyFounded() ||
+                      getCompanyHeadquarters()) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {getCompanySize() && (
+                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                              <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
+                                  <Users className="h-6 w-6 text-breneo-accent" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                                    Company Size
+                                  </p>
+                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                                    {getCompanySize()}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {getCompanyIndustry() && (
+                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                              <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
+                                  <Factory className="h-6 w-6 text-breneo-accent" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                                    Industry
+                                  </p>
+                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                                    {getCompanyIndustry()}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {getCompanyFounded() && (
+                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                              <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
+                                  <Calendar className="h-6 w-6 text-breneo-accent" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                                    Founded
+                                  </p>
+                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                                    {getCompanyFounded()}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {getCompanyHeadquarters() && (
+                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
+                            <CardContent className="p-5">
+                              <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
+                                  <MapPin className="h-6 w-6 text-breneo-accent" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                                    Headquarters
+                                  </p>
+                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
+                                    {getCompanyHeadquarters()}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Show message if no company details available */}
+                    {!getCompanyDescription() &&
+                      !getCompanySize() &&
+                      !getCompanyIndustry() &&
+                      !getCompanyFounded() &&
+                      !getCompanyHeadquarters() &&
+                      !isLoadingCompanyDetails && (
+                        <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl">
+                          <CardContent className="p-6 text-center">
+                            <Building2 className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              Additional company information is not available at this time.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
