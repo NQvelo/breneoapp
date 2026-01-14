@@ -25,6 +25,7 @@ import EmailConfirmed from "@/pages/auth/EmailConfirmed";
 // User pages (User-only)
 import UserDashboard from "@/pages/user/UserHome";
 import UserProfile from "@/pages/user/ProfilePage";
+import SavedPage from "@/pages/user/SavedPage";
 import UserSettings from "@/pages/user/UserSettings";
 import JobsPage from "@/pages/user/JobsPage";
 import JobSearchResultsPage from "@/pages/user/JobSearchResultsPage";
@@ -112,6 +113,12 @@ export const AppRoutes = () => {
         "/profile",
         <ProtectedRoute requiredRole="user">
           <UserProfile />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/saved",
+        <ProtectedRoute requiredRole="user">
+          <SavedPage />
         </ProtectedRoute>
       )}
       {createLocalizedRoute(

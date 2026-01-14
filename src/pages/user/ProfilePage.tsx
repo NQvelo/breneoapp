@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
 import { useTranslation } from "@/contexts/LanguageContext";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -83,6 +84,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
+import { RadialProgress } from "@/components/ui/radial-progress";
+import { 
+  calculateMatchPercentage, 
+  getMatchQualityLabel 
+} from "@/utils/jobMatchUtils";
+import { ApiJob } from "@/api/jobs/types";
 
 interface SkillTestResult {
   final_role?: string;
@@ -165,6 +172,7 @@ interface SavedJob {
   salary?: string;
   employment_type?: string;
   work_arrangement?: string;
+  matchPercentage?: number;
 }
 
 // Social Platform Icons as React Components
@@ -285,11 +293,77 @@ const platformLabels: Record<SocialPlatform, string> = {
   behance: "Behance",
 };
 
+// Helper function to extract skills from job data (copied from JobsPage.tsx for consistency)
+const extractJobSkills = (job: any): string[] => {
+  const skills: string[] = [];
+  const textToSearch = [
+    job.job_title || job.title || "",
+    job.description || job.job_description || "",
+    job.job_required_experience || job.required_experience || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  // Common tech skills keywords
+  const skillKeywords: Record<string, string[]> = {
+    javascript: ["javascript", "js", "node.js", "nodejs", "react", "vue", "angular"],
+    python: ["python", "django", "flask", "fastapi"],
+    java: ["java", "spring", "spring boot"],
+    "c++": ["c++", "cpp", "c plus plus"],
+    "c#": ["c#", "csharp", "dotnet", ".net"],
+    go: ["go", "golang"],
+    rust: ["rust"],
+    php: ["php", "laravel", "symfony"],
+    ruby: ["ruby", "rails"],
+    swift: ["swift", "ios"],
+    kotlin: ["kotlin", "android"],
+    typescript: ["typescript", "ts"],
+    html: ["html", "html5"],
+    css: ["css", "css3", "sass", "scss", "tailwind"],
+    sql: ["sql", "mysql", "postgresql", "mongodb", "database"],
+    react: ["react", "reactjs", "react.js"],
+    vue: ["vue", "vuejs", "vue.js"],
+    angular: ["angular", "angularjs"],
+    "node.js": ["node.js", "nodejs", "node"],
+    express: ["express", "express.js"],
+    django: ["django"],
+    flask: ["flask"],
+    spring: ["spring", "spring boot"],
+    laravel: ["laravel"],
+    rails: ["rails", "ruby on rails"],
+    git: ["git", "github", "gitlab"],
+    docker: ["docker", "containerization"],
+    kubernetes: ["kubernetes", "k8s"],
+    aws: ["aws", "amazon web services"],
+    azure: ["azure", "microsoft azure"],
+    gcp: ["gcp", "google cloud", "google cloud platform"],
+    linux: ["linux", "unix"],
+    "machine learning": ["machine learning", "ml", "deep learning", "neural network"],
+    "data science": ["data science", "data analysis", "data analytics"],
+    ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
+    blockchain: ["blockchain", "ethereum", "solidity", "web3"],
+    devops: ["devops", "ci/cd", "continuous integration"],
+    testing: ["testing", "qa", "quality assurance", "test automation"],
+    ui: ["ui", "user interface", "ux", "user experience"],
+    design: ["design", "figma", "sketch", "adobe"],
+  };
+
+  Object.keys(skillKeywords).forEach((skill) => {
+    const keywords = skillKeywords[skill];
+    if (keywords.some((keyword) => textToSearch.includes(keyword))) {
+      skills.push(skill);
+    }
+  });
+
+  return [...new Set(skills)];
+};
+
 const ProfilePage = () => {
   // ✅ Get user, loading state, and logout function from AuthContext
   const { user, loading, logout } = useAuth();
   const isMobile = useMobile();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const t = useTranslation();
 
@@ -304,8 +378,25 @@ const ProfilePage = () => {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [aboutMe, setAboutMe] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<"profile" | "saved">("profile");
+  const [activeSavedTab, setActiveSavedTab] = useState<"courses" | "jobs">("courses");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
+
+  // Update active view based on hash
+  useEffect(() => {
+    const hash = location.hash;
+    if (hash === "#saved" || hash === "#savedjobs" || hash === "#savedcourses") {
+      setActiveView("saved");
+      if (hash === "#savedjobs") {
+        setActiveSavedTab("jobs");
+      } else {
+        setActiveSavedTab("courses");
+      }
+    } else {
+      setActiveView("profile");
+    }
+  }, [location.hash]);
 
   // Initialize profile image from user context on mount
   useEffect(() => {
@@ -419,8 +510,9 @@ const ProfilePage = () => {
           return [];
         }
 
-        // Limit to 6 for display
-        const limitedIds = savedCourseIdsList.slice(0, 6);
+        // Limit to 6 for display if in profile view (optional, but requested to show only when tapped)
+        // Actually the user said "dont be displayed" in default view, so we can just fetch all.
+        const idsToFetch = savedCourseIdsList;
 
         // Fetch course details from Supabase using the IDs from API
         const { data: coursesData, error: coursesError } = await supabase
@@ -428,7 +520,7 @@ const ProfilePage = () => {
           .select(
             "id, title, provider, category, level, duration, image, description, academy_id"
           )
-          .in("id", limitedIds);
+          .in("id", idsToFetch);
 
         if (coursesError) {
           console.error(
@@ -519,7 +611,6 @@ const ProfilePage = () => {
     enabled: !!user?.id,
   });
 
-
   // Save course mutation
   const saveCourseMutation = useMutation({
     mutationFn: async (courseId: string) => {
@@ -579,10 +670,10 @@ const ProfilePage = () => {
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
         const savedJobsArray = profileResponse.data?.saved_jobs || [];
-        
+
         // Handle both array of IDs and array of objects
         if (!Array.isArray(savedJobsArray)) return [];
-        
+
         return savedJobsArray
           .map((item: unknown) => {
             if (typeof item === "string" || typeof item === "number") {
@@ -605,14 +696,16 @@ const ProfilePage = () => {
   });
 
   // Fetch saved jobs with details
-  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<SavedJob[]>({
-    queryKey: ["savedJobs", user?.id],
+  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<
+    SavedJob[]
+  >({
+    queryKey: ["savedJobs", user?.id, skillResults],
     queryFn: async () => {
       if (!user?.id) return [];
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
         const savedJobsArray = profileResponse.data?.saved_jobs || [];
-        
+
         if (!Array.isArray(savedJobsArray) || savedJobsArray.length === 0) {
           return [];
         }
@@ -632,26 +725,133 @@ const ProfilePage = () => {
           })
           .filter((id): id is string => id !== null);
 
-        // Fetch job details for each ID
+        // Fetch job details for each ID using logic from SavedPage.tsx
         const jobPromises = jobIds.map(async (jobId) => {
           try {
             const jobDetail = await fetchJobDetail(jobId);
+            if (!jobDetail) return null;
+
+            // Extract job data
+            const jobTitle = (jobDetail.title ||
+              jobDetail.job_title ||
+              jobDetail.position ||
+              "Untitled Position") as string;
+
+            const companyName =
+              jobDetail.company_name ||
+              jobDetail.employer_name ||
+              (typeof jobDetail.company === "string"
+                ? jobDetail.company
+                : null) ||
+              "Unknown Company";
+
+            const jobCity = jobDetail.job_city || jobDetail.city || "";
+            const jobState = jobDetail.job_state || jobDetail.state || "";
+            const jobCountry = jobDetail.job_country || jobDetail.country || "";
+            const location =
+              jobDetail.job_location ||
+              jobDetail.location ||
+              [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+              "Location not specified";
+
+            const logo =
+              jobDetail.employer_logo ||
+              jobDetail.company_logo ||
+              jobDetail.companyLogo ||
+              jobDetail.logo_url ||
+              (typeof jobDetail.company === "object" && jobDetail.company
+                ? (jobDetail.company as { logo?: string; company_logo?: string })
+                    .logo ||
+                  (jobDetail.company as { company_logo?: string }).company_logo
+                : undefined);
+
+            // Format salary
+            let salary = "By agreement";
+            const minSalary = jobDetail.job_min_salary || jobDetail.min_salary;
+            const maxSalary = jobDetail.job_max_salary || jobDetail.max_salary;
+            const salaryCurrency = (jobDetail.job_salary_currency || jobDetail.salary_currency || "$") as string;
+            const salaryPeriod = (jobDetail.job_salary_period || jobDetail.salary_period || "yearly") as string;
+
+            if (
+              minSalary &&
+              maxSalary &&
+              typeof minSalary === "number" &&
+              typeof maxSalary === "number"
+            ) {
+              const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+              const minSalaryFormatted = minSalary.toLocaleString();
+              const maxSalaryFormatted = maxSalary.toLocaleString();
+              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+              const isCurrencyBefore = currencySymbols.some((sym) =>
+                salaryCurrency.includes(sym)
+              );
+              if (isCurrencyBefore) {
+                salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+                  periodLabel ? `/${periodLabel}` : ""
+                }`;
+              } else {
+                salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+                  periodLabel ? `/${periodLabel}` : ""
+                }`;
+              }
+            } else if (minSalary && typeof minSalary === "number") {
+              const minSalaryFormatted = minSalary.toLocaleString();
+              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+              const isCurrencyBefore = currencySymbols.some((sym) =>
+                salaryCurrency.includes(sym)
+              );
+              salary = isCurrencyBefore
+                ? `${salaryCurrency}${minSalaryFormatted}+`
+                : `${minSalaryFormatted}+ ${salaryCurrency}`;
+            } else if (jobDetail.salary && typeof jobDetail.salary === "string") {
+              salary = jobDetail.salary;
+            }
+
+            // Format employment type
+            const employmentTypeRaw = (jobDetail.job_employment_type ||
+              jobDetail.employment_type ||
+              jobDetail.type ||
+              "FULLTIME") as string;
+            const jobTypeLabels: Record<string, string> = {
+              FULLTIME: "Full time",
+              PARTTIME: "Part time",
+              CONTRACTOR: "Contract",
+              INTERN: "Internship",
+            };
+            const employmentType =
+              jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+
+            // Determine work arrangement
+            let workArrangement = "On-site";
+            const isRemote =
+              jobDetail.job_is_remote || jobDetail.is_remote || jobDetail.remote === true;
+            if (isRemote) {
+              workArrangement = "Remote";
+            } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+              workArrangement = "Hybrid";
+            }
+
+            // Calculate match percentage if skill results are available
+            let matchPercentage = 0;
+            if (skillResults?.skills_json) {
+              const tech = skillResults.skills_json.tech || {};
+              const soft = skillResults.skills_json.soft || {};
+              const userSkills = [...Object.keys(tech), ...Object.keys(soft)];
+              const jobSkills = extractJobSkills(jobDetail);
+              matchPercentage = calculateMatchPercentage(userSkills, jobSkills, jobTitle);
+            }
+
             return {
               id: jobId,
-              title: (jobDetail.job_title || jobDetail.title || "Untitled Job") as string,
-              company: (jobDetail.company_name || jobDetail.employer_name || jobDetail.company || "Unknown Company") as string,
-              location: (jobDetail.location || jobDetail.job_location || [
-                jobDetail.city,
-                jobDetail.state,
-                jobDetail.country
-              ].filter(Boolean).join(", ") || "Location not specified") as string,
-              url: (jobDetail.job_apply_link || jobDetail.url || jobDetail.apply_url || "") as string,
-              company_logo: (jobDetail.company_logo || jobDetail.employer_logo || jobDetail.logo_url) as string | undefined,
-              salary: (jobDetail.min_salary && jobDetail.max_salary
-                ? `${jobDetail.min_salary}-${jobDetail.max_salary} ${jobDetail.salary_currency || ""}`
-                : jobDetail.salary) as string | undefined,
-              employment_type: (jobDetail.employment_type || jobDetail.job_employment_type) as string | undefined,
-              work_arrangement: (jobDetail.is_remote ? "Remote" : undefined) as string | undefined,
+              title: jobTitle,
+              company: companyName,
+              location: typeof location === "string" ? location : "Location not specified",
+              url: jobDetail.url || "",
+              company_logo: logo,
+              salary,
+              employment_type: employmentType,
+              work_arrangement: workArrangement,
+              matchPercentage,
             } as SavedJob;
           } catch (error) {
             console.error(`Error fetching job detail for ID ${jobId}:`, error);
@@ -660,7 +860,10 @@ const ProfilePage = () => {
         });
 
         const jobs = await Promise.all(jobPromises);
-        return jobs.filter((job): job is SavedJob => job !== null && job.title !== `Job ${job.id}`);
+        return jobs.filter(
+          (job): job is SavedJob =>
+            job !== null && job.title !== `Job ${job.id}`
+        );
       } catch (error) {
         console.error("Error fetching saved jobs:", error);
         return [];
@@ -680,9 +883,12 @@ const ProfilePage = () => {
     onMutate: async (jobId: string) => {
       await queryClient.cancelQueries({ queryKey: ["savedJobIds", user?.id] });
       await queryClient.cancelQueries({ queryKey: ["savedJobs", user?.id] });
-      
-      const previousSavedJobIds = queryClient.getQueryData<string[]>(["savedJobIds", user?.id]);
-      
+
+      const previousSavedJobIds = queryClient.getQueryData<string[]>([
+        "savedJobIds",
+        user?.id,
+      ]);
+
       queryClient.setQueryData<string[]>(["savedJobIds", user?.id], (prev) => {
         if (!prev) return prev;
         const idString = String(jobId);
@@ -690,12 +896,15 @@ const ProfilePage = () => {
           ? prev.filter((j) => j !== idString)
           : [...prev, idString];
       });
-      
+
       return { previousSavedJobIds };
     },
     onError: (error, jobId, context) => {
       if (context?.previousSavedJobIds && user?.id) {
-        queryClient.setQueryData(["savedJobIds", user?.id], context.previousSavedJobIds);
+        queryClient.setQueryData(
+          ["savedJobIds", user?.id],
+          context.previousSavedJobIds
+        );
       }
       console.error("Error updating saved jobs:", error);
       toast.error("Failed to update saved jobs. Please try again.");
@@ -704,11 +913,16 @@ const ProfilePage = () => {
       queryClient.invalidateQueries({ queryKey: ["savedJobIds", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      
-      const savedJobsList = queryClient.getQueryData<string[]>(["savedJobIds", user?.id]);
+
+      const savedJobsList = queryClient.getQueryData<string[]>([
+        "savedJobIds",
+        user?.id,
+      ]);
       const isCurrentlySaved = savedJobsList?.includes(String(jobId));
       toast.success(
-        isCurrentlySaved ? "Removed from saved jobs." : "Job saved to your profile."
+        isCurrentlySaved
+          ? "Removed from saved jobs."
+          : "Job saved to your profile."
       );
     },
   });
@@ -980,11 +1194,23 @@ const ProfilePage = () => {
     }
 
     // Create a stable reference key for the current profileData
-    const profileDataKey = profileData ? JSON.stringify({
-      social_links: (profileData as Record<string, unknown>)?.social_links,
-      profile_social_links: (profileData as Record<string, unknown>)?.profile?.social_links,
-      user_social_links: (profileData as Record<string, unknown>)?.user?.social_links,
-    }) : null;
+    const profileDataKey = profileData
+      ? JSON.stringify({
+          social_links: profileData.social_links,
+          profile_social_links:
+            profileData.profile &&
+            typeof profileData.profile === "object" &&
+            "social_links" in profileData.profile
+              ? (profileData.profile as Record<string, unknown>).social_links
+              : undefined,
+          user_social_links:
+            profileData.user &&
+            typeof profileData.user === "object" &&
+            "social_links" in profileData.user
+              ? (profileData.user as Record<string, unknown>).social_links
+              : undefined,
+        })
+      : null;
 
     // Skip if we've already processed this exact profileData
     if (processedProfileDataRef.current === profileDataKey) {
@@ -1063,7 +1289,9 @@ const ProfilePage = () => {
           // Only update if links have actually changed
           setSocialLinks((prev) => {
             const hasChanged = Object.keys(extractedLinks).some(
-              (key) => prev[key as keyof SocialLinks] !== extractedLinks[key as keyof typeof extractedLinks]
+              (key) =>
+                prev[key as keyof SocialLinks] !==
+                extractedLinks[key as keyof typeof extractedLinks]
             );
             if (!hasChanged) {
               return prev; // Return previous to prevent unnecessary re-render
@@ -2084,8 +2312,8 @@ const ProfilePage = () => {
       return [];
     }
 
-    const tech = skillResults.skills_json.tech || {};
-    const soft = skillResults.skills_json.soft || {};
+    const tech = skillResults?.skills_json?.tech || {};
+    const soft = skillResults?.skills_json?.soft || {};
 
     // console.log("🔍 Tech skills:", tech);
     // console.log("🔍 Soft skills:", soft);
@@ -2137,6 +2365,11 @@ const ProfilePage = () => {
 
   // Render skills as a modern vertical bar chart with primary color and opacity
   const renderSkillsChart = (skills: Record<string, string>, title: string) => {
+    // Guard clause: return null if skills is undefined, null, or not an object
+    if (!skills || typeof skills !== "object" || Array.isArray(skills)) {
+      return null;
+    }
+
     const primaryColor = "#19B5FE"; // breneo-blue (primary color)
 
     const chartData = Object.entries(skills)
@@ -2186,21 +2419,47 @@ const ProfilePage = () => {
 
     // Custom label component to show skill name at bottom of chart (below bars)
     const CustomInsideLabel = (props: {
-      x?: number;
-      y?: number;
-      width?: number;
-      height?: number;
+      x?: string | number;
+      y?: string | number;
+      width?: string | number;
+      height?: string | number;
       payload?: { skill?: string };
-      value?: string;
+      value?: string | { name?: string } | unknown;
     }) => {
       const { x, y, width, height, payload, value } = props;
-      const skillName = payload?.skill || value || "";
+      // Handle case where value might be an object
+      let skillName = "";
+      if (typeof value === "string") {
+        skillName = value;
+      } else if (value && typeof value === "object" && "name" in value) {
+        skillName = String((value as { name?: string }).name || "");
+      } else if (payload?.skill) {
+        skillName = payload.skill;
+      }
 
-      if (!x || !y || !width || !height || !skillName) {
+      // Convert x, y, width, height to numbers for calculations
+      const xNum =
+        typeof x === "number" ? x : typeof x === "string" ? parseFloat(x) : 0;
+      const yNum =
+        typeof y === "number" ? y : typeof y === "string" ? parseFloat(y) : 0;
+      const widthNum =
+        typeof width === "number"
+          ? width
+          : typeof width === "string"
+          ? parseFloat(width)
+          : 0;
+      const heightNum =
+        typeof height === "number"
+          ? height
+          : typeof height === "string"
+          ? parseFloat(height)
+          : 0;
+
+      if (!xNum || !yNum || !widthNum || !heightNum || !skillName) {
         return null;
       }
 
-      const centerX = x + width / 2;
+      const centerX = xNum + widthNum / 2;
       // Position skill name at fixed bottom position of chart
       // Chart height is 250px, bottom margin is 80px, so bottom is at ~170px
       // Use a fixed Y position that's always at the bottom regardless of bar height
@@ -2211,7 +2470,7 @@ const ProfilePage = () => {
 
       // Split long skill names into multiple lines
       // Max characters per line based on bar width (approximately 8-10 chars per 50px width)
-      const maxCharsPerLine = Math.max(8, Math.floor(width / 6));
+      const maxCharsPerLine = Math.max(8, Math.floor(widthNum / 6));
       const words = skillName.split(" ");
       const lines: string[] = [];
       let currentLine = "";
@@ -2278,29 +2537,62 @@ const ProfilePage = () => {
 
     // Custom label component to show percentage at bottom of chart (below bars)
     const CustomBottomLabel = (props: {
-      x?: number;
-      y?: number;
-      width?: number;
-      height?: number;
-      value?: number;
+      x?: string | number;
+      y?: string | number;
+      width?: string | number;
+      height?: string | number;
+      value?: number | { name?: string } | unknown;
       payload?: { skill?: string };
     }) => {
       const { x, y, width, height, value, payload } = props;
-      const percentage = value || 0;
+      // Handle case where value might be an object or number
+      let percentage = 0;
+      if (typeof value === "number") {
+        percentage = value;
+      } else if (value && typeof value === "object" && "name" in value) {
+        // If value is an object, try to extract a numeric value or default to 0
+        percentage = 0;
+      }
       const skillName = payload?.skill || "";
 
-      if (!x || !y || !width || !height) {
+      // Convert x, y, width, height to numbers for calculations
+      const xNum =
+        typeof x === "number"
+          ? x
+          : typeof x === "string"
+          ? parseFloat(x) || 0
+          : 0;
+      const yNum =
+        typeof y === "number"
+          ? y
+          : typeof y === "string"
+          ? parseFloat(y) || 0
+          : 0;
+      const widthNum =
+        typeof width === "number"
+          ? width
+          : typeof width === "string"
+          ? parseFloat(width) || 0
+          : 0;
+      const heightNum =
+        typeof height === "number"
+          ? height
+          : typeof height === "string"
+          ? parseFloat(height) || 0
+          : 0;
+
+      if (!xNum || !yNum || !widthNum || !heightNum) {
         return null;
       }
 
-      const centerX = x + width / 2;
+      const centerX = xNum + widthNum / 2;
       // Position percentage at fixed bottom position of chart
       // Chart height is 250px, bottom margin is 80px, so bottom is at ~170px
       // Adjust position based on whether skill name is wrapped to 2 lines
       // Added more space between skill name and percentage
       const chartHeight = 250;
       const bottomMargin = 80;
-      const maxCharsPerLine = Math.max(8, Math.floor(width / 6));
+      const maxCharsPerLine = Math.max(8, Math.floor(widthNum / 6));
       const isLongName = skillName.length > maxCharsPerLine * 1.2;
       // If skill name is wrapped, move percentage down a bit more
       const percentY = chartHeight - bottomMargin + (isLongName ? 70 : 60);
@@ -2420,580 +2712,607 @@ const ProfilePage = () => {
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
-        {/* Left Column - Profile Summary, Contact Info, Social Networks */}
-        <div className="lg:col-span-1">
-          <div className="space-y-4 md:space-y-6">
-            {/* Profile Header Card */}
-            <Card className="bg-transparent border-0 md:bg-card md:border">
-              <CardContent className="pb-4 pt-6 px-6 md:pb-6">
-                {/* Mobile: Horizontal layout, Desktop: Vertical centered */}
-                <div className="flex flex-col md:items-center">
-                  {/* Top Section: Name/Info on left, Picture on right (Mobile) | Picture on top, Name below (Desktop) */}
-                  <div className="flex items-start justify-between gap-4 mb-4 md:flex-col md:items-center md:mb-4">
-                    {/* Profile Picture - Right side (Mobile) | Top (Desktop) */}
-                    <div className="relative flex-shrink-0 order-2 md:relative md:order-1">
-                      <div
-                        className="relative group cursor-pointer rounded-full overflow-hidden"
-                        onClick={handleImageModalClick}
-                      >
-                        <OptimizedAvatar
-                          key={`avatar-${imageTimestamp}`}
-                          src={displayProfileImage || undefined}
-                          alt="Profile photo"
-                          fallback={
-                            first_name
-                              ? first_name.charAt(0).toUpperCase()
-                              : "U"
-                          }
-                          size="lg"
-                          loading="eager"
-                          className="h-16 w-16 md:h-28 md:w-28 rounded-full"
-                        />
-                        {uploadingImage ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                          </div>
+      {/* Profile/Saved/Jobs Switcher */}
+      <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+        <motion.div 
+          layout
+          transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-border rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
+        >
+          <motion.button
+            layout
+            onClick={() => navigate("#")}
+            className={`relative px-6 py-2.5 rounded-full text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+              activeView === "profile"
+                ? "text-gray-900 dark:text-gray-100 font-bold"
+                : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {activeView === "profile" && (
+              <motion.div
+                layoutId="active-pill"
+                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm"
+                transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+              />
+            )}
+            <span className="relative z-10">Profile</span>
+          </motion.button>
+
+          <AnimatePresence mode="popLayout" initial={false}>
+            {activeView === "profile" ? (
+              <motion.button
+                layout
+                key="saved-summary"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => navigate("#savedcourses")}
+                className="relative px-6 py-2.5 rounded-full text-sm transition-colors duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap outline-none"
+              >
+                <span className="relative z-10">Saved</span>
+              </motion.button>
+            ) : (
+              <motion.div 
+                key="saved-tabs" 
+                layout 
+                className="flex items-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.button
+                  layout
+                  key="saved-courses"
+                  onClick={() => navigate("#savedcourses")}
+                  className={`relative px-4 py-2.5 md:px-6 rounded-full text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+                    activeSavedTab === "courses"
+                      ? "text-gray-900 dark:text-gray-100 font-bold"
+                      : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {activeSavedTab === "courses" && (
+                    <motion.div
+                      layoutId="active-pill"
+                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm"
+                      transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                    />
+                  )}
+                  <span className="relative z-10">Saved Courses</span>
+                </motion.button>
+                <motion.button
+                  layout
+                  key="saved-jobs"
+                  onClick={() => navigate("#savedjobs")}
+                  className={`relative px-4 py-2.5 md:px-6 rounded-full text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+                    activeSavedTab === "jobs"
+                      ? "text-gray-900 dark:text-gray-100 font-bold"
+                      : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {activeSavedTab === "jobs" && (
+                    <motion.div
+                      layoutId="active-pill"
+                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm"
+                      transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                    />
+                  )}
+                  <span className="relative z-10">Saved Jobs</span>
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
+
+      {activeView === "profile" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
+          {/* Left Column - Profile Summary, Contact Info, Social Networks */}
+          <div className="lg:col-span-1">
+            <div className="space-y-4 md:space-y-6">
+              {/* Profile Header Card */}
+              <Card className="bg-transparent border-0 md:bg-card md:border">
+                <CardContent className="pb-4 pt-6 px-6 md:pb-6">
+                  {/* Mobile: Horizontal layout, Desktop: Vertical centered */}
+                  <div className="flex flex-col md:items-center">
+                    {/* Top Section: Name/Info on left, Picture on right (Mobile) | Picture on top, Name below (Desktop) */}
+                    <div className="flex items-start justify-between gap-4 mb-4 md:flex-col md:items-center md:mb-4">
+                      {/* Profile Picture - Right side (Mobile) | Top (Desktop) */}
+                      <div className="relative flex-shrink-0 order-2 md:relative md:order-1">
+                        <div
+                          className="relative group cursor-pointer rounded-full overflow-hidden"
+                          onClick={handleImageModalClick}
+                        >
+                          <OptimizedAvatar
+                            key={`avatar-${imageTimestamp}`}
+                            src={displayProfileImage || undefined}
+                            alt="Profile photo"
+                            fallback={
+                              first_name
+                                ? first_name.charAt(0).toUpperCase()
+                                : "U"
+                            }
+                            size="lg"
+                            loading="eager"
+                            className="h-16 w-16 md:h-28 md:w-28 rounded-full"
+                          />
+                          {uploadingImage ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                            </div>
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              <Camera className="h-5 w-5 md:h-7 md:w-7 text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        id="profile-image-input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+
+                      {/* Name and Info - Left side (Mobile) | Below picture (Desktop) */}
+                      <div className="flex-1 min-w-0 order-1 md:text-center md:flex-none md:mb-4 md:order-2">
+                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                          {first_name} {last_name}
+                        </h1>
+                        {(user as { job_title?: string; position?: string })
+                          ?.job_title && (
+                          <p className="text-sm font-semibold md:font-normal text-gray-900 dark:text-gray-100 md:text-gray-600 md:dark:text-gray-400 mb-1">
+                            {(user as { job_title?: string }).job_title}
+                          </p>
+                        )}
+                        {(user as { city?: string; location?: string })?.city ? (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {(user as { city?: string }).city}
+                            {(user as { country?: string })?.country &&
+                              `, ${(user as { country?: string }).country}`}
+                          </p>
                         ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                            <Camera className="h-5 w-5 md:h-7 md:w-7 text-white" />
-                          </div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {phone_number || "Location not specified"}
+                          </p>
                         )}
                       </div>
                     </div>
-                    <input
-                      id="profile-image-input"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
 
-                    {/* Name and Info - Left side (Mobile) | Below picture (Desktop) */}
-                    <div className="flex-1 min-w-0 order-1 md:text-center md:flex-none md:mb-4 md:order-2">
-                      <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                        {first_name} {last_name}
-                      </h1>
-                      {(user as { job_title?: string; position?: string })
-                        ?.job_title && (
-                        <p className="text-sm font-semibold md:font-normal text-gray-900 dark:text-gray-100 md:text-gray-600 md:dark:text-gray-400 mb-1">
-                          {(user as { job_title?: string }).job_title}
-                        </p>
-                      )}
-                      {(user as { city?: string; location?: string })?.city ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {(user as { city?: string }).city}
-                          {(user as { country?: string })?.country &&
-                            `, ${(user as { country?: string }).country}`}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {phone_number || "Location not specified"}
-                        </p>
-                      )}
+                    {/* Hidden Profile Badge */}
+                    {(user as { is_profile_hidden?: boolean })
+                      ?.is_profile_hidden && (
+                      <div className="mb-4 md:text-center">
+                        <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-0">
+                          <Eye size={12} className="mr-1" />
+                          Hidden Profile
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Bottom Section: Settings and Logout Buttons */}
+                    <div className="flex items-center gap-2 w-full pt-3 md:mt-2 md:pt-0">
+                      <Button
+                        variant="outline"
+                        className="flex-[5] md:flex-1 flex items-center justify-center gap-2 h-12 px-6 bg-breneo-blue/10 text-breneo-blue border-0 hover:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
+                        onClick={() => navigate("/settings")}
+                      >
+                        <Settings size={16} />
+                        <span>Settings</span>
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="icon"
+                        onClick={handleLogout}
+                        className="h-12 w-12 bg-red-100 text-red-600 hover:bg-red-200 active:bg-red-300 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 dark:active:bg-red-900/70"
+                      >
+                        <LogOut size={16} />
+                      </Button>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
 
-                  {/* Hidden Profile Badge */}
-                  {(user as { is_profile_hidden?: boolean })
-                    ?.is_profile_hidden && (
-                    <div className="mb-4 md:text-center">
-                      <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-0">
-                        <Eye size={12} className="mr-1" />
-                        Hidden Profile
-                      </Badge>
+              {/* Contact Information Card */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    Contact Information
+                  </h3>
+                  <Button
+                    variant="link"
+                    className="text-breneo-blue p-0 h-auto font-normal hover:underline"
+                    onClick={handleOpenContactEditModal}
+                  >
+                    Edit
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-0 p-0">
+                  <div className="px-6 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
+                        <Phone size={18} className="text-breneo-blue" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {phone_number || "Not provided"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="px-6 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
+                        <Mail size={18} className="text-breneo-blue" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {email}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Social Networks Card */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    Social Networks
+                  </h3>
+                  <Button
+                    variant="link"
+                    className="text-breneo-blue p-0 h-auto font-normal hover:underline"
+                    onClick={handleOpenSocialLinkModal}
+                  >
+                    Add
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {loadingSocialLinks ? (
+                    <div className="text-center py-4 text-gray-500 text-sm px-6">
+                      Loading...
+                    </div>
+                  ) : Object.entries(socialLinks).some(
+                      ([_, url]) => url && url.trim() !== ""
+                    ) ? (
+                    <div>
+                      {(Object.entries(socialLinks) as [SocialPlatform, string][])
+                        .filter(([_, url]) => url && url.trim() !== "")
+                        .map(([platform, url], index, filteredArray) => (
+                          <div
+                            key={platform}
+                            className={`px-6 py-4 ${
+                              index < filteredArray.length - 1
+                                ? "border-b border-gray-200 dark:border-gray-700"
+                                : ""
+                            } group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 flex-1 min-w-0"
+                              >
+                                <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
+                                  {getSocialIcon(
+                                    platform,
+                                    "h-[18px] w-[18px] text-breneo-blue"
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                    {platformLabels[platform]}
+                                  </p>
+                                  <p className="text-xs text-gray-500 truncate">
+                                    {url
+                                      .replace(/^https?:\/\//, "")
+                                      .replace(/^www\./, "")}
+                                  </p>
+                                </div>
+                              </a>
+                              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditSocialLink(platform);
+                                  }}
+                                >
+                                  <Edit
+                                    size={14}
+                                    className="text-gray-600 dark:text-gray-400"
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10 dark:hover:bg-primary/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteSocialLink(platform);
+                                  }}
+                                >
+                                  <Trash2
+                                    size={14}
+                                    className="text-gray-600 dark:text-gray-400"
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 text-sm px-6">
+                      No social links added yet. Click "Add" to add your social
+                      media profiles.
                     </div>
                   )}
+                </CardContent>
+              </Card>
 
-                  {/* Bottom Section: Settings and Logout Buttons */}
-                  <div className="flex items-center gap-2 w-full pt-3 md:mt-2 md:pt-0">
-                    <Button
-                      variant="outline"
-                      className="flex-[5] md:flex-1 flex items-center justify-center gap-2 h-12 px-6 bg-breneo-blue/10 text-breneo-blue border-0 hover:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
-                      onClick={() => navigate("/settings")}
-                    >
-                      <Settings size={16} />
-                      <span>Settings</span>
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="icon"
-                      onClick={handleLogout}
-                      className="h-12 w-12 bg-red-100 text-red-600 hover:bg-red-200 active:bg-red-300 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 dark:active:bg-red-900/70"
-                    >
-                      <LogOut size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Skill Test Card */}
+              <Card
+                className="bg-white transition-all w-auto flex-shrink-0 rounded-3xl border-0"
+                style={{
+                  boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
+                }}
+              >
+                <CardContent className="p-4 md:p-4">
+                  <Link to="/skill-test" className="block cursor-pointer group">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      {/* Left side - Content */}
+                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                        <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
+                          {t.home.skillTestTitle}
+                        </h3>
+                        <p className="text-sm md:text-sm text-gray-900">
+                          {t.home.skillTestSubtitle}
+                        </p>
+                      </div>
 
-            {/* Contact Information Card */}
+                      {/* Right side - Illustration / Icon */}
+                      <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
+                        <img
+                          src="/lovable-uploads/3dicons-target-front-color.png"
+                          alt="Skill test target"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* Right Column - Details */}
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
+            {/* About Me Card */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Contact Information
+                  About Me
                 </h3>
                 <Button
                   variant="link"
                   className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                  onClick={handleOpenContactEditModal}
+                  onClick={handleOpenAboutMeModal}
                 >
                   Edit
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-0 p-0">
-                <div className="px-6 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
-                      <Phone size={18} className="text-breneo-blue" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {phone_number || "Not provided"}
-                    </span>
-                  </div>
-                </div>
-                <div className="px-6 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
-                      <Mail size={18} className="text-breneo-blue" />
-                    </div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {email}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Social Networks Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Social Networks
-                </h3>
-                <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                  onClick={handleOpenSocialLinkModal}
-                >
-                  Add
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loadingSocialLinks ? (
-                  <div className="text-center py-4 text-gray-500 text-sm px-6">
-                    Loading...
-                  </div>
-                ) : Object.entries(socialLinks).some(
-                    ([_, url]) => url && url.trim() !== ""
-                  ) ? (
+              <CardContent className="px-6 py-4">
+                {loadingProfile ? (
+                  <div className="text-center py-4 text-gray-500">Loading...</div>
+                ) : aboutMe ? (
                   <div>
-                    {(Object.entries(socialLinks) as [SocialPlatform, string][])
-                      .filter(([_, url]) => url && url.trim() !== "")
-                      .map(([platform, url], index, filteredArray) => (
-                        <div
-                          key={platform}
-                          className={`px-6 py-4 ${
-                            index < filteredArray.length - 1
-                              ? "border-b border-gray-200 dark:border-gray-700"
-                              : ""
-                          } group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 flex-1 min-w-0"
-                            >
-                              <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
-                                {getSocialIcon(
-                                  platform,
-                                  "h-[18px] w-[18px] text-breneo-blue"
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                  {platformLabels[platform]}
-                                </p>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {url
-                                    .replace(/^https?:\/\//, "")
-                                    .replace(/^www\./, "")}
-                                </p>
-                              </div>
-                            </a>
-                            <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                              <button
-                                type="button"
-                                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditSocialLink(platform);
-                                }}
-                              >
-                                <Edit
-                                  size={14}
-                                  className="text-gray-600 dark:text-gray-400"
-                                />
-                              </button>
-                              <button
-                                type="button"
-                                className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10 dark:hover:bg-primary/20"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteSocialLink(platform);
-                                }}
-                              >
-                                <Trash2
-                                  size={14}
-                                  className="text-gray-600 dark:text-gray-400"
-                                />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
+                      {aboutMe.length > 200
+                        ? `${aboutMe.substring(0, 200)}...`
+                        : aboutMe}
+                    </p>
+                    {aboutMe.length > 200 && (
+                      <Button
+                        variant="link"
+                        className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
+                        onClick={handleOpenAboutMeModal}
+                      >
+                        View More
+                      </Button>
+                    )}
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-gray-500 text-sm px-6">
-                    No social links added yet. Click "Add" to add your social
-                    media profiles.
-                  </div>
+                  <p className="text-sm text-gray-500 italic">
+                    No information available. Add some details about yourself!
+                  </p>
                 )}
               </CardContent>
             </Card>
 
-            {/* Skill Test Card */}
-            <Card
-              className="bg-white transition-all w-auto flex-shrink-0 rounded-3xl border-0"
-              style={{
-                boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
-              }}
-            >
-              <CardContent className="p-4 md:p-4">
-                <Link to="/skill-test" className="block cursor-pointer group">
-                  <div className="flex items-center gap-3 md:gap-4">
-                    {/* Left side - Content */}
-                    <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                      <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
-                        {t.home.skillTestTitle}
-                      </h3>
-                      <p className="text-sm md:text-sm text-gray-900">
-                        {t.home.skillTestSubtitle}
-                      </p>
-                    </div>
-
-                    {/* Right side - Illustration / Icon */}
-                    <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
-                      <img
-                        src="/lovable-uploads/3dicons-target-front-color.png"
-                        alt="Skill test target"
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
+            {/* Personal Skills Card */}
+            <Card>
+              <CardHeader className="p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  Personal Skills
+                </h3>
+              </CardHeader>
+              <CardContent className="px-6 py-4">
+                {loadingResults ? (
+                  <div className="text-center py-4 text-gray-500">
+                    Loading skill results...
                   </div>
-                </Link>
+                ) : skillResults &&
+                  (skillResults?.final_role || getAllSkills().length > 0) ? (
+                  <div className="space-y-4">
+                    {/* Final Role */}
+                    {skillResults?.final_role && (
+                      <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border border-breneo-blue/20 dark:border-breneo-blue/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="bg-breneo-blue/10 rounded-full p-2">
+                            <Award className="h-5 w-5 text-breneo-blue" />
+                          </div>
+                          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                            Recommended Role
+                          </span>
+                        </div>
+                        <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
+                          {skillResults?.final_role}
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Skills with Charts */}
+                    {skillResults?.skills_json && (
+                      <div>
+                        <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
+                          Top Skills
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Technical Skills */}
+                          {skillResults?.skills_json?.tech &&
+                            Object.keys(skillResults.skills_json.tech).length >
+                              0 && (
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="flex items-center gap-2 text-sm">
+                                    Technical Skills
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-2 pt-0 pb-4">
+                                  {renderSkillsChart(
+                                    skillResults.skills_json.tech,
+                                    "Technical Skills"
+                                  )}
+                                </CardContent>
+                              </Card>
+                            )}
+
+                          {/* Soft Skills */}
+                          {skillResults?.skills_json?.soft &&
+                            Object.keys(skillResults.skills_json.soft).length >
+                              0 && (
+                              <Card>
+                                <CardHeader className="pb-2">
+                                  <CardTitle className="flex items-center gap-2 text-sm">
+                                    Soft Skills
+                                  </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-2 pt-0 pb-4">
+                                  {renderSkillsChart(
+                                    skillResults.skills_json.soft,
+                                    "Soft Skills"
+                                  )}
+                                </CardContent>
+                              </Card>
+                            )}
+                        </div>
+                      </div>
+                    )}
+
+                    {getAllSkills().length === 0 && !loadingResults && (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        No skill test results available. Take a skill test to see
+                        your results here.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500 text-sm">
+                    No skill test results available. Take a skill test to see your
+                    results here.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
         </div>
-
-        {/* Right Column - Details */}
-        <div className="lg:col-span-2 space-y-4 md:space-y-6">
-          {/* About Me Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                About Me
-              </h3>
-              <Button
-                variant="link"
-                className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                onClick={handleOpenAboutMeModal}
-              >
-                Edit
-              </Button>
-            </CardHeader>
-            <CardContent className="px-6 py-4">
-              {loadingProfile ? (
-                <div className="text-center py-4 text-gray-500">Loading...</div>
-              ) : aboutMe ? (
-                <div>
-                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
-                    {aboutMe.length > 200
-                      ? `${aboutMe.substring(0, 200)}...`
-                      : aboutMe}
-                  </p>
-                  {aboutMe.length > 200 && (
-                    <Button
-                      variant="link"
-                      className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
-                      onClick={handleOpenAboutMeModal}
-                    >
-                      View More
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 italic">
-                  No information available. Add some details about yourself!
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Work Experience Card */}
-          {/* <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Work Experience</h3>
-              <Button
-                variant="link"
-                className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-              >
-                <Plus size={16} />
-                Add
-              </Button>
-            </CardHeader>
-          </Card> */}
-
-          {/* Education Card */}
-          {/* <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Education</h3>
-              <Button
-                variant="link"
-                className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-              >
-                <Plus size={16} />
-                Add
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                <p className="text-base">Management and IT</p>
-                <p className="text-sm text-gray-600">Master</p>
-                <p className="text-sm text-gray-500">University</p>
-              </div>
-            </CardContent>
-          </Card> */}
-
-          {/* Professional Skills Card */}
-          {/* <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Professional Skills</h3>
-              <Button
-                variant="link"
-                className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-              >
-                <Plus size={16} />
-                Add
-              </Button>
-            </CardHeader>
-          </Card> */}
-
-          {/* Personal Skills Card */}
-          <Card>
-            <CardHeader className="p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                Personal Skills
-              </h3>
-            </CardHeader>
-            <CardContent className="px-6 py-4">
-              {loadingResults ? (
-                <div className="text-center py-4 text-gray-500">
-                  Loading skill results...
-                </div>
-              ) : skillResults &&
-                (skillResults.final_role || getAllSkills().length > 0) ? (
-                <div className="space-y-4">
-                  {/* Final Role */}
-                  {skillResults.final_role && (
-                    <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border border-breneo-blue/20 dark:border-breneo-blue/30">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="bg-breneo-blue/10 rounded-full p-2">
-                          <Award className="h-5 w-5 text-breneo-blue" />
-                        </div>
-                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                          Recommended Role
-                        </span>
-                      </div>
-                      <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
-                        {skillResults.final_role}
-                      </Badge>
-                    </div>
-                  )}
-
-                  {/* Skills with Charts */}
-                  {skillResults?.skills_json && (
-                    <div>
-                      <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
-                        Top Skills
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {/* Technical Skills */}
-                        {skillResults.skills_json.tech &&
-                          Object.keys(skillResults.skills_json.tech).length >
-                            0 && (
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                  Technical Skills
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="p-2 pt-0 pb-4">
-                                {renderSkillsChart(
-                                  skillResults.skills_json.tech,
-                                  "Technical Skills"
-                                )}
-                              </CardContent>
-                            </Card>
-                          )}
-
-                        {/* Soft Skills */}
-                        {skillResults.skills_json.soft &&
-                          Object.keys(skillResults.skills_json.soft).length >
-                            0 && (
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-sm">
-                                  Soft Skills
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="p-2 pt-0 pb-4">
-                                {renderSkillsChart(
-                                  skillResults.skills_json.soft,
-                                  "Soft Skills"
-                                )}
-                              </CardContent>
-                            </Card>
-                          )}
-                      </div>
-                    </div>
-                  )}
-
-                  {getAllSkills().length === 0 && !loadingResults && (
-                    <div className="text-center py-4 text-gray-500 text-sm">
-                      No skill test results available. Take a skill test to see
-                      your results here.
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  No skill test results available. Take a skill test to see your
-                  results here.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Saved Courses Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                Saved Courses
-              </h3>
-              {savedCourses.length > 0 && (
-                <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                  onClick={() => navigate("/courses")}
-                >
-                  View All
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
+      ) : (
+        <div className="max-w-7xl mx-auto pb-32 md:pb-6">
+          {/* Saved Courses Tab */}
+          {activeSavedTab === "courses" && (
+            <div className="space-y-6">
               {loadingSavedCourses ? (
-                <div className="px-6 py-4 space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 animate-pulse"
-                    >
-                      <Skeleton className="w-12 h-12 rounded-3xl flex-shrink-0" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                        <Skeleton className="h-3 w-2/3" />
-                        <div className="flex items-center gap-2 mt-2">
-                          <Skeleton className="h-7 w-20" />
-                          <Skeleton className="h-7 w-7 rounded-full" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i}>
+                      <CardContent className="p-0">
+                        <Skeleton className="h-40 w-full rounded-t-3xl" />
+                        <div className="p-4">
+                          <Skeleton className="h-5 w-3/4 mb-2" />
+                          <Skeleton className="h-4 w-1/2 mb-3" />
+                          <Skeleton className="h-3 w-full" />
                         </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              ) : savedCourses.length > 0 ? (
-                <div>
-                  {savedCourses.map((course, index) => {
-                    const isCourseSaved =
-                      savedCourseIds?.includes(String(course.id)) ?? false;
+              ) : savedCourses.length === 0 ? (
+                <Card className="rounded-3xl border-0 shadow-sm bg-card/50">
+                  <CardContent className="p-12 text-center">
+                    <GraduationCap className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No saved courses</h3>
+                    <p className="text-gray-500 mb-4">
+                      Start saving courses to view them here!
+                    </p>
+                    <Button onClick={() => navigate("/courses")} variant="default">
+                      Browse Courses
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {savedCourses.map((course) => {
+                    const isCourseSaved = savedCourseIds.includes(String(course.id));
                     return (
-                      <div
+                      <Link
                         key={course.id}
-                        className={`px-6 py-4 ${
-                          index < savedCourses.length - 1
-                            ? "border-b border-gray-200 dark:border-gray-700"
-                            : ""
-                        } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
+                        to={`/course/${course.id}`}
+                        className="block"
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0">
-                            {course.academy_logo ? (
+                        <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col h-full bg-card">
+                          <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
+                            <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                               <img
-                                src={course.academy_logo}
-                                alt={`${course.provider} logo`}
-                                className="w-12 h-12 rounded-3xl object-cover cursor-pointer border border-gray-200 dark:border-gray-700"
-                                onClick={() => navigate(`/course/${course.id}`)}
+                                src={course.image || "/placeholder.svg"}
+                                alt={course.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = "/lovable-uploads/no_photo.png";
+                                  (e.target as HTMLImageElement).src =
+                                    "/placeholder.svg";
                                 }}
                               />
-                            ) : (
-                              <div className="w-12 h-12 rounded-3xl bg-breneo-accent flex items-center justify-center cursor-pointer">
-                                <GraduationCap className="h-6 w-6 text-white" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4
-                                className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
-                                onClick={() => navigate(`/course/${course.id}`)}
-                              >
+                            </div>
+                            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
+                              <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
                                 {course.title}
-                              </h4>
-                              <div className="flex items-center gap-2 flex-shrink-0">
+                              </h3>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                                {course.provider}
+                              </p>
+                              <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {course.duration && (
+                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                                      {course.duration}
+                                    </Badge>
+                                  )}
+                                  {course.level && (
+                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                                      {course.level}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <Button
                                   variant="secondary"
                                   size="icon"
-                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0"
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
-                                    navigate(`/course/${course.id}`);
-                                  }}
-                                  aria-label="View course"
-                                >
-                                  <ExternalLink className="h-4 w-4 text-black dark:text-white" />
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    saveCourseMutation.mutate(course.id);
+                                    saveCourseMutation.mutate(String(course.id));
                                   }}
                                   disabled={saveCourseMutation.isPending}
-                                  aria-label={
-                                    isCourseSaved
-                                      ? "Unsave course"
-                                      : "Save course"
-                                  }
+                                  aria-label="Unsave course"
                                   className={cn(
                                     "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
                                     isCourseSaved
@@ -3008,160 +3327,6 @@ const ProfilePage = () => {
                                       className={cn(
                                         "h-4 w-4 transition-colors",
                                         isCourseSaved
-                                          ? "text-red-500 fill-red-500 animate-heart-pop"
-                                          : "text-black dark:text-white"
-                                      )}
-                                    />
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                              {course.provider}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <span>{course.level}</span>
-                              <span>•</span>
-                              <span>{course.duration}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {savedCourses.length >= 6 && (
-                    <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-                      <Button
-                        variant="link"
-                        className="text-breneo-blue p-0 h-auto font-normal text-sm w-full justify-center hover:underline"
-                        onClick={() => navigate("/courses")}
-                      >
-                        View All Saved Courses
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500 text-sm px-6">
-                  No saved courses yet. Browse courses and save your favorites!
-                  <Button
-                    variant="link"
-                    className="mt-2 text-breneo-blue font-normal text-sm hover:underline"
-                    onClick={() => navigate("/courses")}
-                  >
-                    Browse Courses
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Saved Jobs Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                Saved Jobs
-              </h3>
-              {savedJobs.length > 0 && (
-                <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                  onClick={() => navigate("/jobs")}
-                >
-                  View All
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="p-0">
-              {loadingSavedJobs ? (
-                <div className="px-6 py-8 space-y-4">
-                  <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-                    Loading saved jobs...
-                  </div>
-                </div>
-              ) : savedJobs.length > 0 ? (
-                <div>
-                  {savedJobs.slice(0, 5).map((job, index) => {
-                    const isJobSaved = savedJobIds?.includes(String(job.id)) ?? false;
-                    return (
-                      <div
-                        key={job.id}
-                        className={`px-6 py-4 ${
-                          index < Math.min(savedJobs.length, 5) - 1
-                            ? "border-b border-gray-200 dark:border-gray-700"
-                            : ""
-                        } hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0">
-                            {job.company_logo ? (
-                              <img
-                                src={job.company_logo}
-                                alt={`${job.company} logo`}
-                                className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  if (target.nextElementSibling) {
-                                    (target.nextElementSibling as HTMLElement).style.display = "flex";
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            {!job.company_logo && (
-                              <div className="w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center">
-                                <Briefcase className="h-6 w-6 text-breneo-blue" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-1">
-                              <h4
-                                className="font-medium text-sm text-gray-900 dark:text-gray-100 line-clamp-1 cursor-pointer hover:text-breneo-blue transition-colors flex-1"
-                                onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
-                              >
-                                {job.title}
-                              </h4>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  className="bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (job.url) {
-                                      window.open(job.url, "_blank");
-                                    } else {
-                                      navigate(`/jobs/${encodeURIComponent(job.id)}`);
-                                    }
-                                  }}
-                                  aria-label="View job"
-                                >
-                                  <ExternalLink className="h-4 w-4 text-black dark:text-white" />
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    saveJobMutation.mutate(job.id);
-                                  }}
-                                  disabled={saveJobMutation.isPending}
-                                  aria-label={isJobSaved ? "Unsave job" : "Save job"}
-                                  className={cn(
-                                    "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
-                                    isJobSaved
-                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                      : "text-black dark:text-white"
-                                  )}
-                                >
-                                  {saveJobMutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Heart
-                                      className={cn(
-                                        "h-4 w-4 transition-colors",
-                                        isJobSaved
                                           ? "text-red-500 fill-red-500"
                                           : "text-black dark:text-white"
                                       )}
@@ -3170,57 +3335,172 @@ const ProfilePage = () => {
                                 </Button>
                               </div>
                             </div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                              {job.company}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                              <MapPin className="h-3 w-3" />
-                              <span className="line-clamp-1">{job.location}</span>
-                            </div>
-                            {job.salary && (
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                {job.salary}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                          </CardContent>
+                        </Card>
+                      </Link>
                     );
                   })}
-                  {savedJobs.length > 5 && (
-                    <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">
-                      <Button
-                        variant="link"
-                        className="text-breneo-blue p-0 h-auto font-normal text-sm w-full justify-center hover:underline"
-                        onClick={() => navigate("/jobs")}
-                      >
-                        View All Saved Jobs
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-gray-500 text-sm px-6">
-                  No saved jobs yet. Browse jobs and save your favorites!
-                  <Button
-                    variant="link"
-                    className="mt-2 text-breneo-blue font-normal text-sm hover:underline"
-                    onClick={() => navigate("/jobs")}
-                  >
-                    Browse Jobs
-                  </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          )}
 
+          {/* Saved Jobs Tab */}
+          {activeSavedTab === "jobs" && (
+            <div className="space-y-6">
+              {loadingSavedJobs ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i}>
+                      <CardContent className="p-4">
+                        <Skeleton className="h-4 w-20 mb-2" />
+                        <Skeleton className="h-6 w-3/4 mb-4" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : savedJobs.length === 0 ? (
+                <Card className="rounded-3xl border-0 shadow-sm bg-card/50">
+                  <CardContent className="p-12 text-center">
+                    <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No saved jobs</h3>
+                    <p className="text-gray-500 mb-4">
+                      Start saving jobs to view them here!
+                    </p>
+                    <Button onClick={() => navigate("/jobs")} variant="default">
+                      Browse Jobs
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {savedJobs.map((job) => {
+                    const isJobSaved = savedJobIds.includes(String(job.id));
+                    return (
+                      <Card
+                        key={job.id}
+                        className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl cursor-pointer bg-card"
+                        onClick={() => {
+                          if (job.url) {
+                            window.open(job.url, "_blank");
+                          } else {
+                            navigate(`/jobs/${encodeURIComponent(job.id)}`);
+                          }
+                        }}
+                      >
+                        <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
+                          {/* Company Logo and Info */}
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className="flex-shrink-0 relative w-10 h-10">
+                              {job.company_logo ? (
+                                <img
+                                  src={job.company_logo}
+                                  alt={`${job.company} logo`}
+                                  className="w-10 h-10 rounded-md object-cover flex-shrink-0 border border-gray-200 dark:border-gray-700 relative z-10"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = "none";
+                                    const fallback = target.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.classList.remove("hidden");
+                                      fallback.classList.add("flex");
+                                    }
+                                  }}
+                                />
+                              ) : null}
+                              <div className={`w-10 h-10 rounded-md bg-breneo-blue/10 flex items-center justify-center ${job.company_logo ? 'hidden absolute inset-0' : ''}`}>
+                                <Briefcase className="h-5 w-5 text-breneo-blue" />
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-sm truncate text-gray-600 dark:text-gray-400">
+                                {job.company}
+                              </h3>
+                              <p className="mt-0.5 text-xs text-gray-500 truncate">
+                                {job.location}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Job Title */}
+                          <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem] group-hover:text-breneo-blue transition-colors">
+                            {job.title}
+                          </h4>
+
+                          {/* Job Details as chips */}
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {job.employment_type && (
+                              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
+                                {job.employment_type}
+                              </Badge>
+                            )}
+                            {job.work_arrangement && (
+                              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
+                                {job.work_arrangement}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {/* Match percentage & Save button */}
+                          <div className="mt-7 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <RadialProgress
+                                value={job.matchPercentage ?? 0}
+                                size={44}
+                                strokeWidth={5}
+                                showLabel={false}
+                                percentageTextSize="sm"
+                                className="text-breneo-blue"
+                              />
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
+                                {getMatchQualityLabel(job.matchPercentage)}
+                              </span>
+                            </div>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                saveJobMutation.mutate(job.id);
+                              }}
+                              disabled={saveJobMutation.isPending}
+                              aria-label="Unsave job"
+                              className={cn(
+                                "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 border-0",
+                                isJobSaved
+                                  ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                  : "text-black dark:text-white"
+                              )}
+                            >
+                              {saveJobMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4 transition-colors",
+                                    isJobSaved
+                                      ? "text-red-500 fill-red-500"
+                                      : "text-black dark:text-white"
+                                  )}
+                                />
+                              )}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Logout Confirmation */}
       {isMobile ? (
         <Drawer
-          open={isLogoutConfirmOpen}
           onOpenChange={setIsLogoutConfirmOpen}
         >
           <DrawerContent>

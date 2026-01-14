@@ -37,7 +37,8 @@ const isSkillPathPage = (pathname: string): boolean => {
 // Helper function to check if current path is a course add/edit page
 const isCourseAddEditPage = (pathname: string): boolean => {
   // Match patterns like /academy/courses/add, /academy/courses/edit/:courseId
-  const courseAddEditPattern = /^(\/(en|ka))?\/academy\/courses\/(add|edit\/[^/]+)$/;
+  const courseAddEditPattern =
+    /^(\/(en|ka))?\/academy\/courses\/(add|edit\/[^/]+)$/;
   return courseAddEditPattern.test(pathname);
 };
 
@@ -108,7 +109,7 @@ export function DashboardHeader({
   const isCourseDetail = isCourseDetailPage(currentPath);
   const isSkillPath = isSkillPathPage(currentPath);
   const isCourseAddEdit = isCourseAddEditPage(currentPath);
-  
+
   // Get course add/edit page title
   const getCourseAddEditTitle = () => {
     if (isCourseAddEdit) {
@@ -120,7 +121,7 @@ export function DashboardHeader({
     }
     return null;
   };
-  
+
   const courseAddEditTitle = getCourseAddEditTitle();
 
   const currentLanguageText = language === "ka" ? "GEO" : "EN";

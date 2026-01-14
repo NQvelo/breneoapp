@@ -51,16 +51,7 @@ import {
   XCircle,
   ThumbsUp,
 } from "lucide-react";
-import { extractSkillsFromText } from "@/utils/skillExtractor";
-import {
-  extractResponsibilities,
-  extractQualifications,
-  extractSkillsFromQualifications,
-} from "@/utils/jobSectionExtractor";
-import {
-  getUserTestAnswers,
-  calculateSkillScores,
-} from "@/utils/skillTestUtils";
+
 import { numericIdToUuid, cn } from "@/lib/utils";
 import { jobService, JobDetail, CompanyInfo } from "@/api/jobs";
 import {
@@ -135,251 +126,7 @@ const JobDetailPage = () => {
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
 
-  // Responsibilities state
-  const [responsibilities, setResponsibilities] = useState<string | null>(null);
-  const [isExtractingResponsibilities, setIsExtractingResponsibilities] =
-    useState(false);
-  const [responsibilitiesError, setResponsibilitiesError] = useState<
-    string | null
-  >(null);
 
-  // Qualifications state
-  const [qualifications, setQualifications] = useState<string | null>(null);
-  const [isExtractingQualifications, setIsExtractingQualifications] =
-    useState(false);
-  const [qualificationsError, setQualificationsError] = useState<string | null>(
-    null
-  );
-
-  // Skills comparison state
-  const [jobSkills, setJobSkills] = useState<string[]>([]);
-  const [qualificationSkills, setQualificationSkills] = useState<string[]>([]);
-  const [userSkills, setUserSkills] = useState<Set<string>>(new Set());
-  const [isExtractingSkills, setIsExtractingSkills] = useState(false);
-  const [isLoadingUserSkills, setIsLoadingUserSkills] = useState(false);
-
-  // Reset sections when job changes
-  useEffect(() => {
-    setResponsibilities(null);
-    setResponsibilitiesError(null);
-    setIsExtractingResponsibilities(false);
-
-    setQualifications(null);
-    setQualificationsError(null);
-    setIsExtractingQualifications(false);
-  }, [jobId]);
-
-  // Extract responsibilities and qualifications when job detail changes
-  useEffect(() => {
-    const extractSections = async () => {
-      if (!jobDetail) {
-        setResponsibilities(null);
-        setQualifications(null);
-        return;
-      }
-
-      const description = getDescription();
-      if (!description || description.length < 50) {
-        setResponsibilities(null);
-        setQualifications(null);
-        return;
-      }
-
-      // Extract responsibilities
-      setIsExtractingResponsibilities(true);
-      setResponsibilitiesError(null);
-      try {
-        const respResult = await extractResponsibilities(description);
-        if (respResult.error) {
-          setResponsibilitiesError(respResult.error);
-          setResponsibilities(null);
-        } else {
-          setResponsibilities(respResult.content);
-        }
-      } catch (error) {
-        console.error("Error extracting responsibilities:", error);
-        setResponsibilitiesError(
-          error instanceof Error
-            ? error.message
-            : "Failed to extract responsibilities"
-        );
-        setResponsibilities(null);
-      } finally {
-        setIsExtractingResponsibilities(false);
-      }
-
-      // Extract qualifications
-      setIsExtractingQualifications(true);
-      setQualificationsError(null);
-      try {
-        const qualResult = await extractQualifications(description);
-        if (qualResult.error) {
-          setQualificationsError(qualResult.error);
-          setQualifications(null);
-          setQualificationSkills([]);
-        } else {
-          setQualifications(qualResult.content);
-          // Extract skills from qualifications
-          const skills = extractSkillsFromQualifications(qualResult.content);
-          setQualificationSkills(skills);
-          // Also update jobSkills with skills from qualifications
-          if (skills.length > 0) {
-            setJobSkills(skills);
-          }
-        }
-      } catch (error) {
-        console.error("Error extracting qualifications:", error);
-        setQualificationsError(
-          error instanceof Error
-            ? error.message
-            : "Failed to extract qualifications"
-        );
-        setQualifications(null);
-        setQualificationSkills([]);
-      } finally {
-        setIsExtractingQualifications(false);
-      }
-    };
-
-    extractSections();
-  }, [jobDetail]);
-
-  // Fetch user skills from test results (same method as SkillPathPage)
-  useEffect(() => {
-    const fetchUserSkills = async () => {
-      if (!user) {
-        setUserSkills(new Set());
-        return;
-      }
-
-      setIsLoadingUserSkills(true);
-      try {
-        // Method 1: Try Django backend skill test results API (same as SkillPathPage)
-        try {
-          const response = await apiClient.get(
-            `/api/skilltest/results/?user=${user.id}`
-          );
-
-          let skillTestData = null;
-          if (Array.isArray(response.data) && response.data.length > 0) {
-            skillTestData = response.data[0];
-          } else if (response.data && typeof response.data === "object") {
-            skillTestData = response.data;
-          }
-
-          if (
-            skillTestData &&
-            (skillTestData.final_role || skillTestData.skills_json)
-          ) {
-            // Extract skills from skills_json
-            const skillsJson = skillTestData.skills_json || {};
-            const techSkills = Object.keys(skillsJson.tech || {});
-            const softSkills = Object.keys(skillsJson.soft || {});
-            const allSkills = [...techSkills, ...softSkills];
-            setUserSkills(new Set(allSkills.map((s) => s.toLowerCase())));
-            setIsLoadingUserSkills(false);
-            return;
-          }
-        } catch (apiError) {
-          console.log("Django API not available, trying Supabase...");
-        }
-
-        // Method 2: Fallback to Supabase: fetch from usertestanswers
-        const answers = await getUserTestAnswers(user.id);
-
-        if (answers && answers.length > 0) {
-          // Calculate skill scores
-          const skillScores = calculateSkillScores(answers);
-          // Get all skills the user has (skills with score > 0)
-          const skills = Object.keys(skillScores).filter(
-            (skill) => skillScores[skill] > 0
-          );
-          setUserSkills(new Set(skills.map((s) => s.toLowerCase())));
-        } else {
-          setUserSkills(new Set());
-        }
-      } catch (error) {
-        console.error("Error fetching user skills:", error);
-        setUserSkills(new Set());
-      } finally {
-        setIsLoadingUserSkills(false);
-      }
-    };
-
-    fetchUserSkills();
-  }, [user]);
-
-  // Extract skills from job when job detail changes
-  useEffect(() => {
-    const extractJobSkills = async () => {
-      if (!jobDetail) {
-        setJobSkills([]);
-        return;
-      }
-
-      setIsExtractingSkills(true);
-      try {
-        const allSkills: Set<string> = new Set();
-
-        // 1. Get skills from existing fields (these are already verified)
-        const existingSkills = getRequiredSkills();
-        existingSkills.forEach((skill) => {
-          allSkills.add(skill.toLowerCase());
-        });
-
-        // 2. Combine description and requirements for comprehensive AI analysis
-        const description = getDescription();
-        const requirements = getRequirements();
-
-        // Combine all text for AI to analyze comprehensively
-        let combinedText = "";
-        if (description && description.length > 50) {
-          combinedText += description + "\n\n";
-        }
-        if (requirements && requirements.length > 50) {
-          combinedText += "Requirements:\n" + requirements;
-        }
-
-        // 3. Extract skills using AI (more accurate - AI analyzes and thinks)
-        if (combinedText.length > 50) {
-          const extracted = await extractSkillsFromText(combinedText);
-          if (extracted.skills && extracted.skills.length > 0) {
-            extracted.skills.forEach((skill) => {
-              // Normalize skill names
-              const normalized = skill.toLowerCase().trim();
-              if (normalized.length > 0) {
-                allSkills.add(normalized);
-              }
-            });
-          }
-        }
-
-        // 4. Remove duplicates and normalize skill names
-        // Convert to array, normalize, and sort
-        const skillsArray = Array.from(allSkills)
-          .map((s) => {
-            // Capitalize first letter of each word
-            return s
-              .split(/[\s-]+/)
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ");
-          })
-          .filter((s) => s.length > 0)
-          .sort();
-
-        setJobSkills(skillsArray);
-      } catch (error) {
-        console.error("Error extracting job skills:", error);
-        // Fallback to just required skills
-        const existingSkills = getRequiredSkills();
-        setJobSkills(existingSkills);
-      } finally {
-        setIsExtractingSkills(false);
-      }
-    };
-
-    extractJobSkills();
-  }, [jobDetail]);
 
   // Handle scroll detection for fixed bottom bar
   useEffect(() => {
@@ -1654,11 +1401,11 @@ const JobDetailPage = () => {
         )}
 
         {!isLoading && jobDetail && (
-          <Card className="md:bg-card md:border md:shadow-sm bg-transparent border-0 shadow-none">
-            <CardContent className="p-3 sm:p-6 space-y-8">
+          <Card className="bg-transparent border-0 shadow-none h-full">
+            <CardContent className="p-1 sm:p-6 space-y-8">
               {/* Job Header */}
               <div>
-                <div className="flex flex-col md:flex-row md:items-start gap-6">
+                <div className="flex flex-col md:flex-row md:items-start gap-6 bg-white rounded-3xl p-6 shadow-none border-0">
                   {/* Left Side: Job Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-4 mb-3">
@@ -1693,7 +1440,7 @@ const JobDetailPage = () => {
                     </div>
 
                     {/* Job Highlights */}
-                    <div className="flex flex-nowrap md:flex-wrap gap-2 md:gap-4 mb-6 text-sm md:text-base font-medium text-gray-700 dark:text-gray-200 overflow-x-auto">
+                    <div className="flex flex-col md:flex-row md:flex-wrap gap-2 md:gap-4 mb-6 text-sm md:text-base font-medium text-gray-700 dark:text-gray-200 ">
                       <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
                         <PiggyBank className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                         <span>{formatSalary()}</span>
@@ -1809,222 +1556,26 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-              {/* Responsibilities Section */}
-              <div className="pt-8">
+
+
+              {/* About the Job Section */}
+              <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    Responsibilities
+                    <FileText className="h-5 w-5" />
+                    About the Job
                   </h2>
                 </div>
-
-                {isExtractingResponsibilities ? (
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                        <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                        <p className="text-sm">
-                          AI is extracting responsibilities from the job
-                          description...
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : responsibilitiesError ? (
-                  <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
-                        <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium mb-1">
-                            Failed to extract responsibilities
-                          </p>
-                          <p className="text-xs">{responsibilitiesError}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : responsibilities ? (
-                  <div
-                    className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line"
-                    style={{ whiteSpace: "pre-line" }}
-                  >
-                    {responsibilities.split("\n").map((line, index) => {
-                      const trimmedLine = line.trim();
-                      if (!trimmedLine) return null;
-
-                      if (/^[•\-*]\s/.test(trimmedLine)) {
-                        return (
-                          <div key={index} className="mb-2 ml-4">
-                            {trimmedLine}
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <p key={index} className="mb-2">
-                          {trimmedLine}
-                        </p>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-6">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No responsibilities information available for this job.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Qualifications Section */}
-              <div className="pt-8">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5" />
-                    Qualifications
-                  </h2>
+                <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
+                  <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                     {getDescription()}
+                  </p>
                 </div>
-
-                {isExtractingQualifications ? (
-                  <Card>
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                        <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                        <p className="text-sm">
-                          AI is extracting qualifications from the job
-                          description...
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : qualificationsError ? (
-                  <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
-                        <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium mb-1">
-                            Failed to extract qualifications
-                          </p>
-                          <p className="text-xs">{qualificationsError}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : qualifications ? (
-                  <div className="space-y-4">
-                    {/* Skills Match Section - Moved here from top */}
-                    {user &&
-                      (qualificationSkills.length > 0 ||
-                        jobSkills.length > 0) && (
-                        <Card>
-                          <CardContent className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                              <h3 className="text-base font-semibold">
-                                Skills Match
-                              </h3>
-                            </div>
-
-                            {isLoadingUserSkills ? (
-                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Loading your skills...</span>
-                              </div>
-                            ) : userSkills.size === 0 ? (
-                              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 mb-4">
-                                <AlertCircle className="h-4 w-4" />
-                                <span>
-                                  You haven't taken the skill test yet.{" "}
-                                  <button
-                                    onClick={() => navigate("/skill-test")}
-                                    className="underline hover:no-underline font-medium"
-                                  >
-                                    Take the skill test
-                                  </button>{" "}
-                                  to see your skill match.
-                                </span>
-                              </div>
-                            ) : null}
-
-                            <div className="flex flex-wrap gap-2">
-                              {(qualificationSkills.length > 0
-                                ? qualificationSkills
-                                : jobSkills
-                              ).map((skill, index) => {
-                                const hasSkill = userSkills.has(
-                                  skill.toLowerCase()
-                                );
-                                return (
-                                  <div
-                                    key={index}
-                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors ${
-                                      hasSkill
-                                        ? "bg-green-500 text-white"
-                                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                    }`}
-                                  >
-                                    <div className="flex-shrink-0">
-                                      {hasSkill ? (
-                                        <ThumbsUp className="h-4 w-4 text-white" />
-                                      ) : (
-                                        <XCircle className="h-4 w-4" />
-                                      )}
-                                    </div>
-                                    <span className="text-sm font-medium whitespace-nowrap">
-                                      {skill}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                    {/* Qualifications List */}
-                    <div>
-                      <div
-                        className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line"
-                        style={{ whiteSpace: "pre-line" }}
-                      >
-                        {qualifications.split("\n").map((line, index) => {
-                          const trimmedLine = line.trim();
-                          if (!trimmedLine) return null;
-
-                          if (/^[•\-*]\s/.test(trimmedLine)) {
-                            return (
-                              <div key={index} className="mb-2 ml-4">
-                                {trimmedLine}
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <p key={index} className="mb-2">
-                              {trimmedLine}
-                            </p>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <Card>
-                    <CardContent className="p-6">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No qualifications information available for this job.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
 
               {/* Requirements & Qualifications */}
               {getRequirements() && (
-                <div className="pt-8">
+                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
                   <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <Target className="h-5 w-5" />
                     Requirements & Qualifications
@@ -2046,7 +1597,7 @@ const JobDetailPage = () => {
                 getRequiredSkills().length > 0 ||
                 getJobCategory() ||
                 getApplicationDeadline()) && (
-                <div className="pt-8">
+                <div className="rounded-3xl p-6 shadow-none border-0 mt-6">
                   <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <CheckCircle2 className="h-5 w-5" />
                     Job Details
@@ -2158,202 +1709,102 @@ const JobDetailPage = () => {
                 </div>
               )}
 
-              {/* Company Details Section - Modernized and Moved to Bottom */}
-              <div className="pt-8 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Company Details
-                  </h2>
-                </div>
+                {/* Company Details Section - Redesigned */}
+                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                       <Building2 className="h-5 w-5" />
+                       Company Details
+                    </h2>
+                  </div>
 
-                {isLoadingCompanyDetails ? (
-                  <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl">
-                    <CardContent className="p-6">
-                      <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                        <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                        <p className="text-sm">Loading company information...</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Company Header Card - Modern Design */}
-                    <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl overflow-hidden">
-                      <CardContent className="p-6">
-                        <div className="flex items-start gap-4">
-                          {/* Company Logo */}
-                          <div className="flex-shrink-0 relative">
-                            {getCompanyLogo() ? (
-                              <img
-                                src={getCompanyLogo()}
-                                alt={getCompanyName() || "Company logo"}
-                                className="h-20 w-20 rounded-2xl object-cover border border-gray-200 dark:border-gray-700 shadow-sm"
-                                onError={(e) => {
-                                  // Hide image on error
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                  const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                                  if (fallback) {
-                                    fallback.style.display = "flex";
-                                  }
-                                }}
-                              />
-                            ) : null}
-                            <div
-                              className={`h-20 w-20 rounded-2xl bg-gradient-to-br from-breneo-accent to-breneo-blue flex items-center justify-center text-white shadow-sm ${
-                                getCompanyLogo() ? "hidden" : "flex"
-                              }`}
-                            >
-                              <Building2 className="h-10 w-10" />
-                            </div>
-                          </div>
+                  {isLoadingCompanyDetails ? (
+                    <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                       <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                       <p className="text-sm">Loading company information...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                        {/* Header: Name and Logo */}
+                        <div className="flex items-center gap-4">
+                           <div className="flex-shrink-0">
+                             {getCompanyLogo() ? (
+                               <img
+                                 src={getCompanyLogo()}
+                                 alt={getCompanyName() || "Company logo"}
+                                 className="h-14 w-14 md:h-14 md:w-14 rounded-2xl object-cover bg-white shadow-sm border border-gray-100 dark:border-gray-800"
+                                 onError={(e) => {
+                                   (e.target as HTMLImageElement).style.display = "none";
+                                   ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display = "flex";
+                                 }}
+                               />
+                             ) : null}
+                             <div
+                               className={`h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-gradient-to-br from-breneo-accent to-breneo-blue flex items-center justify-center text-white shadow-sm ${
+                                 getCompanyLogo() ? "hidden" : "flex"
+                               }`}
+                             >
+                               <Building2 className="h-8 w-8" />
+                             </div>
+                           </div>
 
-                          {/* Company Info */}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 truncate">
-                              {getCompanyName() || "Company Name Not Available"}
-                            </h3>
-                            {getCompanyWebsite() && (
-                              <a
-                                href={getCompanyWebsite()}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 text-sm text-breneo-accent hover:text-breneo-blue transition-colors font-medium"
-                              >
-                                <Globe className="h-4 w-4" />
-                                Visit Website
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                            )}
-                          </div>
+                           <h3 className="text-xl md:text-xl font-bold text-gray-900 dark:text-white break-words">
+                             {getCompanyName() || "Company Name"}
+                           </h3>
                         </div>
-                      </CardContent>
-                    </Card>
 
-                    {/* Company Description */}
-                    {getCompanyDescription() && (
-                      <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl">
-                        <CardContent className="p-6">
-                          <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-breneo-accent" />
-                            About {getCompanyName()}
-                          </h4>
+                        {/* Description */}
+                        {getCompanyDescription() && (
                           <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-line">
+                            <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
                               {getCompanyDescription()}
                             </p>
                           </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Company Information Grid - Modern Card Style */}
-                    {(getCompanySize() ||
-                      getCompanyIndustry() ||
-                      getCompanyFounded() ||
-                      getCompanyHeadquarters()) && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {getCompanySize() && (
-                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
-                            <CardContent className="p-5">
-                              <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
-                                  <Users className="h-6 w-6 text-breneo-accent" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                                    Company Size
-                                  </p>
-                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
-                                    {getCompanySize()}
-                                  </p>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
                         )}
 
-                        {getCompanyIndustry() && (
-                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
-                            <CardContent className="p-5">
-                              <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
-                                  <Factory className="h-6 w-6 text-breneo-accent" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                                    Industry
-                                  </p>
-                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
-                                    {getCompanyIndustry()}
-                                  </p>
-                                </div>
+                        {/* Details List */}
+                        <div className="space-y-4 pt-2">
+                           {getCompanyFounded() && (
+                              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
+                                <Calendar className="h-5 w-5" />
+                                <span className="text-base font-medium">Founded in {getCompanyFounded()}</span>
                               </div>
-                            </CardContent>
-                          </Card>
-                        )}
-
-                        {getCompanyFounded() && (
-                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
-                            <CardContent className="p-5">
-                              <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
-                                  <Calendar className="h-6 w-6 text-breneo-accent" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                                    Founded
-                                  </p>
-                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
-                                    {getCompanyFounded()}
-                                  </p>
-                                </div>
+                           )}
+                           
+                           {getCompanyHeadquarters() && (
+                              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
+                                <MapPin className="h-5 w-5" />
+                                <span className="text-base font-medium">{getCompanyHeadquarters()}</span>
                               </div>
-                            </CardContent>
-                          </Card>
-                        )}
+                           )}
 
-                        {getCompanyHeadquarters() && (
-                          <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl hover:shadow-md transition-shadow">
-                            <CardContent className="p-5">
-                              <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 p-3 rounded-2xl bg-breneo-accent/10 dark:bg-breneo-accent/20">
-                                  <MapPin className="h-6 w-6 text-breneo-accent" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                                    Headquarters
-                                  </p>
-                                  <p className="text-base font-semibold text-gray-900 dark:text-white">
-                                    {getCompanyHeadquarters()}
-                                  </p>
-                                </div>
+                           {getCompanySize() && (
+                              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
+                                <Users className="h-5 w-5" />
+                                <span className="text-base font-medium">{getCompanySize()} employees</span>
                               </div>
-                            </CardContent>
-                          </Card>
                         )}
-                      </div>
-                    )}
+                        {/* Socials / Website */}
+                        {getCompanyWebsite() && (
+                          <div className="flex gap-2">
+                            <a
+                              href={getCompanyWebsite()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-primary text-white dark:text-black hover:opacity-80 transition-opacity font-medium text-sm"
+                              title="Visit Website"
+                            >
+                               <Globe className="h-4 w-4" />
+                               Visit Website
+                            </a>
+                          </div>
+                        )}
+                        </div>
+                    </div>
 
-                    {/* Show message if no company details available */}
-                    {!getCompanyDescription() &&
-                      !getCompanySize() &&
-                      !getCompanyIndustry() &&
-                      !getCompanyFounded() &&
-                      !getCompanyHeadquarters() &&
-                      !isLoadingCompanyDetails && (
-                        <Card className="border border-gray-200 dark:border-gray-700 rounded-3xl">
-                          <CardContent className="p-6 text-center">
-                            <Building2 className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Additional company information is not available at this time.
-                            </p>
-                          </CardContent>
-                        </Card>
-                      )}
-                  </div>
-                )}
-              </div>
+
+                  )}
+                </div>
             </CardContent>
           </Card>
         )}

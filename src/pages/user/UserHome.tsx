@@ -558,28 +558,24 @@ const UserHome = () => {
     enabled: !!user,
   });
 
-  // Fetch saved courses
-  const { data: savedCourses = [] } = useQuery<string[]>({
-    queryKey: ["savedCourses", user?.id],
+  // Fetch saved course IDs (for checking if courses are saved in the regular courses section)
+  const { data: savedCourseIds = [] } = useQuery<string[]>({
+    queryKey: ["savedCourseIds", user?.id],
     queryFn: async () => {
       if (!user) return [];
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
         const savedCoursesArray = profileResponse.data?.saved_courses || [];
 
-        // Handle both array of IDs and array of objects
         if (!Array.isArray(savedCoursesArray)) return [];
 
         return savedCoursesArray
           .map((item: unknown) => {
-            // If it's already a string or number, convert to string
             if (typeof item === "string" || typeof item === "number") {
               return String(item);
             }
-            // If it's an object, try to extract the ID
             if (item && typeof item === "object") {
               const obj = item as Record<string, unknown>;
-              // Try common ID field names
               if (obj.id) return String(obj.id);
               if (obj.course_id) return String(obj.course_id);
               if (obj.courseId) return String(obj.courseId);
@@ -588,7 +584,7 @@ const UserHome = () => {
           })
           .filter((id): id is string => id !== null);
       } catch (error) {
-        console.error("Error fetching saved courses:", error);
+        console.error("Error fetching saved course IDs:", error);
         return [];
       }
     },
@@ -725,31 +721,34 @@ const UserHome = () => {
     },
     onMutate: async (id: string) => {
       await queryClient.cancelQueries({
-        queryKey: ["savedCourses", user?.id],
+        queryKey: ["savedCourseIds", user?.id],
       });
 
-      const previousSavedCourses = queryClient.getQueryData<string[]>([
-        "savedCourses",
+      const previousSavedCourseIds = queryClient.getQueryData<string[]>([
+        "savedCourseIds",
         user?.id,
       ]);
 
       let wasSaved = false;
-      queryClient.setQueryData<string[]>(["savedCourses", user?.id], (prev) => {
-        if (!prev) return prev;
-        const idString = String(id);
-        wasSaved = prev.includes(idString);
-        return wasSaved
-          ? prev.filter((c) => c !== idString)
-          : [...prev, idString];
-      });
+      queryClient.setQueryData<string[]>(
+        ["savedCourseIds", user?.id],
+        (prev) => {
+          if (!prev) return prev;
+          const idString = String(id);
+          wasSaved = prev.includes(idString);
+          return wasSaved
+            ? prev.filter((c) => c !== idString)
+            : [...prev, idString];
+        }
+      );
 
-      return { previousSavedCourses, wasSaved };
+      return { previousSavedCourseIds, wasSaved };
     },
     onError: (error, id, context) => {
-      if (context?.previousSavedCourses && user?.id) {
+      if (context?.previousSavedCourseIds && user?.id) {
         queryClient.setQueryData(
-          ["savedCourses", user.id],
-          context.previousSavedCourses
+          ["savedCourseIds", user.id],
+          context.previousSavedCourseIds
         );
       }
 
@@ -757,7 +756,7 @@ const UserHome = () => {
       toast.error("Failed to update saved courses. Please try again.");
     },
     onSuccess: (_, id, context) => {
-      queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["savedCourseIds", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["home-courses"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
 
@@ -1457,7 +1456,7 @@ const UserHome = () => {
                   className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
                 >
                   {filteredCourses.map((course) => {
-                    const isCourseSaved = savedCourses.includes(
+                    const isCourseSaved = savedCourseIds.includes(
                       String(course.id)
                     );
                     return (

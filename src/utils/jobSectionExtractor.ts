@@ -99,12 +99,16 @@ async function tryExtractResponsibilitiesAPI(
   text: string
 ): Promise<string | null> {
   try {
+    const moveKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+    if (!moveKey) return null;
+
     const response = await fetch(
       "https://api.deepseek.com/v1/chat/completions",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${moveKey}`
         },
         body: JSON.stringify({
           model: "deepseek-chat",
@@ -113,29 +117,17 @@ async function tryExtractResponsibilitiesAPI(
               role: "system",
               content: `You are a job description analyzer. Extract and summarize ONLY the RESPONSIBILITIES, DUTIES, and DAILY TASKS from the job description.
 
-CRITICAL FORMATTING REQUIREMENTS:
-- Each responsibility MUST start on a NEW LINE
-- Use bullet points (•) for each item
-- Start each bullet point with "• " (bullet space)
-- Write complete, grammatically correct sentences
-- Ensure 100% accuracy - do not add information not in the source text
-- Be precise and exact - use the exact wording from the job description when possible
+CRITICAL INSTRUCTIONS:
+1. Make a single, clean list with bullet points.
+2. Remove irrelevant sections such as legal notices, equal opportunity statements, privacy policies, pay transparency explanations, interview recording notices, and long salary disclaimers.
+3. Merge duplicated sections (e.g., multiple "Responsibilities" headers) into one list.
+4. Rewrite all extracted content in clear, simple, neutral English, without changing meaning.
+5. Do NOT add new information that does not exist in the text.
 
-Focus on:
-- What the person will do on a daily basis
-- Key responsibilities and duties
-- Main tasks and activities
-- What the role entails
-
-EXCLUDE:
-- Qualifications, requirements, skills, education, and experience requirements
-- Company information, mission, values
-- Only include what the person will DO, not what they need to HAVE
-
-Output format example:
-• [First responsibility - complete sentence]
-• [Second responsibility - complete sentence]
-• [Third responsibility - complete sentence]
+FORMATTING:
+- Start each item with "• " (bullet space).
+- One item per line.
+- Full sentences.
 
 If no clear responsibilities are found, return "No specific responsibilities listed."`,
             },
@@ -167,44 +159,35 @@ async function tryExtractQualificationsAPI(
   text: string
 ): Promise<string | null> {
   try {
+    const moveKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+    if (!moveKey) return null;
+
     const response = await fetch(
       "https://api.deepseek.com/v1/chat/completions",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${moveKey}`
         },
         body: JSON.stringify({
           model: "deepseek-chat",
           messages: [
             {
               role: "system",
-              content: `You are a job description analyzer. Extract and summarize ONLY the QUALIFICATIONS, REQUIREMENTS, and WHAT CANDIDATES NEED TO HAVE from the job description.
+              content: `You are a job description analyzer. Extract and summarize ONLY the QUALIFICATIONS, REQUIREMENTS, SKILLS, and EDUCATION from the job description.
 
-CRITICAL FORMATTING REQUIREMENTS:
-- Each qualification MUST start on a NEW LINE
-- Use bullet points (•) for each item
-- Start each bullet point with "• " (bullet space)
-- Write complete, grammatically correct sentences
-- Ensure 100% accuracy - do not add information not in the source text
-- Be precise and exact - use the exact wording from the job description when possible
+CRITICAL INSTRUCTIONS:
+1. Make a single, clean list with bullet points.
+2. Remove irrelevant sections such as legal notices, equal opportunity statements, privacy policies, pay transparency explanations, interview recording notices, and long salary disclaimers.
+3. Merge duplicated sections (e.g., multiple "Required Qualifications" headers) into one list.
+4. Rewrite all extracted content in clear, simple, neutral English, without changing meaning.
+5. Do NOT add new information that does not exist in the text.
 
-Focus on:
-- Required skills (technical and soft skills)
-- Required experience (years, type)
-- Education requirements (degree, certifications)
-- Required qualifications and credentials
-- What candidates must have or should have
-
-EXCLUDE:
-- Responsibilities, duties, and daily tasks
-- Company information, mission, values
-- Only include what the person needs to HAVE, not what they will DO
-
-Output format example:
-• [First qualification - complete sentence]
-• [Second qualification - complete sentence]
-• [Third qualification - complete sentence]
+FORMATTING:
+- Start each item with "• " (bullet space).
+- One item per line.
+- Full sentences.
 
 If no clear qualifications are found, return "No specific qualifications listed."`,
             },
@@ -271,6 +254,14 @@ function extractResponsibilitiesIntelligent(text: string): string {
   const scoredSentences = sentences
     .map((sentence, index) => {
       const lowerSentence = sentence.toLowerCase();
+      
+      // Filter out legal/irrelevant text immediately
+      if (
+        /equal opportunity|affirmative action|privacy policy|click here|salary range|color, religion|sex, sexual orientation|gender identity|national origin|disability|veteran status|arrest history|background check/i.test(lowerSentence)
+      ) {
+        return { sentence: "", score: -100, index };
+      }
+
       let score = 0;
 
       responsibilityKeywords.forEach((keyword) => {
@@ -358,6 +349,14 @@ function extractQualificationsIntelligent(text: string): string {
   const scoredSentences = sentences
     .map((sentence, index) => {
       const lowerSentence = sentence.toLowerCase();
+
+      // Filter out legal/irrelevant text immediately
+      if (
+        /equal opportunity|affirmative action|privacy policy|click here|salary range|color, religion|sex, sexual orientation|gender identity|national origin|disability|veteran status|arrest history|background check/i.test(lowerSentence)
+      ) {
+        return { sentence: "", score: -100, index };
+      }
+
       let score = 0;
 
       qualificationKeywords.forEach((keyword) => {
