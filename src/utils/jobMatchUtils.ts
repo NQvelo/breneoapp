@@ -10,6 +10,103 @@
  * - Relevance: how many user skills are utilized
  */
 
+// Common tech skills keywords for extraction from job text
+// Moved here from UserHome.tsx / JobsPage.tsx to ensure consistency
+const skillKeywords: Record<string, string[]> = {
+  javascript: ["javascript", "js", "node.js", "nodejs", "react", "vue", "angular"],
+  python: ["python", "django", "flask", "fastapi"],
+  java: ["java", "spring", "spring boot"],
+  "c++": ["c++", "cpp", "c plus plus"],
+  "c#": ["c#", "csharp", "dotnet", ".net"],
+  go: ["go", "golang"],
+  rust: ["rust"],
+  php: ["php", "laravel", "symfony"],
+  ruby: ["ruby", "rails"],
+  swift: ["swift", "ios"],
+  kotlin: ["kotlin", "android"],
+  typescript: ["typescript", "ts"],
+  html: ["html", "html5"],
+  css: ["css", "css3", "sass", "scss", "tailwind"],
+  sql: ["sql", "mysql", "postgresql", "mongodb", "database"],
+  react: ["react", "reactjs", "react.js"],
+  vue: ["vue", "vuejs", "vue.js"],
+  angular: ["angular", "angularjs"],
+  "node.js": ["node.js", "nodejs", "node"],
+  express: ["express", "express.js"],
+  django: ["django"],
+  flask: ["flask"],
+  spring: ["spring", "spring boot"],
+  laravel: ["laravel"],
+  rails: ["rails", "ruby on rails"],
+  git: ["git", "github", "gitlab"],
+  docker: ["docker", "containerization"],
+  kubernetes: ["kubernetes", "k8s"],
+  aws: ["aws", "amazon web services"],
+  azure: ["azure", "microsoft azure"],
+  gcp: ["gcp", "google cloud", "google cloud platform"],
+  linux: ["linux", "unix"],
+  "machine learning": ["machine learning", "ml", "deep learning", "neural network"],
+  "data science": ["data science", "data analysis", "data analytics"],
+  ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
+  blockchain: ["blockchain", "ethereum", "solidity", "web3"],
+  devops: ["devops", "ci/cd", "continuous integration"],
+  testing: ["testing", "qa", "quality assurance", "test automation"],
+  ui: ["ui", "user interface", "ux", "user experience"],
+  design: ["design", "figma", "sketch", "adobe"],
+};
+
+/**
+ * Extract skills from job data based on keywords in title, description and requirements
+ */
+export const extractJobSkills = (job: any): string[] => {
+  if (!job) return [];
+  
+  const skills: string[] = [];
+  
+  // Collect all text fields to search through
+  const fieldsToSearch = [
+    job.title,
+    job.job_title,
+    job.position,
+    job.description,
+    job.job_description,
+    job.job_required_experience,
+    job.required_experience,
+    ...(Array.isArray(job.required_skills) ? job.required_skills : []),
+    ...(Array.isArray(job.skills) ? job.skills : []),
+    ...(Array.isArray(job.job_skills) ? job.job_skills : []),
+  ];
+
+  const textToSearch = fieldsToSearch
+    .filter(val => typeof val === 'string' && val.length > 0)
+    .join(" ")
+    .toLowerCase();
+
+  // Check for each defined skill keyword
+  Object.keys(skillKeywords).forEach((skill) => {
+    const keywords = skillKeywords[skill];
+    if (keywords.some((keyword) => textToSearch.includes(keyword.toLowerCase()))) {
+      skills.push(skill);
+    }
+  });
+
+  // Also include any skills already listed in arrays but not caught by keywords
+  const explicitSkills = [
+     ...(Array.isArray(job.required_skills) ? job.required_skills : []),
+     ...(Array.isArray(job.skills) ? job.skills : []),
+     ...(Array.isArray(job.job_skills) ? job.job_skills : []),
+  ].filter(s => typeof s === 'string');
+  
+  explicitSkills.forEach(skill => {
+    if (!skills.includes(skill.toLowerCase())) {
+        skills.push(skill.toLowerCase());
+    }
+  });
+
+  return [...new Set(skills)]; // Remove duplicates
+};
+
+
 interface MatchResult {
   exactMatches: string[];
   partialMatches: string[];

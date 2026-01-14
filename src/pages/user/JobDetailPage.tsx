@@ -61,6 +61,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useMobile } from "@/hooks/use-mobile";
+import { RadialProgress } from "@/components/ui/radial-progress";
+import {
+  calculateMatchPercentage,
+  getMatchQualityLabel,
+  extractJobSkills,
+} from "@/utils/jobMatchUtils";
+import { Zap } from "lucide-react";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -117,6 +124,38 @@ const JobDetailPage = () => {
         return savedJobsArray.map((id: string | number) => String(id));
       } catch (error) {
         console.error("Error fetching saved jobs from profile API:", error);
+        return [];
+      }
+    },
+    enabled: !!user,
+  });
+
+  // Fetch user skills for matching
+  const { data: userSkills = [], isLoading: isLoadingUserSkills } = useQuery<string[]>({
+    queryKey: ["userSkills", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      try {
+        const response = await apiClient.get(
+          `/api/skilltest/results/?user=${user.id}`
+        );
+        
+        let skillTestData = null;
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          skillTestData = response.data[0];
+        } else if (response.data && typeof response.data === "object") {
+          skillTestData = response.data;
+        }
+
+        if (skillTestData && (skillTestData.skills_json)) {
+          const skillsJson = skillTestData.skills_json || {};
+          const techSkills = Object.keys(skillsJson.tech || {});
+          const softSkills = Object.keys(skillsJson.soft || {});
+          return [...techSkills, ...softSkills];
+        }
+        return [];
+      } catch (error) {
+        console.error("Error fetching user skills for matching:", error);
         return [];
       }
     },
@@ -1361,11 +1400,18 @@ const JobDetailPage = () => {
     }
   };
 
+  const matchPercentage = calculateMatchPercentage(
+    userSkills,
+    jobDetail ? extractJobSkills(jobDetail) : [],
+    getJobTitle()
+  );
+  const matchLabel = getMatchQualityLabel(matchPercentage);
+
   return (
     <DashboardLayout>
       <div
         ref={mainContentRef}
-        className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 px-1 sm:px-4 md:px-6"
+        className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 sm:px-4 md:px-6"
       >
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
@@ -1402,7 +1448,7 @@ const JobDetailPage = () => {
 
         {!isLoading && jobDetail && (
           <Card className="bg-transparent border-0 shadow-none h-full">
-            <CardContent className="p-1 sm:p-6 space-y-8">
+            <CardContent className="p-1 sm:p-6 space-y-5">
               {/* Job Header */}
               <div>
                 <div className="flex flex-col md:flex-row md:items-start gap-6 bg-white rounded-3xl p-6 shadow-none border-0">
@@ -1471,6 +1517,7 @@ const JobDetailPage = () => {
                         </div>
                       ) : null}
                     </div>
+
                   </div>
 
                   {/* Right Side: Action Buttons - Aligned to Top */}
@@ -1557,6 +1604,40 @@ const JobDetailPage = () => {
               </div>
 
 
+
+              {/* Job Match Section - Standalone Card */}
+              {user && userSkills.length > 0 && (
+                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
+                  <div className="flex flex-row items-start gap-5">
+                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-1">
+                      <RadialProgress
+                        value={matchPercentage}
+                        size={56}
+                        strokeWidth={4}
+                        showLabel={false}
+                        percentageTextSize="md"
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                        MATCH SCORE
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-start gap-2 mb-2">
+                        <div className="bg-breneo-accent/10 p-1.5 rounded-lg">
+                          <Zap className="h-4 w-4 text-breneo-accent fill-breneo-accent" />
+                        </div>
+                        <span className="text-base font-bold text-gray-900 dark:text-white uppercase tracking-wide">
+                          {matchLabel || "Match Analysis"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-2xl">
+                        This score is calculated by comparing your profile skills with the job requirements. We prioritize exact matches and key skills mentioned in the job title to ensure the best fit for your career path.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* About the Job Section */}
               <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">

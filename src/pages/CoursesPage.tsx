@@ -616,101 +616,67 @@ const CoursesPage = () => {
                   (responseData.profile_data as Record<string, unknown>) ||
                   responseData;
 
-                const getStringField = (
-                  field: string,
-                  source: Record<string, unknown> = profileData
-                ) => {
-                  const value = source[field];
-                  return typeof value === "string" ? value : undefined;
+                const getStringField = (fields: string[]) => {
+                  for (const field of fields) {
+                    const value = profileData[field] || responseData[field];
+                    if (typeof value === "string") return value;
+                  }
+                  return undefined;
                 };
 
-                // Debug: Log all available fields from API
-                if (process.env.NODE_ENV === "development") {
-                  console.log(
-                    `[Academy ${academyId}] API Response structure:`,
-                    {
-                      hasProfileData: !!responseData.profile_data,
-                      profileDataKeys: profileData
-                        ? Object.keys(profileData)
-                        : [],
-                      fullResponse: responseData,
-                    }
-                  );
-                }
-
-                // Extract academy ID - check both profile_data and root level
+                // Extract academy ID
                 const academyIdFromApi =
-                  getStringField("id", profileData) ||
-                  getStringField("academy_id", profileData) ||
-                  getStringField("id", responseData) ||
-                  getStringField("academy_id", responseData) ||
-                  academyId;
+                  getStringField(["academy_id", "id"]) || academyId;
 
-                // Extract academy name - 'name' field in profile_data
-                const academyNameFromApi =
-                  getStringField("academy_name", profileData) ||
-                  getStringField("name", profileData) ||
-                  getStringField("academy_name", responseData) ||
-                  getStringField("name", responseData) ||
-                  getStringField("first_name", profileData) ||
-                  getStringField("firstName", profileData);
+                // Extract academy name
+                const academyNameFromApi = getStringField([
+                  "academy_name",
+                  "name",
+                  "first_name",
+                  "firstName",
+                ]);
 
-                const descriptionFromApi =
-                  getStringField("description", profileData) ||
-                  getStringField("description", responseData);
-                const websiteFromApi =
-                  getStringField("website_url", profileData) ||
-                  getStringField("websiteUrl", profileData) ||
-                  getStringField("website_url", responseData);
-                const contactEmailFromApi =
-                  getStringField("contact_email", profileData) ||
-                  getStringField("contactEmail", profileData) ||
-                  getStringField("email", profileData) ||
-                  getStringField("contact_email", responseData);
+                const descriptionFromApi = getStringField(["description"]);
+                const websiteFromApi = getStringField([
+                  "website_url",
+                  "websiteUrl",
+                ]);
+                const contactEmailFromApi = getStringField([
+                  "contact_email",
+                  "contactEmail",
+                  "email",
+                ]);
 
-                // Extract logo - check profile_data first
-                const logoFromApi =
-                  getStringField("logo_url", profileData) ||
-                  getStringField("logoUrl", profileData) ||
-                  getStringField("logo", profileData) ||
-                  getStringField("logo_url", responseData) ||
-                  getStringField("logoUrl", responseData);
+                // Extract logo and profile photo with correct priority
+                // Matches AcademyDashboard.tsx: logo_url: data.profile_photo_url || data.logo_url
+                const profilePhotoFromApi = getStringField([
+                  "profile_photo_url",
+                  "profilePhotoUrl",
+                  "profile_photo",
+                  "profilePhoto",
+                ]);
 
-                // Extract profile photo
-                const profilePhotoFromApi =
-                  getStringField("profile_photo_url", profileData) ||
-                  getStringField("profilePhotoUrl", profileData) ||
-                  getStringField("profile_photo", profileData) ||
-                  getStringField("profilePhoto", profileData) ||
-                  getStringField("profile_photo_url", responseData);
+                const logoFromApi = getStringField([
+                  "logo_url",
+                  "logoUrl",
+                  "logo",
+                  "image_url",
+                  "imageUrl",
+                ]);
 
-                // Extract profile image - try multiple variations
-                const profileImageFromApi =
-                  getStringField("profile_image_url", profileData) ||
-                  getStringField("profileImageUrl", profileData) ||
-                  getStringField("profile_image", profileData) ||
-                  getStringField("profileImage", profileData) ||
-                  getStringField("image_url", profileData) ||
-                  getStringField("imageUrl", profileData) ||
-                  getStringField("profile_image_url", responseData) ||
-                  getStringField("profileImageUrl", responseData) ||
-                  // Fallback to profile_photo if profile_image not found
-                  profilePhotoFromApi;
+                // Final image to use: prioritize profile_photo then logo (consistent with academy dashboard)
+                const finalImageUrl = profilePhotoFromApi || logoFromApi;
 
-                const slugFromApi =
-                  getStringField("slug", profileData) ||
-                  getStringField("slug", responseData);
+                const slugFromApi = getStringField(["slug"]);
 
                 // Debug: Log what we found
                 if (process.env.NODE_ENV === "development") {
                   console.log(`[Academy ${academyId}] Extracted values:`, {
                     academy_id: academyIdFromApi,
                     academy_name: academyNameFromApi,
-                    profile_image_url: profileImageFromApi,
+                    final_image_url: finalImageUrl,
                     profile_photo_url: profilePhotoFromApi,
                     logo_url: logoFromApi,
-                    description: descriptionFromApi,
-                    email: contactEmailFromApi,
                   });
                 }
 
@@ -722,7 +688,7 @@ const CoursesPage = () => {
                   contact_email: contactEmailFromApi,
                   logo_url: logoFromApi,
                   profile_photo_url: profilePhotoFromApi,
-                  profile_image_url: profileImageFromApi || profilePhotoFromApi,
+                  profile_image_url: finalImageUrl,
                   slug:
                     slugFromApi || createAcademySlug(academyNameFromApi || ""),
                 });

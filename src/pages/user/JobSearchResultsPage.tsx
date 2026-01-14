@@ -52,6 +52,7 @@ import { cn } from "@/lib/utils";
 import {
   calculateMatchPercentage,
   getMatchQualityLabel,
+  extractJobSkills,
 } from "@/utils/jobMatchUtils";
 import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 
@@ -80,82 +81,7 @@ const jobTypeLabels: Record<string, string> = {
   INTERN: "Intern",
 };
 
-// Function to extract skills from job data
-const extractJobSkills = (job: ApiJob): string[] => {
-  const skills: string[] = [];
-  const textToSearch = [
-    job.title || job.job_title || "",
-    job.description || job.job_description || "",
-    job.job_required_experience || job.required_experience || "",
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  const skillKeywords: Record<string, string[]> = {
-    javascript: [
-      "javascript",
-      "js",
-      "node.js",
-      "nodejs",
-      "react",
-      "vue",
-      "angular",
-    ],
-    python: ["python", "django", "flask", "fastapi"],
-    java: ["java", "spring", "spring boot"],
-    "c++": ["c++", "cpp", "c plus plus"],
-    "c#": ["c#", "csharp", "dotnet", ".net"],
-    go: ["go", "golang"],
-    rust: ["rust"],
-    php: ["php", "laravel", "symfony"],
-    ruby: ["ruby", "rails"],
-    swift: ["swift", "ios"],
-    kotlin: ["kotlin", "android"],
-    typescript: ["typescript", "ts"],
-    html: ["html", "html5"],
-    css: ["css", "css3", "sass", "scss", "tailwind"],
-    sql: ["sql", "mysql", "postgresql", "mongodb", "database"],
-    react: ["react", "reactjs", "react.js"],
-    vue: ["vue", "vuejs", "vue.js"],
-    angular: ["angular", "angularjs"],
-    "node.js": ["node.js", "nodejs", "node"],
-    express: ["express", "express.js"],
-    django: ["django"],
-    flask: ["flask"],
-    spring: ["spring", "spring boot"],
-    laravel: ["laravel"],
-    rails: ["rails", "ruby on rails"],
-    git: ["git", "github", "gitlab"],
-    docker: ["docker", "containerization"],
-    kubernetes: ["kubernetes", "k8s"],
-    aws: ["aws", "amazon web services"],
-    azure: ["azure", "microsoft azure"],
-    gcp: ["gcp", "google cloud", "google cloud platform"],
-    linux: ["linux", "unix"],
-    "machine learning": [
-      "machine learning",
-      "ml",
-      "deep learning",
-      "neural network",
-    ],
-    "data science": ["data science", "data analysis", "data analytics"],
-    ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
-    blockchain: ["blockchain", "ethereum", "solidity", "web3"],
-    devops: ["devops", "ci/cd", "continuous integration"],
-    testing: ["testing", "qa", "quality assurance", "test automation"],
-    ui: ["ui", "user interface", "ux", "user experience"],
-    design: ["design", "figma", "sketch", "adobe"],
-  };
-
-  Object.keys(skillKeywords).forEach((skill) => {
-    const keywords = skillKeywords[skill];
-    if (keywords.some((keyword) => textToSearch.includes(keyword))) {
-      skills.push(skill);
-    }
-  });
-
-  return [...new Set(skills)];
-};
+// extractJobSkills is now imported from @/utils/jobMatchUtils
 
 // calculateMatchPercentage and getMatchQualityLabel are now imported from @/utils/jobMatchUtils
 
@@ -336,9 +262,10 @@ const JobSearchResultsPage = () => {
     const fetchUserSkills = async () => {
       if (!user) return;
       try {
-        // Try to fetch from API first (skill test results)
         try {
-          const response = await apiClient.get("/api/skilltest/results/");
+          const response = await apiClient.get(
+            `/api/skilltest/results/?user=${user.id}`
+          );
           if (
             response.data &&
             Array.isArray(response.data) &&
@@ -347,18 +274,12 @@ const JobSearchResultsPage = () => {
             const result = response.data[0];
             const skillsJson = result.skills_json;
 
-            // Extract skills from tech and soft skills
-            const allSkills: string[] = [];
-            if (skillsJson?.tech) {
-              allSkills.push(...Object.keys(skillsJson.tech));
-            }
-            if (skillsJson?.soft) {
-              allSkills.push(...Object.keys(skillsJson.soft));
-            }
+            // Extract skills from tech and soft skills for matching
+            const techSkills = Object.keys(skillsJson.tech || {});
+            const softSkills = Object.keys(skillsJson.soft || {});
+            const allSkills = [...techSkills, ...softSkills];
 
-            // Get top 5 skills
-            const topSkills = allSkills.slice(0, 5);
-            setUserTopSkills(topSkills);
+            setUserTopSkills(allSkills);
             return;
           }
         } catch (apiError) {
@@ -369,7 +290,7 @@ const JobSearchResultsPage = () => {
         const answers = await getUserTestAnswers(String(user.id));
         if (answers && answers.length > 0) {
           const skillScores = calculateSkillScores(answers);
-          const topSkillsData = getTopSkills(skillScores, 5);
+          const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
           const topSkills = topSkillsData.map((s) => s.skill);
           setUserTopSkills(topSkills);
         }

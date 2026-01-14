@@ -2654,7 +2654,7 @@ const ProfilePage = () => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
+                    <div className="rounded-3xl border-0 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
                       <div className="flex flex-col gap-2">
                         <span className="font-semibold text-base text-gray-900 dark:text-gray-100">
                           {data.skill}
@@ -2717,12 +2717,12 @@ const ProfilePage = () => {
         <motion.div 
           layout
           transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
-          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-border rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
+          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border-0 rounded-3xl p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
         >
           <motion.button
             layout
             onClick={() => navigate("#")}
-            className={`relative px-6 py-2.5 rounded-full text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+            className={`relative px-6 py-2.5 rounded-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
               activeView === "profile"
                 ? "text-gray-900 dark:text-gray-100 font-bold"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -2731,7 +2731,7 @@ const ProfilePage = () => {
             {activeView === "profile" && (
               <motion.div
                 layoutId="active-pill"
-                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm"
+                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-3xl shadow-sm"
                 transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
               />
             )}
@@ -2747,7 +2747,7 @@ const ProfilePage = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => navigate("#savedcourses")}
-                className="relative px-6 py-2.5 rounded-full text-sm transition-colors duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap outline-none"
+                className="relative px-6 py-2.5 rounded-3xl text-sm transition-colors duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap outline-none"
               >
                 <span className="relative z-10">Saved</span>
               </motion.button>
@@ -2764,7 +2764,7 @@ const ProfilePage = () => {
                   layout
                   key="saved-courses"
                   onClick={() => navigate("#savedcourses")}
-                  className={`relative px-4 py-2.5 md:px-6 rounded-full text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+                  className={`relative px-4 py-2.5 md:px-6 rounded-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
                     activeSavedTab === "courses"
                       ? "text-gray-900 dark:text-gray-100 font-bold"
                       : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -2773,7 +2773,7 @@ const ProfilePage = () => {
                   {activeSavedTab === "courses" && (
                     <motion.div
                       layoutId="active-pill"
-                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm"
+                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-3xl shadow-sm"
                       transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
                     />
                   )}
@@ -2783,7 +2783,7 @@ const ProfilePage = () => {
                   layout
                   key="saved-jobs"
                   onClick={() => navigate("#savedjobs")}
-                  className={`relative px-4 py-2.5 md:px-6 rounded-full text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+                  className={`relative px-4 py-2.5 md:px-6 rounded-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
                     activeSavedTab === "jobs"
                       ? "text-gray-900 dark:text-gray-100 font-bold"
                       : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -2792,7 +2792,7 @@ const ProfilePage = () => {
                   {activeSavedTab === "jobs" && (
                     <motion.div
                       layoutId="active-pill"
-                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full shadow-sm"
+                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-3xl shadow-sm"
                       transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
                     />
                   )}
@@ -2810,7 +2810,7 @@ const ProfilePage = () => {
           <div className="lg:col-span-1">
             <div className="space-y-4 md:space-y-6">
               {/* Profile Header Card */}
-              <Card className="bg-transparent border-0 md:bg-card md:border">
+              <Card className="bg-transparent border-0 md:bg-card md:border-0 md:rounded-3xl">
                 <CardContent className="pb-4 pt-6 px-6 md:pb-6">
                   {/* Mobile: Horizontal layout, Desktop: Vertical centered */}
                   <div className="flex flex-col md:items-center">
@@ -2915,8 +2915,8 @@ const ProfilePage = () => {
               </Card>
 
               {/* Contact Information Card */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <Card className="border-0 rounded-3xl">
+                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     Contact Information
                   </h3>
@@ -2953,8 +2953,8 @@ const ProfilePage = () => {
               </Card>
 
               {/* Social Networks Card */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+              <Card className="border-0 rounded-3xl">
+                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     Social Networks
                   </h3>
@@ -2982,7 +2982,7 @@ const ProfilePage = () => {
                             key={platform}
                             className={`px-6 py-4 ${
                               index < filteredArray.length - 1
-                                ? "border-b border-gray-200 dark:border-gray-700"
+                                ? "border-b-0"
                                 : ""
                             } group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
                           >
@@ -3089,8 +3089,8 @@ const ProfilePage = () => {
           {/* Right Column - Details */}
           <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* About Me Card */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+            <Card className="border-0 rounded-3xl">
+              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   About Me
                 </h3>
@@ -3131,8 +3131,8 @@ const ProfilePage = () => {
             </Card>
 
             {/* Personal Skills Card */}
-            <Card>
-              <CardHeader className="p-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+            <Card className="border-0 rounded-3xl">
+              <CardHeader className="p-4 pb-3 border-b-0">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   Personal Skills
                 </h3>
@@ -3147,7 +3147,7 @@ const ProfilePage = () => {
                   <div className="space-y-4">
                     {/* Final Role */}
                     {skillResults?.final_role && (
-                      <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border border-breneo-blue/20 dark:border-breneo-blue/30">
+                      <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border-0">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="bg-breneo-blue/10 rounded-full p-2">
                             <Award className="h-5 w-5 text-breneo-blue" />
@@ -3173,7 +3173,7 @@ const ProfilePage = () => {
                           {skillResults?.skills_json?.tech &&
                             Object.keys(skillResults.skills_json.tech).length >
                               0 && (
-                              <Card>
+                              <Card className="border-0 rounded-3xl">
                                 <CardHeader className="pb-2">
                                   <CardTitle className="flex items-center gap-2 text-sm">
                                     Technical Skills
@@ -3192,7 +3192,7 @@ const ProfilePage = () => {
                           {skillResults?.skills_json?.soft &&
                             Object.keys(skillResults.skills_json.soft).length >
                               0 && (
-                              <Card>
+                              <Card className="border-0 rounded-3xl">
                                 <CardHeader className="pb-2">
                                   <CardTitle className="flex items-center gap-2 text-sm">
                                     Soft Skills
@@ -3232,10 +3232,13 @@ const ProfilePage = () => {
           {/* Saved Courses Tab */}
           {activeSavedTab === "courses" && (
             <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+                Saved Courses
+              </h2>
               {loadingSavedCourses ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[...Array(6)].map((_, i) => (
-                    <Card key={i}>
+                    <Card key={i} className="border-0 rounded-3xl">
                       <CardContent className="p-0">
                         <Skeleton className="h-40 w-full rounded-t-3xl" />
                         <div className="p-4">
@@ -3270,7 +3273,7 @@ const ProfilePage = () => {
                         to={`/course/${course.id}`}
                         className="block"
                       >
-                        <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col h-full bg-card">
+                        <Card className="relative transition-all duration-200 cursor-pointer group border-0 rounded-3xl w-full flex flex-col h-full bg-card">
                           <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
                             <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                               <img
@@ -3348,10 +3351,13 @@ const ProfilePage = () => {
           {/* Saved Jobs Tab */}
           {activeSavedTab === "jobs" && (
             <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+                Saved Jobs
+              </h2>
               {loadingSavedJobs ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[...Array(6)].map((_, i) => (
-                    <Card key={i}>
+                    <Card key={i} className="border-0 rounded-3xl">
                       <CardContent className="p-4">
                         <Skeleton className="h-4 w-20 mb-2" />
                         <Skeleton className="h-6 w-3/4 mb-4" />
@@ -3380,7 +3386,7 @@ const ProfilePage = () => {
                     return (
                       <Card
                         key={job.id}
-                        className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl cursor-pointer bg-card"
+                        className="group flex flex-col transition-all duration-200 border-0 overflow-hidden rounded-3xl cursor-pointer bg-card"
                         onClick={() => {
                           if (job.url) {
                             window.open(job.url, "_blank");
