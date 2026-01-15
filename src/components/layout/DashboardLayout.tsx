@@ -71,7 +71,7 @@ export function DashboardLayout({
           showSidebar && (sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]"),
           // Adjusted top padding for the new header position
           showHeader && "pt-24 pb-32 md:pt-24 md:pb-0",
-          (showSidebar || showHeader) && "px-3 md:px-6"
+          (showSidebar || showHeader) && "px-2 md:px-6"
         )}
       >
         <div className="h-full">{children}</div>

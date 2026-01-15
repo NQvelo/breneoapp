@@ -1448,7 +1448,7 @@ const JobDetailPage = () => {
 
         {!isLoading && jobDetail && (
           <Card className="bg-transparent border-0 shadow-none h-full">
-            <CardContent className="p-1 sm:p-6 space-y-5">
+            <CardContent className="p-1 sm:p-6 space-y-2">
               {/* Job Header */}
               <div>
                 <div className="flex flex-col md:flex-row md:items-start gap-6 bg-white rounded-3xl p-6 shadow-none border-0">
@@ -1650,7 +1650,7 @@ const JobDetailPage = () => {
                         Responsibilities
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.responsibilities}
                         </p>
                       </div>
@@ -1665,7 +1665,7 @@ const JobDetailPage = () => {
                         Qualifications
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.qualifications}
                         </p>
                       </div>
@@ -1680,7 +1680,7 @@ const JobDetailPage = () => {
                         About the Team
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.team_description}
                         </p>
                       </div>
@@ -1695,7 +1695,7 @@ const JobDetailPage = () => {
                         Benefits
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.benefits}
                         </p>
                       </div>
@@ -1725,7 +1725,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Required Experience
                           </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {getRequiredExperience()}
                           </p>
                         </div>
@@ -1739,7 +1739,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Education Required
                           </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {getEducationRequired()}
                           </p>
                         </div>
@@ -1753,7 +1753,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Category/Industry
                           </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {getJobCategory()}
                           </p>
                         </div>
@@ -1767,7 +1767,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Application Deadline
                           </p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {formatDate(getApplicationDeadline()) ||
                               getApplicationDeadline()}
                           </p>
@@ -1871,7 +1871,7 @@ const JobDetailPage = () => {
                         {/* Description */}
                         {getCompanyDescription() && (
                           <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
+<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                               {getCompanyDescription()}
                             </p>
                           </div>
