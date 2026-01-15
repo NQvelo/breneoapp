@@ -2714,15 +2714,15 @@ const ProfilePage = () => {
     <DashboardLayout>
       {/* Profile/Saved/Jobs Switcher */}
       <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
-        <motion.div 
+        <motion.div
           layout
           transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
-          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border-0 rounded-3xl p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
+          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
         >
           <motion.button
             layout
             onClick={() => navigate("#")}
-            className={`relative px-6 py-2.5 rounded-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+            className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
               activeView === "profile"
                 ? "text-gray-900 dark:text-gray-100 font-bold"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -2731,8 +2731,13 @@ const ProfilePage = () => {
             {activeView === "profile" && (
               <motion.div
                 layoutId="active-pill"
-                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-3xl shadow-sm"
-                transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                transition={{
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 40,
+                  mass: 1,
+                }}
               />
             )}
             <span className="relative z-10">Profile</span>
@@ -2747,7 +2752,7 @@ const ProfilePage = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => navigate("#savedcourses")}
-                className="relative px-6 py-2.5 rounded-3xl text-sm transition-colors duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap outline-none"
+                className="relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap outline-none"
               >
                 <span className="relative z-10">Saved</span>
               </motion.button>
@@ -2764,7 +2769,7 @@ const ProfilePage = () => {
                   layout
                   key="saved-courses"
                   onClick={() => navigate("#savedcourses")}
-                  className={`relative px-4 py-2.5 md:px-6 rounded-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+                  className={`relative px-4 py-2.5 md:px-6 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
                     activeSavedTab === "courses"
                       ? "text-gray-900 dark:text-gray-100 font-bold"
                       : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -2773,8 +2778,13 @@ const ProfilePage = () => {
                   {activeSavedTab === "courses" && (
                     <motion.div
                       layoutId="active-pill"
-                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-3xl shadow-sm"
-                      transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 40,
+                        mass: 1,
+                      }}
                     />
                   )}
                   <span className="relative z-10">Saved Courses</span>
@@ -2783,7 +2793,7 @@ const ProfilePage = () => {
                   layout
                   key="saved-jobs"
                   onClick={() => navigate("#savedjobs")}
-                  className={`relative px-4 py-2.5 md:px-6 rounded-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+                  className={`relative px-4 py-2.5 md:px-6 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
                     activeSavedTab === "jobs"
                       ? "text-gray-900 dark:text-gray-100 font-bold"
                       : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -2792,8 +2802,13 @@ const ProfilePage = () => {
                   {activeSavedTab === "jobs" && (
                     <motion.div
                       layoutId="active-pill"
-                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-3xl shadow-sm"
-                      transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                      className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                      transition={{
+                        type: "spring",
+                        stiffness: 500,
+                        damping: 40,
+                        mass: 1,
+                      }}
                     />
                   )}
                   <span className="relative z-10">Saved Jobs</span>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1627,33 +1628,64 @@ const SkillPathPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
-        {/* Switcher */}
-        <div className="flex justify-center mb-2">
-          <div className="relative inline-flex items-center bg-gray-100 dark:bg-[#242424] rounded-full p-1">
-            <button
-              onClick={() => setActiveView("skills")}
-              className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
-                activeView === "skills"
-                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 font-medium"
-              }`}
-            >
-              Your Skills
-            </button>
-            <button
-              onClick={() => setActiveView("matchedRoles")}
-              className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
-                activeView === "matchedRoles"
-                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 font-medium"
-              }`}
-            >
-              Matched Roles
-            </button>
-          </div>
-        </div>
+      {/* Skills/Matched Roles Switcher */}
+      <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+        <motion.div
+          layout
+          transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
+        >
+          <motion.button
+            layout
+            onClick={() => setActiveView("skills")}
+            className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+              activeView === "skills"
+                ? "text-gray-900 dark:text-gray-100 font-bold"
+                : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {activeView === "skills" && (
+              <motion.div
+                layoutId="active-pill"
+                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                transition={{
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 40,
+                  mass: 1,
+                }}
+              />
+            )}
+            <span className="relative z-10">Your Skills</span>
+          </motion.button>
 
+          <motion.button
+            layout
+            onClick={() => setActiveView("matchedRoles")}
+            className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
+              activeView === "matchedRoles"
+                ? "text-gray-900 dark:text-gray-100 font-bold"
+                : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+            }`}
+          >
+            {activeView === "matchedRoles" && (
+              <motion.div
+                layoutId="active-pill"
+                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                transition={{
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 40,
+                  mass: 1,
+                }}
+              />
+            )}
+            <span className="relative z-10">Matched Roles</span>
+          </motion.button>
+        </motion.div>
+      </div>
+
+      <div className="space-y-4 md:space-y-6 pb-32 md:pb-6">
         {/* Skills Chart Section - shown when "Your Skills" is active */}
         {activeView === "skills" && (
           <>

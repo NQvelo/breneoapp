@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Card,
@@ -127,16 +128,14 @@ export default function SettingsPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Scroll active button into view on mobile
+  // Scroll active button into view on mobile (for horizontal switcher)
   useEffect(() => {
     if (!isMobile || !scrollContainerRef.current) return;
 
-    // Use a small timeout to ensure DOM is updated after ref assignment
     const timeoutId = setTimeout(() => {
       const container = scrollContainerRef.current;
       if (!container) return;
 
-      // Find the active button by data attribute instead of ref
       const activeButton = container.querySelector(
         `[data-section="${activeSection}"]`
       ) as HTMLButtonElement;
@@ -1248,41 +1247,72 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      {/* Mobile: Fixed Horizontal Scrollable Navigation */}
+      {/* Mobile: Settings Sections Switcher */}
       {isMobile && (
-        <div className="fixed top-[53px] left-0 right-0 z-40 bg-[#F8F9FA]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] md:hidden">
-          <div
-            ref={scrollContainerRef}
-            className="overflow-x-auto scrollbar-hide touch-pan-x"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            <div className="flex gap-4 px-6 py-4 min-w-max">
-              {settingsSections.map((section) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  data-section={section.id}
-                  ref={activeSection === section.id ? activeButtonRef : null}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSectionChange(section.id);
-                  }}
-                  onTouchStart={(e) => {
-                    // Prevent scroll when tapping button
-                    e.stopPropagation();
-                  }}
-                  className={cn(
-                    "text-sm whitespace-nowrap transition-colors py-1 cursor-pointer touch-manipulation",
-                    activeSection === section.id
-                      ? "text-primary font-medium border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground active:text-foreground"
-                  )}
-                >
-                  {section.label}
-                </button>
-              ))}
-            </div>
+        <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:hidden" style={{ width: '380px' }}>
+          <div className="relative rounded-full overflow-hidden">
+            <div
+              ref={scrollContainerRef}
+              className="overflow-x-auto scrollbar-hide touch-pan-x"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              <motion.div
+                layout
+                transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                className="relative inline-flex items-center bg-gray-100/90 dark:bg-[#242424]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-sm min-w-max"
+              >
+              {settingsSections.map((section, index) => {
+                const isFirst = index === 0;
+                const isLast = index === settingsSections.length - 1;
+                const isActive = activeSection === section.id;
+                
+                return (
+                  <motion.button
+                    key={section.id}
+                    layout
+                    type="button"
+                    data-section={section.id}
+                    ref={activeSection === section.id ? activeButtonRef : null}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSectionChange(section.id);
+                    }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                    }}
+                    className={`relative px-6 py-2.5 text-sm transition-colors duration-200 whitespace-nowrap outline-none touch-manipulation ${
+                      isFirst ? "rounded-l-full" : ""
+                    } ${
+                      isLast ? "rounded-r-full" : ""
+                    } ${
+                      !isFirst && !isLast ? "rounded-none" : ""
+                    } ${
+                      isActive
+                        ? "text-gray-900 dark:text-gray-100 font-bold"
+                        : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="active-settings-pill"
+                        className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full"
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 40,
+                          mass: 1,
+                        }}
+                      />
+                    )}
+                    <span className="relative z-10">{section.label}</span>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          </div>
+          {/* Right side fade gradient */}
+          <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-gray-100/90 dark:from-[#242424]/90 to-transparent rounded-r-full" />
           </div>
         </div>
       )}
@@ -1290,7 +1320,7 @@ export default function SettingsPage() {
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
         <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
           {/* Left Column - Content */}
-          <div className={cn(isMobile && "mt-12 min-h-screen pb-12")}>
+          <div className={cn(isMobile && "min-h-screen pb-32")}>
             {renderContent()}
             {/* Mobile App Install Card - Mobile Only */}
             {isMobile && (
