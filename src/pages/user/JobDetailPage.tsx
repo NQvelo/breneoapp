@@ -1639,38 +1639,72 @@ const JobDetailPage = () => {
                 </div>
               )}
 
-              {/* About the Job Section */}
-              <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    About the Job
-                  </h2>
-                </div>
-                <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                  <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
-                     {getDescription()}
-                  </p>
-                </div>
-              </div>
+              {/* Job Details Section - Combined */}
+              {(jobDetail.responsibilities || jobDetail.qualifications || jobDetail.team_description || jobDetail.benefits) && (
+                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6 space-y-6">
+                  {/* Responsibilities */}
+                  {jobDetail.responsibilities && (
+                    <div>
+                      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                        <Target className="h-5 w-5" />
+                        Responsibilities
+                      </h2>
+                      <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
+                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                          {jobDetail.responsibilities}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Requirements & Qualifications */}
-              {getRequirements() && (
-                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-                    <Target className="h-5 w-5" />
-                    Requirements & Qualifications
-                  </h2>
-                  <div
-                    className="prose prose-sm max-w-none dark:prose-invert"
-                    dangerouslySetInnerHTML={{
-                      __html: (getRequirements() || "")
-                        .toString()
-                        .replace(/\n/g, "<br />"),
-                    }}
-                  />
+                  {/* Qualifications */}
+                  {jobDetail.qualifications && (
+                    <div>
+                      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                        <Award className="h-5 w-5" />
+                        Qualifications
+                      </h2>
+                      <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
+                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                          {jobDetail.qualifications}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Team Description - Only show if available */}
+                  {jobDetail.team_description && (
+                    <div>
+                      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                        <Users className="h-5 w-5" />
+                        About the Team
+                      </h2>
+                      <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
+                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                          {jobDetail.team_description}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Benefits */}
+                  {jobDetail.benefits && (
+                    <div>
+                      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                        <Sparkles className="h-5 w-5" />
+                        Benefits
+                      </h2>
+                      <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
+                        <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                          {jobDetail.benefits}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+
 
               {/* Job Details Grid */}
               {(getRequiredExperience() ||

@@ -72,6 +72,8 @@ export interface JobDetail {
   requirements?: string;
   job_requirements?: string;
   qualifications?: string;
+  responsibilities?: string;
+  team_description?: string;
   required_experience?: string;
   job_required_experience?: string;
   experience?: string;
