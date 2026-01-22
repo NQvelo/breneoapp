@@ -357,7 +357,7 @@ const LoginPage: React.FC = () => {
 
         {/* Right Section (Image) */}
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-          <div className="relative w-full h-full rounded-xl overflow-hidden">
+          <div className="relative w-full h-full rounded-3xl overflow-hidden">
             {/* Loading skeleton */}
             {!backgroundLoaded && !imageError && (
               <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-[#242424] dark:to-[#2a2a2a] animate-pulse flex items-center justify-center">
@@ -372,14 +372,14 @@ const LoginPage: React.FC = () => {
               }`}
               style={{
                 backgroundImage: backgroundLoaded
-                  ? "url('/lovable-uploads/future.png')"
+                  ? "url('/lovable-uploads/cover_3.png')"
                   : "none",
               }}
             />
 
             {/* Hidden image for loading detection */}
             <img
-              src="/lovable-uploads/future.png"
+              src="/lovable-uploads/cover_3.png"
               alt=""
               className="hidden"
               onLoad={() => setBackgroundLoaded(true)}

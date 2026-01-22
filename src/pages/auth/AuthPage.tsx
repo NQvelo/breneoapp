@@ -294,14 +294,14 @@ const AuthPage: React.FC = () => {
               }`}
               style={{
                 backgroundImage: backgroundLoaded
-                  ? "url('/lovable-uploads/way.png')"
+                  ? "url('/lovable-uploads/cover_2.png')"
                   : "none",
               }}
             />
 
             {/* Hidden image for loading detection */}
             <img
-              src="/lovable-uploads/way.png"
+              src="/lovable-uploads/cover_2.png"
               alt=""
               className="hidden"
               onLoad={() => setBackgroundLoaded(true)}
