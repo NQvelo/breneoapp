@@ -1799,31 +1799,6 @@ const JobDetailPage = () => {
                 </div>
               )}
 
-              {/* Benefits & Perks - Moved to Bottom */}
-              {getBenefitsList().length > 0 && (
-                <div className="pt-8">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-                    <Sparkles className="h-5 w-5" />
-                    Benefits & Perks
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {getBenefitsList().map((benefit, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-3 rounded-3xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <div className="flex-shrink-0 text-breneo-accent">
-                          {getBenefitIcon(benefit)}
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          {formatBenefitName(benefit)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
                 {/* Company Details Section - Redesigned */}
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
                   <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
