@@ -55,13 +55,13 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         icons: [
           {
-            src: "/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png",
+            src: "/lovable-uploads/breneo-favicon.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any maskable",
           },
           {
-            src: "/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png",
+            src: "/lovable-uploads/breneo-favicon.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",
@@ -76,7 +76,7 @@ export default defineConfig(({ mode }) => ({
             url: "/dashboard",
             icons: [
               {
-                src: "/lovable-uploads/d42d6d67-a5c8-468e-a458-51e9b24eeec0.png",
+                src: "/lovable-uploads/breneo-favicon.png",
                 sizes: "96x96",
               },
             ],
