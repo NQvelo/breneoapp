@@ -99,7 +99,7 @@ const JobDetailPage = () => {
         console.log("📍 Location:", detail.location || detail.job_location);
         console.log(
           "📝 Description length:",
-          detail.description?.length || detail.job_description?.length || 0
+          detail.description?.length || detail.job_description?.length || 0,
         );
         return detail;
       } catch (err) {
@@ -131,15 +131,17 @@ const JobDetailPage = () => {
   });
 
   // Fetch user skills for matching
-  const { data: userSkills = [], isLoading: isLoadingUserSkills } = useQuery<string[]>({
+  const { data: userSkills = [], isLoading: isLoadingUserSkills } = useQuery<
+    string[]
+  >({
     queryKey: ["userSkills", user?.id],
     queryFn: async () => {
       if (!user) return [];
       try {
         const response = await apiClient.get(
-          `/api/skilltest/results/?user=${user.id}`
+          `/api/skilltest/results/?user=${user.id}`,
         );
-        
+
         let skillTestData = null;
         if (Array.isArray(response.data) && response.data.length > 0) {
           skillTestData = response.data[0];
@@ -147,7 +149,7 @@ const JobDetailPage = () => {
           skillTestData = response.data;
         }
 
-        if (skillTestData && (skillTestData.skills_json)) {
+        if (skillTestData && skillTestData.skills_json) {
           const skillsJson = skillTestData.skills_json || {};
           const techSkills = Object.keys(skillsJson.tech || {});
           const softSkills = Object.keys(skillsJson.soft || {});
@@ -164,8 +166,6 @@ const JobDetailPage = () => {
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
-
-
 
   // Handle scroll detection for fixed bottom bar
   useEffect(() => {
@@ -207,7 +207,7 @@ const JobDetailPage = () => {
         if (isMobile) {
           // Find mobile navbar by its structure: div with md:hidden, fixed, bottom-0, z-50
           const allFixedBottom = Array.from(
-            document.querySelectorAll(".fixed.bottom-0")
+            document.querySelectorAll(".fixed.bottom-0"),
           );
           const mobileNav = allFixedBottom.find((el) => {
             const htmlEl = el as HTMLElement;
@@ -288,7 +288,7 @@ const JobDetailPage = () => {
       // Reset mobile navbar visibility on cleanup
       if (isMobile) {
         const allFixedBottom = Array.from(
-          document.querySelectorAll(".fixed.bottom-0")
+          document.querySelectorAll(".fixed.bottom-0"),
         );
         const mobileNav = allFixedBottom.find((el) => {
           const htmlEl = el as HTMLElement;
@@ -365,7 +365,7 @@ const JobDetailPage = () => {
       const maxSalaryFormatted = maxSalary.toLocaleString();
       const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
       const isCurrencyBefore = currencySymbols.some((sym) =>
-        salaryCurrency.includes(sym)
+        salaryCurrency.includes(sym),
       );
       if (isCurrencyBefore) {
         return `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -380,7 +380,7 @@ const JobDetailPage = () => {
       const minSalaryFormatted = minSalary.toLocaleString();
       const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
       const isCurrencyBefore = currencySymbols.some((sym) =>
-        salaryCurrency.includes(sym)
+        salaryCurrency.includes(sym),
       );
       return isCurrencyBefore
         ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -396,10 +396,7 @@ const JobDetailPage = () => {
     const jobDetailAny = jobDetail as Record<string, unknown>;
 
     // Check new API structure - apply_url is primary field
-    if (
-      jobDetail.apply_url &&
-      typeof jobDetail.apply_url === "string"
-    ) {
+    if (jobDetail.apply_url && typeof jobDetail.apply_url === "string") {
       return jobDetail.apply_url;
     }
 
@@ -408,7 +405,8 @@ const JobDetailPage = () => {
       jobDetail.apply_url ||
       jobDetail.job_apply_link ||
       jobDetail.url ||
-      (jobDetailAny.job_apply_link && typeof jobDetailAny.job_apply_link === "string"
+      (jobDetailAny.job_apply_link &&
+      typeof jobDetailAny.job_apply_link === "string"
         ? jobDetailAny.job_apply_link
         : null) ||
       jobDetail.applyUrl ||
@@ -683,9 +681,13 @@ const JobDetailPage = () => {
   };
 
   // Fetch company details from API
-  const [companyDetails, setCompanyDetails] = useState<CompanyInfo | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<CompanyInfo | null>(
+    null,
+  );
   const [isLoadingCompanyDetails, setIsLoadingCompanyDetails] = useState(false);
-  const [companyLogoFromAPI, setCompanyLogoFromAPI] = useState<string | undefined>(undefined);
+  const [companyLogoFromAPI, setCompanyLogoFromAPI] = useState<
+    string | undefined
+  >(undefined);
 
   // Fetch company details when company name is available
   useEffect(() => {
@@ -708,9 +710,9 @@ const JobDetailPage = () => {
         // Fetch from the company API endpoint
         const encodedCompanyName = encodeURIComponent(companyName.trim());
         const companyApiUrl = `https://breneo-job-aggregator-k7ti.onrender.com/api/companies/${encodedCompanyName}`;
-        
+
         console.log("🔍 Fetching company details from:", companyApiUrl);
-        
+
         const response = await fetch(companyApiUrl, {
           method: "GET",
           headers: {
@@ -722,7 +724,7 @@ const JobDetailPage = () => {
         if (response.ok) {
           const data = await response.json();
           console.log("✅ Company details fetched:", data);
-          
+
           // Extract company info from response
           const companyInfo: CompanyInfo = {
             name: data.name || data.company_name || companyName,
@@ -741,14 +743,18 @@ const JobDetailPage = () => {
             founded: data.founded || data.company_founded,
             company_founded: data.company_founded || data.founded,
             headquarters: data.headquarters || data.company_headquarters,
-            company_headquarters: data.company_headquarters || data.headquarters,
+            company_headquarters:
+              data.company_headquarters || data.headquarters,
             ...data, // Include any other fields
           };
 
           setCompanyDetails(companyInfo);
-          
+
           // Set logo from API if available
-          const logoUrl = companyInfo.logo || companyInfo.company_logo || companyInfo.logo_url;
+          const logoUrl =
+            companyInfo.logo ||
+            companyInfo.company_logo ||
+            companyInfo.logo_url;
           if (logoUrl && typeof logoUrl === "string") {
             try {
               const url = new URL(logoUrl);
@@ -760,7 +766,10 @@ const JobDetailPage = () => {
             }
           }
         } else {
-          console.log("⚠️ Company details not found or API error:", response.status);
+          console.log(
+            "⚠️ Company details not found or API error:",
+            response.status,
+          );
           setCompanyDetails(null);
           setCompanyLogoFromAPI(undefined);
         }
@@ -919,8 +928,16 @@ const JobDetailPage = () => {
 
   // Get company website - prioritize API data, then fallback to job detail
   const getCompanyWebsite = (): string | undefined => {
-    if (companyDetails?.website || companyDetails?.company_url || companyDetails?.website_url) {
-      return companyDetails.website || companyDetails.company_url || companyDetails.website_url;
+    if (
+      companyDetails?.website ||
+      companyDetails?.company_url ||
+      companyDetails?.website_url
+    ) {
+      return (
+        companyDetails.website ||
+        companyDetails.company_url ||
+        companyDetails.website_url
+      );
     }
     if (!jobDetail) return undefined;
     const website =
@@ -1403,7 +1420,7 @@ const JobDetailPage = () => {
   const matchPercentage = calculateMatchPercentage(
     userSkills,
     jobDetail ? extractJobSkills(jobDetail) : [],
-    getJobTitle()
+    getJobTitle(),
   );
   const matchLabel = getMatchQualityLabel(matchPercentage);
 
@@ -1499,25 +1516,33 @@ const JobDetailPage = () => {
                         <Briefcase className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                         <span>{getWorkArrangement()}</span>
                       </div>
-                      {jobDetail.posted_at || jobDetail.fetched_at || jobDetail.date_posted || jobDetail.posted_date ? (
+                      {jobDetail.posted_at ||
+                      jobDetail.fetched_at ||
+                      jobDetail.date_posted ||
+                      jobDetail.posted_date ? (
                         <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap text-sm md:text-base font-medium text-gray-700 dark:text-gray-200">
                           <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0 text-gray-700 dark:text-gray-200" />
                           <span>
                             {formatDate(
-                              String(jobDetail.posted_at || 
-                              jobDetail.fetched_at || 
-                              jobDetail.date_posted || 
-                              jobDetail.posted_date || "")
+                              String(
+                                jobDetail.posted_at ||
+                                  jobDetail.fetched_at ||
+                                  jobDetail.date_posted ||
+                                  jobDetail.posted_date ||
+                                  "",
+                              ),
                             ) ||
-                              String(jobDetail.posted_at ||
-                              jobDetail.fetched_at ||
-                              jobDetail.date_posted ||
-                              jobDetail.posted_date || "")}
+                              String(
+                                jobDetail.posted_at ||
+                                  jobDetail.fetched_at ||
+                                  jobDetail.date_posted ||
+                                  jobDetail.posted_date ||
+                                  "",
+                              )}
                           </span>
                         </div>
                       ) : null}
                     </div>
-
                   </div>
 
                   {/* Right Side: Action Buttons - Aligned to Top */}
@@ -1603,8 +1628,6 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-
-
               {/* Job Match Section - Standalone Card */}
               {user && userSkills.length > 0 && (
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
@@ -1632,7 +1655,10 @@ const JobDetailPage = () => {
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-2xl">
-                        This score is calculated by comparing your profile skills with the job requirements. We prioritize exact matches and key skills mentioned in the job title to ensure the best fit for your career path.
+                        This score is calculated by comparing your profile
+                        skills with the job requirements. We prioritize exact
+                        matches and key skills mentioned in the job title to
+                        ensure the best fit for your career path.
                       </p>
                     </div>
                   </div>
@@ -1640,7 +1666,10 @@ const JobDetailPage = () => {
               )}
 
               {/* Job Details Section - Combined */}
-              {(jobDetail.responsibilities || jobDetail.qualifications || jobDetail.team_description || jobDetail.benefits) && (
+              {(jobDetail.responsibilities ||
+                jobDetail.qualifications ||
+                jobDetail.team_description ||
+                jobDetail.benefits) && (
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6 space-y-6">
                   {/* Responsibilities */}
                   {jobDetail.responsibilities && (
@@ -1650,7 +1679,7 @@ const JobDetailPage = () => {
                         Responsibilities
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.responsibilities}
                         </p>
                       </div>
@@ -1665,7 +1694,7 @@ const JobDetailPage = () => {
                         Qualifications
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.qualifications}
                         </p>
                       </div>
@@ -1680,7 +1709,7 @@ const JobDetailPage = () => {
                         About the Team
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.team_description}
                         </p>
                       </div>
@@ -1695,7 +1724,7 @@ const JobDetailPage = () => {
                         Benefits
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                           {jobDetail.benefits}
                         </p>
                       </div>
@@ -1703,8 +1732,6 @@ const JobDetailPage = () => {
                   )}
                 </div>
               )}
-
-
 
               {/* Job Details Grid */}
               {(getRequiredExperience() ||
@@ -1725,7 +1752,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Required Experience
                           </p>
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {getRequiredExperience()}
                           </p>
                         </div>
@@ -1739,7 +1766,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Education Required
                           </p>
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {getEducationRequired()}
                           </p>
                         </div>
@@ -1753,7 +1780,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Category/Industry
                           </p>
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {getJobCategory()}
                           </p>
                         </div>
@@ -1767,7 +1794,7 @@ const JobDetailPage = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                             Application Deadline
                           </p>
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
                             {formatDate(getApplicationDeadline()) ||
                               getApplicationDeadline()}
                           </p>
@@ -1799,102 +1826,110 @@ const JobDetailPage = () => {
                 </div>
               )}
 
-                {/* Company Details Section - Redesigned */}
-                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
-                       <Building2 className="h-5 w-5" />
-                       Company Details
-                    </h2>
-                  </div>
-
-                  {isLoadingCompanyDetails ? (
-                    <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
-                       <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
-                       <p className="text-sm">Loading company information...</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                        {/* Header: Name and Logo */}
-                        <div className="flex items-center gap-4">
-                           <div className="flex-shrink-0">
-                             {getCompanyLogo() ? (
-                               <img
-                                 src={getCompanyLogo()}
-                                 alt={getCompanyName() || "Company logo"}
-                                 className="h-14 w-14 md:h-14 md:w-14 rounded-2xl object-cover bg-white shadow-sm border border-gray-100 dark:border-gray-800"
-                                 onError={(e) => {
-                                   (e.target as HTMLImageElement).style.display = "none";
-                                   ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display = "flex";
-                                 }}
-                               />
-                             ) : null}
-                             <div
-                               className={`h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-gradient-to-br from-breneo-accent to-breneo-blue flex items-center justify-center text-white shadow-sm ${
-                                 getCompanyLogo() ? "hidden" : "flex"
-                               }`}
-                             >
-                               <Building2 className="h-8 w-8" />
-                             </div>
-                           </div>
-
-                           <h3 className="text-xl md:text-xl font-bold text-gray-900 dark:text-white break-words">
-                             {getCompanyName() || "Company Name"}
-                           </h3>
-                        </div>
-
-                        {/* Description */}
-                        {getCompanyDescription() && (
-                          <div className="prose prose-sm max-w-none dark:prose-invert">
-<p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                              {getCompanyDescription()}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Details List */}
-                        <div className="space-y-4 pt-2">
-                           {getCompanyFounded() && (
-                              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
-                                <Calendar className="h-5 w-5" />
-                                <span className="text-base font-medium">Founded in {getCompanyFounded()}</span>
-                              </div>
-                           )}
-                           
-                           {getCompanyHeadquarters() && (
-                              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
-                                <MapPin className="h-5 w-5" />
-                                <span className="text-base font-medium">{getCompanyHeadquarters()}</span>
-                              </div>
-                           )}
-
-                           {getCompanySize() && (
-                              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
-                                <Users className="h-5 w-5" />
-                                <span className="text-base font-medium">{getCompanySize()} employees</span>
-                              </div>
-                        )}
-                        {/* Socials / Website */}
-                        {getCompanyWebsite() && (
-                          <div className="flex gap-2">
-                            <a
-                              href={getCompanyWebsite()}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-primary text-white dark:text-black hover:opacity-80 transition-opacity font-medium text-sm"
-                              title="Visit Website"
-                            >
-                               <Globe className="h-4 w-4" />
-                               Visit Website
-                            </a>
-                          </div>
-                        )}
-                        </div>
-                    </div>
-
-
-                  )}
+              {/* Company Details Section - Redesigned */}
+              <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Company Details
+                  </h2>
                 </div>
+
+                {isLoadingCompanyDetails ? (
+                  <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                    <Loader2 className="h-5 w-5 animate-spin text-breneo-accent" />
+                    <p className="text-sm">Loading company information...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Header: Name and Logo */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-shrink-0">
+                        {getCompanyLogo() ? (
+                          <img
+                            src={getCompanyLogo()}
+                            alt={getCompanyName() || "Company logo"}
+                            className="h-14 w-14 md:h-14 md:w-14 rounded-2xl object-cover bg-white shadow-sm"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
+                              (
+                                (e.target as HTMLImageElement)
+                                  .nextElementSibling as HTMLElement
+                              ).style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-gradient-to-br from-breneo-accent to-breneo-blue flex items-center justify-center text-white shadow-sm ${
+                            getCompanyLogo() ? "hidden" : "flex"
+                          }`}
+                        >
+                          <Building2 className="h-8 w-8" />
+                        </div>
+                      </div>
+
+                      <h3 className="text-xl md:text-xl font-bold text-gray-900 dark:text-white break-words">
+                        {getCompanyName() || "Company Name"}
+                      </h3>
+                    </div>
+
+                    {/* Description */}
+                    {getCompanyDescription() && (
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                          {getCompanyDescription()}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Details List */}
+                    <div className="space-y-4 pt-2">
+                      {getCompanyFounded() && (
+                        <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
+                          <Calendar className="h-5 w-5" />
+                          <span className="text-base font-medium">
+                            Founded in {getCompanyFounded()}
+                          </span>
+                        </div>
+                      )}
+
+                      {getCompanyHeadquarters() && (
+                        <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
+                          <MapPin className="h-5 w-5" />
+                          <span className="text-base font-medium">
+                            {getCompanyHeadquarters()}
+                          </span>
+                        </div>
+                      )}
+
+                      {getCompanySize() && (
+                        <div className="flex items-center gap-3 text-gray-700 dark:text-gray-200">
+                          <Users className="h-5 w-5" />
+                          <span className="text-base font-medium">
+                            {getCompanySize()} employees
+                          </span>
+                        </div>
+                      )}
+                      {/* Socials / Website */}
+                      {getCompanyWebsite() && (
+                        <div className="flex gap-2">
+                          <a
+                            href={getCompanyWebsite()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-primary text-white dark:text-black hover:opacity-80 transition-opacity font-medium text-sm"
+                            title="Visit Website"
+                          >
+                            <Globe className="h-4 w-4" />
+                            Visit Website
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1938,7 +1973,7 @@ const JobDetailPage = () => {
             "left-0",
             showFixedBar
               ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-full pointer-events-none"
+              : "opacity-0 translate-y-full pointer-events-none",
           )}
         >
           <div className="px-5 sm:px-9 md:px-12 lg:px-14 py-4">

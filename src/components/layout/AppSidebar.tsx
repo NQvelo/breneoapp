@@ -15,8 +15,7 @@ import {
   Sun,
   LibraryBig,
   Video,
-  ChevronRight,
-  Sparkles,
+  ArrowRight,
   Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +24,7 @@ import { useTheme } from "next-themes";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -82,7 +82,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
     // ✅ Changed userData to user
     if (user?.first_name && user?.last_name) {
       return `${user.first_name.charAt(0)}${user.last_name.charAt(
-        0
+        0,
       )}`.toUpperCase();
     }
     // ✅ Fallback to first letter of email or "U"
@@ -126,14 +126,10 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   return (
     <>
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F6F9F9]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-b border-black/[0.03] dark:border-white/[0.03] px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F3F3F4]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 px-4 py-3">
         <div className="flex items-center justify-between">
-          <LocalizedLink to={homePath} className="flex items-center">
-            <img
-              src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
-              alt="Breneo Logo"
-              className="h-7"
-            />
+          <LocalizedLink to={homePath} className="flex items-center ml-1">
+            <BreneoLogo className="h-6 md:h-5" />
           </LocalizedLink>
           <div className="flex items-center gap-2">
             <Button
@@ -169,7 +165,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F6F9F9]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 border-t border-black/[0.03] dark:border-white/[0.03]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F3F3F4]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 ">
         <nav className="flex justify-around items-center py-2">
           {mobileNavItems.map((item, index) => {
             // Check if current path matches the item href
@@ -202,7 +198,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                   "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-1",
                   isActive
                     ? "text-gray-600"
-                    : "text-gray-600 hover:text-breneo-blue"
+                    : "text-gray-600 hover:text-breneo-blue",
                 )}
               >
                 <item.icon
@@ -211,7 +207,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "transition-colors duration-200 mb-1",
                     isActive
                       ? "text-breneo-blue"
-                      : "text-gray-600 group-hover:text-breneo-blue"
+                      : "text-gray-600 group-hover:text-breneo-blue",
                   )}
                 />
                 <span
@@ -219,7 +215,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "text-xs font-medium transition-colors duration-200 text-center",
                     isActive
                       ? "text-gray-600"
-                      : "text-gray-600 group-hover:text-breneo-blue"
+                      : "text-gray-600 group-hover:text-breneo-blue",
                   )}
                 >
                   {item.label}
@@ -233,36 +229,28 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       {/* Desktop Sidebar */}
       <div
         className={cn(
-          "hidden md:flex fixed top-4 left-4 bottom-4 z-40 bg-[#FFFFFF] dark:bg-card border border-gray-200 dark:border-border transition-all duration-300 flex-col rounded-2xl",
-          collapsed ? "w-20" : "w-64"
+          "hidden md:flex fixed top-4 left-4 bottom-4 z-40 bg-[#FFFFFF] dark:bg-card transition-all duration-300 flex-col rounded-3xl",
+          collapsed ? "w-20" : "w-64",
         )}
       >
         {/* Header */}
-        <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-border">
+        <div className="p-4 pt-5 flex items-center justify-between">
           {!collapsed ? (
             <LocalizedLink
               to={homePath}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 ml-3"
             >
-              <img
-                src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
-                alt="Breneo Logo"
-                className="h-8"
-              />
+              <BreneoLogo className="h-6" />
             </LocalizedLink>
           ) : (
-            <img
-              src="/lovable-uploads/breneo_logo.png" // ✅ Use root path
-              alt="Breneo Logo"
-              className="h-5 w-10 object-cover object-left"
-            />
+            <BreneoLogo className="h-4 w-8 object-cover object-left ml-3" />
           )}
         </div>
 
         {/* Main Nav */}
         <div className="flex flex-col flex-1">
           <div className="flex-1 overflow-y-auto pt-8">
-            <nav className="space-y-2 px-4">
+            <nav className="space-y-1 px-4">
               {navItems.map((item, index) => {
                 // Check if current path matches the item href
                 // Handle home/dashboard equivalence (both routes go to same page)
@@ -292,10 +280,10 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     key={index}
                     to={item.href}
                     className={cn(
-                      "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
+                      "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                       isActive
                         ? "bg-breneo-blue/10 text-breneo-blue"
-                        : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
+                        : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
                     )}
                   >
                     <item.icon
@@ -304,7 +292,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                         "transition-colors duration-200 flex-shrink-0",
                         isActive
                           ? "text-breneo-blue"
-                          : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue"
+                          : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
                       )}
                     />
                     {!collapsed && (
@@ -313,7 +301,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                           "font-medium text-base transition-colors duration-200 flex items-center gap-3",
                           isActive
                             ? "text-breneo-blue"
-                            : "text-gray-600 group-hover:text-breneo-blue"
+                            : "text-gray-600 group-hover:text-breneo-blue",
                         )}
                       >
                         {item.label}
@@ -332,17 +320,17 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
           {/* Bottom section */}
           <div className="px-4 pb-4">
-            <div className="border-t border-gray-200 dark:border-border mb-4"></div>
+            <div className="mb-4"></div>
 
             {/* Settings, Help Center, Theme Toggle grouped together */}
-            <div className="space-y-2 mb-4">
+            <div className="space-y-1 mb-4">
               <LocalizedLink
                 to={settingsPath}
                 className={cn(
-                  "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
+                  "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                   currentPath === settingsPath
                     ? "bg-breneo-blue/10 text-breneo-blue"
-                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
+                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
                 )}
               >
                 <Settings
@@ -351,7 +339,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === settingsPath
                       ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue"
+                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
                   )}
                 />
                 {!collapsed && (
@@ -364,10 +352,10 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
               <LocalizedLink
                 to="/help"
                 className={cn(
-                  "flex items-center space-x-4 px-4 py-4 rounded-xl transition-all duration-200 group",
+                  "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                   currentPath === "/help"
                     ? "bg-breneo-blue/10 text-breneo-blue"
-                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
+                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
                 )}
               >
                 <HelpCircle
@@ -376,7 +364,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === "/help"
                       ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue"
+                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
                   )}
                 />
                 {!collapsed && (
@@ -389,38 +377,27 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 <LocalizedLink
                   to="/subscription"
                   className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-md transition-all duration-200 group",
-                    "bg-gradient-to-r from-breneo-blue/10 to-purple-500/10 dark:from-breneo-blue/20 dark:to-purple-500/20",
-                    "border border-breneo-blue/20 dark:border-breneo-blue/30",
-                    "hover:from-breneo-blue/15 hover:to-purple-500/15 dark:hover:from-breneo-blue/25 dark:hover:to-purple-500/25",
-                    collapsed && "justify-center px-2"
+                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                    "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
+                    "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50",
+                    collapsed && "justify-center px-4",
                   )}
                 >
-                  {!collapsed ? (
-                    <>
-                      <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        <Sparkles
-                          size={14}
-                          className="text-breneo-blue flex-shrink-0"
-                        />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
-                          {t.subscription.upgrade}
-                        </span>
-                      </div>
-                      <ChevronRight
-                        size={14}
-                        className="text-breneo-blue flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
-                      />
-                    </>
-                  ) : (
-                    <Sparkles size={14} className="text-breneo-blue" />
+                  <ArrowRight
+                    size={22}
+                    className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                  />
+                  {!collapsed && (
+                    <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
+                      {t.subscription.upgrade}
+                    </span>
                   )}
                 </LocalizedLink>
               )}
             </div>
 
             {/* Profile */}
-            <div className="border-t border-gray-200 dark:border-border mt-4 pt-4">
+            <div className="mt-4 pt-4">
               <LocalizedLink
                 to={profilePath}
                 className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all duration-200 group"
@@ -428,11 +405,11 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 {/* Avatar box */}
                 <div
                   className={cn(
-                    "flex items-center justify-center w-8 h-8 rounded-[12px] text-sm font-semibold shrink-0",
+                    "flex items-center justify-center w-8 h-8 rounded-[50px] text-sm font-semibold shrink-0",
                     // ✅ Changed userData to user
                     user?.profile_image
                       ? "overflow-hidden"
-                      : "bg-[#AAF0FF] text-[#099DBC]"
+                      : "bg-[#AAF0FF] text-[#099DBC]",
                   )}
                 >
                   {/* ✅ Changed userData to user */}

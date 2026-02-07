@@ -9,6 +9,7 @@ import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTheme } from "next-themes";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const AcademyRegistrationPage = () => {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ const AcademyRegistrationPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(
-    countries.find((c) => c.code === "GE")
+    countries.find((c) => c.code === "GE"),
   );
 
   // Image loading states
@@ -60,7 +61,8 @@ const AcademyRegistrationPage = () => {
     const preloadImages = async () => {
       try {
         await Promise.all([
-          preloadImage("lovable-uploads/breneo_logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo-dark.png"),
           preloadImage("/lovable-uploads/academy.png"),
         ]);
       } catch (error) {
@@ -109,7 +111,7 @@ const AcademyRegistrationPage = () => {
             description,
             website,
           }),
-        }
+        },
       );
 
       const contentType = response.headers.get("content-type");
@@ -145,14 +147,12 @@ const AcademyRegistrationPage = () => {
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
           {!logoLoaded && !imageError && (
-            <div className="h-7 w-20 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
               <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
             </div>
           )}
-          <img
-            src="/lovable-uploads/breneo_logo.png"
-            alt="Breneo Logo"
-            className={`h-7 transition-opacity duration-300 ${
+          <BreneoLogo
+            className={`h-6 lg:h-5 transition-opacity duration-300 ${
               logoLoaded ? "opacity-100" : "opacity-0"
             }`}
             onLoad={() => setLogoLoaded(true)}
@@ -174,14 +174,12 @@ const AcademyRegistrationPage = () => {
             <div className="mb-4 hidden lg:flex items-center justify-between">
               <div className="flex items-center">
                 {!logoLoaded && !imageError && (
-                  <div className="h-10 w-32 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+                  <div className="h-8 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
                     <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
                   </div>
                 )}
-                <img
-                  src="/lovable-uploads/breneo_logo.png"
-                  alt="Breneo Logo"
-                  className={`h-10 transition-opacity duration-300 ${
+                <BreneoLogo
+                  className={`h-8 transition-opacity duration-300 ${
                     logoLoaded ? "opacity-100" : "opacity-0"
                   }`}
                   onLoad={() => setLogoLoaded(true)}
@@ -221,7 +219,7 @@ const AcademyRegistrationPage = () => {
                     <Input
                       id="name"
                       placeholder="Your academy's name"
-                      className="mt-1 h-12"
+                      className="mt-1 h-[3.2rem]"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
@@ -234,7 +232,7 @@ const AcademyRegistrationPage = () => {
                       id="email"
                       type="email"
                       placeholder="Enter contact email"
-                      className="mt-1 h-12"
+                      className="mt-1 h-[3.2rem]"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -247,14 +245,14 @@ const AcademyRegistrationPage = () => {
                       <CountrySelector
                         value={selectedCountry}
                         onChange={setSelectedCountry}
-                        className="max-w-fit px-3 h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
+                        className="max-w-fit px-3 h-[3.2rem] border-0 bg-transparent hover:bg-transparent rounded-r-none"
                       />
                       <div className="h-6 w-px bg-slate-200 dark:bg-border" />
                       <Input
                         id="phone"
                         type="tel"
                         placeholder="Phone number"
-                        className="flex-1 h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="flex-1 h-[3.2rem] border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         required
@@ -269,7 +267,7 @@ const AcademyRegistrationPage = () => {
                         id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
-                        className="pr-10 h-12"
+                        className="pr-10 h-[3.2rem]"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
@@ -313,7 +311,7 @@ const AcademyRegistrationPage = () => {
                       id="website"
                       type="url"
                       placeholder="https://your-academy.com"
-                      className="mt-1 h-12"
+                      className="mt-1 h-[3.2rem]"
                       value={website}
                       onChange={(e) => setWebsite(e.target.value)}
                       required

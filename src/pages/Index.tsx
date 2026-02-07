@@ -24,7 +24,7 @@ const Index = () => {
     const preloadImages = async () => {
       try {
         await preloadImage(
-          "/lovable-uploads/6bee4aa6-3a7f-4806-98bd-dc73a1955812.png"
+          "/lovable-uploads/6bee4aa6-3a7f-4806-98bd-dc73a1955812.png",
         );
       } catch (error) {
         console.warn("Image failed to preload:", error);

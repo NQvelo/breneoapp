@@ -176,6 +176,9 @@ export interface JobFilters {
   salaryMin?: number; // Minimum salary
   salaryMax?: number; // Maximum salary
   salaryByAgreement?: boolean; // "By agreement" checkbox
+  seniority?: string[]; // Seniority levels (intern, junior, mid, senior, lead)
+  workMode?: string[]; // Work modes (remote, hybrid, onsite)
+  company?: string[]; // Company names
 }
 
 // Job search parameters

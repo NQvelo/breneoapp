@@ -69,14 +69,14 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
     return countries.filter(
       (country) =>
         country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query)
+        country.code.toLowerCase().includes(query),
     );
   }, [searchQuery]);
 
   const handleToggleCountry = (countryCode: string) => {
     if (tempSelectedLocations.includes(countryCode)) {
       setTempSelectedLocations(
-        tempSelectedLocations.filter((code) => code !== countryCode)
+        tempSelectedLocations.filter((code) => code !== countryCode),
       );
     } else {
       setTempSelectedLocations([...tempSelectedLocations, countryCode]);
@@ -88,7 +88,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
       setTempSelectedLocations([]);
     } else {
       setTempSelectedLocations(
-        filteredCountries.map((country) => country.code)
+        filteredCountries.map((country) => country.code),
       );
     }
   };
@@ -101,7 +101,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
   const isAllSelected =
     filteredCountries.length > 0 &&
     filteredCountries.every((country) =>
-      tempSelectedLocations.includes(country.code)
+      tempSelectedLocations.includes(country.code),
     );
 
   // Smart display text: show count when too many countries selected
@@ -154,7 +154,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             "transition-colors cursor-pointer hover:opacity-80 overflow-hidden",
             isPlaceholder
               ? "text-gray-400 dark:text-gray-500"
-              : "text-gray-900 dark:text-gray-100"
+              : "text-gray-900 dark:text-gray-100",
           )}
         >
           <MapPin className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2" />
@@ -198,20 +198,20 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             "absolute top-full mt-2 w-[calc(100vw-2rem)] md:w-[400px] rounded-lg shadow-lg border z-[9999] max-h-[500px] flex flex-col overflow-hidden",
             "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700",
             "min-w-[320px]",
-            "left-0 md:right-0 md:left-auto"
+            "left-0 md:right-0 md:left-auto",
           )}
         >
           {/* Header with Title and Close Button */}
           <div
             className={cn(
               "flex items-center justify-between px-4 py-3 border-b",
-              "border-gray-200 dark:border-gray-700"
+              "border-gray-200 dark:border-gray-700",
             )}
           >
             <h3
               className={cn(
                 "font-bold text-base",
-                "text-gray-900 dark:text-gray-100"
+                "text-gray-900 dark:text-gray-100",
               )}
             >
               Countries
@@ -225,7 +225,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
               }}
               className={cn(
                 "p-1 rounded transition-colors",
-                "hover:bg-gray-100 dark:hover:bg-gray-700"
+                "hover:bg-gray-100 dark:hover:bg-gray-700",
               )}
               aria-label="Close"
             >
@@ -249,7 +249,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                   "pl-9 pr-3 h-9 text-sm",
                   "bg-white dark:bg-gray-800",
                   "border-gray-200 dark:border-gray-700",
-                  "focus-visible:ring-1 focus-visible:ring-breneo-accent"
+                  "focus-visible:ring-1 focus-visible:ring-breneo-accent",
                 )}
               />
             </div>
@@ -263,7 +263,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                 className={cn(
                   "flex items-center px-4 py-3 cursor-pointer transition-colors border-b",
                   "hover:bg-gray-50 dark:hover:bg-gray-700/50",
-                  "border-gray-100 dark:border-gray-700"
+                  "border-gray-100 dark:border-gray-700",
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -275,17 +275,17 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                   onCheckedChange={(checked) => {
                     if (checked) {
                       setTempSelectedLocations(
-                        filteredCountries.map((country) => country.code)
+                        filteredCountries.map((country) => country.code),
                       );
                     } else {
                       // Remove all filtered countries from selection
                       const filteredCodes = filteredCountries.map(
-                        (c) => c.code
+                        (c) => c.code,
                       );
                       setTempSelectedLocations(
                         tempSelectedLocations.filter(
-                          (code) => !filteredCodes.includes(code)
-                        )
+                          (code) => !filteredCodes.includes(code),
+                        ),
                       );
                     }
                   }}
@@ -312,7 +312,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                     key={country.code}
                     className={cn(
                       "flex items-center px-4 py-2.5 cursor-pointer transition-colors",
-                      "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      "hover:bg-gray-50 dark:hover:bg-gray-700/50",
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -330,8 +330,8 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                         } else {
                           setTempSelectedLocations(
                             tempSelectedLocations.filter(
-                              (code) => code !== country.code
-                            )
+                              (code) => code !== country.code,
+                            ),
                           );
                         }
                       }}
@@ -340,7 +340,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                     <span
                       className={cn(
                         "text-sm flex-1",
-                        "text-gray-900 dark:text-gray-100"
+                        "text-gray-900 dark:text-gray-100",
                       )}
                     >
                       {country.name}

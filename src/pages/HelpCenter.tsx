@@ -115,7 +115,7 @@ const HelpCenter = () => {
     questions: category.questions.filter(
       (item) =>
         item.q.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.a.toLowerCase().includes(searchQuery.toLowerCase())
+        item.a.toLowerCase().includes(searchQuery.toLowerCase()),
     ),
   }));
 
@@ -154,7 +154,7 @@ const HelpCenter = () => {
 
           {/* Quick Links */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card className="hover:shadow-soft transition-shadow cursor-pointer">
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 bg-breneo-blue/10 rounded-3xl flex items-center justify-center mb-2">
                   <Mail className="text-breneo-blue" size={24} />
@@ -164,7 +164,7 @@ const HelpCenter = () => {
               </CardHeader>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card className="hover:shadow-soft transition-shadow cursor-pointer">
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 bg-breneo-blue/10 rounded-3xl flex items-center justify-center mb-2">
                   <Phone className="text-breneo-blue" size={24} />
@@ -174,7 +174,7 @@ const HelpCenter = () => {
               </CardHeader>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card className="hover:shadow-soft transition-shadow cursor-pointer">
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 bg-breneo-blue/10 rounded-3xl flex items-center justify-center mb-2">
                   <MessageCircle className="text-breneo-blue" size={24} />
@@ -221,7 +221,7 @@ const HelpCenter = () => {
                       </Accordion>
                     </CardContent>
                   </Card>
-                )
+                ),
             )}
           </div>
 

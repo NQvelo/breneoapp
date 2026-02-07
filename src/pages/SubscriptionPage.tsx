@@ -85,9 +85,12 @@ export default function SubscriptionPage() {
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <div className="mt-4">
                   <span className="text-4xl font-bold">{plan.price}</span>
-                  {plan.period !== "forever" && plan.period !== "contact us" && (
-                    <span className="text-muted-foreground">/{plan.period}</span>
-                  )}
+                  {plan.period !== "forever" &&
+                    plan.period !== "contact us" && (
+                      <span className="text-muted-foreground">
+                        /{plan.period}
+                      </span>
+                    )}
                   {plan.period === "contact us" && (
                     <span className="text-muted-foreground block text-sm mt-1">
                       {plan.period}
@@ -123,4 +126,3 @@ export default function SubscriptionPage() {
     </DashboardLayout>
   );
 }
-

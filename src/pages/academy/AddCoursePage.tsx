@@ -64,7 +64,7 @@ const AddCoursePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -233,12 +233,13 @@ const AddCoursePage = () => {
           const fileExt = courseImage.name.split(".").pop();
           const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from("course-images")
-            .upload(fileName, courseImage, {
-              cacheControl: "3600",
-              upsert: false,
-            });
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("course-images")
+              .upload(fileName, courseImage, {
+                cacheControl: "3600",
+                upsert: false,
+              });
 
           if (uploadError) {
             console.error("❌ Image upload error:", uploadError);
@@ -248,7 +249,7 @@ const AddCoursePage = () => {
               uploadError.message?.includes("does not exist")
             ) {
               toast.error(
-                "Storage bucket 'course-images' not found. Please contact support to set it up."
+                "Storage bucket 'course-images' not found. Please contact support to set it up.",
               );
               throw new Error("Storage bucket not configured");
             }
@@ -259,13 +260,13 @@ const AddCoursePage = () => {
               uploadError.statusCode === 403
             ) {
               toast.error(
-                "Permission denied. Please check storage bucket policies."
+                "Permission denied. Please check storage bucket policies.",
               );
               throw new Error("Storage permission denied");
             }
 
             toast.error(
-              `Failed to upload image: ${uploadError.message || "Unknown error"}`
+              `Failed to upload image: ${uploadError.message || "Unknown error"}`,
             );
             throw uploadError;
           }
@@ -346,12 +347,13 @@ const AddCoursePage = () => {
           const fileExt = courseImage.name.split(".").pop();
           const fileName = `${academyProfile.id}/${Date.now()}.${fileExt}`;
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from("course-images")
-            .upload(fileName, courseImage, {
-              cacheControl: "3600",
-              upsert: false,
-            });
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from("course-images")
+              .upload(fileName, courseImage, {
+                cacheControl: "3600",
+                upsert: false,
+              });
 
           if (uploadError) {
             console.error("❌ Image upload error:", uploadError);
@@ -361,7 +363,7 @@ const AddCoursePage = () => {
               uploadError.message?.includes("does not exist")
             ) {
               toast.error(
-                "Storage bucket 'course-images' not found. Please contact support to set it up."
+                "Storage bucket 'course-images' not found. Please contact support to set it up.",
               );
               throw new Error("Storage bucket not configured");
             }
@@ -372,13 +374,13 @@ const AddCoursePage = () => {
               uploadError.statusCode === 403
             ) {
               toast.error(
-                "Permission denied. Please check storage bucket policies."
+                "Permission denied. Please check storage bucket policies.",
               );
               throw new Error("Storage permission denied");
             }
 
             toast.error(
-              `Failed to upload image: ${uploadError.message || "Unknown error"}`
+              `Failed to upload image: ${uploadError.message || "Unknown error"}`,
             );
             throw uploadError;
           }
@@ -482,7 +484,6 @@ const AddCoursePage = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="bg-white rounded-3xl p-6 shadow-sm">
-
           <div className="space-y-6">
             {/* Cover Image - Full Width */}
             <div>
@@ -503,7 +504,7 @@ const AddCoursePage = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                  <div className="flex justify-center px-6 pt-5 pb-6 rounded-md bg-muted/50">
                     <div className="space-y-1 text-center">
                       <UploadCloud className="mx-auto h-12 w-12 text-gray-400" />
                       <div className="flex text-sm text-gray-600">
@@ -677,7 +678,7 @@ const AddCoursePage = () => {
           </div>
 
           {/* Footer with Delete and Save buttons */}
-          <div className="flex justify-between items-center mt-6 pt-6 border-t">
+          <div className="flex justify-between items-center mt-6 pt-6">
             {isEditMode ? (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -693,8 +694,8 @@ const AddCoursePage = () => {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently
-                      delete the course.
+                      This action cannot be undone. This will permanently delete
+                      the course.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -718,17 +719,15 @@ const AddCoursePage = () => {
               <Button
                 onClick={handleSubmit}
                 disabled={
-                  isSubmitting ||
-                  !courseForm.title ||
-                  !courseForm.description
+                  isSubmitting || !courseForm.title || !courseForm.description
                 }
                 className="bg-breneo-blue hover:bg-breneo-blue/90"
               >
                 {isSubmitting
                   ? "Saving..."
                   : isEditMode
-                  ? "Save Changes"
-                  : "Add Course"}
+                    ? "Save Changes"
+                    : "Add Course"}
               </Button>
             </div>
           </div>
@@ -739,4 +738,3 @@ const AddCoursePage = () => {
 };
 
 export default AddCoursePage;
-

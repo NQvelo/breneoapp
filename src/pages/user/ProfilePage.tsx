@@ -85,9 +85,9 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { RadialProgress } from "@/components/ui/radial-progress";
-import { 
-  calculateMatchPercentage, 
-  getMatchQualityLabel 
+import {
+  calculateMatchPercentage,
+  getMatchQualityLabel,
 } from "@/utils/jobMatchUtils";
 import { ApiJob } from "@/api/jobs/types";
 
@@ -306,7 +306,15 @@ const extractJobSkills = (job: any): string[] => {
 
   // Common tech skills keywords
   const skillKeywords: Record<string, string[]> = {
-    javascript: ["javascript", "js", "node.js", "nodejs", "react", "vue", "angular"],
+    javascript: [
+      "javascript",
+      "js",
+      "node.js",
+      "nodejs",
+      "react",
+      "vue",
+      "angular",
+    ],
     python: ["python", "django", "flask", "fastapi"],
     java: ["java", "spring", "spring boot"],
     "c++": ["c++", "cpp", "c plus plus"],
@@ -338,7 +346,12 @@ const extractJobSkills = (job: any): string[] => {
     azure: ["azure", "microsoft azure"],
     gcp: ["gcp", "google cloud", "google cloud platform"],
     linux: ["linux", "unix"],
-    "machine learning": ["machine learning", "ml", "deep learning", "neural network"],
+    "machine learning": [
+      "machine learning",
+      "ml",
+      "deep learning",
+      "neural network",
+    ],
     "data science": ["data science", "data analysis", "data analytics"],
     ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
     blockchain: ["blockchain", "ethereum", "solidity", "web3"],
@@ -369,7 +382,7 @@ const ProfilePage = () => {
 
   // State for skill test results
   const [skillResults, setSkillResults] = useState<SkillTestResult | null>(
-    null
+    null,
   );
   const [loadingResults, setLoadingResults] = useState(false);
 
@@ -379,14 +392,20 @@ const ProfilePage = () => {
   const [aboutMe, setAboutMe] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<"profile" | "saved">("profile");
-  const [activeSavedTab, setActiveSavedTab] = useState<"courses" | "jobs">("courses");
+  const [activeSavedTab, setActiveSavedTab] = useState<"courses" | "jobs">(
+    "courses",
+  );
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
 
   // Update active view based on hash
   useEffect(() => {
     const hash = location.hash;
-    if (hash === "#saved" || hash === "#savedjobs" || hash === "#savedcourses") {
+    if (
+      hash === "#saved" ||
+      hash === "#savedjobs" ||
+      hash === "#savedcourses"
+    ) {
       setActiveView("saved");
       if (hash === "#savedjobs") {
         setActiveSavedTab("jobs");
@@ -431,7 +450,7 @@ const ProfilePage = () => {
   const [loadingSocialLinks, setLoadingSocialLinks] = useState(false);
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
   const [editingPlatform, setEditingPlatform] = useState<SocialPlatform | null>(
-    null
+    null,
   );
   const [socialLinkForm, setSocialLinkForm] = useState<{
     platform: SocialPlatform | "";
@@ -486,20 +505,20 @@ const ProfilePage = () => {
           // Check for saved_courses in various possible locations
           if (Array.isArray(data.saved_courses)) {
             savedCourseIdsList = data.saved_courses.map((id: string | number) =>
-              String(id)
+              String(id),
             );
           } else if (data.profile && typeof data.profile === "object") {
             const profile = data.profile as Record<string, unknown>;
             if (Array.isArray(profile.saved_courses)) {
               savedCourseIdsList = profile.saved_courses.map(
-                (id: string | number) => String(id)
+                (id: string | number) => String(id),
               );
             }
           } else if (data.user && typeof data.user === "object") {
             const userData = data.user as Record<string, unknown>;
             if (Array.isArray(userData.saved_courses)) {
               savedCourseIdsList = userData.saved_courses.map(
-                (id: string | number) => String(id)
+                (id: string | number) => String(id),
               );
             }
           }
@@ -518,14 +537,14 @@ const ProfilePage = () => {
         const { data: coursesData, error: coursesError } = await supabase
           .from("courses")
           .select(
-            "id, title, provider, category, level, duration, image, description, academy_id"
+            "id, title, provider, category, level, duration, image, description, academy_id",
           )
           .in("id", idsToFetch);
 
         if (coursesError) {
           console.error(
             "Error fetching course details from Supabase:",
-            coursesError
+            coursesError,
           );
           return [];
         }
@@ -535,7 +554,7 @@ const ProfilePage = () => {
           ...new Set(
             coursesData
               ?.map((c) => c.academy_id)
-              .filter((id): id is string => !!id) || []
+              .filter((id): id is string => !!id) || [],
           ),
         ];
 
@@ -547,7 +566,7 @@ const ProfilePage = () => {
             uniqueAcademyIds.map(async (academyId) => {
               try {
                 const response = await apiClient.get(
-                  `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`
+                  `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`,
                 );
 
                 if (response.data) {
@@ -558,7 +577,7 @@ const ProfilePage = () => {
 
                   const getStringField = (
                     field: string,
-                    source: Record<string, unknown> = profileData
+                    source: Record<string, unknown> = profileData,
                   ) => {
                     const value = source[field];
                     return typeof value === "string" ? value : undefined;
@@ -576,11 +595,11 @@ const ProfilePage = () => {
                 }
               } catch (error) {
                 console.debug(
-                  `Could not fetch academy profile for ${academyId}`
+                  `Could not fetch academy profile for ${academyId}`,
                 );
                 academyProfilesMap.set(academyId, null);
               }
-            })
+            }),
           );
         }
 
@@ -640,7 +659,7 @@ const ProfilePage = () => {
       if (context?.previousSavedCourses && user?.id) {
         queryClient.setQueryData(
           ["savedCourses", user?.id],
-          context.previousSavedCourses
+          context.previousSavedCourses,
         );
       }
       console.error("Error updating saved courses:", error);
@@ -657,7 +676,7 @@ const ProfilePage = () => {
       toast.success(
         isCurrentlySaved
           ? "Removed from saved courses."
-          : "Course saved to your profile."
+          : "Course saved to your profile.",
       );
     },
   });
@@ -760,8 +779,12 @@ const ProfilePage = () => {
               jobDetail.companyLogo ||
               jobDetail.logo_url ||
               (typeof jobDetail.company === "object" && jobDetail.company
-                ? (jobDetail.company as { logo?: string; company_logo?: string })
-                    .logo ||
+                ? (
+                    jobDetail.company as {
+                      logo?: string;
+                      company_logo?: string;
+                    }
+                  ).logo ||
                   (jobDetail.company as { company_logo?: string }).company_logo
                 : undefined);
 
@@ -769,8 +792,12 @@ const ProfilePage = () => {
             let salary = "By agreement";
             const minSalary = jobDetail.job_min_salary || jobDetail.min_salary;
             const maxSalary = jobDetail.job_max_salary || jobDetail.max_salary;
-            const salaryCurrency = (jobDetail.job_salary_currency || jobDetail.salary_currency || "$") as string;
-            const salaryPeriod = (jobDetail.job_salary_period || jobDetail.salary_period || "yearly") as string;
+            const salaryCurrency = (jobDetail.job_salary_currency ||
+              jobDetail.salary_currency ||
+              "$") as string;
+            const salaryPeriod = (jobDetail.job_salary_period ||
+              jobDetail.salary_period ||
+              "yearly") as string;
 
             if (
               minSalary &&
@@ -783,7 +810,7 @@ const ProfilePage = () => {
               const maxSalaryFormatted = maxSalary.toLocaleString();
               const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
               const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym)
+                salaryCurrency.includes(sym),
               );
               if (isCurrencyBefore) {
                 salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -798,12 +825,15 @@ const ProfilePage = () => {
               const minSalaryFormatted = minSalary.toLocaleString();
               const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
               const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym)
+                salaryCurrency.includes(sym),
               );
               salary = isCurrencyBefore
                 ? `${salaryCurrency}${minSalaryFormatted}+`
                 : `${minSalaryFormatted}+ ${salaryCurrency}`;
-            } else if (jobDetail.salary && typeof jobDetail.salary === "string") {
+            } else if (
+              jobDetail.salary &&
+              typeof jobDetail.salary === "string"
+            ) {
               salary = jobDetail.salary;
             }
 
@@ -819,12 +849,16 @@ const ProfilePage = () => {
               INTERN: "Internship",
             };
             const employmentType =
-              jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+              jobTypeLabels[employmentTypeRaw] ||
+              employmentTypeRaw ||
+              "Full time";
 
             // Determine work arrangement
             let workArrangement = "On-site";
             const isRemote =
-              jobDetail.job_is_remote || jobDetail.is_remote || jobDetail.remote === true;
+              jobDetail.job_is_remote ||
+              jobDetail.is_remote ||
+              jobDetail.remote === true;
             if (isRemote) {
               workArrangement = "Remote";
             } else if (jobTitle?.toLowerCase().includes("hybrid")) {
@@ -838,14 +872,21 @@ const ProfilePage = () => {
               const soft = skillResults.skills_json.soft || {};
               const userSkills = [...Object.keys(tech), ...Object.keys(soft)];
               const jobSkills = extractJobSkills(jobDetail);
-              matchPercentage = calculateMatchPercentage(userSkills, jobSkills, jobTitle);
+              matchPercentage = calculateMatchPercentage(
+                userSkills,
+                jobSkills,
+                jobTitle,
+              );
             }
 
             return {
               id: jobId,
               title: jobTitle,
               company: companyName,
-              location: typeof location === "string" ? location : "Location not specified",
+              location:
+                typeof location === "string"
+                  ? location
+                  : "Location not specified",
               url: jobDetail.url || "",
               company_logo: logo,
               salary,
@@ -862,7 +903,7 @@ const ProfilePage = () => {
         const jobs = await Promise.all(jobPromises);
         return jobs.filter(
           (job): job is SavedJob =>
-            job !== null && job.title !== `Job ${job.id}`
+            job !== null && job.title !== `Job ${job.id}`,
         );
       } catch (error) {
         console.error("Error fetching saved jobs:", error);
@@ -903,7 +944,7 @@ const ProfilePage = () => {
       if (context?.previousSavedJobIds && user?.id) {
         queryClient.setQueryData(
           ["savedJobIds", user?.id],
-          context.previousSavedJobIds
+          context.previousSavedJobIds,
         );
       }
       console.error("Error updating saved jobs:", error);
@@ -922,7 +963,7 @@ const ProfilePage = () => {
       toast.success(
         isCurrentlySaved
           ? "Removed from saved jobs."
-          : "Job saved to your profile."
+          : "Job saved to your profile.",
       );
     },
   });
@@ -960,7 +1001,7 @@ const ProfilePage = () => {
       try {
         // Pass user ID as query parameter to fetch user-specific results
         const response = await apiClient.get(
-          `/api/skilltest/results/?user=${user.id}`
+          `/api/skilltest/results/?user=${user.id}`,
         );
 
         // console.log("🔍 Skill test results response:", response.data);
@@ -1291,7 +1332,7 @@ const ProfilePage = () => {
             const hasChanged = Object.keys(extractedLinks).some(
               (key) =>
                 prev[key as keyof SocialLinks] !==
-                extractedLinks[key as keyof typeof extractedLinks]
+                extractedLinks[key as keyof typeof extractedLinks],
             );
             if (!hasChanged) {
               return prev; // Return previous to prevent unnecessary re-render
@@ -1304,7 +1345,7 @@ const ProfilePage = () => {
           // Don't reset if we already have links (might be a manual update)
           setSocialLinks((prev) => {
             const hasAnyLinks = Object.values(prev).some(
-              (v) => v && v.trim() !== ""
+              (v) => v && v.trim() !== "",
             );
             if (hasAnyLinks) {
               console.log("⚠️ Keeping existing social links:", prev);
@@ -1325,7 +1366,7 @@ const ProfilePage = () => {
         console.log("⚠️ Profile data not loaded yet");
         setSocialLinks((prev) => {
           const hasAnyLinks = Object.values(prev).some(
-            (v) => v && v.trim() !== ""
+            (v) => v && v.trim() !== "",
           );
           if (hasAnyLinks) {
             return prev;
@@ -1345,7 +1386,7 @@ const ProfilePage = () => {
       // Don't reset on error if we have links
       setSocialLinks((prev) => {
         const hasAnyLinks = Object.values(prev).some(
-          (v) => v && v.trim() !== ""
+          (v) => v && v.trim() !== "",
         );
         if (hasAnyLinks) {
           return prev;
@@ -1432,7 +1473,7 @@ const ProfilePage = () => {
   };
 
   const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1533,7 +1574,7 @@ const ProfilePage = () => {
           headers: {
             Authorization: token ? `Bearer ${token}` : undefined,
           },
-        }
+        },
       );
 
       console.log("✅ Image removal response:", response.data);
@@ -1635,7 +1676,7 @@ const ProfilePage = () => {
     if (!isValidUrl(socialLinkForm.url)) {
       console.error("❌ Invalid URL:", socialLinkForm.url);
       toast.error(
-        "Please enter a valid URL (e.g., https://example.com or example.com)."
+        "Please enter a valid URL (e.g., https://example.com or example.com).",
       );
       return;
     }
@@ -1669,7 +1710,7 @@ const ProfilePage = () => {
       console.log("📤 Normalized URL:", normalizedUrl);
       console.log(
         "📤 Full payload:",
-        JSON.stringify({ social_links: socialLinksToSend }, null, 2)
+        JSON.stringify({ social_links: socialLinksToSend }, null, 2),
       );
 
       // Set flag to prevent useEffect from overwriting - MUST BE SET BEFORE ANY STATE UPDATES
@@ -1701,13 +1742,13 @@ const ProfilePage = () => {
               Authorization: token ? `Bearer ${token}` : undefined,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
         console.log("✅ PATCH successful with social_links object");
       } catch (apiError) {
         console.error(
           "❌ PATCH with social_links object failed, error:",
-          apiError
+          apiError,
         );
 
         // Check if it's a validation error about the format
@@ -1721,7 +1762,7 @@ const ProfilePage = () => {
         // If 400 error, try sending individual fields instead
         if (error.response?.status === 400) {
           console.log(
-            "🔄 Trying alternative format - sending individual fields..."
+            "🔄 Trying alternative format - sending individual fields...",
           );
           try {
             // Try sending social links as individual fields on the profile
@@ -1732,7 +1773,7 @@ const ProfilePage = () => {
 
             console.log(
               "📤 Trying individual fields payload:",
-              individualFieldsPayload
+              individualFieldsPayload,
             );
             response = await apiClient.patch(
               API_ENDPOINTS.AUTH.PROFILE,
@@ -1742,13 +1783,13 @@ const ProfilePage = () => {
                   Authorization: token ? `Bearer ${token}` : undefined,
                   "Content-Type": "application/json",
                 },
-              }
+              },
             );
             console.log("✅ PATCH successful with individual fields");
           } catch (individualError) {
             console.error(
               "❌ PATCH with individual fields also failed:",
-              individualError
+              individualError,
             );
             // Reset flag on error
             manualSocialLinkUpdateRef.current = false;
@@ -1775,12 +1816,12 @@ const ProfilePage = () => {
             headers: {
               Authorization: token ? `Bearer ${token}` : undefined,
             },
-          }
+          },
         );
 
         console.log(
           "✅ Refreshed profile data:",
-          JSON.stringify(refreshedProfileResponse.data, null, 2)
+          JSON.stringify(refreshedProfileResponse.data, null, 2),
         );
 
         if (refreshedProfileResponse.data) {
@@ -1801,7 +1842,7 @@ const ProfilePage = () => {
 
           console.log(
             "🔍 Social links from refreshed profile:",
-            socialLinksFromRefreshed
+            socialLinksFromRefreshed,
           );
 
           if (
@@ -1831,12 +1872,12 @@ const ProfilePage = () => {
             };
             console.log(
               "✅ Setting social links from refreshed data:",
-              extractedLinks
+              extractedLinks,
             );
             setSocialLinks(extractedLinks);
           } else {
             console.log(
-              "⚠️ No social links in refreshed data, checking if our update was saved..."
+              "⚠️ No social links in refreshed data, checking if our update was saved...",
             );
             // If no social links in response, check if our update should have been there
             // This might indicate the API doesn't return social_links in the response
@@ -1865,7 +1906,7 @@ const ProfilePage = () => {
       toast.success(
         editingPlatform
           ? "Social link updated successfully."
-          : "Social link added successfully."
+          : "Social link added successfully.",
       );
     } catch (error) {
       console.error("❌ Error saving social link:", error);
@@ -1911,7 +1952,7 @@ const ProfilePage = () => {
 
           console.error(
             "❌ Error response data:",
-            JSON.stringify(errorData, null, 2)
+            JSON.stringify(errorData, null, 2),
           );
         }
 
@@ -1965,7 +2006,7 @@ const ProfilePage = () => {
       console.log("📤 Removing social link, sending:", socialLinksToSend);
       console.log(
         "📤 Full payload:",
-        JSON.stringify({ social_links: socialLinksToSend }, null, 2)
+        JSON.stringify({ social_links: socialLinksToSend }, null, 2),
       );
 
       // Set flag to prevent useEffect from overwriting - MUST BE SET BEFORE ANY STATE UPDATES
@@ -1999,7 +2040,7 @@ const ProfilePage = () => {
               Authorization: token ? `Bearer ${token}` : undefined,
               "Content-Type": "application/json",
             },
-          }
+          },
         );
       } catch (apiError) {
         // Reset flag on error
@@ -2020,12 +2061,12 @@ const ProfilePage = () => {
             headers: {
               Authorization: token ? `Bearer ${token}` : undefined,
             },
-          }
+          },
         );
 
         console.log(
           "✅ Refreshed profile data (delete):",
-          JSON.stringify(refreshedProfileResponse.data, null, 2)
+          JSON.stringify(refreshedProfileResponse.data, null, 2),
         );
 
         if (refreshedProfileResponse.data) {
@@ -2046,7 +2087,7 @@ const ProfilePage = () => {
 
           console.log(
             "🔍 Social links from refreshed profile (delete):",
-            socialLinksFromRefreshed
+            socialLinksFromRefreshed,
           );
 
           if (
@@ -2076,7 +2117,7 @@ const ProfilePage = () => {
             };
             console.log(
               "✅ Setting social links from refreshed data (delete):",
-              extractedLinks
+              extractedLinks,
             );
             setSocialLinks(extractedLinks);
           } else {
@@ -2084,14 +2125,14 @@ const ProfilePage = () => {
             // The platform should be removed, so finalSocialLinks is correct
             console.log(
               "✅ Keeping local update (platform removed):",
-              finalSocialLinks
+              finalSocialLinks,
             );
           }
         }
       } catch (refreshError) {
         console.error(
           "❌ Error refreshing profile after delete:",
-          refreshError
+          refreshError,
         );
         // Keep the local update since PATCH succeeded
       }
@@ -2136,7 +2177,7 @@ const ProfilePage = () => {
           errorMessage = errorData.detail || errorData.message || errorMessage;
           console.error(
             "❌ Error response data:",
-            JSON.stringify(errorData, null, 2)
+            JSON.stringify(errorData, null, 2),
           );
         }
       }
@@ -2161,7 +2202,7 @@ const ProfilePage = () => {
           headers: {
             Authorization: token ? `Bearer ${token}` : undefined,
           },
-        }
+        },
       );
 
       console.log("✅ About Me updated:", response.data);
@@ -2234,7 +2275,7 @@ const ProfilePage = () => {
           headers: {
             Authorization: token ? `Bearer ${token}` : undefined,
           },
-        }
+        },
       );
 
       console.log("✅ Contact information updated:", response.data);
@@ -2275,7 +2316,7 @@ const ProfilePage = () => {
       toast.info(
         phone_number
           ? `We've sent a 6-digit code to ${phone_number}.`
-          : "We've sent a 6-digit code to your phone."
+          : "We've sent a 6-digit code to your phone.",
       );
     } catch (error) {
       const message =
@@ -2446,14 +2487,14 @@ const ProfilePage = () => {
         typeof width === "number"
           ? width
           : typeof width === "string"
-          ? parseFloat(width)
-          : 0;
+            ? parseFloat(width)
+            : 0;
       const heightNum =
         typeof height === "number"
           ? height
           : typeof height === "string"
-          ? parseFloat(height)
-          : 0;
+            ? parseFloat(height)
+            : 0;
 
       if (!xNum || !yNum || !widthNum || !heightNum || !skillName) {
         return null;
@@ -2560,26 +2601,26 @@ const ProfilePage = () => {
         typeof x === "number"
           ? x
           : typeof x === "string"
-          ? parseFloat(x) || 0
-          : 0;
+            ? parseFloat(x) || 0
+            : 0;
       const yNum =
         typeof y === "number"
           ? y
           : typeof y === "string"
-          ? parseFloat(y) || 0
-          : 0;
+            ? parseFloat(y) || 0
+            : 0;
       const widthNum =
         typeof width === "number"
           ? width
           : typeof width === "string"
-          ? parseFloat(width) || 0
-          : 0;
+            ? parseFloat(width) || 0
+            : 0;
       const heightNum =
         typeof height === "number"
           ? height
           : typeof height === "string"
-          ? parseFloat(height) || 0
-          : 0;
+            ? parseFloat(height) || 0
+            : 0;
 
       if (!xNum || !yNum || !widthNum || !heightNum) {
         return null;
@@ -2757,9 +2798,9 @@ const ProfilePage = () => {
                 <span className="relative z-10">Saved</span>
               </motion.button>
             ) : (
-              <motion.div 
-                key="saved-tabs" 
-                layout 
+              <motion.div
+                key="saved-tabs"
+                layout
                 className="flex items-center"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -2881,7 +2922,8 @@ const ProfilePage = () => {
                             {(user as { job_title?: string }).job_title}
                           </p>
                         )}
-                        {(user as { city?: string; location?: string })?.city ? (
+                        {(user as { city?: string; location?: string })
+                          ?.city ? (
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {(user as { city?: string }).city}
                             {(user as { country?: string })?.country &&
@@ -2987,10 +3029,15 @@ const ProfilePage = () => {
                       Loading...
                     </div>
                   ) : Object.entries(socialLinks).some(
-                      ([_, url]) => url && url.trim() !== ""
+                      ([_, url]) => url && url.trim() !== "",
                     ) ? (
                     <div>
-                      {(Object.entries(socialLinks) as [SocialPlatform, string][])
+                      {(
+                        Object.entries(socialLinks) as [
+                          SocialPlatform,
+                          string,
+                        ][]
+                      )
                         .filter(([_, url]) => url && url.trim() !== "")
                         .map(([platform, url], index, filteredArray) => (
                           <div
@@ -3011,7 +3058,7 @@ const ProfilePage = () => {
                                 <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
                                   {getSocialIcon(
                                     platform,
-                                    "h-[18px] w-[18px] text-breneo-blue"
+                                    "h-[18px] w-[18px] text-breneo-blue",
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -3068,7 +3115,7 @@ const ProfilePage = () => {
 
               {/* Skill Test Card */}
               <Card
-                className="bg-white transition-all w-auto flex-shrink-0 rounded-3xl border-0"
+                className="bg-white transition-all w-auto flex-shrink-0 rounded-3xl border-0 hover:shadow-soft transition-shadow cursor-pointer"
                 style={{
                   boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
                 }}
@@ -3119,7 +3166,9 @@ const ProfilePage = () => {
               </CardHeader>
               <CardContent className="px-6 py-4">
                 {loadingProfile ? (
-                  <div className="text-center py-4 text-gray-500">Loading...</div>
+                  <div className="text-center py-4 text-gray-500">
+                    Loading...
+                  </div>
                 ) : aboutMe ? (
                   <div>
                     <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
@@ -3197,7 +3246,7 @@ const ProfilePage = () => {
                                 <CardContent className="p-2 pt-0 pb-4">
                                   {renderSkillsChart(
                                     skillResults.skills_json.tech,
-                                    "Technical Skills"
+                                    "Technical Skills",
                                   )}
                                 </CardContent>
                               </Card>
@@ -3216,7 +3265,7 @@ const ProfilePage = () => {
                                 <CardContent className="p-2 pt-0 pb-4">
                                   {renderSkillsChart(
                                     skillResults.skills_json.soft,
-                                    "Soft Skills"
+                                    "Soft Skills",
                                   )}
                                 </CardContent>
                               </Card>
@@ -3227,15 +3276,15 @@ const ProfilePage = () => {
 
                     {getAllSkills().length === 0 && !loadingResults && (
                       <div className="text-center py-4 text-gray-500 text-sm">
-                        No skill test results available. Take a skill test to see
-                        your results here.
+                        No skill test results available. Take a skill test to
+                        see your results here.
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="text-center py-4 text-gray-500 text-sm">
-                    No skill test results available. Take a skill test to see your
-                    results here.
+                    No skill test results available. Take a skill test to see
+                    your results here.
                   </div>
                 )}
               </CardContent>
@@ -3269,11 +3318,16 @@ const ProfilePage = () => {
                 <Card className="rounded-3xl border-0 shadow-sm bg-card/50">
                   <CardContent className="p-12 text-center">
                     <GraduationCap className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No saved courses</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      No saved courses
+                    </h3>
                     <p className="text-gray-500 mb-4">
                       Start saving courses to view them here!
                     </p>
-                    <Button onClick={() => navigate("/courses")} variant="default">
+                    <Button
+                      onClick={() => navigate("/courses")}
+                      variant="default"
+                    >
                       Browse Courses
                     </Button>
                   </CardContent>
@@ -3281,14 +3335,16 @@ const ProfilePage = () => {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {savedCourses.map((course) => {
-                    const isCourseSaved = savedCourseIds.includes(String(course.id));
+                    const isCourseSaved = savedCourseIds.includes(
+                      String(course.id),
+                    );
                     return (
                       <Link
                         key={course.id}
                         to={`/course/${course.id}`}
                         className="block"
                       >
-                        <Card className="relative transition-all duration-200 cursor-pointer group border-0 rounded-3xl w-full flex flex-col h-full bg-card">
+                        <Card className="relative transition-all duration-200 cursor-pointer group border-0 rounded-3xl w-full flex flex-col h-full bg-card hover:shadow-soft">
                           <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
                             <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                               <img
@@ -3327,7 +3383,9 @@ const ProfilePage = () => {
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    saveCourseMutation.mutate(String(course.id));
+                                    saveCourseMutation.mutate(
+                                      String(course.id),
+                                    );
                                   }}
                                   disabled={saveCourseMutation.isPending}
                                   aria-label="Unsave course"
@@ -3335,7 +3393,7 @@ const ProfilePage = () => {
                                     "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
                                     isCourseSaved
                                       ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                      : "text-black dark:text-white"
+                                      : "text-black dark:text-white",
                                   )}
                                 >
                                   {saveCourseMutation.isPending ? (
@@ -3346,7 +3404,7 @@ const ProfilePage = () => {
                                         "h-4 w-4 transition-colors",
                                         isCourseSaved
                                           ? "text-red-500 fill-red-500"
-                                          : "text-black dark:text-white"
+                                          : "text-black dark:text-white",
                                       )}
                                     />
                                   )}
@@ -3385,7 +3443,9 @@ const ProfilePage = () => {
                 <Card className="rounded-3xl border-0 shadow-sm bg-card/50">
                   <CardContent className="p-12 text-center">
                     <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No saved jobs</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      No saved jobs
+                    </h3>
                     <p className="text-gray-500 mb-4">
                       Start saving jobs to view them here!
                     </p>
@@ -3401,7 +3461,7 @@ const ProfilePage = () => {
                     return (
                       <Card
                         key={job.id}
-                        className="group flex flex-col transition-all duration-200 border-0 overflow-hidden rounded-3xl cursor-pointer bg-card"
+                        className="group flex flex-col transition-all duration-200 border-0 overflow-hidden rounded-3xl cursor-pointer bg-card hover:shadow-soft"
                         onClick={() => {
                           if (job.url) {
                             window.open(job.url, "_blank");
@@ -3422,7 +3482,8 @@ const ProfilePage = () => {
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     target.style.display = "none";
-                                    const fallback = target.nextElementSibling as HTMLElement;
+                                    const fallback =
+                                      target.nextElementSibling as HTMLElement;
                                     if (fallback) {
                                       fallback.classList.remove("hidden");
                                       fallback.classList.add("flex");
@@ -3430,7 +3491,9 @@ const ProfilePage = () => {
                                   }}
                                 />
                               ) : null}
-                              <div className={`w-10 h-10 rounded-md bg-breneo-blue/10 flex items-center justify-center ${job.company_logo ? 'hidden absolute inset-0' : ''}`}>
+                              <div
+                                className={`w-10 h-10 rounded-md bg-breneo-blue/10 flex items-center justify-center ${job.company_logo ? "hidden absolute inset-0" : ""}`}
+                              >
                                 <Briefcase className="h-5 w-5 text-breneo-blue" />
                               </div>
                             </div>
@@ -3491,7 +3554,7 @@ const ProfilePage = () => {
                                 "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 border-0",
                                 isJobSaved
                                   ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                  : "text-black dark:text-white"
+                                  : "text-black dark:text-white",
                               )}
                             >
                               {saveJobMutation.isPending ? (
@@ -3502,7 +3565,7 @@ const ProfilePage = () => {
                                     "h-4 w-4 transition-colors",
                                     isJobSaved
                                       ? "text-red-500 fill-red-500"
-                                      : "text-black dark:text-white"
+                                      : "text-black dark:text-white",
                                   )}
                                 />
                               )}
@@ -3521,9 +3584,7 @@ const ProfilePage = () => {
 
       {/* Logout Confirmation */}
       {isMobile ? (
-        <Drawer
-          onOpenChange={setIsLogoutConfirmOpen}
-        >
+        <Drawer onOpenChange={setIsLogoutConfirmOpen}>
           <DrawerContent>
             <DrawerHeader>
               <DrawerTitle>Log out</DrawerTitle>
@@ -3763,7 +3824,7 @@ const ProfilePage = () => {
                               <span>{platformLabels[platform]}</span>
                             </div>
                           </SelectItem>
-                        )
+                        ),
                       )}
                     </SelectContent>
                   </Select>
@@ -3796,8 +3857,8 @@ const ProfilePage = () => {
                 {savingSocialLink
                   ? "Saving..."
                   : editingPlatform
-                  ? "Update"
-                  : "Add"}
+                    ? "Update"
+                    : "Add"}
               </Button>
               <DrawerClose asChild>
                 <Button variant="outline" disabled={savingSocialLink}>
@@ -3844,7 +3905,7 @@ const ProfilePage = () => {
                               <span>{platformLabels[platform]}</span>
                             </div>
                           </SelectItem>
-                        )
+                        ),
                       )}
                     </SelectContent>
                   </Select>
@@ -3888,8 +3949,8 @@ const ProfilePage = () => {
                 {savingSocialLink
                   ? "Saving..."
                   : editingPlatform
-                  ? "Update"
-                  : "Add"}
+                    ? "Update"
+                    : "Add"}
               </Button>
             </DialogFooter>
           </DialogContent>

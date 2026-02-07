@@ -102,7 +102,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
     return countries.filter(
       (country) =>
         country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query)
+        country.code.toLowerCase().includes(query),
     );
   }, [searchQuery]);
 
@@ -149,7 +149,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   const handleSelectAllSkills = () => {
     if (userTopSkills.length === 0) return;
     const allSelected = userTopSkills.every((skill) =>
-      filters.skills.includes(skill)
+      filters.skills.includes(skill),
     );
     if (allSelected) {
       // Remove all
@@ -362,7 +362,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                   ) : (
                     filteredCountries.map((country) => {
                       const isChecked = filters.countries.includes(
-                        country.code
+                        country.code,
                       );
                       return (
                         <label

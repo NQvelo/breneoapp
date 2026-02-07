@@ -129,7 +129,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
     return countries.filter(
       (country) =>
         country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query)
+        country.code.toLowerCase().includes(query),
     );
   }, [searchQuery]);
 
@@ -248,7 +248,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   const handleSelectAllSkills = () => {
     if (userTopSkills.length === 0) return;
     const allSelected = userTopSkills.every((skill) =>
-      filters.skills.includes(skill)
+      filters.skills.includes(skill),
     );
     if (allSelected) {
       // Remove all
@@ -282,7 +282,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   const handleSalaryChange = (
     min: number | undefined,
     max: number | undefined,
-    byAgreement: boolean
+    byAgreement: boolean,
   ) => {
     onFiltersChange({
       ...filters,
@@ -618,7 +618,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                   ) : (
                     filteredCountries.map((country) => {
                       const isChecked = filters.countries.includes(
-                        country.code
+                        country.code,
                       );
                       return (
                         <label
@@ -661,7 +661,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   const { t } = useLanguage();
   const isMobile = useMobile();
   const [mobileView, setMobileView] = useState<"main" | "workType" | "country">(
-    "main"
+    "main",
   );
   const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
@@ -677,7 +677,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     return countries.filter(
       (country) =>
         country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query)
+        country.code.toLowerCase().includes(query),
     );
   }, [locationSearchQuery]);
 
@@ -734,7 +734,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   const handleSalaryChange = (
     min: number | undefined,
     max: number | undefined,
-    byAgreement: boolean
+    byAgreement: boolean,
   ) => {
     onFiltersChange({
       ...filters,
@@ -764,8 +764,8 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               {mobileView === "workType"
                 ? t.jobs.workType
                 : mobileView === "country"
-                ? t.jobs.country
-                : SEARCH_TITLE_KA}
+                  ? t.jobs.country
+                  : SEARCH_TITLE_KA}
             </DrawerTitle>
           </DrawerHeader>
           {mobileView === "country" && (

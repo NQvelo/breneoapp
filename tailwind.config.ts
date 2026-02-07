@@ -31,7 +31,7 @@ export default {
           blue: "#19B5FE",
           navy: "#303B5A",
           accent: "#19ACE5",
-          lightgray: "#F6F9F9",
+          lightgray: "#F3F3F4",
           gray: "#E9ECEF",
           success: "#20C997",
           warning: "#FFC107",
@@ -81,6 +81,9 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      boxShadow: {
+        soft: "0 4px 14px 0 rgba(0, 0, 0, 0.04)",
       },
       borderRadius: {
         lg: "16px", // base large radius

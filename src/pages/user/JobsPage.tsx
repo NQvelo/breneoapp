@@ -122,7 +122,7 @@ const jobTypeLabels: Record<string, string> = {
 
 // Skill icon mapping - maps skill names to appropriate icons
 const getSkillIcon = (
-  skill: string
+  skill: string,
 ): React.ComponentType<{ className?: string }> => {
   const skillLower = skill.toLowerCase();
 
@@ -411,7 +411,7 @@ const getSkillColor = (skill: string, index: number): string => {
 
 // Fetch all internship jobs without any filtering
 const fetchInternshipJobs = async (
-  page: number = 1
+  page: number = 1,
 ): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
@@ -419,7 +419,7 @@ const fetchInternshipJobs = async (
 }> => {
   try {
     console.log(
-      `🚀 fetchInternshipJobs called - fetching internship jobs page ${page}`
+      `🚀 fetchInternshipJobs called - fetching internship jobs page ${page}`,
     );
 
     const response = await jobService.fetchActiveJobs({
@@ -429,7 +429,7 @@ const fetchInternshipJobs = async (
         countries: [], // No country filtering
         jobTypes: ["INTERN"], // Filter for internship jobs only
         isRemote: undefined,
-        datePosted: undefined,
+        datePosted: "week", // Only jobs updated in the last 1 week
         skills: [], // No skill filtering
         salaryMin: undefined,
         salaryMax: undefined,
@@ -467,7 +467,7 @@ const fetchInternshipJobs = async (
 const fetchLatestJobs = async (
   page: number = 1,
   filters: JobFilters,
-  userTopSkills: string[] = []
+  userTopSkills: string[] = [],
 ): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
@@ -476,7 +476,7 @@ const fetchLatestJobs = async (
   try {
     console.log(
       `🚀 fetchLatestJobs called - fetching regular jobs page ${page} with filters:`,
-      filters
+      filters,
     );
 
     // Check if all interests are selected (like JobSearchResultsPage does)
@@ -567,7 +567,7 @@ const fetchLatestJobs = async (
     }
 
     console.log(
-      `✅ fetchLatestJobs: ${validJobs.length} jobs found after filtering`
+      `✅ fetchLatestJobs: ${validJobs.length} jobs found after filtering`,
     );
 
     // Return valid jobs with pagination info
@@ -585,7 +585,7 @@ const fetchLatestJobs = async (
 // Fetch remote jobs filtered by user skills
 const fetchRemoteJobs = async (
   page: number = 1,
-  userTopSkills: string[] = []
+  userTopSkills: string[] = [],
 ): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
@@ -594,7 +594,7 @@ const fetchRemoteJobs = async (
   try {
     console.log(
       `🚀 fetchRemoteJobs called - fetching remote jobs page ${page} with skills:`,
-      userTopSkills
+      userTopSkills,
     );
 
     // Use "remote" as search term
@@ -605,7 +605,7 @@ const fetchRemoteJobs = async (
         countries: [], // No country filtering - show remote jobs from all countries
         jobTypes: [], // No job type filtering (will exclude interns client-side)
         isRemote: true, // Filter for remote jobs only
-        datePosted: undefined,
+        datePosted: "week", // Only jobs updated in the last 1 week
         skills: [], // No skills filter
         salaryMin: undefined,
         salaryMax: undefined,
@@ -634,7 +634,7 @@ const fetchRemoteJobs = async (
     });
 
     console.log(
-      `✅ fetchRemoteJobs: ${validJobs.length} valid remote jobs found`
+      `✅ fetchRemoteJobs: ${validJobs.length} valid remote jobs found`,
     );
 
     // Return valid remote jobs with pagination info
@@ -653,11 +653,66 @@ const fetchRemoteJobs = async (
 const JOBS_FILTERS_STORAGE_KEY = "jobsFilters";
 const COURSES_FILTERS_STORAGE_KEY = "coursesFilters";
 
+// Latest jobs cache: avoid refetch on every reload (only last 1 week jobs)
+const LATEST_JOBS_CACHE_KEY = "jobsPage_latestJobs";
+const LATEST_JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+interface LatestJobsCacheEntry {
+  jobs: ApiJob[];
+  hasMore: boolean;
+  total: number;
+  timestamp: number;
+}
+
+const getCachedLatestJobs = (): {
+  jobs: ApiJob[];
+  hasMore: boolean;
+  total: number;
+} | null => {
+  try {
+    const raw = sessionStorage.getItem(LATEST_JOBS_CACHE_KEY);
+    if (!raw) return null;
+    const entry: LatestJobsCacheEntry = JSON.parse(raw);
+    if (
+      !entry ||
+      !Array.isArray(entry.jobs) ||
+      Date.now() - entry.timestamp > LATEST_JOBS_CACHE_TTL_MS
+    ) {
+      return null;
+    }
+    return {
+      jobs: entry.jobs,
+      hasMore: entry.hasMore ?? false,
+      total: entry.total ?? entry.jobs.length,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const setCachedLatestJobs = (data: {
+  jobs: ApiJob[];
+  hasMore: boolean;
+  total: number;
+}) => {
+  try {
+    sessionStorage.setItem(
+      LATEST_JOBS_CACHE_KEY,
+      JSON.stringify({
+        ...data,
+        timestamp: Date.now(),
+      } as LatestJobsCacheEntry),
+    );
+  } catch {
+    // ignore
+  }
+};
+
 // Helper functions for session storage
 const saveFiltersToSession = (
   key: string,
   filters: unknown,
-  search: string
+  search: string,
 ) => {
   try {
     sessionStorage.setItem(key, JSON.stringify({ filters, search }));
@@ -667,7 +722,7 @@ const saveFiltersToSession = (
 };
 
 const loadFiltersFromSession = (
-  key: string
+  key: string,
 ): { filters: unknown; search: string } | null => {
   try {
     const stored = sessionStorage.getItem(key);
@@ -746,7 +801,7 @@ const JobsPage = () => {
       // Save to session storage
       saveFiltersToSession(JOBS_FILTERS_STORAGE_KEY, filters, search);
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   // Initialize filters - always start with cleared filters
@@ -803,21 +858,28 @@ const JobsPage = () => {
     }
   }, [isFilterModalOpen, activeFilters]);
 
-  // Clear all filter params from URL on mount - JobsPage should always start with cleared filters
+  // If URL has filter/search params, redirect to job search page so jobs are filtered by URL
   useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    // Remove all filter-related params, keep only search if it exists
-    params.delete("countries");
-    params.delete("country");
-    params.delete("skills");
-    params.delete("jobTypes");
-    params.delete("isRemote");
-    params.delete("datePosted");
-    params.delete("page");
+    const hasFilterParams =
+      searchParams.get("search") ||
+      searchParams.get("countries") ||
+      searchParams.get("country") ||
+      searchParams.get("skills") ||
+      searchParams.get("jobTypes") ||
+      searchParams.get("isRemote") ||
+      searchParams.get("datePosted") ||
+      searchParams.get("page") ||
+      searchParams.get("salaryMin") ||
+      searchParams.get("salaryMax") ||
+      searchParams.get("salaryByAgreement");
 
-    // Only update if we removed something
-    if (params.toString() !== searchParams.toString()) {
-      setSearchParams(params, { replace: true });
+    if (hasFilterParams) {
+      const params = new URLSearchParams(searchParams);
+      // Normalize: use "page" (ensure page=1 if missing when other params exist)
+      if (!params.get("page") && params.toString()) {
+        params.set("page", "1");
+      }
+      navigate(`/jobs/search?${params.toString()}`, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -836,7 +898,7 @@ const JobsPage = () => {
         // Try to fetch from API first (skill test results)
         try {
           const response = await apiClient.get(
-            `/api/skilltest/results/?user=${user.id}`
+            `/api/skilltest/results/?user=${user.id}`,
           );
           if (
             response.data &&
@@ -846,12 +908,10 @@ const JobsPage = () => {
             const result = response.data[0];
             const skillsJson = result.skills_json;
 
-            // Extract tech and soft skills for matching
+            // Extract only tech skills for the Interests/Skills filter (not soft skills)
             const techSkills = Object.keys(skillsJson.tech || {});
-            const softSkills = Object.keys(skillsJson.soft || {});
-            const allSkills = [...techSkills, ...softSkills];
 
-            setUserTopSkills(allSkills);
+            setUserTopSkills(techSkills);
             setLoadingSkills(false);
             return;
           }
@@ -865,8 +925,8 @@ const JobsPage = () => {
           const skillScores = calculateSkillScores(answers);
           const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
           const topSkills = topSkillsData.map((s) => s.skill);
- 
-          setUserTopSkills(topSkills);
+          const techSkillsOnly = filterHardSkills(topSkills);
+          setUserTopSkills(techSkillsOnly);
         }
       } catch (error) {
         console.error("Error fetching user skills:", error);
@@ -944,74 +1004,67 @@ const JobsPage = () => {
     });
   }, [activeFilters]);
 
-  // Fetch latest regular jobs with user skills - fetch jobs matching user's skills
+  // Fetch latest regular jobs: only last 1 week, cached so not refetched on every reload
   const {
     data: jobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["latestJobs"], // Simple key - no skill filtering
+    queryKey: ["latestJobs"],
     queryFn: async () => {
       try {
-        console.log("🔍 Fetching all jobs (no filters)");
+        // Use sessionStorage cache so we don't fetch on every reload (valid for 30 min)
+        const cached = getCachedLatestJobs();
+        if (cached) {
+          return cached;
+        }
 
-        // Fetch all jobs without any filters
         const response = await jobService.fetchActiveJobs({
-          query: "", // No query filter - get all jobs
+          query: "",
           filters: {
             country: undefined,
-            countries: [], // No country filter
-            jobTypes: [], // No job type filter
-            isRemote: undefined, // No remote filter
-            datePosted: undefined, // No date filter
-            skills: [], // No skills filter
+            countries: [],
+            jobTypes: [],
+            isRemote: undefined,
+            datePosted: "week", // Only jobs updated in the last 1 week
+            skills: [],
             salaryMin: undefined,
             salaryMax: undefined,
             salaryByAgreement: undefined,
           },
-          page: 1, // Always fetch first page for latest jobs
-          pageSize: 500, // Fetch many jobs
-        });
-
-        console.log("✅ Job service response:", {
-          jobsCount: response?.jobs?.length || 0,
-          hasMore: response?.hasMore,
-          total: response?.total,
+          page: 1,
+          pageSize: 500,
         });
 
         if (!response || !Array.isArray(response.jobs)) {
-          console.warn("⚠️ Invalid response from jobService:", response);
           return { jobs: [], hasMore: false, total: 0 };
         }
 
-        // Filter out jobs without valid IDs
         const validJobs = response.jobs.filter((job) => {
           const jobId = String(job.id || "");
           return jobId && jobId.trim() !== "";
         });
 
-        console.log(
-          `✅ Valid jobs: ${validJobs.length} out of ${response.jobs.length}`
-        );
-
-        return {
+        const result = {
           jobs: validJobs,
           hasMore: response.hasMore ?? false,
           total: validJobs.length,
         };
+        setCachedLatestJobs(result);
+        return result;
       } catch (error) {
         console.error("❌ Error fetching jobs:", error);
         throw error;
       }
     },
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
+    refetchOnMount: true,
     refetchOnReconnect: false,
-    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-    retry: 2, // Retry up to 2 times on failure
+    staleTime: LATEST_JOBS_CACHE_TTL_MS, // 30 min - no refetch while fresh
+    gcTime: 60 * 60 * 1000, // 1 hour in memory
+    retry: 2,
     retryDelay: 1000,
-    enabled: true, // Always enabled - don't wait for skills (they can be empty)
+    enabled: true,
   });
 
   // Fetch all internship jobs without any filtering
@@ -1075,7 +1128,7 @@ const JobsPage = () => {
         setAllInternshipJobs((prev) => {
           const existingIds = new Set(prev.map((j) => j.id || j.job_id));
           const newJobs = internshipJobsData.jobs.filter(
-            (j) => !existingIds.has(j.id || j.job_id)
+            (j) => !existingIds.has(j.id || j.job_id),
           );
           return [...prev, ...newJobs];
         });
@@ -1100,7 +1153,7 @@ const JobsPage = () => {
         setAllRemoteJobs((prev) => {
           const existingIds = new Set(prev.map((j) => j.id || j.job_id));
           const newJobs = remoteJobsData.jobs.filter(
-            (j) => !existingIds.has(j.id || j.job_id)
+            (j) => !existingIds.has(j.id || j.job_id),
           );
           return [...prev, ...newJobs];
         });
@@ -1246,7 +1299,7 @@ const JobsPage = () => {
           }
 
           const jobTitle = String(
-            job.title || job.job_title || job.position || "Untitled Position"
+            job.title || job.job_title || job.position || "Untitled Position",
           );
           const companyName = String(
             job.company_name ||
@@ -1264,7 +1317,7 @@ const JobsPage = () => {
                 ? job.employer_name
                 : null) ||
               (typeof job.company === "string" ? job.company : null) ||
-              "Unknown Company"
+              "Unknown Company",
           );
           const jobCity =
             job.job_city || job.city || (companyObj?.city as string) || "";
@@ -1279,7 +1332,7 @@ const JobsPage = () => {
           // Robust location extraction: handle strings, objects, arrays, and nested fields
           const getLocationStringFromJob = (
             j: Record<string, any>,
-            co: Record<string, any> | null
+            co: Record<string, any> | null,
           ): string => {
             // Remote override
             if (j?.job_is_remote || j?.is_remote || j?.remote === true) {
@@ -1357,7 +1410,7 @@ const JobsPage = () => {
           };
 
           const locationString = String(
-            getLocationStringFromJob(job as Record<string, any>, companyObj)
+            getLocationStringFromJob(job as Record<string, any>, companyObj),
           );
           const applyLink =
             job.apply_url ||
@@ -1438,7 +1491,7 @@ const JobsPage = () => {
                 console.debug(
                   "Accepted protocol-relative logo for job",
                   jobId,
-                  logoUrl
+                  logoUrl,
                 );
               return true;
             }
@@ -1465,7 +1518,7 @@ const JobsPage = () => {
                 console.debug(
                   "Accepted relative-path logo for job",
                   jobId,
-                  logoUrl
+                  logoUrl,
                 );
               return true;
             }
@@ -1473,7 +1526,7 @@ const JobsPage = () => {
             if (process.env.NODE_ENV === "development")
               console.debug(
                 "Rejected logo candidate (unsupported format)",
-                logoUrl
+                logoUrl,
               );
 
             return false;
@@ -1488,13 +1541,13 @@ const JobsPage = () => {
             const logoFields = Object.keys(jobAny).filter(
               (key) =>
                 key.toLowerCase().includes("logo") ||
-                key.toLowerCase().includes("company")
+                key.toLowerCase().includes("company"),
             );
             if (logoFields.length > 0) {
               console.log(
                 "🔍 Checking logo fields for job:",
                 jobId,
-                logoFields
+                logoFields,
               );
               logoFields.forEach((field) => {
                 console.log(`  - ${field}:`, jobAny[field]);
@@ -1591,7 +1644,7 @@ const JobsPage = () => {
             const maxSalaryFormatted = maxSalary.toLocaleString();
             const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
             const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym)
+              salaryCurrency.includes(sym),
             );
             if (isCurrencyBefore) {
               salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -1606,7 +1659,7 @@ const JobsPage = () => {
             const minSalaryFormatted = minSalary.toLocaleString();
             const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
             const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym)
+              salaryCurrency.includes(sym),
             );
             salary = isCurrencyBefore
               ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -1644,7 +1697,7 @@ const JobsPage = () => {
           const matchPercentage = calculateMatchPercentage(
             userTopSkills,
             jobSkills,
-            jobTitle
+            jobTitle,
           );
 
           return {
@@ -1677,7 +1730,7 @@ const JobsPage = () => {
   const regularJobs = useMemo(() => {
     console.log(
       "📅 Processing latest jobs - total jobs:",
-      transformedJobs.length
+      transformedJobs.length,
     );
 
     // Sort by date posted (newest first) - no other filtering
@@ -1715,7 +1768,7 @@ const JobsPage = () => {
     const latest9Jobs = sorted.slice(0, 9);
 
     console.log(
-      `✅ Displaying ${latest9Jobs.length} latest jobs (no filters applied)`
+      `✅ Displaying ${latest9Jobs.length} latest jobs (no filters applied)`,
     );
 
     return latest9Jobs;
@@ -1780,7 +1833,7 @@ const JobsPage = () => {
                 .filter(Boolean)
                 .map((s) => String(s))
                 .join(", ") ||
-              "Location not specified"
+              "Location not specified",
           );
           const applyLink =
             job.applyUrl ||
@@ -1935,7 +1988,7 @@ const JobsPage = () => {
             const maxSalaryFormatted = maxSalary.toLocaleString();
             const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
             const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym)
+              salaryCurrency.includes(sym),
             );
             if (isCurrencyBefore) {
               salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -1950,7 +2003,7 @@ const JobsPage = () => {
             const minSalaryFormatted = minSalary.toLocaleString();
             const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
             const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym)
+              salaryCurrency.includes(sym),
             );
             salary = isCurrencyBefore
               ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -1987,7 +2040,7 @@ const JobsPage = () => {
           const matchPercentage = calculateMatchPercentage(
             userTopSkills,
             jobSkills,
-            jobTitle
+            jobTitle,
           );
 
           return {
@@ -2079,7 +2132,7 @@ const JobsPage = () => {
                 .filter(Boolean)
                 .map((s) => String(s))
                 .join(", ") ||
-              "Remote"
+              "Remote",
           );
           const applyLink =
             job.applyUrl ||
@@ -2215,7 +2268,7 @@ const JobsPage = () => {
             const maxSalaryFormatted = maxSalary.toLocaleString();
             const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
             const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym)
+              salaryCurrency.includes(sym),
             );
             if (isCurrencyBefore) {
               salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -2230,7 +2283,7 @@ const JobsPage = () => {
             const minSalaryFormatted = minSalary.toLocaleString();
             const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
             const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym)
+              salaryCurrency.includes(sym),
             );
             salary = isCurrencyBefore
               ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -2260,7 +2313,7 @@ const JobsPage = () => {
           const matchPercentage = calculateMatchPercentage(
             userTopSkills,
             jobSkills,
-            jobTitle
+            jobTitle,
           );
 
           return {
@@ -2309,7 +2362,7 @@ const JobsPage = () => {
       ];
 
       const jobsNeedingLogos = allJobs.filter(
-        (job) => !job.company_logo && job.company_name
+        (job) => !job.company_logo && job.company_name,
       );
 
       if (jobsNeedingLogos.length === 0) return;
@@ -2356,7 +2409,7 @@ const JobsPage = () => {
   // Debug logging
   useEffect(() => {
     console.log(
-      "🌐 Job API Endpoint: https://breneo-job-aggregator-k7ti.onrender.com/api/search"
+      "🌐 Job API Endpoint: https://breneo-job-aggregator-k7ti.onrender.com/api/search",
     );
     console.log("📊 JobsPage State:", {
       isLoading,
@@ -2433,7 +2486,7 @@ const JobsPage = () => {
       }
       navigate(`/jobs/search?${params.toString()}`);
     },
-    [navigate]
+    [navigate],
   );
 
   // Handle work types change - only update filters, don't redirect until search button is clicked
@@ -2486,7 +2539,7 @@ const JobsPage = () => {
     const newFilters = {
       ...activeFilters,
       countries: activeFilters.countries.filter(
-        (code) => code !== countryCodeToRemove
+        (code) => code !== countryCodeToRemove,
       ),
     };
     setActiveFilters(newFilters);
@@ -2497,7 +2550,7 @@ const JobsPage = () => {
   // Handle removing job type filter - redirect to search results
   const handleRemoveJobType = (jobTypeToRemove: string) => {
     const newJobTypes = activeFilters.jobTypes.filter(
-      (type) => type !== jobTypeToRemove
+      (type) => type !== jobTypeToRemove,
     );
     const newFilters = {
       ...activeFilters,
@@ -2557,7 +2610,7 @@ const JobsPage = () => {
           countries: [],
           jobTypes: [],
           isRemote: false,
-          datePosted: undefined,
+          datePosted: "week", // Only last 1 week for consistency with job lists
           skills: [skill], // Filter by this skill only
         },
         page: 1,
@@ -2580,7 +2633,7 @@ const JobsPage = () => {
       await Promise.all(
         userTopSkills.map(async (skill) => {
           counts[skill] = await fetchJobCountForSkill(skill);
-        })
+        }),
       );
       return counts;
     },
@@ -2596,7 +2649,7 @@ const JobsPage = () => {
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
-          <div className="flex items-center bg-white dark:bg-[#242424] border-2 border-breneo-accent dark:border-gray-600 rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
+          <div className="flex items-center bg-white dark:bg-[#242424] rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
             {/* Briefcase Icon - At the start */}
             <Briefcase
               className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -2771,10 +2824,10 @@ const JobsPage = () => {
                       {activeFilters.datePosted === "today"
                         ? "Posted Today"
                         : activeFilters.datePosted === "week"
-                        ? "Posted This Week"
-                        : activeFilters.datePosted === "month"
-                        ? "Posted This Month"
-                        : `Posted: ${activeFilters.datePosted}`}
+                          ? "Posted This Week"
+                          : activeFilters.datePosted === "month"
+                            ? "Posted This Month"
+                            : `Posted: ${activeFilters.datePosted}`}
                     </span>
                     <button
                       onClick={() => {
@@ -2803,8 +2856,8 @@ const JobsPage = () => {
                       activeFilters.salaryMax !== undefined
                         ? `$${activeFilters.salaryMin} - $${activeFilters.salaryMax}`
                         : activeFilters.salaryMin !== undefined
-                        ? `Min: $${activeFilters.salaryMin}`
-                        : `Max: $${activeFilters.salaryMax}`}
+                          ? `Min: $${activeFilters.salaryMin}`
+                          : `Max: $${activeFilters.salaryMax}`}
                     </span>
                     <button
                       onClick={() => {
@@ -2877,7 +2930,7 @@ const JobsPage = () => {
               {regularJobsWithLogos.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl cursor-pointer"
+                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
                   onClick={() => {
                     if (!job.id || String(job.id).trim() === "") return;
                     const encodedId = encodeURIComponent(String(job.id));
@@ -2892,7 +2945,7 @@ const JobsPage = () => {
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
-                            className="w-10 h-10 rounded-md object-cover flex-shrink-0 border border-gray-200"
+                            className="w-10 h-10 rounded-md object-cover flex-shrink-0"
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => {
@@ -2900,7 +2953,7 @@ const JobsPage = () => {
                               console.warn(
                                 "❌ Logo failed to load:",
                                 job.company_logo,
-                                target.src
+                                target.src,
                               );
                               target.style.display = "none";
                               const fallback =
@@ -2914,7 +2967,7 @@ const JobsPage = () => {
                               if (process.env.NODE_ENV === "development") {
                                 console.log(
                                   "✅ Logo loaded successfully:",
-                                  job.company_logo
+                                  job.company_logo,
                                 );
                               }
                             }}
@@ -2984,7 +3037,7 @@ const JobsPage = () => {
                           "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                           job.is_saved
                             ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                            : "text-black dark:text-white"
+                            : "text-black dark:text-white",
                         )}
                       >
                         <Heart
@@ -2992,7 +3045,7 @@ const JobsPage = () => {
                             "h-4 w-4 transition-colors",
                             job.is_saved
                               ? "text-red-500 fill-red-500 animate-heart-pop"
-                              : "text-black dark:text-white"
+                              : "text-black dark:text-white",
                           )}
                         />
                       </Button>
@@ -3013,7 +3066,7 @@ const JobsPage = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(9)].map((_, i) => (
-                <Card key={i} className="border border-gray-200">
+                <Card key={i}>
                   <CardContent className="p-4">
                     <div className="animate-pulse">
                       <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
@@ -3039,7 +3092,7 @@ const JobsPage = () => {
               {remoteJobsWithLogos.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl cursor-pointer"
+                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
                   onClick={() => {
                     if (!job.id || String(job.id).trim() === "") return;
                     const encodedId = encodeURIComponent(String(job.id));
@@ -3054,7 +3107,7 @@ const JobsPage = () => {
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
-                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                            className="w-10 h-10 rounded-full object-cover"
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => {
@@ -3062,7 +3115,7 @@ const JobsPage = () => {
                               console.warn(
                                 "❌ Logo failed to load:",
                                 job.company_logo,
-                                target.src
+                                target.src,
                               );
                               target.style.display = "none";
                               const fallback =
@@ -3076,7 +3129,7 @@ const JobsPage = () => {
                               if (process.env.NODE_ENV === "development") {
                                 console.log(
                                   "✅ Logo loaded successfully:",
-                                  job.company_logo
+                                  job.company_logo,
                                 );
                               }
                             }}
@@ -3146,7 +3199,7 @@ const JobsPage = () => {
                           "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                           job.is_saved
                             ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                            : "text-black dark:text-white"
+                            : "text-black dark:text-white",
                         )}
                       >
                         <Heart
@@ -3154,7 +3207,7 @@ const JobsPage = () => {
                             "h-4 w-4 transition-colors",
                             job.is_saved
                               ? "text-red-500 fill-red-500 animate-heart-pop"
-                              : "text-black dark:text-white"
+                              : "text-black dark:text-white",
                           )}
                         />
                       </Button>

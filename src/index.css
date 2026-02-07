@@ -72,7 +72,7 @@
 
 @layer base {
   :root {
-    --background: 180 20% 97%;
+    --background: 240 5% 95.5%; /* #F3F3F4 light mode page background */
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -89,7 +89,7 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 89%;
     --ring: 197 80% 50%;
     --radius: 0.5rem;
     --sidebar-background: 0 0% 100%;
@@ -139,7 +139,7 @@
 
     /* Borders with subtle contrast */
     --border: 0 0% 20%;
-    --input: 0 0% 20%;
+    --input: 0 0% 22%;
     --ring: 197 80% 55%;
 
     /* Sidebar */
@@ -166,7 +166,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: "Mark GEO", sans-serif; /* Apply the font here */
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 }
 
@@ -202,15 +204,20 @@
 
   /* Enhanced shadows for depth in dark mode */
   .dark .shadow-sm {
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.6), 0 1px 2px -1px rgb(0 0 0 / 0.6);
+    box-shadow:
+      0 1px 3px 0 rgb(0 0 0 / 0.6),
+      0 1px 2px -1px rgb(0 0 0 / 0.6);
   }
 
   .dark .shadow-md {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+    box-shadow:
+      0 4px 6px -1px rgb(0 0 0 / 0.5),
+      0 2px 4px -2px rgb(0 0 0 / 0.5);
   }
 
   .dark .shadow-lg {
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.6),
+    box-shadow:
+      0 10px 15px -3px rgb(0 0 0 / 0.6),
       0 4px 6px -4px rgb(0 0 0 / 0.6);
   }
 
@@ -241,11 +248,6 @@
   /* Soft transitions for interactive elements */
   .dark .transition-smooth {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* Switch logo to dark mode version */
-  .dark img[src*="breneo_logo.png"] {
-    content: url("/lovable-uploads/breneo_logo_dark.png");
   }
 
   /* Animated gradient text for AI summary transition */
@@ -304,7 +306,8 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .career-path-card-animated {
-    animation: homepage-shortcut-card_card_fade 250ms linear 0ms,
+    animation:
+      homepage-shortcut-card_card_fade 250ms linear 0ms,
       homepage-shortcut-card_card_transform 1833ms
         cubic-bezier(
           0,

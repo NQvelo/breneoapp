@@ -80,7 +80,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
   const handleToggleWorkType = (workTypeId: string) => {
     if (tempSelectedWorkTypes.includes(workTypeId)) {
       setTempSelectedWorkTypes(
-        tempSelectedWorkTypes.filter((id) => id !== workTypeId)
+        tempSelectedWorkTypes.filter((id) => id !== workTypeId),
       );
     } else {
       setTempSelectedWorkTypes([...tempSelectedWorkTypes, workTypeId]);
@@ -110,13 +110,13 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
     selectedWorkTypes.length === 0
       ? placeholder
       : selectedWorkTypes.length === 1
-      ? workTypes.find((t) => t.id === selectedWorkTypes[0])?.label ||
-        placeholder
-      : selectedWorkTypes.length === workTypes.length
-      ? "All work types"
-      : selectedWorkTypes
-          .map((id) => workTypes.find((t) => t.id === id)?.label || id)
-          .join(", ");
+        ? workTypes.find((t) => t.id === selectedWorkTypes[0])?.label ||
+          placeholder
+        : selectedWorkTypes.length === workTypes.length
+          ? "All work types"
+          : selectedWorkTypes
+              .map((id) => workTypes.find((t) => t.id === id)?.label || id)
+              .join(", ");
 
   const isPlaceholder = selectedWorkTypes.length === 0;
 
@@ -143,7 +143,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
             "transition-colors cursor-pointer hover:opacity-80 overflow-hidden",
             isPlaceholder
               ? "text-gray-400 dark:text-gray-500"
-              : "text-gray-900 dark:text-gray-100"
+              : "text-gray-900 dark:text-gray-100",
           )}
         >
           <Network className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent flex-shrink-0 mr-2" />
@@ -186,20 +186,20 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
           className={cn(
             "absolute top-full left-0 mt-2 w-[calc(100vw-2rem)] md:w-[320px] rounded-lg shadow-lg border z-[9999] max-h-[400px] flex flex-col overflow-hidden",
             "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-            "min-w-[280px]"
+            "min-w-[280px]",
           )}
         >
           {/* Header with Title and Close Button */}
           <div
             className={cn(
               "flex items-center justify-between px-4 py-3 border-b",
-              "border-gray-200 dark:border-gray-700"
+              "border-gray-200 dark:border-gray-700",
             )}
           >
             <h3
               className={cn(
                 "font-bold text-base",
-                "text-gray-900 dark:text-gray-100"
+                "text-gray-900 dark:text-gray-100",
               )}
             >
               Work Types
@@ -212,7 +212,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
               }}
               className={cn(
                 "p-1 rounded transition-colors",
-                "hover:bg-gray-100 dark:hover:bg-gray-700"
+                "hover:bg-gray-100 dark:hover:bg-gray-700",
               )}
               aria-label="Close"
             >
@@ -229,7 +229,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
               className={cn(
                 "flex items-center px-4 py-3 cursor-pointer transition-colors border-b",
                 "hover:bg-gray-50 dark:hover:bg-gray-700/50",
-                "border-gray-100 dark:border-gray-700"
+                "border-gray-100 dark:border-gray-700",
               )}
               onClick={(e) => {
                 e.stopPropagation();
@@ -262,7 +262,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
                   key={workType.id}
                   className={cn(
                     "flex items-center px-4 py-3 cursor-pointer transition-colors",
-                    "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    "hover:bg-gray-50 dark:hover:bg-gray-700/50",
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -280,8 +280,8 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
                       } else {
                         setTempSelectedWorkTypes(
                           tempSelectedWorkTypes.filter(
-                            (id) => id !== workType.id
-                          )
+                            (id) => id !== workType.id,
+                          ),
                         );
                       }
                     }}
@@ -290,7 +290,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
                   <span
                     className={cn(
                       "text-sm",
-                      "text-gray-900 dark:text-gray-100"
+                      "text-gray-900 dark:text-gray-100",
                     )}
                   >
                     {workType.label}
@@ -305,13 +305,13 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
                 <div
                   className={cn(
                     "border-t",
-                    "border-gray-100 dark:border-gray-700"
+                    "border-gray-100 dark:border-gray-700",
                   )}
                 />
                 <div
                   className={cn(
                     "flex items-center px-4 py-3 cursor-pointer transition-colors",
-                    "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    "hover:bg-gray-50 dark:hover:bg-gray-700/50",
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -328,7 +328,7 @@ export const WorkTypeDropdown: React.FC<WorkTypeDropdownProps> = ({
                   <span
                     className={cn(
                       "text-sm",
-                      "text-gray-900 dark:text-gray-100"
+                      "text-gray-900 dark:text-gray-100",
                     )}
                   >
                     Remote Jobs Only

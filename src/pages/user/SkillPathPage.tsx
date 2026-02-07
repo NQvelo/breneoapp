@@ -95,7 +95,7 @@ const generateRoleExplanation = (
   techSkills: Record<string, string>,
   softSkills: Record<string, string>,
   topSkills: Array<{ skill: string; score: number }>,
-  jobPaths: JobPath[]
+  jobPaths: JobPath[],
 ): string => {
   const topTechSkills = Object.entries(techSkills)
     .sort((a, b) => {
@@ -130,7 +130,7 @@ const generateRoleExplanation = (
     explanation += topTechSkills.join(", ");
     if (topSoftSkills.length > 0) {
       explanation += `, and you also have great ${topSoftSkills.join(
-        " and "
+        " and ",
       )} skills`;
     }
   } else if (topSoftSkills.length > 0) {
@@ -139,7 +139,7 @@ const generateRoleExplanation = (
     explanation += "many important skills";
   }
   explanation += `. Your skills match really well with what ${role} jobs need - about ${Math.round(
-    avgMatchPercentage
+    avgMatchPercentage,
   )}% match! `;
 
   // Why it's good - simple language
@@ -154,7 +154,7 @@ const generateRoleExplanation = (
 // Helper function to generate job path details based on category and skills
 const getJobPathDetails = (
   category: string,
-  skills: Array<{ skill: string; score: number }>
+  skills: Array<{ skill: string; score: number }>,
 ): Omit<JobPath, "matchPercentage"> => {
   const skillNames = skills.map((s) => s.skill);
   const topSkills = skillNames.slice(0, 4);
@@ -163,7 +163,7 @@ const getJobPathDetails = (
   const basePath: Omit<JobPath, "matchPercentage"> = {
     title: category,
     description: `Build your career using your skills in ${skillNames.join(
-      ", "
+      ", ",
     )}.`,
     requiredSkills: topSkills,
     suggestedCourses: [
@@ -380,7 +380,7 @@ const getJobPathDetails = (
         ...basePath,
         title: category,
         description: `Leverage your expertise in ${skillNames.join(
-          ", "
+          ", ",
         )} to advance your career.`,
         requiredSkills: topSkills,
       };
@@ -390,7 +390,7 @@ const getJobPathDetails = (
 // Generate job paths based on hard skills from user test
 // Uses exact skill names from the hard skills chart
 const generateJobPaths = (
-  skills: Array<{ skill: string; score: number }>
+  skills: Array<{ skill: string; score: number }>,
 ): JobPath[] => {
   // Filter out soft skills - only use hard/tech skills for job path generation
   const softSkillKeywords = [
@@ -425,7 +425,7 @@ const generateJobPaths = (
   const hardSkillsOnly = skills.filter((skill) => {
     const skillLower = skill.skill.toLowerCase().trim();
     return !softSkillKeywords.some(
-      (keyword) => skillLower.includes(keyword) || keyword.includes(skillLower)
+      (keyword) => skillLower.includes(keyword) || keyword.includes(skillLower),
     );
   });
 
@@ -450,7 +450,7 @@ const generateJobPaths = (
     const maxPossibleScore = 5;
     const matchPercentage = Math.min(
       95,
-      Math.max(60, Math.round((skillEntry.score / maxPossibleScore) * 100))
+      Math.max(60, Math.round((skillEntry.score / maxPossibleScore) * 100)),
     );
 
     // Generate description and details based on the skill name
@@ -506,7 +506,7 @@ const SkillPathPage = () => {
   const [userCountry, setUserCountry] = useState<string>("Georgia");
   const [roleExplanation, setRoleExplanation] = useState<string>("");
   const [activeView, setActiveView] = useState<"skills" | "matchedRoles">(
-    "skills"
+    "skills",
   );
   const [userSkillsSet, setUserSkillsSet] = useState<Set<string>>(new Set());
 
@@ -600,10 +600,10 @@ const SkillPathPage = () => {
           const genericTitle = skillLower.includes("design")
             ? "ui/ux designer"
             : skillLower.includes("data") || skillLower.includes("analyst")
-            ? "data analyst"
-            : skillLower.includes("manager")
-            ? "product manager"
-            : "software developer";
+              ? "data analyst"
+              : skillLower.includes("manager")
+                ? "product manager"
+                : "software developer";
 
           const fallbackSalary = calculateAISalary(genericTitle, country);
           if (fallbackSalary.min_salary && fallbackSalary.max_salary) {
@@ -616,7 +616,7 @@ const SkillPathPage = () => {
 
           // Last resort fallback
           console.warn(
-            `Could not calculate salary for "${path.title}" (${searchTitle})`
+            `Could not calculate salary for "${path.title}" (${searchTitle})`,
           );
           return {
             ...path,
@@ -631,7 +631,7 @@ const SkillPathPage = () => {
         }
       });
     },
-    []
+    [],
   );
 
   // Fetch jobs for each job path based on tech skills (not job titles)
@@ -640,7 +640,7 @@ const SkillPathPage = () => {
     async (
       paths: JobPath[],
       techSkillsList: string[],
-      country: string
+      country: string,
     ): Promise<JobPath[]> => {
       const updatedPaths = await Promise.all(
         paths.map(async (path) => {
@@ -687,12 +687,12 @@ const SkillPathPage = () => {
               jobs: [], // Return empty array on error
             };
           }
-        })
+        }),
       );
 
       return updatedPaths;
     },
-    []
+    [],
   );
 
   const loadSkillData = useCallback(async () => {
@@ -704,7 +704,7 @@ const SkillPathPage = () => {
       try {
         // console.log("📡 Attempting Django API call...");
         const response = await apiClient.get(
-          `/api/skilltest/results/?user=${user!.id}`
+          `/api/skilltest/results/?user=${user!.id}`,
         );
         // console.log("🔍 SkillPathPage - Checking Django API:", response.data);
 
@@ -738,22 +738,22 @@ const SkillPathPage = () => {
             ([skill, pct]) => ({
               skill,
               score: parseFloat(String(pct).replace("%", "")) || 0,
-            })
+            }),
           );
           const softSkillsArray = Object.entries(skillsJson.soft || {}).map(
             ([skill, pct]) => ({
               skill,
               score: parseFloat(String(pct).replace("%", "")) || 0,
-            })
+            }),
           );
 
           // Prioritize hard/tech skills over soft skills
           // Sort tech skills first, then soft skills, then combine
           const sortedTechSkills = techSkillsArray.sort(
-            (a, b) => b.score - a.score
+            (a, b) => b.score - a.score,
           );
           const sortedSoftSkills = softSkillsArray.sort(
-            (a, b) => b.score - a.score
+            (a, b) => b.score - a.score,
           );
 
           // Use tech skills primarily, only add soft skills if we need more for display
@@ -771,12 +771,12 @@ const SkillPathPage = () => {
           const country = await fetchUserCountry();
           const pathsWithSalaries = calculateSalariesForJobPaths(
             paths,
-            country
+            country,
           );
 
           // Store user skills for comparison
           const allUserSkills = [...techSkillsArray, ...softSkillsArray].map(
-            (s) => s.skill.toLowerCase()
+            (s) => s.skill.toLowerCase(),
           );
           setUserSkillsSet(new Set(allUserSkills));
 
@@ -791,7 +791,7 @@ const SkillPathPage = () => {
               skillsJson.tech || {},
               skillsJson.soft || {},
               top,
-              pathsWithSalaries
+              pathsWithSalaries,
             );
             setRoleExplanation(explanation);
           }
@@ -808,7 +808,7 @@ const SkillPathPage = () => {
                   generateRoleSummary(
                     path.title,
                     userTopSkills,
-                    path.matchPercentage
+                    path.matchPercentage,
                   ),
                   generateRequiredSkills(path.title),
                 ]);
@@ -829,7 +829,7 @@ const SkillPathPage = () => {
               } catch (error) {
                 console.error(
                   `Error generating data for ${path.title}:`,
-                  error
+                  error,
                 );
                 // Use expanded fallback, not short placeholder
                 return {
@@ -840,13 +840,13 @@ const SkillPathPage = () => {
                   aiGeneratedSkills: path.requiredSkills,
                 };
               }
-            })
+            }),
           ).then((updatedPaths) => {
             // Use functional update to ensure we're updating the correct state
             setJobPaths((prevPaths) => {
               // Create a map of updated paths by title for quick lookup
               const updatedMap = new Map(
-                updatedPaths.map((path) => [path.title, path])
+                updatedPaths.map((path) => [path.title, path]),
               );
               // Merge updates with existing paths, preserving any other state
               return prevPaths.map((prevPath) => {
@@ -863,7 +863,7 @@ const SkillPathPage = () => {
               const pathsWithJobs = await fetchJobsForJobPaths(
                 pathsWithSalaries,
                 techSkillsList,
-                country
+                country,
               );
 
               setJobPaths(pathsWithJobs);
@@ -872,7 +872,7 @@ const SkillPathPage = () => {
               const missing = await identifyMissingSkills(
                 Object.keys(skillsJson.tech || {}),
                 Object.keys(skillsJson.soft || {}),
-                pathsWithJobs
+                pathsWithJobs,
               );
               setMissingSkills(missing);
             })(),
@@ -951,7 +951,7 @@ const SkillPathPage = () => {
         const skillLower = skill.toLowerCase().trim();
         const isSoftSkill = softSkillKeywords.some(
           (keyword) =>
-            skillLower.includes(keyword) || keyword.includes(skillLower)
+            skillLower.includes(keyword) || keyword.includes(skillLower),
         );
 
         if (isSoftSkill) {
@@ -985,7 +985,7 @@ const SkillPathPage = () => {
 
       // Store user skills for comparison
       const allUserSkills = [...sortedHardSkills, ...sortedSoftSkills].map(
-        (s) => s.skill.toLowerCase()
+        (s) => s.skill.toLowerCase(),
       );
       setUserSkillsSet(new Set(allUserSkills));
 
@@ -1011,7 +1011,7 @@ const SkillPathPage = () => {
           techSkillsMap,
           softSkillsMap,
           allSkillsForDisplay,
-          pathsWithSalaries
+          pathsWithSalaries,
         );
         setRoleExplanation(explanation);
         setFinalRole(primaryRole);
@@ -1029,7 +1029,7 @@ const SkillPathPage = () => {
               generateRoleSummary(
                 path.title,
                 userTopSkills,
-                path.matchPercentage
+                path.matchPercentage,
               ),
               generateRequiredSkills(path.title),
             ]);
@@ -1058,13 +1058,13 @@ const SkillPathPage = () => {
               aiGeneratedSkills: path.requiredSkills,
             };
           }
-        })
+        }),
       ).then((updatedPaths) => {
         // Use functional update to ensure we're updating the correct state
         setJobPaths((prevPaths) => {
           // Create a map of updated paths by title for quick lookup
           const updatedMap = new Map(
-            updatedPaths.map((path) => [path.title, path])
+            updatedPaths.map((path) => [path.title, path]),
           );
           // Merge updates with existing paths, preserving any other state
           return prevPaths.map((prevPath) => {
@@ -1081,7 +1081,7 @@ const SkillPathPage = () => {
           const pathsWithJobs = await fetchJobsForJobPaths(
             pathsWithSalaries,
             hardSkillsList,
-            country
+            country,
           );
 
           setJobPaths(pathsWithJobs);
@@ -1090,7 +1090,7 @@ const SkillPathPage = () => {
           const missing = await identifyMissingSkills(
             hardSkillsList,
             [],
-            pathsWithJobs
+            pathsWithJobs,
           );
           setMissingSkills(missing);
         })(),
@@ -1106,7 +1106,7 @@ const SkillPathPage = () => {
       console.error("❌ Error loading skill data:", error);
       console.error(
         "Error details:",
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error ? error.message : String(error),
       );
       setHasTestAnswers(false);
     } finally {
@@ -1134,7 +1134,7 @@ const SkillPathPage = () => {
   }, [user, navigate, loadSkillData, fetchUserCountry]);
 
   const getCourseRecommendations = async (
-    skills: string[]
+    skills: string[],
   ): Promise<CourseRecommendation[]> => {
     try {
       if (skills.length === 0) return [];
@@ -1168,11 +1168,11 @@ const SkillPathPage = () => {
   const identifyMissingSkills = async (
     userTechSkills: string[],
     userSoftSkills: string[],
-    jobPaths: JobPath[]
+    jobPaths: JobPath[],
   ): Promise<MissingSkill[]> => {
     // Normalize user skills to lowercase for comparison
     const allUserSkills = [...userTechSkills, ...userSoftSkills].map((s) =>
-      s.toLowerCase().trim()
+      s.toLowerCase().trim(),
     );
 
     // Collect all required skills from job paths with frequency
@@ -1207,7 +1207,7 @@ const SkillPathPage = () => {
     if (!error && allCourses) {
       allCourses.forEach((course) => {
         const courseSkills = (course.required_skills || []).map((s: string) =>
-          s.toLowerCase().trim()
+          s.toLowerCase().trim(),
         );
         courseSkills.forEach((skill) => {
           if (skillFrequency.has(skill)) {
@@ -1230,7 +1230,7 @@ const SkillPathPage = () => {
 
     // Build missing skills array
     const missingSkillsArray: MissingSkill[] = Array.from(
-      skillFrequency.entries()
+      skillFrequency.entries(),
     ).map(([skill, data]) => {
       // Determine category (tech vs soft) - simple heuristic
       const techKeywords = [
@@ -1504,7 +1504,7 @@ const SkillPathPage = () => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   return (
-                    <div className="rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
+                    <div className="rounded-3xl bg-white dark:bg-gray-800 p-4 backdrop-blur-sm">
                       <div className="flex flex-col gap-2">
                         <span className="font-semibold text-base text-gray-900 dark:text-gray-100">
                           {data.skill}
@@ -1567,7 +1567,7 @@ const SkillPathPage = () => {
     "HasTestAnswers:",
     hasTestAnswers,
     "User:",
-    user?.id
+    user?.id,
   );
 
   if (loading) {
@@ -1691,7 +1691,7 @@ const SkillPathPage = () => {
           <>
             {/* AI-Generated Role Explanation */}
             {finalRole && roleExplanation && (
-              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+              <Card className="bg-gradient-to-br from-primary/5 to-primary/10">
                 <CardHeader>
                   <div className="flex items-center gap-4">
                     <img
@@ -1717,7 +1717,7 @@ const SkillPathPage = () => {
                           </strong>
                         ) : (
                           part
-                        )
+                        ),
                       )}
                     </p>
                   </div>
@@ -1768,7 +1768,7 @@ const SkillPathPage = () => {
               jobPaths.map((job, index) => (
                 <Card
                   key={job.title}
-                  className={index === 0 ? "border-primary" : ""}
+                  className={index === 0 ? "bg-primary/5" : ""}
                 >
                   <CardContent className="p-6">
                     <div className="flex flex-col gap-4">
@@ -1781,7 +1781,7 @@ const SkillPathPage = () => {
                           onClick={() => {
                             navigate(
                               `/skill-path/${encodeURIComponent(job.title)}`,
-                              { state: { jobPath: job } }
+                              { state: { jobPath: job } },
                             );
                           }}
                         >
@@ -1793,7 +1793,7 @@ const SkillPathPage = () => {
                       {/* Salary and Brief Cards - Side by Side */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Salary Information Card */}
-                        <Card className="border-primary/20 bg-gray-50 dark:bg-gray-800/50">
+                        <Card className="bg-gray-50 dark:bg-gray-800/50">
                           <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                               <DollarSign className="h-4 w-4 text-primary" />
@@ -1814,7 +1814,7 @@ const SkillPathPage = () => {
                         </Card>
 
                         {/* Role Brief Card */}
-                        <Card className="border-primary/20 bg-gray-50 dark:bg-gray-800/50">
+                        <Card className="bg-gray-50 dark:bg-gray-800/50">
                           <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                               Role Brief
@@ -1834,7 +1834,7 @@ const SkillPathPage = () => {
                                       </strong>
                                     ) : (
                                       part
-                                    )
+                                    ),
                                   )
                                 ) : (
                                   <span className="text-muted-foreground italic">
@@ -1853,7 +1853,7 @@ const SkillPathPage = () => {
                           {(job.aiGeneratedSkills || job.requiredSkills).map(
                             (skill, index) => {
                               const hasSkill = userSkillsSet.has(
-                                skill.toLowerCase()
+                                skill.toLowerCase(),
                               );
                               return (
                                 <div
@@ -1876,7 +1876,7 @@ const SkillPathPage = () => {
                                   </span>
                                 </div>
                               );
-                            }
+                            },
                           )}
                         </div>
                       </div>

@@ -103,7 +103,7 @@ export default function SettingsPage() {
   };
 
   const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
-    getInitialSection()
+    getInitialSection(),
   );
 
   // Handle payment redirect status
@@ -111,7 +111,7 @@ export default function SettingsPage() {
     const paymentStatus = searchParams.get("payment");
     if (paymentStatus === "success") {
       toast.success(
-        "Payment successful! Your subscription has been activated."
+        "Payment successful! Your subscription has been activated.",
       );
       // Clean up URL
       setSearchParams((prev) => {
@@ -137,7 +137,7 @@ export default function SettingsPage() {
       if (!container) return;
 
       const activeButton = container.querySelector(
-        `[data-section="${activeSection}"]`
+        `[data-section="${activeSection}"]`,
       ) as HTMLButtonElement;
 
       if (!activeButton) return;
@@ -200,7 +200,7 @@ export default function SettingsPage() {
 
   // Accessibility
   const [fontSize, setFontSize] = useState<"small" | "medium" | "big">(
-    contextFontSize
+    contextFontSize,
   );
   const [language, setLanguage] = useState<"en" | "ka">(contextLanguage);
 
@@ -257,15 +257,15 @@ export default function SettingsPage() {
     setShowSkills(loadPreference("privacy_show_skills", true));
     setShowTestResults(loadPreference("privacy_show_test_results", true));
     setShowCompletedCourses(
-      loadPreference("privacy_show_completed_courses", true)
+      loadPreference("privacy_show_completed_courses", true),
     );
     setAiRecommendationFrequency(
-      loadPreference("ai_recommendation_frequency", "weekly")
+      loadPreference("ai_recommendation_frequency", "weekly"),
     );
     // Font size is now managed by FontSizeContext, but we keep local state for UI
     const savedFontSize = loadPreference(
       "breneo-font-size",
-      contextFontSize
+      contextFontSize,
     ) as string;
     // Map "large" to "big" if needed for backward compatibility
     const mappedFontSize = savedFontSize === "large" ? "big" : savedFontSize;
@@ -294,7 +294,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "notif_email_job_matches",
-        JSON.stringify(emailJobMatches)
+        JSON.stringify(emailJobMatches),
       );
     }
   }, [emailJobMatches, mounted]);
@@ -302,7 +302,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "notif_email_new_courses",
-        JSON.stringify(emailNewCourses)
+        JSON.stringify(emailNewCourses),
       );
     }
   }, [emailNewCourses, mounted]);
@@ -310,7 +310,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "notif_email_skill_updates",
-        JSON.stringify(emailSkillUpdates)
+        JSON.stringify(emailSkillUpdates),
       );
     }
   }, [emailSkillUpdates, mounted]);
@@ -318,7 +318,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "notif_in_app_messages",
-        JSON.stringify(inAppMessages)
+        JSON.stringify(inAppMessages),
       );
     }
   }, [inAppMessages, mounted]);
@@ -326,7 +326,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "notif_in_app_progress",
-        JSON.stringify(inAppProgress)
+        JSON.stringify(inAppProgress),
       );
     }
   }, [inAppProgress, mounted]);
@@ -349,7 +349,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "privacy_show_test_results",
-        JSON.stringify(showTestResults)
+        JSON.stringify(showTestResults),
       );
     }
   }, [showTestResults, mounted]);
@@ -357,7 +357,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "privacy_show_completed_courses",
-        JSON.stringify(showCompletedCourses)
+        JSON.stringify(showCompletedCourses),
       );
     }
   }, [showCompletedCourses, mounted]);
@@ -365,7 +365,7 @@ export default function SettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "ai_recommendation_frequency",
-        JSON.stringify(aiRecommendationFrequency)
+        JSON.stringify(aiRecommendationFrequency),
       );
     }
   }, [aiRecommendationFrequency, mounted]);
@@ -428,7 +428,7 @@ export default function SettingsPage() {
         {
           email: user?.email,
           code: code,
-        }
+        },
       );
       toast.success(res.data.message || "Code verified!");
       setPasswordStep(3);
@@ -462,7 +462,7 @@ export default function SettingsPage() {
           code: code,
           new_password: newPassword,
           confirm_password: confirmPassword,
-        }
+        },
       );
       toast.success(res.data.message || "Password updated successfully!");
       setPasswordStep(1);
@@ -485,7 +485,7 @@ export default function SettingsPage() {
     // TODO: Implement data export API call
     setTimeout(() => {
       toast.success(
-        "Data export ready! Check your email for the download link."
+        "Data export ready! Check your email for the download link.",
       );
     }, 2000);
   };
@@ -531,7 +531,7 @@ export default function SettingsPage() {
           headers: {
             Authorization: token ? `Bearer ${token}` : undefined,
           },
-        }
+        },
       );
 
       // console.log("✅ Profile update response:", response.data);
@@ -644,6 +644,7 @@ export default function SettingsPage() {
                       }}
                       placeholder="Enter your first name"
                       disabled={profileLoading}
+                      className="h-[3.2rem]"
                     />
                   </div>
                   <div className="space-y-2">
@@ -657,6 +658,7 @@ export default function SettingsPage() {
                       }}
                       placeholder="Enter your last name"
                       disabled={profileLoading}
+                      className="h-[3.2rem]"
                     />
                   </div>
 
@@ -683,7 +685,7 @@ export default function SettingsPage() {
                   <Input
                     value={user?.email || ""}
                     disabled
-                    className="bg-muted/50"
+                    className="h-[3.2rem] bg-muted/50"
                   />
                   <p className="text-xs text-muted-foreground">
                     Email cannot be edited. Contact support if you need to
@@ -710,6 +712,7 @@ export default function SettingsPage() {
                         placeholder="Enter 6-digit code"
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
+                        className="h-[3.2rem]"
                       />
                       <div className="flex gap-2">
                         <Button type="submit" disabled={passwordLoading}>
@@ -732,12 +735,14 @@ export default function SettingsPage() {
                         placeholder="New password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
+                        className="h-[3.2rem]"
                       />
                       <Input
                         type="password"
                         placeholder="Confirm new password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="h-[3.2rem]"
                       />
                       <div className="flex gap-2">
                         <Button type="submit" disabled={passwordLoading}>
@@ -1075,7 +1080,7 @@ export default function SettingsPage() {
                         const token = await requestBogAccessToken();
                         setBogTokenInfo(token);
                         toast.success(
-                          "Bank of Georgia authentication successful."
+                          "Bank of Georgia authentication successful.",
                         );
                       } catch (error) {
                         const message =
@@ -1084,7 +1089,7 @@ export default function SettingsPage() {
                             : "Authentication failed with Bank of Georgia.";
                         setBogAuthError(message);
                         toast.error(
-                          "Unable to authenticate with Bank of Georgia."
+                          "Unable to authenticate with Bank of Georgia.",
                         );
                       } finally {
                         setBogAuthLoading(false);
@@ -1249,7 +1254,10 @@ export default function SettingsPage() {
     <DashboardLayout>
       {/* Mobile: Settings Sections Switcher */}
       {isMobile && (
-        <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:hidden" style={{ width: '380px' }}>
+        <div
+          className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:hidden"
+          style={{ width: "380px" }}
+        >
           <div className="relative rounded-full overflow-hidden">
             <div
               ref={scrollContainerRef}
@@ -1258,61 +1266,66 @@ export default function SettingsPage() {
             >
               <motion.div
                 layout
-                transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 40,
+                  mass: 1,
+                }}
                 className="relative inline-flex items-center bg-gray-100/90 dark:bg-[#242424]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-sm min-w-max"
               >
-              {settingsSections.map((section, index) => {
-                const isFirst = index === 0;
-                const isLast = index === settingsSections.length - 1;
-                const isActive = activeSection === section.id;
-                
-                return (
-                  <motion.button
-                    key={section.id}
-                    layout
-                    type="button"
-                    data-section={section.id}
-                    ref={activeSection === section.id ? activeButtonRef : null}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleSectionChange(section.id);
-                    }}
-                    onTouchStart={(e) => {
-                      e.stopPropagation();
-                    }}
-                    className={`relative px-6 py-2.5 text-sm transition-colors duration-200 whitespace-nowrap outline-none touch-manipulation ${
-                      isFirst ? "rounded-l-full" : ""
-                    } ${
-                      isLast ? "rounded-r-full" : ""
-                    } ${
-                      !isFirst && !isLast ? "rounded-none" : ""
-                    } ${
-                      isActive
-                        ? "text-gray-900 dark:text-gray-100 font-bold"
-                        : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="active-settings-pill"
-                        className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full"
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 40,
-                          mass: 1,
-                        }}
-                      />
-                    )}
-                    <span className="relative z-10">{section.label}</span>
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          </div>
-          {/* Right side fade gradient */}
-          <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-gray-100/90 dark:from-[#242424]/90 to-transparent rounded-r-full" />
+                {settingsSections.map((section, index) => {
+                  const isFirst = index === 0;
+                  const isLast = index === settingsSections.length - 1;
+                  const isActive = activeSection === section.id;
+
+                  return (
+                    <motion.button
+                      key={section.id}
+                      layout
+                      type="button"
+                      data-section={section.id}
+                      ref={
+                        activeSection === section.id ? activeButtonRef : null
+                      }
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleSectionChange(section.id);
+                      }}
+                      onTouchStart={(e) => {
+                        e.stopPropagation();
+                      }}
+                      className={`relative px-6 py-2.5 text-sm transition-colors duration-200 whitespace-nowrap outline-none touch-manipulation ${
+                        isFirst ? "rounded-l-full" : ""
+                      } ${isLast ? "rounded-r-full" : ""} ${
+                        !isFirst && !isLast ? "rounded-none" : ""
+                      } ${
+                        isActive
+                          ? "text-gray-900 dark:text-gray-100 font-bold"
+                          : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="active-settings-pill"
+                          className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 40,
+                            mass: 1,
+                          }}
+                        />
+                      )}
+                      <span className="relative z-10">{section.label}</span>
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            </div>
+            {/* Right side fade gradient */}
+            <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-gray-100/90 dark:from-[#242424]/90 to-transparent rounded-r-full" />
           </div>
         </div>
       )}
@@ -1351,7 +1364,7 @@ export default function SettingsPage() {
                         "w-full text-left text-sm transition-colors",
                         activeSection === section.id
                           ? "text-primary font-medium"
-                          : "text-foreground hover:text-primary"
+                          : "text-foreground hover:text-primary",
                       )}
                     >
                       {section.label}

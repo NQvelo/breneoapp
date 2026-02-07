@@ -179,7 +179,7 @@ export const ka = {
   // Subscription
   subscription: {
     title: "გამოწერა",
-    upgrade: "Breneo Pro-ზე გადაყვანა",
+    upgrade: "გეგმის განახლება",
     currentPlan: "მიმდინარე გეგმა",
     features: "ფუნქციები",
     subscribe: "გამოწერა",

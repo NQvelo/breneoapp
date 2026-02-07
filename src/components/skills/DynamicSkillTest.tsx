@@ -67,7 +67,7 @@ export function DynamicSkillTest({
   const { user } = useAuth(); // ✅ get current user
   const navigate = useNavigate();
   const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
-    "career"
+    "career",
   );
 
   // State variables
@@ -89,10 +89,10 @@ export function DynamicSkillTest({
   const [isCalculatingResults, setIsCalculatingResults] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [selectedTechAnswer, setSelectedTechAnswer] = useState<string | null>(
-    null
+    null,
   );
   const [selectedSoftAnswer, setSelectedSoftAnswer] = useState<string | null>(
-    null
+    null,
   );
   const [questionKey, setQuestionKey] = useState(0);
   const [showMotivationalAfterCareer, setShowMotivationalAfterCareer] =
@@ -255,7 +255,7 @@ export function DynamicSkillTest({
         console.error("❌ Response status:", err.response.status);
         console.error(
           "❌ Response data:",
-          JSON.stringify(err.response.data, null, 2)
+          JSON.stringify(err.response.data, null, 2),
         );
         console.error("❌ Response headers:", err.response.headers);
       } else if (err.request) {
@@ -545,7 +545,7 @@ export function DynamicSkillTest({
     try {
       console.log(
         "🔍 Finishing soft assessment with session:",
-        softSession.session_id
+        softSession.session_id,
       );
       const res = await apiClient.post("/api/soft/finish/", {
         session_id: softSession.session_id,
@@ -624,7 +624,7 @@ export function DynamicSkillTest({
       if (!techScore && results.tech?.score_per_skill) {
         // console.log("⚡ Calculating tech score from skill percentages");
         const skillScores = Object.values(results.tech.score_per_skill).map(
-          (pct: string) => parseFloat(pct.replace("%", ""))
+          (pct: string) => parseFloat(pct.replace("%", "")),
         );
         const avgScore =
           skillScores.reduce((sum, val) => sum + val, 0) / skillScores.length;
@@ -641,7 +641,7 @@ export function DynamicSkillTest({
       if (!softScore && results.soft?.score_per_skill) {
         // console.log("🌟 Calculating soft score from skill percentages");
         const skillScores = Object.values(results.soft.score_per_skill).map(
-          (pct: string) => parseFloat(pct.replace("%", ""))
+          (pct: string) => parseFloat(pct.replace("%", "")),
         );
         const avgScore =
           skillScores.reduce((sum, val) => sum + val, 0) / skillScores.length;
@@ -969,7 +969,7 @@ export function DynamicSkillTest({
     console.log("🌟 RENDERING SOFT QUESTION - Raw Data:", currentSoftQ);
     console.log(
       "🌟 RENDERING SOFT QUESTION - Has Keys:",
-      Object.keys(currentSoftQ)
+      Object.keys(currentSoftQ),
     );
     console.log("🌟 RENDERING SOFT QUESTION - Values:", {
       questiontext: currentSoftQ.questiontext,

@@ -66,7 +66,7 @@ import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 // Function to calculate job relevance score based on user's hard skills
 const calculateJobRelevanceScore = (
   job: ApiJob,
-  userHardSkills: string[]
+  userHardSkills: string[],
 ): number => {
   // If no user hard skills, return base score
   if (!userHardSkills || userHardSkills.length === 0) {
@@ -120,7 +120,7 @@ const calculateJobRelevanceScore = (
 // Function to calculate course match score based on user skills
 const calculateCourseMatchScore = (
   course: Course,
-  userSkills: string[]
+  userSkills: string[],
 ): number => {
   // If no user skills, return base score
   if (!userSkills || userSkills.length === 0) {
@@ -305,7 +305,7 @@ const UserHome = () => {
         // Method 1: Try Django backend skill test results API (same as ProfilePage)
         try {
           const response = await apiClient.get(
-            `/api/skilltest/results/?user=${user.id}`
+            `/api/skilltest/results/?user=${user.id}`,
           );
           // console.log(
           //   // "🔍 Checking Django API skill test results:",
@@ -421,8 +421,8 @@ const UserHome = () => {
             techSkillKeywords.some(
               (keyword) =>
                 skill.toLowerCase().includes(keyword.toLowerCase()) ||
-                keyword.toLowerCase().includes(skill.toLowerCase())
-            )
+                keyword.toLowerCase().includes(skill.toLowerCase()),
+            ),
           );
           setUserHardSkills(hardSkills.length > 0 ? hardSkills : topSkills); // Fallback to all if no match
         } else {
@@ -626,7 +626,7 @@ const UserHome = () => {
     // Return top courses (prioritize those with matches, but show some variety)
     // Show courses with match score > 0.1 first, then fill with others
     const matchedCourses = coursesWithScores.filter(
-      (c) => (c.match || 0) > 0.1
+      (c) => (c.match || 0) > 0.1,
     );
     const otherCourses = coursesWithScores.filter((c) => (c.match || 0) <= 0.1);
 
@@ -663,7 +663,7 @@ const UserHome = () => {
           return wasSaved
             ? prev.filter((c) => c !== idString)
             : [...prev, idString];
-        }
+        },
       );
 
       return { previousSavedCourseIds, wasSaved };
@@ -672,7 +672,7 @@ const UserHome = () => {
       if (context?.previousSavedCourseIds && user?.id) {
         queryClient.setQueryData(
           ["savedCourseIds", user.id],
-          context.previousSavedCourseIds
+          context.previousSavedCourseIds,
         );
       }
 
@@ -688,7 +688,7 @@ const UserHome = () => {
       toast.success(
         wasSaved
           ? "Removed from saved courses."
-          : "Course saved to your profile."
+          : "Course saved to your profile.",
       );
     },
   });
@@ -706,7 +706,7 @@ const UserHome = () => {
       const matchPercentage = calculateMatchPercentage(
         userTopSkills,
         jobSkills,
-        jobTitle
+        jobTitle,
       );
       return { job, matchPercentage };
     });
@@ -809,7 +809,7 @@ const UserHome = () => {
           const maxSalaryFormatted = maxSalary.toLocaleString();
           const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
           const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+            salaryCurrency.includes(sym),
           );
           if (isCurrencyBefore) {
             salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -824,7 +824,7 @@ const UserHome = () => {
           const minSalaryFormatted = minSalary.toLocaleString();
           const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
           const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+            salaryCurrency.includes(sym),
           );
           salary = isCurrencyBefore
             ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -863,7 +863,7 @@ const UserHome = () => {
         const matchPercentage = calculateMatchPercentage(
           userTopSkills,
           jobSkills,
-          jobTitle
+          jobTitle,
         );
 
         const transformedJob: Job = {
@@ -904,7 +904,7 @@ const UserHome = () => {
   useEffect(() => {
     const fetchMissingLogos = async () => {
       const jobsNeedingLogos = transformedJobs.filter(
-        (job) => !job.company_logo && job.company_name
+        (job) => !job.company_logo && job.company_name,
       );
 
       if (jobsNeedingLogos.length === 0) return;
@@ -1036,7 +1036,7 @@ const UserHome = () => {
             {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
             {!hasCompletedTest && !loadingSkills && (
               <Card
-                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in"
+                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in hover:shadow-soft transition-shadow cursor-pointer"
                 style={{
                   boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
                   transform: isSkillTestPressed ? "scale(0.95)" : "scale(1)",
@@ -1078,7 +1078,7 @@ const UserHome = () => {
             {/* Skill Path CTA Widget - Only show if user has completed the test */}
             {hasCompletedTest && !loadingSkills && (
               <Card
-                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in"
+                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in hover:shadow-soft transition-shadow cursor-pointer"
                 style={{
                   boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
                   transform: isSkillPathPressed ? "scale(0.95)" : "scale(1)",
@@ -1196,7 +1196,7 @@ const UserHome = () => {
                   {displayJobs.map((job) => (
                     <Card
                       key={job.id}
-                      className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px]"
+                      className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px] hover:shadow-soft"
                       onClick={() => {
                         if (!job.id || String(job.id).trim() === "") return;
                         const encodedId = encodeURIComponent(String(job.id));
@@ -1216,7 +1216,7 @@ const UserHome = () => {
                                     ? job.company
                                     : job.company?.name || "Company")
                                 } logo`}
-                                className="w-10 h-10 rounded-md object-cover border border-gray-200"
+                                className="w-10 h-10 rounded-md object-cover"
                                 loading="lazy"
                               />
                             ) : (
@@ -1273,10 +1273,10 @@ const UserHome = () => {
                                 ? job.matchPercentage >= 85
                                   ? "Best match"
                                   : job.matchPercentage >= 70
-                                  ? "Good match"
-                                  : job.matchPercentage >= 50
-                                  ? "Fair match"
-                                  : "Poor match"
+                                    ? "Good match"
+                                    : job.matchPercentage >= 50
+                                      ? "Fair match"
+                                      : "Poor match"
                                 : ""}
                             </span>
                           </div>
@@ -1294,7 +1294,7 @@ const UserHome = () => {
                               "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                               job.is_saved
                                 ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                : "text-black dark:text-white"
+                                : "text-black dark:text-white",
                             )}
                           >
                             <Heart
@@ -1302,7 +1302,7 @@ const UserHome = () => {
                                 "h-4 w-4 transition-colors",
                                 job.is_saved
                                   ? "text-red-500 fill-red-500 animate-heart-pop"
-                                  : "text-black dark:text-white"
+                                  : "text-black dark:text-white",
                               )}
                             />
                           </Button>
@@ -1381,7 +1381,7 @@ const UserHome = () => {
                 >
                   {filteredCourses.map((course) => {
                     const isCourseSaved = savedCourseIds.includes(
-                      String(course.id)
+                      String(course.id),
                     );
                     return (
                       <Link
@@ -1389,7 +1389,7 @@ const UserHome = () => {
                         to={`/course/${course.id}`}
                         className="flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px] block"
                       >
-                        <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col">
+                        <Card className="relative transition-all duration-200 cursor-pointer group rounded-3xl w-full flex flex-col hover:shadow-soft">
                           <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
                             <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                               <img
@@ -1423,7 +1423,7 @@ const UserHome = () => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     saveCourseMutation.mutate(
-                                      String(course.id)
+                                      String(course.id),
                                     );
                                   }}
                                   aria-label={
@@ -1435,7 +1435,7 @@ const UserHome = () => {
                                     "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
                                     isCourseSaved
                                       ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                      : "text-black dark:text-white"
+                                      : "text-black dark:text-white",
                                   )}
                                 >
                                   <Heart
@@ -1443,7 +1443,7 @@ const UserHome = () => {
                                       "h-4 w-4 transition-colors",
                                       isCourseSaved
                                         ? "text-red-500 fill-red-500 animate-heart-pop"
-                                        : "text-black dark:text-white"
+                                        : "text-black dark:text-white",
                                     )}
                                   />
                                 </Button>

@@ -49,7 +49,7 @@ const jobTypeLabels: Record<string, string> = {
 // Fetch jobs for a specific company
 const fetchCompanyJobs = async (
   companyName: string,
-  page: number = 1
+  page: number = 1,
 ): Promise<{
   jobs: ApiJob[];
   hasMore: boolean;
@@ -57,7 +57,7 @@ const fetchCompanyJobs = async (
 }> => {
   try {
     console.log(
-      `🚀 fetchCompanyJobs called - fetching jobs for company: ${companyName}, page ${page}`
+      `🚀 fetchCompanyJobs called - fetching jobs for company: ${companyName}, page ${page}`,
     );
 
     // Try searching with company name, but also fetch more results to filter client-side
@@ -153,7 +153,7 @@ const fetchCompanyJobs = async (
     // If no jobs found with company name search, try a broader search
     if (validJobs.length === 0 && page === 1) {
       console.log(
-        `⚠️ No jobs found with company name search, trying broader search...`
+        `⚠️ No jobs found with company name search, trying broader search...`,
       );
       try {
         const broaderResponse = await jobService.fetchActiveJobs({
@@ -212,7 +212,7 @@ const fetchCompanyJobs = async (
           });
 
           console.log(
-            `✅ Broader search found ${broaderValidJobs.length} jobs for ${companyName}`
+            `✅ Broader search found ${broaderValidJobs.length} jobs for ${companyName}`,
           );
 
           return {
@@ -291,7 +291,7 @@ const CompanyJobsPage = () => {
         setAllJobs((prev) => {
           const existingIds = new Set(prev.map((j) => j.job_id || j.id));
           const newJobs = techJobs.filter(
-            (j) => !existingIds.has(j.job_id || j.id)
+            (j) => !existingIds.has(j.job_id || j.id),
           );
           return [...prev, ...newJobs];
         });
@@ -426,7 +426,7 @@ const CompanyJobsPage = () => {
           const maxSalaryFormatted = maxSalary.toLocaleString();
           const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
           const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+            salaryCurrency.includes(sym),
           );
           if (isCurrencyBefore) {
             salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -441,7 +441,7 @@ const CompanyJobsPage = () => {
           const minSalaryFormatted = minSalary.toLocaleString();
           const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
           const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+            salaryCurrency.includes(sym),
           );
           salary = isCurrencyBefore
             ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -517,7 +517,7 @@ const CompanyJobsPage = () => {
               <img
                 src={companyLogo}
                 alt={`${displayCompanyName} logo`}
-                className="w-16 h-16 rounded-full object-cover border border-gray-200"
+                className="w-16 h-16 rounded-full object-cover"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = "none";
@@ -563,7 +563,7 @@ const CompanyJobsPage = () => {
 
         {/* Empty State */}
         {!isLoading && transformedJobs.length === 0 && (
-          <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
+          <div className="text-center p-10 rounded-3xl text-muted-foreground bg-muted/30">
             <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
             <h4 className="text-lg font-semibold mb-2">No Jobs Found</h4>
             <p className="text-sm">
@@ -579,7 +579,7 @@ const CompanyJobsPage = () => {
               {transformedJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 border border-gray-200 hover:border-gray-400 overflow-hidden rounded-3xl"
+                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl hover:shadow-soft cursor-pointer"
                 >
                   <CardContent className="p-5 flex flex-col flex-grow relative">
                     {/* Company Logo and Info */}
@@ -589,7 +589,7 @@ const CompanyJobsPage = () => {
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 z-10"
+                            className="w-12 h-12 rounded-full object-cover absolute inset-0 z-10"
                             loading="lazy"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
@@ -597,7 +597,7 @@ const CompanyJobsPage = () => {
                               target.style.display = "none";
                               const iconFallback =
                                 target.parentElement?.querySelector(
-                                  ".logo-fallback"
+                                  ".logo-fallback",
                                 ) as HTMLElement;
                               if (iconFallback) {
                                 iconFallback.style.display = "flex";
@@ -610,10 +610,10 @@ const CompanyJobsPage = () => {
                         {job.company && !job.company_logo ? (
                           <img
                             src={`https://logo.clearbit.com/${encodeURIComponent(
-                              job.company
+                              job.company,
                             )}`}
                             alt={`${job.company_name || job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover border border-gray-200 absolute inset-0 clearbit-logo"
+                            className="w-12 h-12 rounded-full object-cover absolute inset-0 clearbit-logo"
                             style={{ zIndex: 10 }}
                             loading="lazy"
                             onError={(e) => {
@@ -622,7 +622,7 @@ const CompanyJobsPage = () => {
                               target.style.display = "none";
                               const iconFallback =
                                 target.parentElement?.querySelector(
-                                  ".logo-fallback"
+                                  ".logo-fallback",
                                 ) as HTMLElement;
                               if (iconFallback) {
                                 iconFallback.style.display = "flex";

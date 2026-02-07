@@ -31,7 +31,7 @@ export function AuthForm({
 
   const [isSignUp, setIsSignUp] = useState(initialIsSignUp ?? false);
   const [isAcademySignUp, setIsAcademySignUp] = useState(
-    initialRole === "academy"
+    initialRole === "academy",
   );
   const [academyName, setAcademyName] = useState("");
   const [academyDescription, setAcademyDescription] = useState("");
@@ -136,8 +136,8 @@ export function AuthForm({
                   ? "Academy Registration"
                   : "Create Account"
                 : isForgotPassword
-                ? "Forgot Password"
-                : "Welcome Back"}
+                  ? "Forgot Password"
+                  : "Welcome Back"}
             </h1>
             <p className="text-muted-foreground">
               {isSignUp
@@ -145,8 +145,8 @@ export function AuthForm({
                   ? "Register your academy on Breneo"
                   : "Sign up for your Breneo account"
                 : isForgotPassword
-                ? "Enter your email to receive a password recovery link"
-                : "Sign in to your Breneo account"}
+                  ? "Enter your email to receive a password recovery link"
+                  : "Sign in to your Breneo account"}
             </p>
           </div>
 
@@ -214,11 +214,7 @@ export function AuthForm({
                 </button>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-12"
-                disabled={loading}
-              >
+              <Button type="submit" className="w-full h-12" disabled={loading}>
                 {loading ? "Signing In..." : "Sign In"}
               </Button>
 
@@ -408,7 +404,7 @@ export function AuthForm({
                         </p> */}
                       </div>
 
-                      <div className="bg-card rounded-lg border p-6">
+                      <div className="bg-card rounded-lg p-6">
                         <div className="flex items-start space-x-3 mb-6">
                           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                             <Building2 className="h-5 w-5 text-primary" />

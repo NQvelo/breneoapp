@@ -1,16 +1,37 @@
 /**
  * Job API Service
  *
- * Service for fetching active jobs from Breneo Job Aggregator API
- * Filters are only applied when user explicitly changes them in the frontend
+ * Service for fetching active jobs from Breneo Job Aggregator API.
+ * Uses /api/search for full multi-value filtering (comma-separated params).
+ * Falls back to /api/v1/jobs/ when search endpoint is unavailable.
  */
 
 import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
 import { countries } from "@/data/countries";
 
-// API Configuration
-const JOB_API_BASE =
-  "https://breneo-job-aggregator-k7ti.onrender.com/api/search";
+const API_BASE = "https://breneo-job-aggregator-k7ti.onrender.com";
+
+// Primary: multi-value filters (comma-separated), recommended for full filtering
+const JOB_SEARCH_API = `${API_BASE}/api/search`;
+
+// Fallback: single-value filters only
+const JOB_API_BASE = `${API_BASE}/api/v1/jobs/`;
+
+/**
+ * Map country code (e.g. "DE", "US") to lowercase for /api/search country param.
+ * API expects: us, uk, de, fr, ca, au, in, nl, etc.
+ */
+const getCountryCodeForApi = (code: string): string =>
+  code.trim().toLowerCase();
+
+/**
+ * Map country code to country name (for v1/jobs location param fallback).
+ */
+const getCountryNameFromCode = (code: string): string => {
+  const normalized = code.trim().toUpperCase();
+  const country = countries.find((c) => c.code.toUpperCase() === normalized);
+  return country?.name ?? code;
+};
 
 // Rate limiter: ensures only 1 request per second
 let lastRequestTime = 0;
@@ -104,29 +125,171 @@ const mapBreneoJobToApiJob = (job: BreneoJobApiResponse): ApiJob => {
 };
 
 /**
+ * Map /api/search job response to ApiJob (company is nested object).
+ */
+const mapSearchJobToApiJob = (job: Record<string, unknown>): ApiJob => {
+  const company = job.company as Record<string, unknown> | undefined;
+  const companyName =
+    (company?.name as string) ||
+    (job.company_name as string) ||
+    "Unknown Company";
+  const companyLogo =
+    (company?.logo as string) || (job.company_logo as string) || undefined;
+
+  return {
+    id: String(job.id ?? ""),
+    job_id: String(job.id ?? ""),
+    title: (job.title as string) || "",
+    job_title: (job.title as string) || "",
+    company: companyName,
+    company_name: companyName,
+    employer_name: companyName,
+    company_logo: companyLogo,
+    companyLogo: companyLogo,
+    location: (job.location as string) || "",
+    job_location: (job.location as string) || "",
+    description: (job.description as string) || (job.description_short as string) || "",
+    job_description: (job.description as string) || (job.description_short as string) || "",
+    apply_url: (job.apply_url as string) || "",
+    job_apply_link: (job.apply_url as string) || "",
+    url: (job.apply_url as string) || "",
+    date_posted: (job.posted_at as string) || (job.fetched_at as string) || "",
+    posted_date: (job.posted_at as string) || (job.fetched_at as string) || "",
+    posted_at: (job.posted_at as string) || (job.fetched_at as string) || "",
+    fetched_at: (job.fetched_at as string) || "",
+    status: "active",
+    ...job,
+  } as ApiJob;
+};
+
+/**
  * Response from Breneo API with pagination info
  */
 interface BreneoApiResponse {
   jobs: ApiJob[];
   pagination?: {
     page?: number;
+    current?: number;
     num_pages?: number;
     total_pages?: number;
     total_results?: number;
+    total_items?: number;
     has_next?: boolean;
     has_previous?: boolean;
   };
 }
 
 /**
- * Fetch jobs from Breneo Job Aggregator API
+ * Fetch jobs from /api/search (multi-value filters, comma-separated).
+ * Per spec: country=us,uk, work_mode=remote,hybrid, etc.
+ */
+const fetchJobsFromSearchAPI = async (
+  params: JobSearchParams
+): Promise<BreneoApiResponse> => {
+  const { query, filters, page = 1, pageSize = 20 } = params;
+
+  const searchParams = new URLSearchParams();
+
+  // Single-value / text
+  if (query && query.trim()) {
+    searchParams.set("query", query.trim());
+  }
+
+  // Multi-value: comma-separated, no spaces
+  if (filters.countries.length > 0) {
+    searchParams.set(
+      "country",
+      filters.countries.map(getCountryCodeForApi).join(",")
+    );
+  }
+  if (filters.skills.length > 0) {
+    searchParams.set("title", filters.skills.join(","));
+  }
+  if (filters.workMode && filters.workMode.length > 0) {
+    searchParams.set(
+      "work_mode",
+      filters.workMode.map((m) => m.toLowerCase()).join(",")
+    );
+  } else if (filters.isRemote) {
+    searchParams.set("work_mode", "remote");
+  }
+  if (filters.seniority && filters.seniority.length > 0) {
+    searchParams.set(
+      "seniority",
+      filters.seniority.map((s) => s.toLowerCase()).join(",")
+    );
+  }
+  if (filters.company && filters.company.length > 0) {
+    searchParams.set("company", filters.company.join(","));
+  }
+
+  // date_posted
+  if (filters.datePosted && filters.datePosted !== "all") {
+    searchParams.set("date_posted", filters.datePosted);
+  }
+
+  // Pagination: page & num_pages (num_pages = page size)
+  searchParams.set("page", String(page));
+  searchParams.set("num_pages", String(pageSize));
+
+  // Sort
+  searchParams.set("sort", "newest");
+
+  const url = `${JOB_SEARCH_API}?${searchParams.toString()}`;
+  console.log("🔍 /api/search request:", url);
+
+  const response = await rateLimitedFetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Search API ${response.status}: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as {
+    results?: Record<string, unknown>[];
+    pagination?: {
+      page?: number;
+      num_pages?: number;
+      total_pages?: number;
+      total_results?: number;
+      has_next?: boolean;
+      has_previous?: boolean;
+    };
+  };
+
+  const rawJobs = data.results || [];
+  const pagination = data.pagination;
+
+  const jobsArray = rawJobs.map(mapSearchJobToApiJob);
+
+  return {
+    jobs: jobsArray,
+    pagination: pagination
+      ? {
+          page: pagination.page,
+          current: pagination.page,
+          num_pages: pagination.num_pages,
+          total_pages: pagination.total_pages,
+          total_results: pagination.total_results,
+          total_items: pagination.total_results,
+          has_next: pagination.has_next,
+          has_previous: pagination.has_previous,
+        }
+      : undefined,
+  };
+};
+
+/**
+ * Fetch jobs from Breneo Job Aggregator API (v1/jobs, single-value filters)
  * The API returns filtered jobs based on query parameters
  * Returns jobs and pagination info from the API
  */
 const fetchJobsFromBreneoAPI = async (
   params: JobSearchParams
 ): Promise<BreneoApiResponse> => {
-  const { query, filters, page = 1, pageSize = 12 } = params;
+  const { query, filters, page = 1, pageSize = 20 } = params;
 
   // Build query parameters
   const queryParams = new URLSearchParams();
@@ -144,53 +307,60 @@ const fetchJobsFromBreneoAPI = async (
 
   if (searchQuery) {
     // User provided a query - use it
-    queryParams.set("query", searchQuery);
+    queryParams.set("search", searchQuery);
   } else if (hasFilters) {
     // No query but has filters - use a broad default to get jobs that match filters
-    queryParams.set("query", "developer");
+    // queryParams.set("search", "developer"); // Optional: let backend handle empty search
   } else {
     // No query and no filters - try empty string to get ALL jobs from API
-    // If API doesn't accept empty, it will return an error and we can handle it
-    queryParams.set("query", "");
+    queryParams.set("search", "");
   }
 
-  // Add page
+  // Add pagination parameters
   queryParams.set("page", String(page));
+  queryParams.set("limit", String(pageSize));
 
-  // Add num_pages (how many pages to fetch per request)
-  // When no filters/query, fetch MANY pages to get all jobs
-  // When filters are applied, fetch enough to cover pageSize
-  let pagesToFetch: number;
-  if (!searchQuery && !hasFilters) {
-    // No query and no filters - fetch maximum pages to get all jobs
-    pagesToFetch = 100; // Fetch up to 100 pages to get all available jobs
-  } else {
-    // Has query or filters - calculate based on pageSize
-    pagesToFetch = Math.max(
-      1,
-      Math.min(100, Math.ceil((pageSize || 200) / 20))
-    );
-  }
-
-  queryParams.set("num_pages", String(pagesToFetch));
+  // Always filter for active jobs only - ensures users see only currently available listings
+  queryParams.set("is_active", "true");
 
   console.log(
-    `📄 Fetching ${pagesToFetch} pages of jobs (pageSize: ${
-      pageSize || 200
-    }, query: "${
+    `📄 Fetching page ${page} with limit ${pageSize}, query: "${
       searchQuery || "(empty - all jobs)"
     }", hasFilters: ${hasFilters})`
   );
 
-  // Add country filter (use first country if multiple, or default to 'us')
+  // Apply filters - all active filters are combined with AND logic by the backend
+  // For example: location=London AND work_mode=remote AND seniority=senior
+  // This means jobs must match ALL specified filters to be returned
+
+  // Add location filter - API expects country/city names, not ISO codes
   if (filters.countries.length > 0) {
-    queryParams.set("country", filters.countries[0].toLowerCase());
-  } else {
-    queryParams.set("country", "us"); // Default to US
+    const locationValue = getCountryNameFromCode(filters.countries[0]);
+    queryParams.set("location", locationValue);
+  }
+
+  // Add work_mode filter
+  if (filters.isRemote) {
+    queryParams.set("work_mode", "remote");
+  } else if (filters.workMode && filters.workMode.length > 0) {
+    // Support explicit workMode filter if added to UI later
+    queryParams.set("work_mode", filters.workMode[0]);
+  }
+
+  // Add seniority filter
+  if (filters.seniority && filters.seniority.length > 0) {
+    queryParams.set("seniority", filters.seniority[0]);
+  }
+
+  // Add company filter
+  if (filters.company && filters.company.length > 0) {
+    queryParams.set("company", filters.company[0]);
   }
 
   // Add date_posted filter
-  queryParams.set("date_posted", filters.datePosted || "all");
+  if (filters.datePosted && filters.datePosted !== "all") {
+    queryParams.set("date_posted", filters.datePosted);
+  }
 
   // Build the API endpoint with query parameters
   const API_ENDPOINT = `${JOB_API_BASE}?${queryParams.toString()}`;
@@ -203,13 +373,15 @@ const fetchJobsFromBreneoAPI = async (
   );
 
   console.log("🔍 Breneo Job API Request:", {
-    url: API_ENDPOINT,
     filters: {
       countries: filters.countries,
       jobTypes: filters.jobTypes,
       isRemote: filters.isRemote,
       datePosted: filters.datePosted || "all",
       skills: filters.skills,
+      seniority: filters.seniority,
+      workMode: filters.workMode,
+      company: filters.company,
     },
     query: query,
     page: page,
@@ -327,9 +499,11 @@ const fetchJobsFromBreneoAPI = async (
         results: BreneoJobApiResponse[];
         pagination?: {
           page?: number;
+          current?: number;
           num_pages?: number;
           total_pages?: number;
           total_results?: number;
+          total_items?: number;
           has_next?: boolean;
           has_previous?: boolean;
         };
@@ -396,94 +570,15 @@ const fetchJobsFromBreneoAPI = async (
     // Apply frontend filters
     let filteredJobs = jobsArray;
 
-    // Client-side search filtering: match search query against job title and company name
-    // This ensures partial word matching works for every word in the search term
-    if (searchQuery && searchQuery.trim()) {
-      const searchTerms = searchQuery
-        .toLowerCase()
-        .trim()
-        .split(/\s+/)
-        .filter((term) => term.length > 0);
+    // Client-side search filtering removed as backend handles it now with 'search' parameter
 
-      if (searchTerms.length > 0) {
-        filteredJobs = filteredJobs.filter((job) => {
-          // Get job title and company name
-          const jobTitle = String(
-            job.title || job.job_title || job.position || ""
-          ).toLowerCase();
-          const companyName = String(
-            job.company_name ||
-              job.employer_name ||
-              (typeof job.company === "string" ? job.company : "") ||
-              ""
-          ).toLowerCase();
+    // Filter by country/location removed as backend handles it now with 'location' parameter
+    // Only keeping client-side logic for array support if we decide to implement multi-location selecting
+    // For now, backend takes the first one, which covers the main use case
 
-          // Check if ALL search terms match in either job title or company name
-          // This allows partial word matching - each word in the search can match anywhere
-          return searchTerms.every((term) => {
-            return (
-              jobTitle.includes(term) ||
-              companyName.includes(term) ||
-              // Also check if any word in title/company contains the search term
-              jobTitle.split(/\s+/).some((word) => word.includes(term)) ||
-              companyName.split(/\s+/).some((word) => word.includes(term))
-            );
-          });
-        });
-        console.log(
-          `🔍 Client-side search filtering: ${filteredJobs.length} jobs match "${searchQuery}"`
-        );
-      }
-    }
+    // Filter by remote removed as backend handles it now with 'work_mode=remote'
 
-    // If no filters are applied and no search query, skip additional client-side filtering
-    if (!hasAnyFilters && (!searchQuery || !searchQuery.trim())) {
-      console.log(
-        "✅ No filters or search query - returning all jobs without additional client-side filtering"
-      );
-      return { jobs: filteredJobs, pagination: paginationInfo };
-    }
-
-    // Note: Search query is now handled by the API endpoint, but we can still filter client-side if needed
-    // The API handles the main query filtering, so we only do additional filtering here if necessary
-
-    // Filter by country/location
-    if (filters.countries.length > 0) {
-      filteredJobs = filteredJobs.filter((job) => {
-        const location = String(
-          job.location || job.job_location || ""
-        ).toLowerCase();
-        return filters.countries.some((countryCode) => {
-          const country = countries.find(
-            (c) => c.code.toLowerCase() === countryCode.toLowerCase()
-          );
-          if (country) {
-            return (
-              location.includes(country.name.toLowerCase()) ||
-              location.includes(countryCode.toLowerCase())
-            );
-          }
-          return false;
-        });
-      });
-    }
-
-    // Filter by remote
-    if (filters.isRemote) {
-      filteredJobs = filteredJobs.filter((job) => {
-        const location = String(
-          job.location || job.job_location || ""
-        ).toLowerCase();
-        return (
-          location.includes("remote") ||
-          job.is_remote === true ||
-          job.remote === true ||
-          job.job_is_remote === true
-        );
-      });
-    }
-
-    // Filter by employment type
+    // employment type filtering maintained as backend doesn't support it yet
     if (filters.jobTypes.length > 0) {
       filteredJobs = filteredJobs.filter((job) => {
         const empType = (
@@ -501,53 +596,11 @@ const fetchJobsFromBreneoAPI = async (
       });
     }
 
-    // Filter by date posted
-    if (filters.datePosted && filters.datePosted !== "all") {
-      const now = Date.now();
-      const daysMap: Record<string, number> = {
-        day: 1,
-        week: 7,
-        month: 30,
-      };
-      const days = daysMap[filters.datePosted] || 30;
-      const cutoffDate = now - days * 24 * 60 * 60 * 1000;
+    // Filter by date posted removed as backend handles it now with 'date_posted' parameter
 
-      filteredJobs = filteredJobs.filter((job) => {
-        const postedDate =
-          job.date_posted ||
-          job.posted_date ||
-          job.job_posted_at_datetime_utc ||
-          job.postedAt;
-        if (postedDate) {
-          try {
-            const jobDate = new Date(postedDate as string).getTime();
-            return jobDate >= cutoffDate;
-          } catch (e) {
-            return true; // If date parsing fails, include the job
-          }
-        }
-        return true;
-      });
-    }
+    // Filter by skills removed as backend handles it now with 'search' parameter
 
-    // Filter by skills (if specified)
-    if (filters.skills.length > 0) {
-      filteredJobs = filteredJobs.filter((job) => {
-        const jobText = [
-          job.title || job.job_title || "",
-          job.description || job.job_description || "",
-          job.job_required_experience || "",
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        return filters.skills.some((skill) =>
-          jobText.includes(skill.toLowerCase())
-        );
-      });
-    }
-
-    // Log the final response (pagination will be handled by fetchActiveJobs)
+    // Log the final response
     console.log("📊 Breneo Job API Final Response:", {
       totalJobsFromAPI: jobsArray.length,
       afterFiltering: filteredJobs.length,
@@ -760,40 +813,57 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
 
 /**
  * Main function to fetch active jobs
- * Combines search term with skills and fetches from Breneo Job Aggregator API
- * Filters are applied on the frontend after fetching all jobs
- * Only returns jobs that are currently active
+ * Tries /api/search first (multi-value filters, comma-separated).
+ * Falls back to /api/v1/jobs/ if search returns 404 or fails.
  */
 export const fetchActiveJobs = async (
   params: JobSearchParams
 ): Promise<JobApiResponse> => {
   try {
-    // Build query parameter combining search term and skills
     const queryParts: string[] = [];
-
-    // Add search term if provided
     if (params.query && params.query.trim()) {
       queryParts.push(params.query.trim());
     }
-
-    // Add skills to query ONLY if skills are provided and not empty
-    // Note: The caller should handle the "all interests selected" case by passing empty skills array
     if (params.filters.skills.length > 0) {
-      // Combine skills into query - API will search for jobs matching these skills
       queryParts.push(...params.filters.skills);
     }
-
-    // If no query parts, use empty string to get all jobs (or use a default search term)
     const query = queryParts.length > 0 ? queryParts.join(" ") : "";
 
-    // Fetch jobs from Breneo API (filtering is done in fetchJobsFromBreneoAPI)
-    const apiResponse = await fetchJobsFromBreneoAPI({
-      ...params,
-      query,
-      filters: params.filters,
-    });
+    let apiResponse: BreneoApiResponse;
 
-    const allJobs = apiResponse.jobs;
+    try {
+      apiResponse = await fetchJobsFromSearchAPI({
+        ...params,
+        query,
+        filters: params.filters,
+      });
+      console.log("✅ Using /api/search");
+    } catch (searchErr) {
+      console.warn("⚠️ /api/search unavailable, falling back to /api/v1/jobs/", searchErr);
+      apiResponse = await fetchJobsFromBreneoAPI({
+        ...params,
+        query,
+        filters: params.filters,
+      });
+    }
+
+    let allJobs = apiResponse.jobs;
+
+    // Client-side jobTypes filter (employment type - not in search API)
+    if (params.filters.jobTypes.length > 0) {
+      allJobs = allJobs.filter((job) => {
+        const empType = (
+          (job.employment_type || job.job_employment_type || job.type || "") as string
+        )
+          .toUpperCase()
+          .replace(/[-\s]/g, "");
+        return params.filters.jobTypes.some((type) => {
+          const normalizedType = type.toUpperCase().replace(/[-\s]/g, "");
+          return empType.includes(normalizedType);
+        });
+      });
+    }
+
     const apiPagination = apiResponse.pagination;
 
     // Remove duplicates based on job_id
@@ -825,14 +895,24 @@ export const fetchActiveJobs = async (
     if (apiPagination) {
       // Use API pagination info - API already paginated, use all unique jobs from this page
       paginatedJobs = uniqueJobs; // API already paginated, use all unique jobs
-      hasMore = apiPagination.has_next ?? false;
-      total = apiPagination.total_results ?? uniqueJobs.length;
+      total =
+        apiPagination.total_results ??
+        apiPagination.total_items ??
+        uniqueJobs.length;
+      // API may use current/total_pages instead of has_next
+      const currentPage =
+        apiPagination.current ?? apiPagination.page ?? params.page ?? 1;
+      const totalPages =
+        apiPagination.total_pages ?? apiPagination.num_pages ?? 1;
+      hasMore =
+        apiPagination.has_next ??
+        (currentPage < totalPages && totalPages > 1);
       console.log(
-        `Using API pagination: ${uniqueJobs.length} unique jobs, hasMore: ${hasMore}, total: ${total}`
+        `Using API pagination: page ${currentPage}/${totalPages}, ${uniqueJobs.length} jobs, hasMore: ${hasMore}, total: ${total}`
       );
     } else {
       // Fallback to client-side pagination
-      const pageSize = params.pageSize || 12;
+      const pageSize = params.pageSize || 20;
       const page = params.page || 1;
       const startIndex = (page - 1) * pageSize;
       const endIndex = startIndex + pageSize;
@@ -851,7 +931,7 @@ export const fetchActiveJobs = async (
     return {
       jobs: paginatedJobs,
       page: apiPagination?.page ?? params.page ?? 1,
-      pageSize: params.pageSize || 12,
+      pageSize: params.pageSize || 20,
       hasMore: hasMore,
       total: total,
     };

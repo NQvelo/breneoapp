@@ -47,7 +47,7 @@ const AcademyHomePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
-    null
+    null,
   );
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +153,7 @@ const AcademyHomePage = () => {
   const categories = new Set(courses.map((c) => c.category)).size;
   const recentCourses = courses.filter(
     (c) =>
-      new Date(c.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000
+      new Date(c.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000,
   ).length;
 
   return (

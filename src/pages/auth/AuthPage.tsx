@@ -11,12 +11,13 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(
-    countries.find((c) => c.code === "GE")
+    countries.find((c) => c.code === "GE"),
   );
 
   const [firstName, setFirstName] = useState("");
@@ -46,7 +47,8 @@ const AuthPage: React.FC = () => {
     const preloadImages = async () => {
       try {
         await Promise.all([
-          preloadImage("/lovable-uploads/breneo_logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo-dark.png"),
           preloadImage("/lovable-uploads/way.png"),
         ]);
       } catch (error) {
@@ -100,14 +102,12 @@ const AuthPage: React.FC = () => {
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
           {!logoLoaded && !imageError && (
-            <div className="h-7 w-20 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
               <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
             </div>
           )}
-          <img
-            src="/lovable-uploads/breneo_logo.png"
-            alt="Breneo Logo"
-            className={`h-7 transition-opacity duration-300 ${
+          <BreneoLogo
+            className={`h-6 lg:h-5 transition-opacity duration-300 ${
               logoLoaded ? "opacity-100" : "opacity-0"
             }`}
             onLoad={() => setLogoLoaded(true)}
@@ -117,7 +117,7 @@ const AuthPage: React.FC = () => {
             }}
           />
           {imageError && (
-            <div className="h-7 w-20 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+            <div className="h-5 w-16 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 Breneo
               </span>
@@ -134,14 +134,12 @@ const AuthPage: React.FC = () => {
             <div className="mb-8 hidden lg:flex items-center justify-between">
               <div className="flex items-center">
                 {!logoLoaded && !imageError && (
-                  <div className="h-10 w-32 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+                  <div className="h-8 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
                     <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
                   </div>
                 )}
-                <img
-                  src="/lovable-uploads/breneo_logo.png"
-                  alt="Breneo Logo"
-                  className={`h-10 transition-opacity duration-300 ${
+                <BreneoLogo
+                  className={`h-8 transition-opacity duration-300 ${
                     logoLoaded ? "opacity-100" : "opacity-0"
                   }`}
                   onLoad={() => setLogoLoaded(true)}
@@ -151,7 +149,7 @@ const AuthPage: React.FC = () => {
                   }}
                 />
                 {imageError && (
-                  <div className="h-10 w-32 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+                  <div className="h-8 w-24 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       Breneo
                     </span>
@@ -175,7 +173,7 @@ const AuthPage: React.FC = () => {
                   <Input
                     id="firstName"
                     placeholder="John"
-                    className="mt-1 h-12"
+                    className="mt-1 h-[3.2rem]"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
@@ -186,7 +184,7 @@ const AuthPage: React.FC = () => {
                   <Input
                     id="lastName"
                     placeholder="Doe"
-                    className="mt-1 h-12"
+                    className="mt-1 h-[3.2rem]"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
@@ -200,7 +198,7 @@ const AuthPage: React.FC = () => {
                   id="email"
                   type="email"
                   placeholder="Enter your email"
-                  className="mt-1 h-12"
+                  className="mt-1 h-[3.2rem]"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -213,14 +211,14 @@ const AuthPage: React.FC = () => {
                   <CountrySelector
                     value={selectedCountry}
                     onChange={setSelectedCountry}
-                    className="max-w-fit px-3 h-12 border-0 bg-transparent hover:bg-transparent rounded-r-none"
+                    className="max-w-fit px-3 h-[3.2rem] border-0 bg-transparent hover:bg-transparent rounded-r-none"
                   />
                   <div className="h-6 w-px bg-slate-200 dark:bg-border" />
                   <Input
                     id="phone"
                     type="tel"
                     placeholder="Phone number"
-                    className="flex-1 h-12 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="flex-1 h-[3.2rem] border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     required
@@ -235,7 +233,7 @@ const AuthPage: React.FC = () => {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Create a password"
-                    className="pr-10 h-12"
+                    className="pr-10 h-[3.2rem]"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

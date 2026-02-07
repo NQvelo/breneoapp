@@ -179,7 +179,7 @@ export const en = {
   // Subscription
   subscription: {
     title: "Subscription",
-    upgrade: "Upgrade to Breneo Pro",
+    upgrade: "Upgrade plan",
     currentPlan: "Current Plan",
     features: "Features",
     subscribe: "Subscribe",

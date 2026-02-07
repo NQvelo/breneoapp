@@ -1,6 +1,6 @@
 /**
  * Hook for managing job notifications
- * 
+ *
  * Requests browser notification permissions and periodically checks for new jobs
  */
 
@@ -16,11 +16,12 @@ interface UseJobNotificationsOptions {
 }
 
 export const useJobNotifications = (
-  options: UseJobNotificationsOptions = {}
+  options: UseJobNotificationsOptions = {},
 ) => {
   const { user } = useAuth();
   const { enabled = true, checkInterval = 30 * 60 * 1000 } = options; // Default: 30 minutes
-  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [permission, setPermission] =
+    useState<NotificationPermission>("default");
   const [isChecking, setIsChecking] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const checkInProgressRef = useRef(false);
@@ -48,39 +49,46 @@ export const useJobNotifications = (
     return result === "granted";
   };
 
-
   // Send browser notification
-  const sendBrowserNotification = useCallback((job: ApiJob) => {
-    if (permission !== "granted") {
-      console.log("Notification permission not granted");
-      return;
-    }
+  const sendBrowserNotification = useCallback(
+    (job: ApiJob) => {
+      if (permission !== "granted") {
+        console.log("Notification permission not granted");
+        return;
+      }
 
-    const jobTitle = job.job_title || job.title || "New Job";
-    const companyName = job.employer_name || job.company_name || job.company || "Company";
-    const jobId = job.job_id || job.id || "";
+      const jobTitle = job.job_title || job.title || "New Job";
+      const companyName =
+        job.employer_name || job.company_name || job.company || "Company";
+      const jobId = job.job_id || job.id || "";
 
-    const notification = new Notification("New Job Match! 🎯", {
-      body: `${jobTitle} at ${companyName} matches your skills`,
-      icon: job.employer_logo || job.company_logo || job.logo_url || "/lovable-uploads/breneo_logo.png",
-      badge: "/lovable-uploads/breneo_logo.png",
-      tag: `job-${jobId}`, // Prevent duplicate notifications
-      requireInteraction: false,
-    });
+      const notification = new Notification("New Job Match! 🎯", {
+        body: `${jobTitle} at ${companyName} matches your skills`,
+        icon:
+          job.employer_logo ||
+          job.company_logo ||
+          job.logo_url ||
+          "/lovable-uploads/Breneo-logo.png",
+        badge: "/lovable-uploads/Breneo-logo.png",
+        tag: `job-${jobId}`, // Prevent duplicate notifications
+        requireInteraction: false,
+      });
 
-    // Handle notification click - navigate to jobs page
-    notification.onclick = () => {
-      window.focus();
-      notification.close();
-      // Navigate to jobs page (you can customize this)
-      window.location.href = "/jobs";
-    };
+      // Handle notification click - navigate to jobs page
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+        // Navigate to jobs page (you can customize this)
+        window.location.href = "/jobs";
+      };
 
-    // Auto-close after 5 seconds
-    setTimeout(() => {
-      notification.close();
-    }, 5000);
-  }, [permission]);
+      // Auto-close after 5 seconds
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+    },
+    [permission],
+  );
 
   // Check for new jobs and send notifications
   const checkForNewJobs = useCallback(async () => {
@@ -171,4 +179,3 @@ export const useJobNotifications = (
     checkForNewJobs,
   };
 };
-

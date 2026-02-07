@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { ImageIcon } from "lucide-react";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const NotFound = () => {
   const location = useLocation();
@@ -29,7 +30,8 @@ const NotFound = () => {
     const preloadImages = async () => {
       try {
         await Promise.all([
-          preloadImage("/lovable-uploads/breneo_logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo-dark.png"),
           preloadImage("/lovable-uploads/full-shot-student-library.jpg"),
         ]);
       } catch (error) {
@@ -44,7 +46,7 @@ const NotFound = () => {
   useEffect(() => {
     console.error(
       "404 Error: User attempted to access non-existent route:",
-      location.pathname
+      location.pathname,
     );
   }, [location.pathname]);
 
@@ -93,14 +95,12 @@ const NotFound = () => {
           {/* Logo */}
           <div className="mb-8">
             {!logoLoaded && !imageError && (
-              <div className="h-12 w-32 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center mx-auto">
+              <div className="h-10 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center mx-auto">
                 <ImageIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
               </div>
             )}
-            <img
-              src="/lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className={`h-12 mx-auto transition-opacity duration-300 ${
+            <BreneoLogo
+              className={`h-12 md:h-10 mx-auto block transition-opacity duration-300 ${
                 logoLoaded ? "opacity-100" : "opacity-0"
               }`}
               onLoad={() => setLogoLoaded(true)}
@@ -110,7 +110,7 @@ const NotFound = () => {
               }}
             />
             {imageError && (
-              <div className="h-12 w-32 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center mx-auto">
+              <div className="h-10 w-24 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center mx-auto">
                 <span className="text-sm text-muted-foreground font-semibold">
                   Breneo
                 </span>
@@ -121,7 +121,9 @@ const NotFound = () => {
           {/* 404 Content */}
           <div className="mb-8">
             <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
-            <h2 className="text-2xl font-semibold mb-2">{t.errors.pageNotFound}</h2>
+            <h2 className="text-2xl font-semibold mb-2">
+              {t.errors.pageNotFound}
+            </h2>
             <p className="text-muted-foreground mb-6">
               {t.errors.pageNotFoundDescription}
             </p>

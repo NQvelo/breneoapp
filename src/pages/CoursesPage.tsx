@@ -48,7 +48,7 @@ const COURSES_FILTERED_RESULTS_KEY = "coursesFilteredResults";
 const saveFiltersToSession = (
   key: string,
   filters: unknown,
-  search: string
+  search: string,
 ) => {
   try {
     sessionStorage.setItem(key, JSON.stringify({ filters, search }));
@@ -58,7 +58,7 @@ const saveFiltersToSession = (
 };
 
 const loadFiltersFromSession = (
-  key: string
+  key: string,
 ): { filters: unknown; search: string } | null => {
   try {
     const stored = sessionStorage.getItem(key);
@@ -75,7 +75,7 @@ const saveFilteredCoursesToSession = (courses: Course[]) => {
   try {
     sessionStorage.setItem(
       COURSES_FILTERED_RESULTS_KEY,
-      JSON.stringify(courses)
+      JSON.stringify(courses),
     );
   } catch (error) {
     console.error("Error saving filtered courses to session storage:", error);
@@ -91,7 +91,7 @@ const loadFilteredCoursesFromSession = (): Course[] => {
   } catch (error) {
     console.error(
       "Error loading filtered courses from session storage:",
-      error
+      error,
     );
   }
   return [];
@@ -179,7 +179,7 @@ const CoursesPage = () => {
       // Save to session storage
       saveFiltersToSession(COURSES_FILTERS_STORAGE_KEY, filters, search);
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   // Initialize filters from URL, session storage, or defaults
@@ -357,7 +357,7 @@ const CoursesPage = () => {
                 saveFiltersToSession(
                   COURSES_FILTERS_STORAGE_KEY,
                   newFilters,
-                  searchTerm
+                  searchTerm,
                 );
                 return newFilters;
               });
@@ -398,7 +398,7 @@ const CoursesPage = () => {
               saveFiltersToSession(
                 COURSES_FILTERS_STORAGE_KEY,
                 newFilters,
-                searchTerm
+                searchTerm,
               );
               return newFilters;
             });
@@ -434,7 +434,7 @@ const CoursesPage = () => {
         try {
           const { latitude, longitude } = position.coords;
           const response = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
           );
           const data = await response.json();
           if (data.countryName) {
@@ -492,7 +492,7 @@ const CoursesPage = () => {
           toast.info("Location permission denied. Defaulting to Georgia.");
           sessionStorage.setItem("locationToastShown", "true");
         }
-      }
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount, and check searchParams inside
@@ -509,7 +509,7 @@ const CoursesPage = () => {
   // Remove UUID validation - backend uses integer IDs, not UUIDs
   const canUseUserId = React.useMemo(
     () => !!userId && userId.length > 0,
-    [userId]
+    [userId],
   );
 
   const { data: savedCourses = [] } = useQuery({
@@ -523,7 +523,7 @@ const CoursesPage = () => {
           API_ENDPOINTS.AUTH.PROFILE,
           {
             timeout: 30000, // 30 seconds timeout
-          }
+          },
         );
         const savedCoursesArray = profileResponse.data?.saved_courses || [];
         return savedCoursesArray.map((id: string | number) => String(id));
@@ -544,7 +544,7 @@ const CoursesPage = () => {
       // Apply search filter using debounced term
       if (debouncedSearchTerm) {
         query = query.or(
-          `title.ilike.%${debouncedSearchTerm}%,provider.ilike.%${debouncedSearchTerm}%,category.ilike.%${debouncedSearchTerm}%,description.ilike.%${debouncedSearchTerm}%`
+          `title.ilike.%${debouncedSearchTerm}%,provider.ilike.%${debouncedSearchTerm}%,category.ilike.%${debouncedSearchTerm}%,description.ilike.%${debouncedSearchTerm}%`,
         );
       }
 
@@ -591,7 +591,7 @@ const CoursesPage = () => {
               // Allow any non-empty string to be safe
               return idStr.length > 0;
             })
-            .map((id) => String(id)) // Ensure all are strings
+            .map((id) => String(id)), // Ensure all are strings
         ),
       ];
 
@@ -606,7 +606,7 @@ const CoursesPage = () => {
             try {
               // Use the academy detail endpoint: /api/academy/<academy_id>/
               const response = await apiClient.get(
-                `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`
+                `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`,
               );
 
               if (response.data) {
@@ -695,10 +695,10 @@ const CoursesPage = () => {
               }
             } catch (error) {
               console.debug(
-                `Could not fetch academy profile for ${academyId} from Django API`
+                `Could not fetch academy profile for ${academyId} from Django API`,
               );
             }
-          })
+          }),
         );
       }
 
@@ -754,8 +754,8 @@ const CoursesPage = () => {
           activeFilters.skills.some(
             (selectedSkill) =>
               courseSkill.toLowerCase().includes(selectedSkill.toLowerCase()) ||
-              selectedSkill.toLowerCase().includes(courseSkill.toLowerCase())
-          )
+              selectedSkill.toLowerCase().includes(courseSkill.toLowerCase()),
+          ),
         );
       });
     }
@@ -774,13 +774,13 @@ const CoursesPage = () => {
           userTopSkills.some(
             (userSkill) =>
               userSkill.toLowerCase().includes(skill.toLowerCase()) ||
-              skill.toLowerCase().includes(userSkill.toLowerCase())
-          )
+              skill.toLowerCase().includes(userSkill.toLowerCase()),
+          ),
         );
         const matchPercentage =
           course.required_skills.length > 0
             ? Math.round(
-                (matchingSkills.length / course.required_skills.length) * 100
+                (matchingSkills.length / course.required_skills.length) * 100,
               )
             : 50;
         return {
@@ -807,7 +807,7 @@ const CoursesPage = () => {
         const academyName =
           course.academy_profile_data?.academy_name || course.provider || "";
         return countryNames.some((countryName) =>
-          academyName.toLowerCase().includes(countryName.toLowerCase())
+          academyName.toLowerCase().includes(countryName.toLowerCase()),
         );
       });
     }
@@ -865,7 +865,7 @@ const CoursesPage = () => {
         if (context?.previousSavedCourses && userId) {
           queryClient.setQueryData(
             ["savedCourses", userId],
-            context.previousSavedCourses
+            context.previousSavedCourses,
           );
         }
 
@@ -883,7 +883,7 @@ const CoursesPage = () => {
         toast.success(
           wasSaved
             ? "Removed from saved courses."
-            : "Course saved to your profile."
+            : "Course saved to your profile.",
         );
       },
     });
@@ -905,7 +905,7 @@ const CoursesPage = () => {
           "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
           isCourseSaved
             ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-            : "text-black dark:text-white"
+            : "text-black dark:text-white",
         )}
       >
         <Heart
@@ -913,7 +913,7 @@ const CoursesPage = () => {
             "h-4 w-4 transition-colors",
             isCourseSaved
               ? "text-red-500 fill-red-500 animate-heart-pop"
-              : "text-black dark:text-white"
+              : "text-black dark:text-white",
           )}
         />
       </Button>
@@ -949,7 +949,7 @@ const CoursesPage = () => {
     const newFilters = {
       ...activeFilters,
       countries: activeFilters.countries.filter(
-        (code) => code !== countryCodeToRemove
+        (code) => code !== countryCodeToRemove,
       ),
     };
     setActiveFilters(newFilters);
@@ -1029,7 +1029,7 @@ const CoursesPage = () => {
     saveFiltersToSession(
       COURSES_FILTERS_STORAGE_KEY,
       clearedFilters,
-      searchTerm
+      searchTerm,
     );
 
     setFilterModalOpen(false);
@@ -1039,7 +1039,7 @@ const CoursesPage = () => {
   const renderCourseCard = (course: Course) => {
     return (
       <Link to={`/course/${course.id}`} className="block">
-        <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col">
+        <Card className="relative transition-all duration-200 cursor-pointer group rounded-3xl w-full flex flex-col hover:shadow-soft">
           <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
             <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
               <img
@@ -1099,7 +1099,7 @@ const CoursesPage = () => {
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-3 md:py-4 overflow-visible min-h-[3.5rem] flex-1">
+            <div className="flex items-center bg-white dark:bg-[#242424] rounded-xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-3 md:py-4 overflow-visible min-h-[3.5rem] flex-1">
               {/* Briefcase Icon - At the start */}
               <Briefcase
                 className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -1137,7 +1137,7 @@ const CoursesPage = () => {
                 <Button
                   variant="outline"
                   onClick={() => setFilterModalOpen(true)}
-                  className="group flex items-center gap-2 bg-transparent border border-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
+                  className="group flex items-center gap-2 bg-breneo-blue/10 hover:bg-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
                   aria-label="Filter courses"
                 >
                   <SlidersHorizontal
@@ -1187,7 +1187,7 @@ const CoursesPage = () => {
         )}
 
         {!coursesLoading && filteredCourses.length === 0 && (
-          <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
+          <div className="text-center p-10 rounded-3xl text-muted-foreground bg-muted/30">
             <img
               src="/lovable-uploads/3dicons-puzzle-dynamic-color.png"
               alt="No data found"

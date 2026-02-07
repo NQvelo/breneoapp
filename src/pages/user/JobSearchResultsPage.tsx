@@ -44,6 +44,7 @@ import {
   getUserTestAnswers,
   calculateSkillScores,
   getTopSkills,
+  filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { useTranslation } from "@/contexts/LanguageContext";
@@ -81,6 +82,8 @@ const jobTypeLabels: Record<string, string> = {
   INTERN: "Intern",
 };
 
+const JOBS_PER_PAGE = 20; // Matches API pagination
+
 // extractJobSkills is now imported from @/utils/jobMatchUtils
 
 // calculateMatchPercentage and getMatchQualityLabel are now imported from @/utils/jobMatchUtils
@@ -90,7 +93,7 @@ const generateMatchExplanation = (
   matchPercentage: number,
   userSkills: string[],
   jobTitle: string,
-  jobSkills: string[]
+  jobSkills: string[],
 ): string => {
   const matchingSkills = userSkills.filter((userSkill) =>
     jobSkills.some((jobSkill) => {
@@ -101,7 +104,7 @@ const generateMatchExplanation = (
         normalizedUser.includes(normalizedJob) ||
         normalizedJob.includes(normalizedUser)
       );
-    })
+    }),
   );
 
   if (matchPercentage >= 80) {
@@ -109,7 +112,7 @@ const generateMatchExplanation = (
       return `Your strong expertise in ${matchingSkills
         .slice(0, 3)
         .join(
-          ", "
+          ", ",
         )} aligns perfectly with this ${jobTitle} role. You have the technical foundation to excel in this position.`;
     }
     return `Your skillset demonstrates excellent alignment with this ${jobTitle} position. You're well-positioned to make an immediate impact.`;
@@ -194,7 +197,7 @@ const JobSearchResultsPage = () => {
       userTopSkills,
     });
     console.log(
-      "🌐 Job API Endpoint: https://breneo-job-aggregator-k7ti.onrender.com/api/"
+      "🌐 Job API Endpoint: https://breneo-job-aggregator-k7ti.onrender.com/api/",
     );
   }, [searchTerm, page, searchParams, activeFilters, userTopSkills]);
 
@@ -264,7 +267,7 @@ const JobSearchResultsPage = () => {
       try {
         try {
           const response = await apiClient.get(
-            `/api/skilltest/results/?user=${user.id}`
+            `/api/skilltest/results/?user=${user.id}`,
           );
           if (
             response.data &&
@@ -274,12 +277,10 @@ const JobSearchResultsPage = () => {
             const result = response.data[0];
             const skillsJson = result.skills_json;
 
-            // Extract skills from tech and soft skills for matching
+            // Extract only tech skills for the Interests/Skills filter (not soft skills)
             const techSkills = Object.keys(skillsJson.tech || {});
-            const softSkills = Object.keys(skillsJson.soft || {});
-            const allSkills = [...techSkills, ...softSkills];
 
-            setUserTopSkills(allSkills);
+            setUserTopSkills(techSkills);
             return;
           }
         } catch (apiError) {
@@ -292,7 +293,8 @@ const JobSearchResultsPage = () => {
           const skillScores = calculateSkillScores(answers);
           const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
           const topSkills = topSkillsData.map((s) => s.skill);
-          setUserTopSkills(topSkills);
+          const techSkillsOnly = filterHardSkills(topSkills);
+          setUserTopSkills(techSkillsOnly);
         }
       } catch (error) {
         console.error("Error fetching user skills:", error);
@@ -306,7 +308,7 @@ const JobSearchResultsPage = () => {
     searchTerm: string,
     filters: JobFilters,
     page: number,
-    userTopSkills: string[]
+    userTopSkills: string[],
   ): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
     try {
       // If all interests are selected, treat as no filter (load all jobs)
@@ -323,26 +325,14 @@ const JobSearchResultsPage = () => {
         skills: allInterestsSelected ? [] : filters.skills,
       };
 
-      // Check if any filters are applied
-      const hasFilters =
-        filtersForAPI.countries.length > 0 ||
-        filtersForAPI.jobTypes.length > 0 ||
-        filtersForAPI.isRemote ||
-        filtersForAPI.datePosted ||
-        filtersForAPI.skills.length > 0 ||
-        filtersForAPI.salaryMin !== undefined ||
-        filtersForAPI.salaryMax !== undefined ||
-        filtersForAPI.salaryByAgreement ||
-        (searchTerm && searchTerm.trim() !== "");
-
-      // If no filters, fetch many more jobs to display all available
-      const pageSize = hasFilters ? 50 : 200;
+      // Use 20 jobs per page to match API pagination
+      const pageSize = 20;
 
       const response = await jobService.fetchActiveJobs({
         query: searchTerm || "",
         filters: filtersForAPI,
         page,
-        pageSize, // Fetch more jobs when no filters to show all available jobs
+        pageSize,
       });
 
       if (!response || !Array.isArray(response.jobs)) {
@@ -401,12 +391,8 @@ const JobSearchResultsPage = () => {
         });
       }
 
-      // Apply client-side remote filter if needed (API should handle this, but double-check)
-      if (filters.isRemote) {
-        validJobs = validJobs.filter((job) => {
-          return job.job_is_remote || job.is_remote || job.remote === true;
-        });
-      }
+      // Note: Removed redundant client-side remote filtering
+      // Backend already handles this via work_mode parameter
 
       return {
         jobs: validJobs,
@@ -608,7 +594,7 @@ const JobSearchResultsPage = () => {
           const maxSalaryFormatted = maxSalary.toLocaleString();
           const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
           const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+            salaryCurrency.includes(sym),
           );
           if (isCurrencyBefore) {
             salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -623,7 +609,7 @@ const JobSearchResultsPage = () => {
           const minSalaryFormatted = minSalary.toLocaleString();
           const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
           const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym)
+            salaryCurrency.includes(sym),
           );
           salary = isCurrencyBefore
             ? `${salaryCurrency}${minSalaryFormatted}+`
@@ -653,7 +639,7 @@ const JobSearchResultsPage = () => {
         const matchPercentage = calculateMatchPercentage(
           userTopSkills,
           jobSkills,
-          jobTitle
+          jobTitle,
         );
 
         // Extract date posted - new API uses posted_at or fetched_at
@@ -736,7 +722,7 @@ const JobSearchResultsPage = () => {
   useEffect(() => {
     const fetchMissingLogos = async () => {
       const jobsNeedingLogos = regularJobs.filter(
-        (job) => !job.company_logo && job.company_name
+        (job) => !job.company_logo && job.company_name,
       );
 
       if (jobsNeedingLogos.length === 0) return;
@@ -809,7 +795,7 @@ const JobSearchResultsPage = () => {
     (filters: JobFilters, search: string, pageNum: number) => {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
-      if (pageNum > 1) params.set("page", String(pageNum));
+      params.set("page", String(pageNum)); // Always include page (1-based, matches API)
       if (filters.countries.length > 0) {
         params.set("countries", filters.countries.join(","));
       }
@@ -836,7 +822,7 @@ const JobSearchResultsPage = () => {
       }
       setSearchParams(params, { replace: true });
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const handleSearch = (value: string) => {
@@ -881,7 +867,7 @@ const JobSearchResultsPage = () => {
       setTempFilters(newFilters);
       updateUrlWithFilters(newFilters, searchTerm, 1);
     },
-    [activeFilters, searchTerm, updateUrlWithFilters]
+    [activeFilters, searchTerm, updateUrlWithFilters],
   );
 
   // Handle removing a country filter
@@ -890,21 +876,21 @@ const JobSearchResultsPage = () => {
       const newFilters = {
         ...activeFilters,
         countries: activeFilters.countries.filter(
-          (code) => code !== countryCodeToRemove
+          (code) => code !== countryCodeToRemove,
         ),
       };
       setActiveFilters(newFilters);
       setTempFilters(newFilters);
       updateUrlWithFilters(newFilters, searchTerm, 1);
     },
-    [activeFilters, searchTerm, updateUrlWithFilters]
+    [activeFilters, searchTerm, updateUrlWithFilters],
   );
 
   // Handle removing job type filter
   const handleRemoveJobType = useCallback(
     (jobTypeToRemove: string) => {
       const newJobTypes = activeFilters.jobTypes.filter(
-        (type) => type !== jobTypeToRemove
+        (type) => type !== jobTypeToRemove,
       );
       const newFilters = {
         ...activeFilters,
@@ -914,7 +900,7 @@ const JobSearchResultsPage = () => {
       setTempFilters(newFilters);
       updateUrlWithFilters(newFilters, searchTerm, 1);
     },
-    [activeFilters, searchTerm, updateUrlWithFilters]
+    [activeFilters, searchTerm, updateUrlWithFilters],
   );
 
   // Handle removing remote filter
@@ -942,8 +928,6 @@ const JobSearchResultsPage = () => {
 
   const isNextPagePossible = hasMore && transformedJobs.length > 0;
   const isPrevPagePossible = page > 1;
-
-  const actualJobsPerPage = transformedJobs.length;
 
   // Build array of all filter items for active filters display
   const allFilters = useMemo(() => {
@@ -1002,10 +986,10 @@ const JobSearchResultsPage = () => {
         activeFilters.datePosted === "today"
           ? "Posted Today"
           : activeFilters.datePosted === "week"
-          ? "Posted This Week"
-          : activeFilters.datePosted === "month"
-          ? "Posted This Month"
-          : `Posted: ${activeFilters.datePosted}`;
+            ? "Posted This Week"
+            : activeFilters.datePosted === "month"
+              ? "Posted This Month"
+              : `Posted: ${activeFilters.datePosted}`;
       filters.push({
         id: "datePosted",
         label: dateLabel,
@@ -1032,8 +1016,8 @@ const JobSearchResultsPage = () => {
         activeFilters.salaryMax !== undefined
           ? `$${activeFilters.salaryMin} - $${activeFilters.salaryMax}`
           : activeFilters.salaryMin !== undefined
-          ? `Min: $${activeFilters.salaryMin}`
-          : `Max: $${activeFilters.salaryMax}`;
+            ? `Min: $${activeFilters.salaryMin}`
+            : `Max: $${activeFilters.salaryMax}`;
       filters.push({
         id: "salaryRange",
         label: salaryLabel,
@@ -1082,7 +1066,7 @@ const JobSearchResultsPage = () => {
 
   const filtersContainerRef = useRef<HTMLDivElement>(null);
   const [visibleFilterCount, setVisibleFilterCount] = useState(
-    allFilters.length
+    allFilters.length,
   );
   const [shouldShowCount, setShouldShowCount] = useState(false);
 
@@ -1130,7 +1114,7 @@ const JobSearchResultsPage = () => {
             .slice(0, mid)
             .map(
               (f) =>
-                `<div class="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700"><span class="text-sm font-medium whitespace-nowrap">${f.label}</span><button><svg class="h-4 w-4"></svg></button></div>`
+                `<div class="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700"><span class="text-sm font-medium whitespace-nowrap">${f.label}</span><button><svg class="h-4 w-4"></svg></button></div>`,
             )
             .join("");
 
@@ -1168,21 +1152,16 @@ const JobSearchResultsPage = () => {
       window.removeEventListener("resize", checkHeight);
     };
   }, [allFilters]);
-  let startIndex = 1;
-  let endIndex = actualJobsPerPage;
-
-  if (totalJobs > 0 && actualJobsPerPage > 0) {
-    const estimatedItemsBefore = (page - 1) * actualJobsPerPage;
-    startIndex = Math.min(estimatedItemsBefore + 1, totalJobs);
-    endIndex = Math.min(estimatedItemsBefore + actualJobsPerPage, totalJobs);
-  } else if (actualJobsPerPage > 0) {
-    startIndex = 1;
-    endIndex = actualJobsPerPage;
-  }
+  const itemsBefore = (page - 1) * JOBS_PER_PAGE;
+  const startIndex = totalJobs > 0 ? Math.min(itemsBefore + 1, totalJobs) : 1;
+  const endIndex =
+    totalJobs > 0
+      ? Math.min(itemsBefore + transformedJobs.length, totalJobs)
+      : transformedJobs.length;
 
   let estimatedTotalPages: number | null = null;
-  if (totalJobs > 0 && actualJobsPerPage > 0) {
-    estimatedTotalPages = Math.ceil(totalJobs / actualJobsPerPage);
+  if (totalJobs > 0) {
+    estimatedTotalPages = Math.ceil(totalJobs / JOBS_PER_PAGE);
   } else if (hasMore) {
     estimatedTotalPages = page + 1;
   } else if (transformedJobs.length > 0) {
@@ -1195,7 +1174,7 @@ const JobSearchResultsPage = () => {
         {/* Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white dark:bg-[#242424] border border-gray-300 dark:border-gray-600 rounded-xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-3 md:py-4 overflow-visible min-h-[3.5rem] flex-1">
+            <div className="flex items-center bg-white dark:bg-[#242424] rounded-xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-3 md:py-4 overflow-visible min-h-[3.5rem] flex-1">
               {/* Briefcase Icon - At the start */}
               <Briefcase
                 className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -1262,7 +1241,7 @@ const JobSearchResultsPage = () => {
                 <Button
                   variant="outline"
                   onClick={() => setFilterModalOpen(true)}
-                  className="group flex items-center gap-2 bg-transparent border border-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
+                  className="group flex items-center gap-2 bg-breneo-blue/10 hover:bg-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
                   aria-label="Filter jobs"
                 >
                   <SlidersHorizontal
@@ -1338,8 +1317,8 @@ const JobSearchResultsPage = () => {
                     ? t.jobs.dateDescending
                     : t.jobs.dateAscending
                   : dateSortOrder === "desc"
-                  ? t.jobs.dateDescendingFull
-                  : t.jobs.dateAscendingFull}
+                    ? t.jobs.dateDescendingFull
+                    : t.jobs.dateAscendingFull}
               </span>
               {dateSortOrder === "desc" ? (
                 <ArrowDown className="h-4 w-4 ml-1 md:ml-2" />
@@ -1354,7 +1333,7 @@ const JobSearchResultsPage = () => {
         {isLoading ? (
           <div className="space-y-4">
             {[...Array(6)].map((_, i) => (
-              <Card key={i} className="border border-gray-200">
+              <Card key={i}>
                 <CardContent className="p-4">
                   <div className="animate-pulse">
                     <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
@@ -1366,13 +1345,13 @@ const JobSearchResultsPage = () => {
             ))}
           </div>
         ) : error ? (
-          <Card className="border border-red-200">
+          <Card className="bg-red-50 dark:bg-red-950/20">
             <CardContent className="p-6 text-center">
               <p className="text-red-600">{t.jobs.errorLoading}</p>
             </CardContent>
           </Card>
         ) : transformedJobs.length === 0 ? (
-          <div className="text-center p-10 border border-dashed rounded-3xl text-muted-foreground">
+          <div className="text-center p-10 rounded-3xl text-muted-foreground bg-muted/30">
             <img
               src="/lovable-uploads/3dicons-travel-front-color.png"
               alt="No data found"
@@ -1386,10 +1365,10 @@ const JobSearchResultsPage = () => {
             {regularJobsWithLogos.map((job) => (
               <div
                 key={job.id}
-                className="group cursor-pointer"
+                className="group cursor-pointer hover:shadow-soft transition-shadow"
                 onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
               >
-                <Card className="border border-gray-200 hover:shadow-md transition-shadow overflow-hidden rounded-lg">
+                <Card className="hover:shadow-soft transition-shadow overflow-hidden rounded-lg">
                   <CardContent
                     className={
                       isMobile
@@ -1406,7 +1385,7 @@ const JobSearchResultsPage = () => {
                               <img
                                 src={job.company_logo}
                                 alt={`${job.company_name || job.company} logo`}
-                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                className="w-10 h-10 rounded-full object-cover"
                                 loading="lazy"
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {
@@ -1414,7 +1393,7 @@ const JobSearchResultsPage = () => {
                                   console.warn(
                                     "❌ Logo failed to load:",
                                     job.company_logo,
-                                    target.src
+                                    target.src,
                                   );
                                   target.style.display = "none";
                                   const fallback =
@@ -1428,7 +1407,7 @@ const JobSearchResultsPage = () => {
                                   if (process.env.NODE_ENV === "development") {
                                     console.log(
                                       "✅ Logo loaded successfully:",
-                                      job.company_logo
+                                      job.company_logo,
                                     );
                                   }
                                 }}
@@ -1502,7 +1481,7 @@ const JobSearchResultsPage = () => {
                               "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                               job.is_saved
                                 ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                : "text-black dark:text-white"
+                                : "text-black dark:text-white",
                             )}
                           >
                             <Heart
@@ -1510,7 +1489,7 @@ const JobSearchResultsPage = () => {
                                 "h-4 w-4 transition-colors",
                                 job.is_saved
                                   ? "text-red-500 fill-red-500 animate-heart-pop"
-                                  : "text-black dark:text-white"
+                                  : "text-black dark:text-white",
                               )}
                             />
                           </Button>
@@ -1527,7 +1506,7 @@ const JobSearchResultsPage = () => {
                                 <img
                                   src={job.company_logo}
                                   alt={job.company_name || job.company}
-                                  className="w-12 h-12 rounded-md object-cover border border-gray-300 absolute inset-0 z-10"
+                                  className="w-12 h-12 rounded-md object-cover absolute inset-0 z-10"
                                   loading="lazy"
                                   referrerPolicy="no-referrer"
                                   onError={(e) => {
@@ -1535,12 +1514,12 @@ const JobSearchResultsPage = () => {
                                     console.warn(
                                       "❌ Logo failed to load:",
                                       job.company_logo,
-                                      target.src
+                                      target.src,
                                     );
                                     target.style.display = "none";
                                     const fallback =
                                       target.parentElement?.querySelector(
-                                        ".logo-fallback"
+                                        ".logo-fallback",
                                       ) as HTMLElement;
                                     if (fallback) {
                                       fallback.style.display = "flex";
@@ -1554,14 +1533,14 @@ const JobSearchResultsPage = () => {
                                     ) {
                                       console.log(
                                         "✅ Logo loaded successfully:",
-                                        job.company_logo
+                                        job.company_logo,
                                       );
                                     }
                                   }}
                                 />
                               ) : null}
                               <div
-                                className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center border border-gray-300 logo-fallback absolute inset-0 ${
+                                className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center logo-fallback absolute inset-0 ${
                                   job.company_logo ? "z-0" : "z-10"
                                 }`}
                                 style={{
@@ -1618,7 +1597,7 @@ const JobSearchResultsPage = () => {
                                         "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                         job.is_saved
                                           ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                          : "text-black dark:text-white"
+                                          : "text-black dark:text-white",
                                       )}
                                     >
                                       <Heart
@@ -1626,7 +1605,7 @@ const JobSearchResultsPage = () => {
                                           "h-4 w-4 transition-colors",
                                           job.is_saved
                                             ? "text-red-500 fill-red-500 animate-heart-pop"
-                                            : "text-black dark:text-white"
+                                            : "text-black dark:text-white",
                                         )}
                                       />
                                     </Button>
@@ -1640,8 +1619,8 @@ const JobSearchResultsPage = () => {
                                         } else {
                                           navigate(
                                             `/jobs/${encodeURIComponent(
-                                              job.id
-                                            )}`
+                                              job.id,
+                                            )}`,
                                           );
                                         }
                                       }}
@@ -1690,8 +1669,8 @@ const JobSearchResultsPage = () => {
                                   {job.matchPercentage >= 70
                                     ? "GOOD MATCH"
                                     : job.matchPercentage >= 40
-                                    ? "FAIR MATCH"
-                                    : "POOR MATCH"}
+                                      ? "FAIR MATCH"
+                                      : "POOR MATCH"}
                                 </p>
                               </div>
                             </div>
@@ -1707,7 +1686,7 @@ const JobSearchResultsPage = () => {
 
         {/* Pagination */}
         {!isLoading && transformedJobs.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 ">
             <div className="text-sm text-gray-600">
               {totalJobs > 0 ? (
                 <>

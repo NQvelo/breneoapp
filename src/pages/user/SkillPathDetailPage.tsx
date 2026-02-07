@@ -247,16 +247,16 @@ const SkillPathDetailPage = () => {
         skillLower.includes("ux")
           ? "ui/ux designer"
           : skillLower.includes("data") ||
-            skillLower.includes("analyst") ||
-            skillLower.includes("analytics")
-          ? "data analyst"
-          : skillLower.includes("manager") || skillLower.includes("product")
-          ? "product manager"
-          : skillLower.includes("security") || skillLower.includes("cyber")
-          ? "cybersecurity specialist"
-          : skillLower.includes("devops") || skillLower.includes("cloud")
-          ? "devops engineer"
-          : "software developer";
+              skillLower.includes("analyst") ||
+              skillLower.includes("analytics")
+            ? "data analyst"
+            : skillLower.includes("manager") || skillLower.includes("product")
+              ? "product manager"
+              : skillLower.includes("security") || skillLower.includes("cyber")
+                ? "cybersecurity specialist"
+                : skillLower.includes("devops") || skillLower.includes("cloud")
+                  ? "devops engineer"
+                  : "software developer";
 
       const fallbackSalary = calculateAISalary(genericTitle, country);
       if (fallbackSalary.min_salary && fallbackSalary.max_salary) {
@@ -284,7 +284,7 @@ const SkillPathDetailPage = () => {
       // Fetch real market data with timeout (3 seconds max)
       const marketDataPromise = getCompleteMarketData(
         decodedSkillName,
-        country
+        country,
       );
       const timeoutPromise = new Promise<null>((resolve) => {
         setTimeout(() => resolve(null), 3000);
@@ -319,10 +319,10 @@ const SkillPathDetailPage = () => {
       const { data, error } = await supabase
         .from("courses")
         .select(
-          "id, title, provider, level, duration, description, required_skills, image"
+          "id, title, provider, level, duration, description, required_skills, image",
         )
         .or(
-          `title.ilike.%${decodedSkillName}%,description.ilike.%${decodedSkillName}%,title.ilike.%${skillNameLower}%,description.ilike.%${skillNameLower}%`
+          `title.ilike.%${decodedSkillName}%,description.ilike.%${decodedSkillName}%,title.ilike.%${skillNameLower}%,description.ilike.%${skillNameLower}%`,
         )
         .limit(6); // Reduced from 10 to 6 for faster query
 
@@ -354,7 +354,7 @@ const SkillPathDetailPage = () => {
             requiredSkills.some(
               (skill: string) =>
                 skill.toLowerCase().includes(skillNameLower) ||
-                skillNameLower.includes(skill.toLowerCase())
+                skillNameLower.includes(skill.toLowerCase()),
             );
 
           return matchesTitleOrDescription || matchesSkills;
@@ -372,7 +372,7 @@ const SkillPathDetailPage = () => {
             description: course.description || "",
             required_skills: course.required_skills || [],
             image: course.image || undefined,
-          }))
+          })),
         );
       } else {
         // No courses found - set empty array
@@ -576,7 +576,7 @@ const SkillPathDetailPage = () => {
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="rounded-lg border bg-background p-2 shadow-sm">
+                            <div className="rounded-lg bg-background p-2 shadow-sm">
                               <div className="grid gap-2">
                                 <div className="flex items-center justify-between gap-4">
                                   <span className="text-sm font-medium">
@@ -625,7 +625,7 @@ const SkillPathDetailPage = () => {
               {courses.map((course) => (
                 <Card
                   key={course.id}
-                  className="border border-gray-200 dark:border-gray-700 hover:border-primary transition-colors cursor-pointer"
+                  className="hover:bg-primary/5 hover:shadow-soft transition-all cursor-pointer"
                   onClick={() => navigate(`/course/${course.id}`)}
                 >
                   <CardContent className="p-4">
@@ -765,7 +765,7 @@ const SkillPathDetailPage = () => {
                   return (
                     <Card
                       key={jobId}
-                      className="border border-gray-200 dark:border-gray-700 hover:border-primary transition-colors cursor-pointer"
+                      className="hover:bg-primary/5 hover:shadow-soft transition-all cursor-pointer"
                       onClick={() => navigate(`/jobs/${jobId}`)}
                     >
                       <CardContent className="p-4">
@@ -821,7 +821,7 @@ const SkillPathDetailPage = () => {
                 className="w-full mt-4"
                 onClick={() => {
                   navigate(
-                    `/jobs?search=${encodeURIComponent(decodedSkillName)}`
+                    `/jobs?search=${encodeURIComponent(decodedSkillName)}`,
                   );
                 }}
               >

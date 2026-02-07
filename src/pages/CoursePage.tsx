@@ -95,7 +95,7 @@ const CoursePage = () => {
       try {
         // Try to fetch from API first - use the detail endpoint
         const response = await apiClient.get(
-          `/api/academy/${course.academy_id}/`
+          `/api/academy/${course.academy_id}/`,
         );
 
         if (response.data) {
@@ -172,7 +172,7 @@ const CoursePage = () => {
       } catch (error) {
         console.debug(
           "Could not fetch academy profile from API, trying Supabase",
-          error
+          error,
         );
       }
 
@@ -294,7 +294,7 @@ const CoursePage = () => {
       if (context?.previousSavedCourses) {
         queryClient.setQueryData(
           ["savedCourses", user?.id],
-          context.previousSavedCourses
+          context.previousSavedCourses,
         );
       }
 
@@ -333,7 +333,7 @@ const CoursePage = () => {
       toast.success(
         `"${course?.title}" has been ${
           wasPreviouslySaved ? "unsaved" : "saved"
-        } successfully.`
+        } successfully.`,
       );
     },
   });
@@ -411,7 +411,7 @@ const CoursePage = () => {
         {/* Main Content Wrapper */}
         <div className="max-w-7xl mx-auto pb-20">
           {/* 1. Cover Image - Outside the main div */}
-          <div className="w-full h-40 sm:h-80 overflow-hidden rounded-3xl mb-6 border border-gray-200 dark:border-gray-700">
+          <div className="w-full h-40 sm:h-80 overflow-hidden rounded-3xl mb-6">
             <img
               src={course.image}
               alt={course.title}
@@ -419,9 +419,9 @@ const CoursePage = () => {
             />
           </div>
 
-          {/* Main Content Card with Border */}
-          <Card className=" rounded-3xl border-0 bg-transparent sm:border sm:border-border sm:bg-white sm:dark:bg-white">
-            <CardContent className="p-0 sm:p-6 space-y-0 ">
+          {/* Main Content Card */}
+          <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
+            <CardContent className="p-6 sm:p-6 space-y-0 ">
               {/* 2. Academy Name */}
               <div className="flex items-center gap-3 pb-2 ">
                 <OptimizedAvatar
@@ -444,7 +444,7 @@ const CoursePage = () => {
               </h1>
 
               {/* 5. Info Cards Section with Registration and Save Buttons */}
-              <div className=" dark:border-gray-700 py-0 px-0 sm:py-5 sm:px-0 bg-white dark:bg-white rounded-3xl py-4">
+              <div className="py-0 px-0 sm:py-5 sm:px-0 bg-white dark:bg-white rounded-3xl">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 sm:gap-6">
                   {/* Info Cards */}
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-12 flex-1 w-full sm:w-auto  rounded-2xl sm:rounded-none p-0 sm:p-0">
@@ -552,7 +552,7 @@ const CoursePage = () => {
                         "aspect-square bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A]",
                         isSaved
                           ? "text-white-500 bg-[#E6E7EB] dark:bg-[#474747] "
-                          : "text-black dark:text-white "
+                          : "text-black dark:text-white ",
                       )}
                     >
                       {isSaving ? (

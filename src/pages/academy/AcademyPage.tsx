@@ -354,7 +354,7 @@ const AcademyPage = () => {
           const { data, error } = await supabase
             .from("academy_profiles")
             .select(
-              "id, academy_name, description, website_url, contact_email, logo_url, is_verified, user_id"
+              "id, academy_name, description, website_url, contact_email, logo_url, is_verified, user_id",
             )
             .eq("id", fetchId)
             .single();
@@ -362,13 +362,13 @@ const AcademyPage = () => {
           if (error) {
             console.warn(
               "⚠️ Error fetching academy profile from Supabase:",
-              error
+              error,
             );
           } else if (data) {
             supabaseData = data;
             console.log(
               "✅ Academy profile fetched from Supabase:",
-              supabaseData
+              supabaseData,
             );
           }
         } catch (supabaseError) {
@@ -667,7 +667,7 @@ const AcademyPage = () => {
                               <div className="bg-breneo-blue/10 rounded-full p-2">
                                 {getSocialIcon(
                                   platform as SocialPlatform,
-                                  "h-[18px] w-[18px] text-breneo-blue"
+                                  "h-[18px] w-[18px] text-breneo-blue",
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -748,7 +748,11 @@ const AcademyPage = () => {
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 // Prevent infinite loop - only set fallback if not already set
-                                if (!target.src.includes("/lovable-uploads/no_photo.png")) {
+                                if (
+                                  !target.src.includes(
+                                    "/lovable-uploads/no_photo.png",
+                                  )
+                                ) {
                                   target.onerror = null; // Remove error handler to prevent loop
                                   target.src = "/lovable-uploads/no_photo.png";
                                 }

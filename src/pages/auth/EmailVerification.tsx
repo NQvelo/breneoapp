@@ -10,6 +10,7 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ImageIcon } from "lucide-react";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const EmailVerification: React.FC = () => {
   const navigate = useNavigate();
@@ -47,7 +48,8 @@ const EmailVerification: React.FC = () => {
     const preloadImages = async () => {
       try {
         await Promise.all([
-          preloadImage("/lovable-uploads/breneo_logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo.png"),
+          preloadImage("/lovable-uploads/Breneo-logo-dark.png"),
           preloadImage("/lovable-uploads/future.png"),
         ]);
       } catch (error) {
@@ -99,7 +101,7 @@ const EmailVerification: React.FC = () => {
       }
 
       toast.error(
-        "Verification successful, but auto-login failed. Please log in manually."
+        "Verification successful, but auto-login failed. Please log in manually.",
       );
       navigate("/auth/login");
     }
@@ -121,7 +123,7 @@ const EmailVerification: React.FC = () => {
 
   const handleKeyDown = (
     index: number,
-    e: React.KeyboardEvent<HTMLInputElement>
+    e: React.KeyboardEvent<HTMLInputElement>,
   ) => {
     // Handle backspace to go to previous input
     if (e.key === "Backspace" && !code[index] && index > 0) {
@@ -219,14 +221,12 @@ const EmailVerification: React.FC = () => {
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
           {!logoLoaded && !imageError && (
-            <div className="h-7 w-20 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
               <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
             </div>
           )}
-          <img
-            src="/lovable-uploads/breneo_logo.png"
-            alt="Breneo Logo"
-            className={`h-7 transition-opacity duration-300 ${
+          <BreneoLogo
+            className={`h-6 lg:h-5 transition-opacity duration-300 ${
               logoLoaded ? "opacity-100" : "opacity-0"
             }`}
             onLoad={() => setLogoLoaded(true)}
@@ -236,7 +236,7 @@ const EmailVerification: React.FC = () => {
             }}
           />
           {imageError && (
-            <div className="h-7 w-20 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+            <div className="h-5 w-16 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 Breneo
               </span>
@@ -253,14 +253,12 @@ const EmailVerification: React.FC = () => {
             <div className="mb-8 hidden lg:flex items-center justify-between">
               <div className="flex items-center">
                 {!logoLoaded && !imageError && (
-                  <div className="h-10 w-32 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
+                  <div className="h-8 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
                     <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
                   </div>
                 )}
-                <img
-                  src="/lovable-uploads/breneo_logo.png"
-                  alt="Breneo Logo"
-                  className={`h-10 transition-opacity duration-300 ${
+                <BreneoLogo
+                  className={`h-8 transition-opacity duration-300 ${
                     logoLoaded ? "opacity-100" : "opacity-0"
                   }`}
                   onLoad={() => setLogoLoaded(true)}
@@ -270,7 +268,7 @@ const EmailVerification: React.FC = () => {
                   }}
                 />
                 {imageError && (
-                  <div className="h-10 w-32 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+                  <div className="h-8 w-24 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                       Breneo
                     </span>

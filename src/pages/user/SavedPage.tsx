@@ -87,17 +87,20 @@ const SavedPage = () => {
   });
 
   // Fetch saved courses with full details
-  const { data: savedCourses = [], isLoading: loadingSavedCourses } = useQuery<SavedCourse[]>({
+  const { data: savedCourses = [], isLoading: loadingSavedCourses } = useQuery<
+    SavedCourse[]
+  >({
     queryKey: ["savedCoursesDetails", user?.id, savedCourseIds],
     queryFn: async () => {
-      if (!user?.id || !savedCourseIds || savedCourseIds.length === 0) return [];
+      if (!user?.id || !savedCourseIds || savedCourseIds.length === 0)
+        return [];
 
       try {
         // Fetch course details from Supabase
         const { data: coursesData, error: coursesError } = await supabase
           .from("courses")
           .select(
-            "id, title, provider, category, level, duration, image, description, academy_id"
+            "id, title, provider, category, level, duration, image, description, academy_id",
           )
           .in("id", savedCourseIds);
 
@@ -111,7 +114,7 @@ const SavedPage = () => {
           ...new Set(
             coursesData
               ?.map((c) => c.academy_id)
-              .filter((id): id is string => !!id) || []
+              .filter((id): id is string => !!id) || [],
           ),
         ];
 
@@ -123,7 +126,7 @@ const SavedPage = () => {
             uniqueAcademyIds.map(async (academyId) => {
               try {
                 const response = await apiClient.get(
-                  `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`
+                  `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`,
                 );
 
                 if (response.data) {
@@ -134,7 +137,7 @@ const SavedPage = () => {
 
                   const getStringField = (
                     field: string,
-                    source: Record<string, unknown> = profileData
+                    source: Record<string, unknown> = profileData,
                   ) => {
                     const value = source[field];
                     return typeof value === "string" ? value : undefined;
@@ -152,11 +155,11 @@ const SavedPage = () => {
                 }
               } catch (error) {
                 console.debug(
-                  `Could not fetch academy profile for ${academyId}`
+                  `Could not fetch academy profile for ${academyId}`,
                 );
                 academyProfilesMap.set(academyId, null);
               }
-            })
+            }),
           );
         }
 
@@ -221,7 +224,9 @@ const SavedPage = () => {
   });
 
   // Fetch saved jobs with full details
-  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<SavedJob[]>({
+  const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<
+    SavedJob[]
+  >({
     queryKey: ["savedJobsDetails", user?.id, savedJobIds],
     queryFn: async () => {
       if (!user?.id || !savedJobIds || savedJobIds.length === 0) return [];
@@ -260,8 +265,12 @@ const SavedPage = () => {
               jobDetail.company_logo ||
               jobDetail.logo_url ||
               (typeof jobDetail.company === "object" && jobDetail.company
-                ? (jobDetail.company as { logo?: string; company_logo?: string })
-                    .logo ||
+                ? (
+                    jobDetail.company as {
+                      logo?: string;
+                      company_logo?: string;
+                    }
+                  ).logo ||
                   (jobDetail.company as { company_logo?: string }).company_logo
                 : undefined);
 
@@ -269,8 +278,12 @@ const SavedPage = () => {
             let salary = "By agreement";
             const minSalary = jobDetail.job_min_salary || jobDetail.min_salary;
             const maxSalary = jobDetail.job_max_salary || jobDetail.max_salary;
-            const salaryCurrency = (jobDetail.job_salary_currency || jobDetail.salary_currency || "$") as string;
-            const salaryPeriod = (jobDetail.job_salary_period || jobDetail.salary_period || "yearly") as string;
+            const salaryCurrency = (jobDetail.job_salary_currency ||
+              jobDetail.salary_currency ||
+              "$") as string;
+            const salaryPeriod = (jobDetail.job_salary_period ||
+              jobDetail.salary_period ||
+              "yearly") as string;
 
             if (
               minSalary &&
@@ -283,7 +296,7 @@ const SavedPage = () => {
               const maxSalaryFormatted = maxSalary.toLocaleString();
               const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
               const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym)
+                salaryCurrency.includes(sym),
               );
               if (isCurrencyBefore) {
                 salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
@@ -298,12 +311,15 @@ const SavedPage = () => {
               const minSalaryFormatted = minSalary.toLocaleString();
               const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
               const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym)
+                salaryCurrency.includes(sym),
               );
               salary = isCurrencyBefore
                 ? `${salaryCurrency}${minSalaryFormatted}+`
                 : `${minSalaryFormatted}+ ${salaryCurrency}`;
-            } else if (jobDetail.salary && typeof jobDetail.salary === "string") {
+            } else if (
+              jobDetail.salary &&
+              typeof jobDetail.salary === "string"
+            ) {
               salary = jobDetail.salary;
             }
 
@@ -319,12 +335,16 @@ const SavedPage = () => {
               INTERN: "Internship",
             };
             const employmentType =
-              jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+              jobTypeLabels[employmentTypeRaw] ||
+              employmentTypeRaw ||
+              "Full time";
 
             // Determine work arrangement
             let workArrangement = "On-site";
             const isRemote =
-              jobDetail.job_is_remote || jobDetail.is_remote || jobDetail.remote === true;
+              jobDetail.job_is_remote ||
+              jobDetail.is_remote ||
+              jobDetail.remote === true;
             if (isRemote) {
               workArrangement = "Remote";
             } else if (jobTitle?.toLowerCase().includes("hybrid")) {
@@ -335,7 +355,10 @@ const SavedPage = () => {
               id: jobId,
               title: jobTitle,
               company: companyName,
-              location: typeof location === "string" ? location : "Location not specified",
+              location:
+                typeof location === "string"
+                  ? location
+                  : "Location not specified",
               url: jobDetail.url || "",
               company_logo: logo,
               salary,
@@ -368,7 +391,9 @@ const SavedPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["savedCourseIds", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["savedCoursesDetails", user?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["savedCoursesDetails", user?.id],
+      });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Course removed from saved");
     },
@@ -388,7 +413,9 @@ const SavedPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["savedJobIds", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["savedJobsDetails", user?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["savedJobsDetails", user?.id],
+      });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast.success("Job removed from saved");
     },
@@ -412,7 +439,7 @@ const SavedPage = () => {
     <DashboardLayout>
       {/* Profile/Courses/Jobs Switcher */}
       <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
-        <div className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-border rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
+        <div className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <button
             onClick={() => navigate("/profile")}
             className="relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -465,11 +492,16 @@ const SavedPage = () => {
               <Card>
                 <CardContent className="p-12 text-center">
                   <GraduationCap className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No saved courses</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    No saved courses
+                  </h3>
                   <p className="text-gray-500 mb-4">
                     Start saving courses to view them here!
                   </p>
-                  <Button onClick={() => navigate("/courses")} variant="default">
+                  <Button
+                    onClick={() => navigate("/courses")}
+                    variant="default"
+                  >
                     Browse Courses
                   </Button>
                 </CardContent>
@@ -477,14 +509,16 @@ const SavedPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {savedCourses.map((course) => {
-                  const isCourseSaved = savedCourseIds.includes(String(course.id));
+                  const isCourseSaved = savedCourseIds.includes(
+                    String(course.id),
+                  );
                   return (
                     <Link
                       key={course.id}
                       to={`/course/${course.id}`}
                       className="block"
                     >
-                      <Card className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl w-full flex flex-col h-full">
+                      <Card className="relative transition-all duration-200 cursor-pointer group rounded-3xl w-full flex flex-col h-full hover:shadow-soft">
                         <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
                           <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                             <img
@@ -531,7 +565,7 @@ const SavedPage = () => {
                                   "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
                                   isCourseSaved
                                     ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                    : "text-black dark:text-white"
+                                    : "text-black dark:text-white",
                                 )}
                               >
                                 {saveCourseMutation.isPending ? (
@@ -542,7 +576,7 @@ const SavedPage = () => {
                                       "h-4 w-4 transition-colors",
                                       isCourseSaved
                                         ? "text-red-500 fill-red-500"
-                                        : "text-black dark:text-white"
+                                        : "text-black dark:text-white",
                                     )}
                                   />
                                 )}
@@ -594,7 +628,7 @@ const SavedPage = () => {
                   return (
                     <Card
                       key={job.id}
-                      className="relative transition-all duration-200 cursor-pointer group border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600 rounded-3xl"
+                      className="relative transition-all duration-200 cursor-pointer group rounded-3xl hover:shadow-soft"
                     >
                       <CardContent className="p-6">
                         <div className="flex items-start gap-3 mb-4">
@@ -602,9 +636,10 @@ const SavedPage = () => {
                             <img
                               src={job.company_logo}
                               alt={`${job.company} logo`}
-                              className="w-12 h-12 rounded-3xl object-cover border border-gray-200 dark:border-gray-700 flex-shrink-0"
+                              className="w-12 h-12 rounded-3xl object-cover flex-shrink-0"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = "none";
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
                               }}
                             />
                           ) : (
@@ -626,7 +661,9 @@ const SavedPage = () => {
                           {job.location && (
                             <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                               <MapPin className="h-3 w-3 flex-shrink-0" />
-                              <span className="line-clamp-1">{job.location}</span>
+                              <span className="line-clamp-1">
+                                {job.location}
+                              </span>
                             </div>
                           )}
                           {job.salary && (
@@ -678,7 +715,7 @@ const SavedPage = () => {
                               "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-9 w-9",
                               isJobSaved
                                 ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                : "text-black dark:text-white"
+                                : "text-black dark:text-white",
                             )}
                           >
                             {saveJobMutation.isPending ? (
@@ -689,7 +726,7 @@ const SavedPage = () => {
                                   "h-4 w-4 transition-colors",
                                   isJobSaved
                                     ? "text-red-500 fill-red-500"
-                                    : "text-black dark:text-white"
+                                    : "text-black dark:text-white",
                                 )}
                               />
                             )}

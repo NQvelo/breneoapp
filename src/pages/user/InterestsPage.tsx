@@ -1,5 +1,6 @@
 import React from "react";
 import { InterestsSelection } from "@/components/onboarding/InterestsSelection";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const InterestsPage = () => {
   return (
@@ -8,11 +9,7 @@ const InterestsPage = () => {
       <header className="bg-white py-4 px-6 shadow-sm">
         <div className="container mx-auto">
           <a href="/" className="flex items-center space-x-2">
-            <img
-              src="lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className="h-10"
-            />
+            <BreneoLogo className="h-9 md:h-8" />
           </a>
         </div>
       </header>
@@ -23,7 +20,7 @@ const InterestsPage = () => {
       </main>
 
       {/* Simple footer */}
-      <footer className="bg-white py-4 px-6 border-t">
+      <footer className="bg-white py-4 px-6">
         <div className="container mx-auto">
           <p className="text-sm text-gray-500 text-center">
             © {new Date().getFullYear()} Breneo. All rights reserved.

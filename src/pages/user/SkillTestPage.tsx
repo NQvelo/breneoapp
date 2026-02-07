@@ -24,6 +24,7 @@ import { CheckCircle2, X } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import { useMobile } from "@/hooks/use-mobile";
+import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 /* ----------------------------- Progress Bar ----------------------------- */
 
@@ -55,8 +56,8 @@ const ProgressBar = ({
             isCompleted
               ? "bg-green-500 dark:bg-green-600"
               : isActive
-              ? "bg-[#01bfff]"
-              : "bg-gray-200 dark:bg-gray-700"
+                ? "bg-[#01bfff]"
+                : "bg-gray-200 dark:bg-gray-700"
           }`}
         ></div>
         <span
@@ -64,8 +65,8 @@ const ProgressBar = ({
             isCompleted
               ? "text-green-600 dark:text-green-400"
               : isActive
-              ? "text-[#01bfff] dark:text-[#5AC9F8]"
-              : "text-gray-500 dark:text-gray-400"
+                ? "text-[#01bfff] dark:text-[#5AC9F8]"
+                : "text-gray-500 dark:text-gray-400"
           }`}
         >
           {step.name}
@@ -128,7 +129,7 @@ const SkillTestPage = () => {
   const t = useTranslation();
   const [testStarted, setTestStarted] = useState(false);
   const [phase, setPhase] = useState<"career" | "assessment" | "finished">(
-    "career"
+    "career",
   );
   const [currentTechQ, setCurrentTechQ] = useState<Question | null>(null);
   const [currentSoftQ, setCurrentSoftQ] = useState<Question | null>(null);
@@ -165,16 +166,14 @@ const SkillTestPage = () => {
             {/* Breneo Logo - Left Column */}
             <div className="flex justify-start items-center">
               {!logoLoaded && !imageError && (
-                <div className="h-8 w-8 md:w-28 bg-gray-200 dark:bg-gray-700 animate-pulse rounded flex items-center justify-center">
+                <div className="h-6 w-6 md:w-24 bg-gray-200 dark:bg-gray-700 animate-pulse rounded flex items-center justify-center">
                   <span className="text-xs text-gray-400 hidden md:inline">
                     Loading...
                   </span>
                 </div>
               )}
-              <img
-                src="/lovable-uploads/breneo-only-logo.png"
-                alt="Breneo Logo"
-                className={`h-8 w-8 md:hidden transition-opacity duration-300 ${
+              <BreneoLogo
+                className={`h-7 w-7 md:hidden object-contain transition-opacity duration-300 ${
                   logoLoaded ? "opacity-100" : "opacity-0"
                 }`}
                 onLoad={() => setLogoLoaded(true)}
@@ -183,10 +182,8 @@ const SkillTestPage = () => {
                   setLogoLoaded(true);
                 }}
               />
-              <img
-                src="/lovable-uploads/breneo_logo.png"
-                alt="Breneo Logo"
-                className={`hidden md:block h-8 transition-opacity duration-300 ${
+              <BreneoLogo
+                className={`hidden md:block h-6 transition-opacity duration-300 ${
                   logoLoaded ? "opacity-100" : "opacity-0"
                 }`}
                 onLoad={() => setLogoLoaded(true)}
@@ -196,7 +193,7 @@ const SkillTestPage = () => {
                 }}
               />
               {imageError && (
-                <div className="h-8 w-8 md:w-28 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+                <div className="h-6 w-6 md:w-24 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
                   <span className="text-xs text-gray-600 dark:text-gray-400 hidden md:inline">
                     Breneo
                   </span>
@@ -300,16 +297,14 @@ const SkillTestPage = () => {
           {/* Breneo Logo - Left Column */}
           <div className="flex justify-start items-center">
             {!logoLoaded && !imageError && (
-              <div className="h-8 w-8 md:w-28 bg-gray-200 dark:bg-gray-700 animate-pulse rounded flex items-center justify-center">
+              <div className="h-6 w-6 md:w-24 bg-gray-200 dark:bg-gray-700 animate-pulse rounded flex items-center justify-center">
                 <span className="text-xs text-gray-400 hidden md:inline">
                   Loading...
                 </span>
               </div>
             )}
-            <img
-              src="/lovable-uploads/breneo-only-logo.png"
-              alt="Breneo Logo"
-              className={`h-8 w-8 md:hidden transition-opacity duration-300 ${
+            <BreneoLogo
+              className={`h-7 w-7 md:hidden object-contain transition-opacity duration-300 ${
                 logoLoaded ? "opacity-100" : "opacity-0"
               }`}
               onLoad={() => setLogoLoaded(true)}
@@ -318,10 +313,8 @@ const SkillTestPage = () => {
                 setLogoLoaded(true);
               }}
             />
-            <img
-              src="/lovable-uploads/breneo_logo.png"
-              alt="Breneo Logo"
-              className={`hidden md:block h-8 transition-opacity duration-300 ${
+            <BreneoLogo
+              className={`hidden md:block h-6 transition-opacity duration-300 ${
                 logoLoaded ? "opacity-100" : "opacity-0"
               }`}
               onLoad={() => setLogoLoaded(true)}
@@ -331,7 +324,7 @@ const SkillTestPage = () => {
               }}
             />
             {imageError && (
-              <div className="h-8 w-8 md:w-28 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
+              <div className="h-6 w-6 md:w-24 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
                 <span className="text-xs text-gray-600 dark:text-gray-400 hidden md:inline">
                   Breneo
                 </span>
