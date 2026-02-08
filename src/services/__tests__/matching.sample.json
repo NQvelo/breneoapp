@@ -1,0 +1,34 @@
+{
+  "description": "Sample job + user and expected match output for job matching algorithm",
+  "job": {
+    "id": "sample-1",
+    "title": "Senior React Developer",
+    "company_name": "TechCo",
+    "skillsRequired": ["react", "typescript", "node.js"],
+    "skillsPreferred": ["docker", "aws"],
+    "seniority": "senior",
+    "roleCategory": "Engineering",
+    "minYearsExperience": 5,
+    "languagesRequired": ["English C1"],
+    "techStack": ["react", "typescript", "git"],
+    "industryTags": ["Technology", "Software"]
+  },
+  "user": {
+    "userSkills": ["react", "typescript", "javascript", "node.js", "docker"],
+    "yearsExperienceTotal": 6,
+    "yearsExperienceByIndustry": { "Technology": 4, "Software": 2 },
+    "industryTags": ["Technology", "Software"],
+    "seniority": "senior",
+    "languages": ["English C1"],
+    "roleInterests": [],
+    "techStackExperience": ["react", "typescript", "git"]
+  },
+  "expectedMatch": {
+    "overallPercent_range": [75, 95],
+    "skills_percent_min": 80,
+    "expLevel_percent_min": 85,
+    "industry_percent_min": 90,
+    "missingCritical": [],
+    "badges_include": ["Meets required skills", "Language fit", "Seniority match", "Industry experience"]
+  }
+}

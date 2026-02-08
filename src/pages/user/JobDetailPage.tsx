@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -48,7 +48,6 @@ import {
   Facebook,
   Linkedin,
   Loader2,
-  XCircle,
   ThumbsUp,
 } from "lucide-react";
 
@@ -62,15 +61,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMobile } from "@/hooks/use-mobile";
 import { RadialProgress } from "@/components/ui/radial-progress";
+import { extractJobSkills } from "@/utils/jobMatchUtils";
 import {
-  calculateMatchPercentage,
-  getMatchQualityLabel,
-  extractJobSkills,
-} from "@/utils/jobMatchUtils";
+  matchJobDetailToUser,
+  buildUserMatchProfileFromSkillTest,
+  getStructuredJobFromDetail,
+  normalizeSkillName,
+  matchJobToUser,
+} from "@/services/matching";
+import type { MatchResult } from "@/types/matching";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
+  const t = useTranslation();
   // Decode the job ID in case it was URL-encoded
   const jobId = rawJobId ? decodeURIComponent(rawJobId) : undefined;
   const { user } = useAuth();
@@ -79,7 +84,12 @@ const JobDetailPage = () => {
   const isMobile = useMobile();
   const [showFixedBar, setShowFixedBar] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  /** Skills required by job that the user has selected as "I have this" (canonical names). Drives skill match %. */
+  const [selectedRequiredSkills, setSelectedRequiredSkills] = useState<
+    Set<string>
+  >(new Set());
   const mainContentRef = React.useRef<HTMLDivElement>(null);
+  const selectedSkillsInitedForJobRef = React.useRef<string | null>(null);
 
   // Fetch job details using the job service
   const {
@@ -1125,6 +1135,50 @@ const JobDetailPage = () => {
     return [];
   };
 
+  // Required skills for this job (canonical names), for chips and match
+  const requiredSkillsList = useMemo(() => {
+    if (!jobDetail) return [];
+    const structured = getStructuredJobFromDetail(jobDetail);
+    if (structured.skillsRequired.length > 0) {
+      return [...new Set(structured.skillsRequired)];
+    }
+    const raw =
+      jobDetail.required_skills ?? jobDetail.skills ?? jobDetail.job_skills;
+    const arr: string[] = Array.isArray(raw)
+      ? raw.filter(Boolean)
+      : typeof raw === "string"
+        ? raw
+            .split(/[,\n]/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+    return [...new Set(arr.map((s) => normalizeSkillName(s)).filter(Boolean))];
+  }, [jobDetail]);
+
+  const jobDetailId = jobDetail
+    ? String(jobDetail.id ?? jobDetail.job_id ?? "")
+    : "";
+
+  // When job changes, allow re-init of selected skills for the new job
+  useEffect(() => {
+    if (!jobDetailId) return;
+    selectedSkillsInitedForJobRef.current = null;
+  }, [jobDetailId]);
+
+  // Initialize selected required skills: pre-select those the user already has
+  useEffect(() => {
+    if (!jobDetail || requiredSkillsList.length === 0) return;
+    const jobKey = String(jobDetail.id ?? jobDetail.job_id ?? "");
+    if (selectedSkillsInitedForJobRef.current === jobKey) return;
+    selectedSkillsInitedForJobRef.current = jobKey;
+    const userSet = new Set(
+      (userSkills || []).map((s) => normalizeSkillName(s)),
+    );
+    setSelectedRequiredSkills(
+      new Set(requiredSkillsList.filter((r) => userSet.has(r))),
+    );
+  }, [jobDetail, requiredSkillsList, userSkills]);
+
   // Get education requirements
   const getEducationRequired = () => {
     if (!jobDetail) return undefined;
@@ -1417,12 +1471,41 @@ const JobDetailPage = () => {
     }
   };
 
-  const matchPercentage = calculateMatchPercentage(
-    userSkills,
-    jobDetail ? extractJobSkills(jobDetail) : [],
-    getJobTitle(),
-  );
-  const matchLabel = getMatchQualityLabel(matchPercentage);
+  // Base match from full profile (used to init chip selection)
+  const matchResult: MatchResult | null =
+    user && jobDetail
+      ? matchJobDetailToUser(
+          jobDetail,
+          buildUserMatchProfileFromSkillTest(userSkills),
+        )
+      : null;
+
+  // Match recalculated from selected skills (chips); skill % reflects user's selection
+  const displayMatchResult: MatchResult | null = useMemo(() => {
+    if (!user || !jobDetail) return null;
+    const structured = getStructuredJobFromDetail(jobDetail);
+    const baseProfile = buildUserMatchProfileFromSkillTest(userSkills);
+    const profileWithSelection = {
+      ...baseProfile,
+      userSkills: Array.from(selectedRequiredSkills),
+      techStackExperience: Array.from(selectedRequiredSkills),
+    };
+    return matchJobToUser(structured, profileWithSelection);
+  }, [jobDetail, user, userSkills, selectedRequiredSkills]);
+
+  const effectiveMatchResult = displayMatchResult ?? matchResult;
+  const matchQualityKey = effectiveMatchResult
+    ? effectiveMatchResult.overallPercent >= 95
+      ? "excellentMatch"
+      : effectiveMatchResult.overallPercent >= 85
+        ? "bestMatch"
+        : effectiveMatchResult.overallPercent >= 70
+          ? "goodMatch"
+          : effectiveMatchResult.overallPercent >= 50
+            ? "fairMatch"
+            : "badMatch"
+    : null;
+  const matchLabel = matchQualityKey ? t.jobMatch[matchQualityKey] : "";
 
   return (
     <DashboardLayout>
@@ -1628,38 +1711,83 @@ const JobDetailPage = () => {
                 </div>
               </div>
 
-              {/* Job Match Section - Standalone Card */}
-              {user && userSkills.length > 0 && (
+              {/* Job Match Section - three matches in one box, OVERALL MATCH separate */}
+              {user && jobDetail && effectiveMatchResult && (
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
-                  <div className="flex flex-row items-start gap-5">
-                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0 pt-1">
+                  <div className="flex flex-col sm:flex-row flex-wrap items-stretch gap-4">
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-row items-center justify-center gap-3 w-full sm:min-w-[280px] flex-1 min-h-[120px] sm:min-h-0">
                       <RadialProgress
-                        value={matchPercentage}
-                        size={56}
+                        value={effectiveMatchResult.overallPercent}
+                        size={52}
                         strokeWidth={4}
                         showLabel={false}
-                        percentageTextSize="md"
+                        percentageTextSize="sm"
                         className="flex-shrink-0"
                       />
-                      <span className="text-[8px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                        MATCH SCORE
-                      </span>
+                      <div className="flex flex-col items-start text-left min-w-0">
+                        <span className="text-sm font-bold text-black dark:text-white capitalize">
+                          {matchLabel || t.jobMatch.overall}
+                        </span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-snug">
+                          {t.jobMatch.scoreDescription}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-start gap-2 mb-2">
-                        <div className="bg-breneo-accent/10 p-1.5 rounded-lg">
-                          <Zap className="h-4 w-4 text-breneo-accent fill-breneo-accent" />
-                        </div>
-                        <span className="text-base font-bold text-gray-900 dark:text-white uppercase tracking-wide">
-                          {matchLabel || "Match Analysis"}
+                    <div className="rounded-xl p-2 flex flex-wrap items-end justify-center sm:justify-end gap-0.5 sm:gap-x-4 flex-1 min-w-0  sm:min-h-0 w-full">
+                      <div className="flex flex-col items-center flex-shrink-0  w-[90px] min-w-[80px]">
+                        <RadialProgress
+                          value={effectiveMatchResult.expLevel.percent ?? 0}
+                          size={52}
+                          strokeWidth={4}
+                          showLabel={false}
+                          percentageTextSize="sm"
+                          centerLabel={
+                            effectiveMatchResult.expLevel.percent != null
+                              ? undefined
+                              : "N/A"
+                          }
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-widest mt-2">
+                          {t.jobMatch.expLevel}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-2xl">
-                        This score is calculated by comparing your profile
-                        skills with the job requirements. We prioritize exact
-                        matches and key skills mentioned in the job title to
-                        ensure the best fit for your career path.
-                      </p>
+                      <div className="flex flex-col items-center flex-shrink-0 w-[90px] min-w-[80px]">
+                        <RadialProgress
+                          value={effectiveMatchResult.skills.percent ?? 0}
+                          size={52}
+                          strokeWidth={4}
+                          showLabel={false}
+                          percentageTextSize="sm"
+                          centerLabel={
+                            effectiveMatchResult.skills.percent != null
+                              ? undefined
+                              : "N/A"
+                          }
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-widest mt-2">
+                          {t.jobMatch.skill}
+                        </span>
+                      </div>
+                      <div className="flex flex-col items-center flex-shrink-0 w-[90px] min-w-[80px]">
+                        <RadialProgress
+                          value={effectiveMatchResult.industry.percent ?? 0}
+                          size={52}
+                          strokeWidth={4}
+                          showLabel={false}
+                          percentageTextSize="sm"
+                          centerLabel={
+                            effectiveMatchResult.industry.percent != null
+                              ? undefined
+                              : "N/A"
+                          }
+                          className="flex-shrink-0"
+                        />
+                        <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-widest mt-2">
+                          {t.jobMatch.industryExp}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1670,7 +1798,7 @@ const JobDetailPage = () => {
                 jobDetail.qualifications ||
                 jobDetail.team_description ||
                 jobDetail.benefits) && (
-                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6 space-y-6">
+                <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6 space-y-[4.5rem]">
                   {/* Responsibilities */}
                   {jobDetail.responsibilities && (
                     <div>
@@ -1687,17 +1815,59 @@ const JobDetailPage = () => {
                   )}
 
                   {/* Qualifications */}
-                  {jobDetail.qualifications && (
+                  {(jobDetail.qualifications ||
+                    requiredSkillsList.length > 0) && (
                     <div>
                       <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
                         <Award className="h-5 w-5" />
                         Qualifications
                       </h2>
-                      <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                          {jobDetail.qualifications}
-                        </p>
-                      </div>
+                      {requiredSkillsList.length > 0 && (
+                        <div className="mb-7">
+                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+                            Skills required — tap to mark as known
+                          </p>
+                          <div className="flex flex-wrap gap-3">
+                            {requiredSkillsList.map((skill) => {
+                              const selected =
+                                selectedRequiredSkills.has(skill);
+                              return (
+                                <Badge
+                                  key={skill}
+                                  variant="outline"
+                                  className={cn(
+                                    "cursor-pointer transition-colors capitalize px-4 py-2 text-sm min-h-[2.25rem] rounded-lg",
+                                    selected
+                                      ? "bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700 dark:hover:bg-sky-800/50"
+                                      : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700",
+                                  )}
+                                  onClick={() => {
+                                    if (!user) return;
+                                    setSelectedRequiredSkills((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(skill)) next.delete(skill);
+                                      else next.add(skill);
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  {skill}
+                                  {selected && (
+                                    <CheckCircle2 className="ml-2 h-4 w-4 inline-block" />
+                                  )}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {jobDetail.qualifications && (
+                        <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                            {jobDetail.qualifications}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 

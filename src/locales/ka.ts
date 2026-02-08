@@ -225,6 +225,20 @@ export const ka = {
     pageNotFoundDescription:
       "გვერდი, რომელსაც ეძებთ, არ არსებობს ან გადატანილია.",
   },
+  // Job match (detail page)
+  jobMatch: {
+    expLevel: "გამოცდილება",
+    skill: "უნარი",
+    industryExp: "ინდუსტრია",
+    overall: "ჯამი",
+    excellentMatch: "შესანიშნავი!",
+    bestMatch: "საუკეთესო!",
+    goodMatch: "კარგი!",
+    fairMatch: "სამართლიანი!",
+    badMatch: "ცუდი!",
+    scoreDescription:
+      "ეს ქულა აჩვენებს, რამდენად ახლოს ემთხვევა თქვენი უნარები ვაკანსიის მოთხოვნებს, უპირატესობას იძლევა ზუსტ და საკვანძო უნარების შესატყვისს.",
+  },
   // Webinars
   webinars: {
     title: "ვებინარები",

@@ -362,7 +362,10 @@ export const calculateMatchPercentage = (
  */
 export const getMatchQualityLabel = (matchPercentage?: number): string => {
   if (matchPercentage === undefined || matchPercentage <= 0) {
-    return "";
+    return "Bad match";
+  }
+  if (matchPercentage >= 95) {
+    return "Excellent match";
   }
   if (matchPercentage >= 85) {
     return "Best match";
@@ -373,6 +376,6 @@ export const getMatchQualityLabel = (matchPercentage?: number): string => {
   if (matchPercentage >= 50) {
     return "Fair match";
   }
-  return "Poor match";
+  return "Bad match";
 };
 

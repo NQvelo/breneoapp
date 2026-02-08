@@ -9,6 +9,8 @@ interface RadialProgressProps {
   showLabel?: boolean;
   matchLabel?: "GOOD MATCH" | "FAIR MATCH";
   percentageTextSize?: "sm" | "md" | "lg" | "xl";
+  /** When set, shown inside the circle instead of "value%" (e.g. "N/A") */
+  centerLabel?: React.ReactNode;
 }
 
 export const RadialProgress = React.forwardRef<
@@ -24,6 +26,7 @@ export const RadialProgress = React.forwardRef<
       showLabel = true,
       matchLabel,
       percentageTextSize = "lg",
+      centerLabel,
     },
     ref
   ) => {
@@ -89,7 +92,7 @@ export const RadialProgress = React.forwardRef<
                 textSizeClasses[percentageTextSize]
               )}
             >
-              {Math.round(value)}%
+              {centerLabel !== undefined ? centerLabel : `${Math.round(value)}%`}
             </span>
           </div>
         </div>

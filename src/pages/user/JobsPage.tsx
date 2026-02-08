@@ -1004,7 +1004,7 @@ const JobsPage = () => {
     });
   }, [activeFilters]);
 
-  // Fetch latest regular jobs: only last 1 week, cached so not refetched on every reload
+  // Fetch latest regular jobs: no filters, display latest 9 by date
   const {
     data: jobsData = { jobs: [], hasMore: false, total: 0 },
     isLoading,
@@ -1013,9 +1013,9 @@ const JobsPage = () => {
     queryKey: ["latestJobs"],
     queryFn: async () => {
       try {
-        // Use sessionStorage cache so we don't fetch on every reload (valid for 30 min)
+        // Use sessionStorage cache only when it has jobs (avoid serving stale empty cache)
         const cached = getCachedLatestJobs();
-        if (cached) {
+        if (cached && cached.jobs.length > 0) {
           return cached;
         }
 
@@ -1026,14 +1026,14 @@ const JobsPage = () => {
             countries: [],
             jobTypes: [],
             isRemote: undefined,
-            datePosted: "week", // Only jobs updated in the last 1 week
+            datePosted: undefined, // No date filter - get all jobs, we show latest 9
             skills: [],
             salaryMin: undefined,
             salaryMax: undefined,
             salaryByAgreement: undefined,
           },
           page: 1,
-          pageSize: 500,
+          pageSize: 100,
         });
 
         if (!response || !Array.isArray(response.jobs)) {
@@ -1041,7 +1041,7 @@ const JobsPage = () => {
         }
 
         const validJobs = response.jobs.filter((job) => {
-          const jobId = String(job.id || "");
+          const jobId = String(job.id || job.job_id || "");
           return jobId && jobId.trim() !== "";
         });
 
@@ -1273,15 +1273,13 @@ const JobsPage = () => {
     },
   });
 
-  const transformedJobs = React.useMemo(() => {
-    if (!jobs || jobs.length === 0) {
-      return [];
-    }
-
-    try {
-      // No filtering - just transform all jobs
-      return (jobs || [])
-        .map((job: ApiJob): Job | null => {
+  // Shared transformer: ApiJob[] -> Job[] (used for both latest and top matched)
+  const transformApiJobsToJobList = React.useCallback(
+    (apiJobs: ApiJob[]): Job[] => {
+      if (!apiJobs || apiJobs.length === 0) return [];
+      try {
+        return (apiJobs || [])
+          .map((job: ApiJob): Job | null => {
           // Handle nested company object if it exists
           const companyObj =
             job.company && typeof job.company === "object"
@@ -1289,8 +1287,8 @@ const JobsPage = () => {
               : null;
 
           // Extract fields with fallbacks for different API formats
-          // Ensure jobId is always a string - use only id field (not job_id or external_job_id)
-          const jobId = String(job.id || "");
+          // Ensure jobId is always a string - accept id or job_id (APIs vary)
+          const jobId = String(job.id || job.job_id || "");
 
           // Skip jobs without valid IDs - they can't be opened
           if (!jobId || jobId.trim() === "") {
@@ -1718,61 +1716,156 @@ const JobsPage = () => {
             matchPercentage,
           };
         })
-        .filter((job): job is Job => job !== null); // Filter out null jobs
-    } catch (error) {
-      console.error("Error transforming jobs:", error);
-      // Return empty array on error to prevent crashes
-      return [];
-    }
-  }, [jobs, savedJobs, userTopSkills]);
+          .filter((job): job is Job => job !== null);
+      } catch (error) {
+        console.error("Error transforming jobs:", error);
+        return [];
+      }
+    },
+    [savedJobs, userTopSkills],
+  );
 
-  // Display latest 9 jobs - no filtering, just sort by date
-  const regularJobs = useMemo(() => {
-    console.log(
-      "📅 Processing latest jobs - total jobs:",
-      transformedJobs.length,
-    );
+  const transformedJobs = React.useMemo(
+    () => transformApiJobsToJobList(jobs || []),
+    [jobs, transformApiJobsToJobList],
+  );
 
-    // Sort by date posted (newest first) - no other filtering
-    const sorted = [...transformedJobs].sort((a, b) => {
-      // Sort by date posted (newest first)
-      const jobA = allRegularJobs.find((j) => (j.id || j.job_id) === a.id);
-      const jobB = allRegularJobs.find((j) => (j.id || j.job_id) === b.id);
+  // Helper: check if a job matches any one of the active filter criteria (union of filter results)
+  const jobMatchesAnyActiveFilter = useCallback(
+    (
+      job: Job,
+      rawJob: ApiJob | undefined,
+      filters: JobFilters,
+    ): boolean => {
+      if (!rawJob) rawJob = allRegularJobs.find((j) => (j.id || j.job_id) === job.id);
 
-      const dateA =
-        jobA?.posted_at || jobA?.fetched_at || jobA?.date_posted || "";
-      const dateB =
-        jobB?.posted_at || jobB?.fetched_at || jobB?.date_posted || "";
+      // Skills: job title or extracted skills contain any of the filter skills
+      if (filters.skills.length > 0) {
+        const jobSkills = extractJobSkills(rawJob || (job as unknown as ApiJob));
+        const titleLower = (job.title || "").toLowerCase();
+        const hasSkill = filters.skills.some((s) => {
+          const sl = s.toLowerCase();
+          if (titleLower.includes(sl)) return true;
+          return jobSkills.some((js) => js.toLowerCase().includes(sl) || sl.includes(js.toLowerCase()));
+        });
+        if (hasSkill) return true;
+      }
 
-      // If both have dates, compare them (newest first)
-      if (dateA && dateB) {
-        try {
-          const timeA = new Date(dateA as string).getTime();
-          const timeB = new Date(dateB as string).getTime();
-          return timeB - timeA; // Newest first (descending)
-        } catch (e) {
-          // If date parsing fails, keep original order
-          return 0;
+      // Countries: job location or country matches any selected country
+      if (filters.countries.length > 0) {
+        const loc = (job.location || "").toLowerCase();
+        const rawCountry = (rawJob?.job_country || rawJob?.country || "").toString().toLowerCase();
+        const rawCity = (rawJob?.job_city || rawJob?.city || "").toString().toLowerCase();
+        const matchCountry = filters.countries.some((code) => {
+          const c = countries.find((co) => co.code === code);
+          const name = (c?.name || code).toLowerCase();
+          return loc.includes(name) || rawCountry.includes(name) || loc.includes(code.toLowerCase()) || rawCity.includes(name);
+        });
+        if (matchCountry) return true;
+      }
+
+      // Job types: employment type matches any selected type
+      if (filters.jobTypes.length > 0) {
+        const empType = (job.employment_type || "").toUpperCase().replace(/[-\s]/g, "");
+        const matchType = filters.jobTypes.some((t) => {
+          const label = jobTypeLabels[t] || t;
+          const labelNorm = label.toUpperCase().replace(/[-\s]/g, "");
+          return empType.includes(labelNorm) || labelNorm.includes(empType);
+        });
+        if (matchType) return true;
+      }
+
+      // Remote: job is remote and filter wants remote
+      if (filters.isRemote && (job.work_arrangement === "Remote" || rawJob?.job_is_remote || rawJob?.is_remote || rawJob?.remote)) {
+        return true;
+      }
+
+      // Date posted: job posted within the selected period
+      if (filters.datePosted && filters.datePosted !== "all") {
+        const posted = (rawJob?.posted_at || rawJob?.date_posted || rawJob?.fetched_at || "") as string;
+        if (posted) {
+          const postedTime = new Date(posted).getTime();
+          const now = Date.now();
+          const weekMs = 7 * 24 * 60 * 60 * 1000;
+          const monthMs = 30 * 24 * 60 * 60 * 1000;
+          if (filters.datePosted === "week" && now - postedTime <= weekMs) return true;
+          if (filters.datePosted === "month" && now - postedTime <= monthMs) return true;
         }
       }
 
-      // If one doesn't have a date, put it at the end
-      if (!dateA && dateB) return 1;
-      if (dateA && !dateB) return -1;
+      // Salary: job salary within range or "by agreement"
+      if (
+        filters.salaryMin !== undefined ||
+        filters.salaryMax !== undefined ||
+        filters.salaryByAgreement
+      ) {
+        const minS = rawJob?.job_min_salary ?? rawJob?.min_salary;
+        const maxS = rawJob?.job_max_salary ?? rawJob?.max_salary;
+        if (filters.salaryByAgreement && minS == null && maxS == null) return true;
+        if (minS != null || maxS != null) {
+          if (filters.salaryMin !== undefined && maxS != null && maxS < filters.salaryMin) return false;
+          if (filters.salaryMax !== undefined && minS != null && minS > filters.salaryMax) return false;
+          return true;
+        }
+      }
 
-      // If neither has a date, keep original order
-      return 0;
+      return false;
+    },
+    [allRegularJobs],
+  );
+
+  // Display latest 9 jobs - when filters are active, show union of jobs matching ANY filter, then sort by date
+  const regularJobs = useMemo(() => {
+    const hasActiveFilters =
+      activeFilters.skills.length > 0 ||
+      activeFilters.countries.length > 0 ||
+      activeFilters.jobTypes.length > 0 ||
+      activeFilters.isRemote ||
+      (activeFilters.datePosted && activeFilters.datePosted !== "all") ||
+      activeFilters.salaryMin !== undefined ||
+      activeFilters.salaryMax !== undefined ||
+      activeFilters.salaryByAgreement;
+
+    const sortByDate = (list: Job[]) =>
+      [...list].sort((a, b) => {
+        const jobA = allRegularJobs.find((j) => (j.id || j.job_id) === a.id);
+        const jobB = allRegularJobs.find((j) => (j.id || j.job_id) === b.id);
+        const dateA = (jobA?.posted_at || jobA?.fetched_at || jobA?.date_posted || "") as string;
+        const dateB = (jobB?.posted_at || jobB?.fetched_at || jobB?.date_posted || "") as string;
+        if (dateA && dateB) {
+          try {
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          } catch {
+            return 0;
+          }
+        }
+        if (!dateA && dateB) return 1;
+        if (dateA && !dateB) return -1;
+        return 0;
+      });
+
+    if (!hasActiveFilters) {
+      return sortByDate(transformedJobs).slice(0, 9);
+    }
+
+    // Union of jobs matching any active filter - show all matching jobs from full data, not limited to 9
+    const matchingIds = new Set<string>();
+    transformedJobs.forEach((job) => {
+      if (jobMatchesAnyActiveFilter(job, undefined, activeFilters)) {
+        matchingIds.add(job.id);
+      }
     });
+    const filtered = transformedJobs.filter((j) => matchingIds.has(j.id));
+    return sortByDate(filtered);
+  }, [transformedJobs, allRegularJobs, activeFilters, jobMatchesAnyActiveFilter]);
 
-    // Return latest 9 jobs
-    const latest9Jobs = sorted.slice(0, 9);
-
-    console.log(
-      `✅ Displaying ${latest9Jobs.length} latest jobs (no filters applied)`,
+  // Top matched 9 jobs only: sort by match % descending, take exactly 9 (from same latest jobs data)
+  const topMatchedJobs = useMemo(() => {
+    const byMatch = [...transformedJobs].sort(
+      (a, b) => (b.matchPercentage ?? 0) - (a.matchPercentage ?? 0),
     );
-
-    return latest9Jobs;
-  }, [transformedJobs, allRegularJobs]);
+    return byMatch.slice(0, 9);
+  }, [transformedJobs]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
   const transformedInternshipJobs = React.useMemo(() => {
@@ -2354,9 +2447,10 @@ const JobsPage = () => {
   // Fetch missing company logos from API for all job types
   useEffect(() => {
     const fetchMissingLogos = async () => {
-      // Combine all jobs that need logos
+      // Combine all jobs that need logos (including top matched)
       const allJobs = [
         ...transformedJobs,
+        ...topMatchedJobs,
         ...transformedInternshipJobs,
         ...transformedRemoteJobs,
       ];
@@ -2388,10 +2482,15 @@ const JobsPage = () => {
     };
 
     fetchMissingLogos();
-  }, [transformedJobs, transformedInternshipJobs, transformedRemoteJobs]);
+  }, [transformedJobs, topMatchedJobs, transformedInternshipJobs, transformedRemoteJobs]);
 
   // Merge fetched logos into jobs
   const regularJobsWithLogos = regularJobs.map((job) => ({
+    ...job,
+    company_logo: job.company_logo || jobLogos[job.id] || undefined,
+  }));
+
+  const topMatchedJobsWithLogos = topMatchedJobs.map((job) => ({
     ...job,
     company_logo: job.company_logo || jobLogos[job.id] || undefined,
   }));
@@ -2916,6 +3015,120 @@ const JobsPage = () => {
                 (remoteError as Error)?.message}
             </p>
           </div>
+        )}
+
+        {/* Top Matched Jobs Section - exactly 9 jobs by match % only */}
+        {!isLoading && topMatchedJobs.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center gap-3 mb-4">
+              <Target className="h-6 w-6 text-breneo-blue" />
+              <h2 className="text-lg font-bold">Top Matched Jobs</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {topMatchedJobsWithLogos.map((job) => (
+                <Card
+                  key={job.id}
+                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
+                  onClick={() => {
+                    if (!job.id || String(job.id).trim() === "") return;
+                    const encodedId = encodeURIComponent(String(job.id));
+                    navigate(`/jobs/${encodedId}`);
+                  }}
+                >
+                  <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="flex-shrink-0 relative w-10 h-10">
+                        {job.company_logo ? (
+                          <img
+                            src={job.company_logo}
+                            alt={`${job.company_name || job.company} logo`}
+                            className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              const fallback = target.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`w-10 h-10 rounded-md bg-breneo-accent flex items-center justify-center ${
+                            job.company_logo ? "hidden absolute inset-0" : ""
+                          }`}
+                        >
+                          <Briefcase className="h-5 w-5 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">
+                          {job.company_name || job.company}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-gray-500 truncate">
+                          {job.location}
+                        </p>
+                      </div>
+                    </div>
+                    <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+                      {job.title}
+                    </h4>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {job.employment_type && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                          {job.employment_type}
+                        </Badge>
+                      )}
+                      {job.work_arrangement && (
+                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                          {job.work_arrangement}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-7 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <RadialProgress
+                          value={job.matchPercentage ?? 0}
+                          size={44}
+                          strokeWidth={5}
+                          showLabel={false}
+                          percentageTextSize="sm"
+                          className="text-breneo-blue"
+                        />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
+                          {getMatchQualityLabel(job.matchPercentage)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          saveJobMutation.mutate(job);
+                        }}
+                        aria-label={job.is_saved ? "Unsave job" : "Save job"}
+                        className={cn(
+                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                          job.is_saved
+                            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                            : "text-black dark:text-white",
+                        )}
+                      >
+                        <Heart
+                          className={cn(
+                            "h-4 w-4 transition-colors",
+                            job.is_saved
+                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              : "text-black dark:text-white",
+                          )}
+                        />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Latest Jobs Section */}

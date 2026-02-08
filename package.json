@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && npm run copy404",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "copy404": "node -e \"require('fs').copyFileSync('dist/index.html', 'dist/404.html')\"",
     "preview": "vite preview",
     "predeploy": "npm run build",
@@ -95,6 +97,7 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1",
+    "vitest": "^2.1.0",
     "vite-plugin-pwa": "^1.1.0"
   }
 }

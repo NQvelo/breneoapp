@@ -225,6 +225,20 @@ export const en = {
     pageNotFoundDescription:
       "The page you're looking for doesn't exist or has been moved.",
   },
+  // Job match (detail page)
+  jobMatch: {
+    expLevel: "Exp. Level",
+    skill: "Skill",
+    industryExp: "Industry Exp.",
+    overall: "Overall",
+    excellentMatch: "Excellent match",
+    bestMatch: "Best match",
+    goodMatch: "Good match",
+    fairMatch: "Fair match",
+    badMatch: "Bad match",
+    scoreDescription:
+      "This score shows how closely your skills match the job requirements, prioritizing exact and key skill matches.",
+  },
   // Webinars
   webinars: {
     title: "Webinars",
