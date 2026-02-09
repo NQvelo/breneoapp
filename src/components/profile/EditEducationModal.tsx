@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -9,8 +9,89 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Trash2, X, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { EducationEntry, EducationPayload } from "@/api/profile/types";
+
+const DEGREE_TYPE_OPTIONS = [
+  { value: "High School", label: "High School" },
+  { value: "Diploma / Certificate", label: "Diploma / Certificate" },
+  { value: "Associate", label: "Associate" },
+  { value: "Bachelor's", label: "Bachelor's" },
+  { value: "Master's", label: "Master's" },
+  { value: "MBA", label: "MBA" },
+  { value: "Doctorate (PhD)", label: "Doctorate (PhD)" },
+  { value: "Bootcamp / Short Program", label: "Bootcamp / Short Program" },
+  { value: "Other", label: "Other" },
+] as const;
+
+function DegreeTypeDropdown({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const label = DEGREE_TYPE_OPTIONS.find((o) => o.value === value)?.label;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex h-[3.2rem] w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm",
+          "focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50",
+          open && "bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600",
+          !label && "text-muted-foreground",
+        )}
+      >
+        <span className="truncate">{label || "Select degree type"}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+      </button>
+      {open && (
+        <ul
+          className="absolute z-50 mt-1 w-full space-y-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-48 overflow-y-auto dark:border-gray-700 dark:bg-[#242424]"
+          role="listbox"
+        >
+          {DEGREE_TYPE_OPTIONS.map((opt) => (
+            <li
+              key={opt.value}
+              role="option"
+              aria-selected={value === opt.value}
+              className={cn(
+                "cursor-pointer select-none rounded-md px-3 py-2.5 text-base md:text-sm",
+                "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-gray-100",
+                value === opt.value && "bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100",
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export interface EditEducationModalProps {
   open: boolean;
@@ -251,12 +332,9 @@ export function EditEducationModal({
                     </div>
                     <div className="space-y-2">
                       <Label>Degree type</Label>
-                      <Input
+                      <DegreeTypeDropdown
                         value={row.degree_type}
-                        onChange={(e) =>
-                          updateRow(index, "degree_type", e.target.value)
-                        }
-                        placeholder="e.g. Bachelor's, Master's"
+                        onChange={(v) => updateRow(index, "degree_type", v)}
                       />
                     </div>
                   </div>

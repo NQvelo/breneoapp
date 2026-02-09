@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -9,11 +9,229 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Trash2, X, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type {
   WorkExperienceEntry,
   WorkExperiencePayload,
 } from "@/api/profile/types";
+
+const JOB_TYPE_OPTIONS = [
+  { value: "Full time", label: "Full time" },
+  { value: "Part time", label: "Part time" },
+  { value: "Contract", label: "Contract" },
+  { value: "Internship", label: "Internship" },
+] as const;
+
+function JobTypeDropdown({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const label = JOB_TYPE_OPTIONS.find((o) => o.value === value)?.label;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex h-[3.2rem] w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm",
+          "focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50",
+          open && "bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600",
+          !label && "text-muted-foreground",
+        )}
+      >
+        <span className="truncate">{label || "Select job type"}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+      </button>
+      {open && (
+        <ul
+          className="absolute z-50 mt-1 w-full space-y-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-48 overflow-y-auto dark:border-gray-700 dark:bg-[#242424]"
+          role="listbox"
+        >
+          {JOB_TYPE_OPTIONS.map((opt) => (
+            <li
+              key={opt.value}
+              role="option"
+              aria-selected={value === opt.value}
+              className={cn(
+                "cursor-pointer select-none rounded-md px-3 py-2.5 text-base md:text-sm",
+                "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-gray-100",
+                value === opt.value &&
+                  "bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100",
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(opt.value);
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const LOCATION_DEBOUNCE_MS = 400;
+const MIN_CHARS_FOR_SUGGESTIONS = 3;
+
+function formatLocationSuggestion(place: {
+  address?: { city?: string; town?: string; village?: string; state?: string; country?: string };
+  display_name?: string;
+}): string {
+  const addr = place.address;
+  if (!addr) return place.display_name || "";
+  const city = addr.city || addr.town || addr.village || addr.state || "";
+  const country = addr.country || "";
+  if (city && country) return `${city}, ${country}`;
+  if (country) return country;
+  return place.display_name || "";
+}
+
+function LocationInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < MIN_CHARS_FOR_SUGGESTIONS) {
+      setSuggestions([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        format: "json",
+        addressdetails: "1",
+        limit: "8",
+      });
+      const res = await fetch(`${NOMINATIM_URL}?${params}`, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "BreneoApp/1.0 (Work Experience Location)",
+        },
+      });
+      const data = await res.json();
+      const formatted = (data as unknown[]).map((p: unknown) =>
+        formatLocationSuggestion(p as Parameters<typeof formatLocationSuggestion>[0])
+      );
+      setSuggestions(formatted);
+      setOpen(true);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = value.trim();
+    if (q.length < MIN_CHARS_FOR_SUGGESTIONS) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+    debounceRef.current = setTimeout(() => fetchSuggestions(q), LOCATION_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [value, fetchSuggestions]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (containerRef.current && !containerRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        className={cn(
+          "flex h-[3.2rem] w-full items-center rounded-md border border-input bg-background px-3 py-2",
+          "focus-within:outline-none focus-within:ring-0",
+          open && "bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600",
+        )}
+      >
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() =>
+            value.trim().length >= MIN_CHARS_FOR_SUGGESTIONS && setOpen(true)
+          }
+          placeholder={placeholder}
+          className="flex-1 min-w-0 bg-transparent text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
+        />
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50 text-muted-foreground" />
+      </div>
+      {open && (suggestions.length > 0 || loading) && (
+        <ul
+          className="absolute z-50 mt-1 w-full space-y-1 rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-48 overflow-auto dark:border-gray-700 dark:bg-[#242424]"
+          role="listbox"
+        >
+          {loading && (
+            <li className="flex items-center gap-2 rounded-md px-3 py-2.5 text-base md:text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Searching...
+            </li>
+          )}
+          {!loading && suggestions.map((s, i) => (
+            <li
+              key={`${s}-${i}`}
+              role="option"
+              className="cursor-pointer select-none rounded-md px-3 py-2.5 text-base md:text-sm hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-gray-100"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onChange(s);
+                setOpen(false);
+              }}
+            >
+              {s}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export interface EditWorkExperienceModalProps {
   open: boolean;
@@ -105,6 +323,8 @@ export function EditWorkExperienceModal({
     for (const r of rows) {
       if (!r.job_title.trim()) return "Job title is required for all entries.";
       if (!r.company.trim()) return "Company is required for all entries.";
+      if (!r.job_type.trim()) return "Job type is required for all entries.";
+      if (!r.location.trim()) return "Location is required for all entries.";
       if (!r.start_date.trim())
         return "Start date is required for all entries.";
       if (!r.is_current && r.end_date && r.start_date > r.end_date) {
@@ -135,8 +355,8 @@ export function EditWorkExperienceModal({
         const payload: WorkExperiencePayload = {
           job_title: r.job_title.trim(),
           company: r.company.trim(),
-          job_type: r.job_type.trim() || undefined,
-          location: r.location.trim() || undefined,
+          job_type: r.job_type.trim() || null,
+          location: r.location.trim() || null,
           start_date: r.start_date,
           end_date: r.is_current ? undefined : r.end_date.trim() || undefined,
           is_current: r.is_current,
@@ -253,22 +473,20 @@ export function EditWorkExperienceModal({
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="space-y-2">
-                      <Label>Job type (optional)</Label>
-                      <Input
+                      <Label>Job type</Label>
+                      <JobTypeDropdown
                         value={row.job_type}
-                        onChange={(e) =>
-                          updateRow(index, "job_type", e.target.value)
-                        }
-                        placeholder="e.g. Full-time"
+                        onChange={(v) => updateRow(index, "job_type", v)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Location (optional)</Label>
-                      <Input
+                      <Label>Location</Label>
+                      <LocationInput
                         value={row.location}
-                        onChange={(e) =>
-                          updateRow(index, "location", e.target.value)
+                        onChange={(value) =>
+                          updateRow(index, "location", value)
                         }
+                        placeholder="e.g. Tbilisi, Georgia"
                       />
                     </div>
                   </div>
