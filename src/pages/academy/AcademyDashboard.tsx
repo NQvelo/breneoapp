@@ -11,13 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Plus,
-  Edit,
-  BookOpen,
-} from "lucide-react";
+import { Plus, Edit, BookOpen } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import { normalizeAcademyProfileApiResponse } from "@/api/academy";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +53,7 @@ const AcademyDashboard = () => {
   const { user } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
-    null
+    null,
   );
   const [loading, setLoading] = useState(true);
 
@@ -72,22 +69,19 @@ const AcademyDashboard = () => {
 
       if (response.data) {
         const data = response.data;
+        const normalized = normalizeAcademyProfileApiResponse(
+          data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
+          user?.id != null ? String(user.id) : undefined
+        );
         const academyProfile: AcademyProfile = {
-          id: data.id || data.academy_id || String(user.id),
-          academy_name: data.academy_name || "",
+          ...normalized,
           first_name:
-            data.first_name ||
-            data.firstName ||
-            user.first_name ||
-            data.academy_name ||
+            normalized.first_name ||
+            user?.first_name ||
+            normalized.academy_name ||
             "",
-          description: data.description || "",
-          website_url: data.website_url || "",
-          contact_email: data.contact_email || user.email || "",
-          is_verified: data.is_verified || false,
-          logo_url: data.profile_photo_url || data.logo_url || null,
+          is_verified: data.is_verified ?? false,
         };
-
         setAcademyProfile(academyProfile);
         console.log("✅ Academy profile loaded from API:", academyProfile);
       }

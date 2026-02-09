@@ -30,6 +30,7 @@ export const API_ENDPOINTS = {
   EDUCATIONS: "/api/educations/",
   WORK_EXPERIENCES: "/api/work-experiences/",
   SKILLS_SEARCH: "/api/skills/",
+  // Academy: profile is tied to authenticated user (User ref in backend). Use for academy home, profile, settings, etc.
   ACADEMY: {
     PROFILE: "/api/academy/profile/",
     DETAIL: "/api/academy/", // For academy detail by ID: /api/academy/<academy_id>/

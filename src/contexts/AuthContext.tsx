@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
+import { normalizeAcademyProfileApiResponse } from "@/api/academy";
 import { useImagePreloader } from "@/components/ui/OptimizedAvatar";
 import {
   getLocalizedPath,
@@ -31,6 +32,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  /** Academy name, email, and verification status (set once per session) */
+  academyDisplay: { name: string; email: string; is_verified?: boolean } | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (email: string, password: string) => Promise<void>;
@@ -165,6 +168,11 @@ const extractUserIdFromToken = (token: string): string | null => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [academyDisplay, setAcademyDisplay] = useState<{
+    name: string;
+    email: string;
+    is_verified?: boolean;
+  } | null>(null);
   const navigate = useNavigate();
   const { preloadImage } = useImagePreloader();
   const preloadImageRef = useRef(preloadImage);
@@ -269,9 +277,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           jwtUserData = null;
         }
 
-        // Try to fetch profile from API
+        // Try to fetch profile from API (skip for academy users - /api/profile/ returns 403 for them)
+        const isAcademyFromStorage = storedRole === "academy";
+        const isAcademyFromJwt = jwtUserData?.user_type === "academy";
         let userData: User | null = null;
-        try {
+
+        if (isAcademyFromStorage || isAcademyFromJwt) {
+          userData = jwtUserData;
+        } else {
+          try {
           const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
           // console.log(
@@ -331,6 +345,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // ✅ FIX: Don't fail session restoration if profile API fails
           // We can still restore using JWT data and localStorage
           userData = jwtUserData;
+        }
         }
 
         // If we don't have user data yet, use JWT data
@@ -456,12 +471,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
 
           setUser(userData);
-          // console.log(
-          //   "✅ Session restored successfully for user:",
-          //   userData.id,
-          //   "type:",
-          //   userData.user_type || "unknown"
-          // );
+          if (userData.user_type === "academy") {
+            apiClient
+              .get(API_ENDPOINTS.ACADEMY.PROFILE)
+              .then((res) => {
+                if (res.data) {
+                  const normalized = normalizeAcademyProfileApiResponse(
+                    res.data as Parameters<
+                      typeof normalizeAcademyProfileApiResponse
+                    >[0],
+                    userData.id != null ? String(userData.id) : undefined
+                  );
+                  setAcademyDisplay({
+                    name: normalized.academy_name || "",
+                    email: normalized.contact_email || "",
+                    is_verified: normalized.is_verified ?? false,
+                  });
+                } else {
+                  setAcademyDisplay(null);
+                }
+              })
+              .catch(() => setAcademyDisplay(null));
+          } else {
+            setAcademyDisplay(null);
+          }
         } else {
           // console.error(
           //   "❌ Cannot restore user - missing required data (email or id)"
@@ -470,6 +503,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // This allows the user to still use the app, and user data might be loaded elsewhere
           // Only clear tokens if we're absolutely sure the token is invalid
           setUser(null);
+          setAcademyDisplay(null);
         }
       } catch (error) {
         // console.error("❌ Failed to restore session:", error);
@@ -478,6 +512,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Only clear if we're certain the token is invalid (e.g., JWT decode failed)
         // Token clearing is now handled by the axios interceptor only for non-session-restoration requests
         setUser(null);
+        setAcademyDisplay(null);
       } finally {
         // ✅ FIX: Always clear session restoration flag at the end of the entire process
         // This ensures the flag is cleared even if an error occurs
@@ -665,7 +700,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       const token = res.data.access || res.data.token; // Handle both JWT 'access' and 'token' fields
-      const refreshToken = res.data.refresh; // Get refresh token
+      const refreshToken = res.data.refresh || res.data.refresh_token; // Get refresh token (support both key names)
 
       // console.log("🔑 Login response - access token:", token);
       // console.log(
@@ -680,16 +715,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         );
       }
 
-      // Store both access and refresh tokens
-      if (refreshToken) {
-        TokenManager.setTokens(token, refreshToken);
-        // console.log("🔑 Stored tokens via TokenManager.setTokens");
-      } else {
-        // Fallback: store only access token if refresh token is not available
-        localStorage.setItem("authToken", token);
-        // console.log(
-        //   "🔑 Stored authToken directly in localStorage (no refresh token)"
-        // );
+      // Always store via TokenManager so tokens persist; use empty string for refresh if backend didn't send one
+      TokenManager.setTokens(token, refreshToken || "");
+      if (!refreshToken) {
+        console.warn(
+          "Login: No refresh token in response. Session may expire when access token expires. Backend should return a refresh token for persistent sessions."
+        );
       }
 
       // Verify token was stored
@@ -792,6 +823,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setUser(userData);
 
+      if (userData.user_type === "academy") {
+        apiClient
+          .get(API_ENDPOINTS.ACADEMY.PROFILE)
+          .then((res) => {
+            if (res.data) {
+              const normalized = normalizeAcademyProfileApiResponse(
+                res.data as Parameters<
+                  typeof normalizeAcademyProfileApiResponse
+                >[0],
+                userData.id != null ? String(userData.id) : undefined
+              );
+              setAcademyDisplay({
+                name: normalized.academy_name || "",
+                email: normalized.contact_email || "",
+                is_verified: normalized.is_verified ?? false,
+              });
+            } else {
+              setAcademyDisplay(null);
+            }
+          })
+          .catch(() => setAcademyDisplay(null));
+      } else {
+        setAcademyDisplay(null);
+      }
+
       // Preload profile image for better performance
       if (userData?.profile_image) {
         preloadImageRef.current(userData.profile_image).catch(console.error);
@@ -837,6 +893,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = () => {
     TokenManager.clearTokens();
     setUser(null);
+    setAcademyDisplay(null);
     navigate("/auth/login");
   };
 
@@ -865,6 +922,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         user,
         loading,
+        academyDisplay,
         login,
         logout,
         register,

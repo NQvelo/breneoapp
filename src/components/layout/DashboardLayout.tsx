@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { DashboardHeader } from "./DashboardHeader";
+import { AcademyVerifiedCongratsModal } from "@/components/common/AcademyVerifiedCongratsModal";
 import { cn } from "@/lib/utils";
 
 interface DashboardLayoutProps {
@@ -76,6 +77,7 @@ export function DashboardLayout({
       >
         <div className="h-full">{children}</div>
       </main>
+      <AcademyVerifiedCongratsModal />
     </div>
   );
 }

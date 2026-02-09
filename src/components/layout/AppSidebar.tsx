@@ -1,11 +1,9 @@
-import React from "react"; // ⛔ Removed useEffect, useState
+import React from "react";
 import { useLocation } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
 import {
-  LayoutDashboard,
   Briefcase,
-  BookOpen,
   Home,
   Settings,
   HelpCircle,
@@ -34,7 +32,7 @@ interface AppSidebarProps {
 export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   const location = useLocation();
   // ✅ Get the user object directly from the context
-  const { loading, user } = useAuth();
+  const { loading, user, academyDisplay } = useAuth();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const t = useTranslation();
@@ -43,11 +41,9 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
   const currentLanguageText = language === "ka" ? "GEO" : "EN";
-  // Also check raw pathname for immediate active state detection
   const rawPathname = location.pathname;
 
-  // Determine if user is an academy
-  // Check both user object and localStorage (in case user object isn't fully loaded)
+  // Determine if user is an academy (same as AuthContext)
   const isAcademy =
     user?.user_type === "academy" ||
     (typeof window !== "undefined" &&
@@ -62,30 +58,35 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
   if (loading) return null;
 
-  // Helper: Get user display name
+  // Helper: Get display name (academy name from context for academy users, else user name – no refetch on nav)
   const getDisplayName = () => {
-    // ✅ Changed userData to user
+    if (isAcademy && academyDisplay?.name) return academyDisplay.name;
     if (!user) return "Member";
     const { first_name, last_name, email } = user;
-
     if (first_name && last_name) {
       const capitalize = (str: string) =>
         str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : "";
       return `${capitalize(first_name)} ${capitalize(last_name)}`;
     }
-    // ✅ Use user.email as a fallback
     return email ?? "Member";
   };
 
-  // Helper: Get avatar initials (always uppercase)
+  // Helper: Get display email (academy email from context for academy users, else user email)
+  const getDisplayEmail = () => {
+    if (isAcademy && academyDisplay?.email) return academyDisplay.email;
+    return user?.email ?? "";
+  };
+
+  // Helper: Get avatar initials (academy name or user name/email)
   const getInitials = () => {
-    // ✅ Changed userData to user
+    if (isAcademy && academyDisplay?.name) {
+      return academyDisplay.name.slice(0, 2).toUpperCase();
+    }
     if (user?.first_name && user?.last_name) {
       return `${user.first_name.charAt(0)}${user.last_name.charAt(
         0,
       )}`.toUpperCase();
     }
-    // ✅ Fallback to first letter of email or "U"
     if (user?.email) {
       return user.email.charAt(0).toUpperCase();
     }
@@ -425,12 +426,13 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 </div>
 
                 {!collapsed && (
-                  <div className="flex-1">
-                    <div className="font-semibold text-sm text-gray-700">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-gray-700 dark:text-gray-200 truncate">
                       {getDisplayName()}
                     </div>
-                    {/* ✅ Changed userData to user */}
-                    <p className="text-xs text-gray-400">{user?.email}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                      {getDisplayEmail()}
+                    </p>
                   </div>
                 )}
               </LocalizedLink>

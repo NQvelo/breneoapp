@@ -54,18 +54,14 @@ export const TokenManager = {
   getAccessToken: (): string | null => {
     const token = localStorage.getItem("authToken");
     if (token) {
-      // Show first 20 and last 10 chars for debugging (safe preview)
-      const preview =
-        token.length > 30
-          ? `${token.substring(0, 20)}...${token.substring(token.length - 10)}`
-          : token.substring(0, 20) + "...";
-      // console.log("🔑 TokenManager.getAccessToken(): Token found", {
-      //   length: token.length,
-      //   preview,
-      //   full: token, // Full token for debugging (remove in production if needed)
-      // });
-    } else {
-      // console.log("🔑 TokenManager.getAccessToken(): No token found");
+      const userRole = typeof localStorage !== "undefined" ? localStorage.getItem("userRole") : null;
+      if (userRole === "academy") {
+        const preview =
+          token.length > 30
+            ? `${token.substring(0, 20)}...${token.substring(token.length - 10)}`
+            : token.substring(0, 20) + "...";
+        console.log("🔑 Academy auth token", { length: token.length, preview, full: token });
+      }
     }
     return token;
   },
@@ -131,8 +127,7 @@ export const TokenManager = {
    */
   refreshAccessToken: async (): Promise<string | null> => {
     const refreshToken = TokenManager.getRefreshToken();
-    if (!refreshToken) {
-      // console.log("⚠️ No refresh token available");
+    if (!refreshToken || !refreshToken.trim()) {
       return null;
     }
 
@@ -176,11 +171,8 @@ export const TokenManager = {
         // Don't clear tokens on server errors - the server might be having issues
         // The original token might still be valid
       } else if (isSessionRestoration) {
-        // console.log(
-        //   "⚠️ Token refresh failed during session restoration, preserving tokens and role"
-        // );
-        // // During session restoration, preserve everything
-        TokenManager.clearTokens(true);
+        // During session restoration, do NOT clear tokens - preserve everything.
+        // AuthContext will use JWT data as fallback and user can retry or re-login later.
       } else {
         // Other errors - be conservative and don't clear tokens
         // console.log(

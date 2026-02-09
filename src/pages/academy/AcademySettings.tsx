@@ -27,6 +27,7 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import { normalizeAcademyProfileApiResponse } from "@/api/academy";
 import axios, { AxiosError } from "axios";
 import { Link, useLocation } from "react-router-dom";
 import { Camera } from "lucide-react";
@@ -66,7 +67,7 @@ export default function AcademySettingsPage() {
   const [contactEmail, setContactEmail] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
-    null
+    null,
   );
 
   // Password Reset State
@@ -82,10 +83,10 @@ export default function AcademySettingsPage() {
     const savedSoundEffects = localStorage.getItem("pref_sound_effects");
     const savedAnimations = localStorage.getItem("pref_animations");
     const savedMotivationalMessages = localStorage.getItem(
-      "pref_motivational_messages"
+      "pref_motivational_messages",
     );
     const savedListeningExercises = localStorage.getItem(
-      "pref_listening_exercises"
+      "pref_listening_exercises",
     );
 
     if (savedSoundEffects !== null)
@@ -114,7 +115,7 @@ export default function AcademySettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "pref_motivational_messages",
-        String(motivationalMessages)
+        String(motivationalMessages),
       );
     }
   }, [motivationalMessages, mounted]);
@@ -123,7 +124,7 @@ export default function AcademySettingsPage() {
     if (mounted) {
       localStorage.setItem(
         "pref_listening_exercises",
-        String(listeningExercises)
+        String(listeningExercises),
       );
     }
   }, [listeningExercises, mounted]);
@@ -146,7 +147,7 @@ export default function AcademySettingsPage() {
         console.error("❌ No token available, cannot fetch academy profile");
         setLoadingData(false);
         toast.error(
-          "Authentication Error: Please log in again to access academy settings."
+          "Authentication Error: Please log in again to access academy settings.",
         );
         return;
       }
@@ -156,16 +157,20 @@ export default function AcademySettingsPage() {
 
         try {
           const academyResponse = await apiClient.get(
-            API_ENDPOINTS.ACADEMY.PROFILE
+            API_ENDPOINTS.ACADEMY.PROFILE,
           );
 
           if (academyResponse.data) {
             const data = academyResponse.data;
             console.log("✅ Academy profile data:", data);
-            setAcademyProfile(data);
-            setAcademyName(data.academy_name || "");
-            setWebsiteUrl(data.website_url || "");
-            setContactEmail(data.contact_email || "");
+            const normalized = normalizeAcademyProfileApiResponse(
+              data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
+              user?.id != null ? String(user.id) : undefined
+            );
+            setAcademyProfile(normalized);
+            setAcademyName(normalized.academy_name);
+            setWebsiteUrl(normalized.website_url);
+            setContactEmail(normalized.contact_email);
           }
         } catch (error: unknown) {
           const academyError = error as AxiosError;
@@ -179,7 +184,7 @@ export default function AcademySettingsPage() {
 
           if (status === 404) {
             console.log(
-              "✅ Academy profile not found (404) - user may need to create one"
+              "✅ Academy profile not found (404) - user may need to create one",
             );
             setAcademyProfile(null);
           } else if (status === 401) {
@@ -192,7 +197,7 @@ export default function AcademySettingsPage() {
 
             if (isProfileNotFound) {
               console.log(
-                "✅ Profile not found based on error message - treating as 404"
+                "✅ Profile not found based on error message - treating as 404",
               );
               setAcademyProfile(null);
             } else {
@@ -202,12 +207,12 @@ export default function AcademySettingsPage() {
           } else if (status === 403) {
             console.error("Access forbidden to academy profile");
             toast.error(
-              "Access Denied: You don't have permission to access academy settings."
+              "Access Denied: You don't have permission to access academy settings.",
             );
           } else {
             console.error("Error fetching academy profile:", academyError);
             toast.error(
-              "Error fetching profile: Could not load academy profile data. Please try again."
+              "Error fetching profile: Could not load academy profile data. Please try again.",
             );
           }
         }
@@ -259,7 +264,7 @@ export default function AcademySettingsPage() {
 
     if (!phoneRegex.test(phone)) {
       setPhoneError(
-        "Phone number can only contain digits, spaces, hyphens, parentheses, and dots, optionally starting with +"
+        "Phone number can only contain digits, spaces, hyphens, parentheses, and dots, optionally starting with +",
       );
       return false;
     }
@@ -320,7 +325,7 @@ export default function AcademySettingsPage() {
           headers: {
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       if (response.data && user) {
@@ -404,26 +409,25 @@ export default function AcademySettingsPage() {
 
         const academyResponse = await apiClient[method](
           API_ENDPOINTS.ACADEMY.PROFILE,
-          academyData
+          academyData,
         );
 
         if (academyResponse.data) {
+          const normalized = normalizeAcademyProfileApiResponse(
+            academyResponse.data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
+            user?.id != null ? String(user.id) : undefined
+          );
           const updatedProfile: AcademyProfile = {
-            id: academyProfile?.id || academyResponse.data.id || "",
+            ...normalized,
             academy_name: academyName.trim(),
-            description:
-              academyResponse.data.description ||
-              academyProfile?.description ||
-              "",
-            website_url: websiteUrl.trim() || "",
-            contact_email: contactEmail.trim() || "",
-            logo_url:
-              academyProfile?.logo_url || academyResponse.data.logo_url || null,
+            description: normalized.description || academyProfile?.description || "",
+            website_url: websiteUrl.trim() || normalized.website_url,
+            contact_email: contactEmail.trim() || normalized.contact_email,
           };
           setAcademyProfile(updatedProfile);
           console.log(
             "✅ Academy profile updated successfully:",
-            updatedProfile
+            updatedProfile,
           );
         }
       } catch (academyError: unknown) {
@@ -504,7 +508,7 @@ export default function AcademySettingsPage() {
         {
           email: user?.email,
           code: code,
-        }
+        },
       );
       toast.success(res.data.message || "Code verified!");
       setPasswordStep(3);
@@ -538,7 +542,7 @@ export default function AcademySettingsPage() {
           code: code,
           new_password: newPassword,
           confirm_password: confirmPassword,
-        }
+        },
       );
       toast.success(res.data.message || "Password updated successfully!");
       setPasswordStep(1);

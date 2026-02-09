@@ -1,8 +1,13 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import {
+  normalizeAcademyProfileApiResponse,
+  normalizeSocialLinksFromApi,
+  type AcademyProfileApiRaw,
+} from "@/api/academy";
 import { toast } from "sonner";
 import { useMobile } from "@/hooks/use-mobile";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
@@ -54,11 +59,8 @@ import { AxiosError } from "axios";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
-import { API_BASE_URL } from "@/api/auth/config";
 
-// Academy Profile API endpoint
-const ACADEMY_PROFILE_API = `${API_BASE_URL}/api/academy/profile/`;
-
+// Academy data is fetched from api/academy/profile/ (backend links academy to User in auth/user table)
 interface AcademyProfile {
   id: string;
   academy_name: string;
@@ -206,7 +208,7 @@ const AcademyProfilePage = () => {
   const navigate = useNavigate();
   const isMobile = useMobile();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
-    null
+    null,
   );
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -232,6 +234,7 @@ const AcademyProfilePage = () => {
     behance: "",
   });
   const [loadingSocialLinks, setLoadingSocialLinks] = useState(false);
+  const socialLinksApiUnavailableRef = useRef(false);
   const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
   const [editingPlatform, setEditingPlatform] = useState<
     SocialPlatform | "website" | null
@@ -290,7 +293,7 @@ const AcademyProfilePage = () => {
       toast.info(
         user?.phone_number
           ? `We've sent a 6-digit code to ${user.phone_number}.`
-          : "We've sent a 6-digit code to your phone."
+          : "We've sent a 6-digit code to your phone.",
       );
     } catch (error) {
       const message =
@@ -351,20 +354,28 @@ const AcademyProfilePage = () => {
       try {
         // Fetch academy profile from API
         try {
-          const academyResponse = await apiClient.get(ACADEMY_PROFILE_API);
+          const academyResponse = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
 
           if (academyResponse.data) {
-            const data = academyResponse.data;
-            setAcademyProfile(data);
+            const data = academyResponse.data as AcademyProfileApiRaw;
+            const normalized = normalizeAcademyProfileApiResponse(
+              data,
+              user?.id != null ? String(user.id) : undefined
+            );
+            setAcademyProfile(normalized);
             setFormState({
-              academy_name: data.academy_name || "",
-              description: data.description || "",
-              website_url: data.website_url || "",
-              contact_email: data.contact_email || "",
+              academy_name: normalized.academy_name,
+              description: normalized.description,
+              website_url: normalized.website_url,
+              contact_email: normalized.contact_email,
             });
             setContactFormState({
-              contact_email: data.contact_email || "",
+              contact_email: normalized.contact_email,
             });
+            if (data.social_links && typeof data.social_links === "object") {
+              setSocialLinks(normalizeSocialLinksFromApi(data.social_links));
+              socialLinksApiUnavailableRef.current = true;
+            }
           }
         } catch (error: unknown) {
           // Handle specific error cases without triggering logout
@@ -387,7 +398,7 @@ const AcademyProfilePage = () => {
           // 404 means academy profile doesn't exist yet - this is okay, user can create it
           if (status === 404) {
             console.log(
-              "✅ Academy profile not found (404) - user may need to create one"
+              "✅ Academy profile not found (404) - user may need to create one",
             );
             // Don't show error toast for 404, this is expected for new academies
             setAcademyProfile(null);
@@ -419,7 +430,7 @@ const AcademyProfilePage = () => {
             if (isProfileNotFound) {
               // Profile doesn't exist - this is expected for new academies
               console.log(
-                "✅ Profile not found based on error message - treating as 404, allowing user to create profile"
+                "✅ Profile not found based on error message - treating as 404, allowing user to create profile",
               );
               setAcademyProfile(null);
               return; // Exit early - this is not an auth error
@@ -434,7 +445,7 @@ const AcademyProfilePage = () => {
               // Token was cleared - this might be a real auth error
               // But check if it's because refresh endpoint had a server error (500)
               console.error(
-                "❌ Token was cleared - checking if it's a server error or real expiration"
+                "❌ Token was cleared - checking if it's a server error or real expiration",
               );
 
               // If error message suggests profile issue, still allow creation
@@ -443,7 +454,7 @@ const AcademyProfilePage = () => {
                 errorMessage.includes("profile")
               ) {
                 console.log(
-                  "⚠️ Error mentions academy/profile - might be missing profile, allowing creation"
+                  "⚠️ Error mentions academy/profile - might be missing profile, allowing creation",
                 );
                 setAcademyProfile(null);
                 return;
@@ -464,7 +475,7 @@ const AcademyProfilePage = () => {
             // 2. Permission issue (but token is valid)
             // Either way, allow user to create profile if they don't have one
             console.log(
-              "⚠️ Token exists but got 401 - treating as missing profile, allowing user to create profile"
+              "⚠️ Token exists but got 401 - treating as missing profile, allowing user to create profile",
             );
 
             // Treat 401 like 404 - allow user to create profile
@@ -476,41 +487,12 @@ const AcademyProfilePage = () => {
           else {
             console.error("Error fetching academy profile:", academyError);
             toast.error(
-              "Could not load academy profile data. Please try again."
+              "Could not load academy profile data. Please try again.",
             );
           }
         }
 
-        // Fetch user profile from API (optional - we already have user data from auth context)
-        // ✅ FIX: Only fetch if we don't have profile_image already, and silently handle 401/403 errors
-        // This fetch is non-critical since we have user data from auth context
-        if (!user?.profile_image) {
-          // Only fetch if we don't have profile image - use silent error handling
-          apiClient
-            .get(API_ENDPOINTS.AUTH.PROFILE)
-            .then((profileResponse) => {
-              if (profileResponse.data) {
-                setUserProfile(profileResponse.data);
-              }
-            })
-            .catch((profileError: unknown) => {
-              // ✅ FIX: Silently ignore all errors - user profile is optional
-              // We already have user data from auth context, so this fetch is just for additional details
-              // Don't log anything - the page works fine without it
-              const axiosError = profileError as AxiosError;
-              const status = axiosError?.response?.status;
-
-              // Only log unexpected errors (500, network errors, etc.) - not auth errors
-              if (status && status !== 401 && status !== 403) {
-                const errorMsg = axiosError?.message || String(profileError);
-                console.warn(
-                  "Could not fetch user profile (non-critical):",
-                  status || errorMsg
-                );
-              }
-              // Silently continue without user profile - not required for academy profile page
-            });
-        }
+        // Academy users: do not call /api/profile/ (returns 403). Use academy profile and auth context only.
       } catch (error: unknown) {
         // This outer catch is for unexpected errors
         const errorMessage =
@@ -529,17 +511,19 @@ const AcademyProfilePage = () => {
     fetchProfileData();
   }, [user, toast, authLoading]); // ✅ Add authLoading as dependency
 
-  // Fetch social links from API
+  // Fetch social links from API (only when user email is present; skip after 404)
   useEffect(() => {
     const fetchSocialLinks = async () => {
       if (!user || !academyProfile) return;
+      if (!user?.email?.trim()) return;
+      if (socialLinksApiUnavailableRef.current) return;
 
       setLoadingSocialLinks(true);
       try {
         const token = localStorage.getItem("authToken");
         const role = "academy";
         const academyId = academyProfile.id;
-        const userEmail = user?.email;
+        const userEmail = user.email.trim();
 
         const response = await apiClient.get("/api/social-links/", {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -571,8 +555,9 @@ const AcademyProfilePage = () => {
             behance: "",
           });
         }
-      } catch (error) {
-        // Silently handle errors - social links are optional
+      } catch (error: unknown) {
+        const status = (error as { response?: { status?: number } })?.response?.status;
+        if (status === 404) socialLinksApiUnavailableRef.current = true;
         setSocialLinks({
           github: "",
           linkedin: "",
@@ -615,7 +600,7 @@ const AcademyProfilePage = () => {
     try {
       // Use POST if profile doesn't exist, PATCH if it does
       const method = academyProfile ? "patch" : "post";
-      const response = await apiClient[method](ACADEMY_PROFILE_API, {
+      const response = await apiClient[method](API_ENDPOINTS.ACADEMY.PROFILE, {
         academy_name: formState.academy_name.trim(),
         description: formState.description.trim() || null,
         website_url: formState.website_url.trim() || null,
@@ -643,7 +628,7 @@ const AcademyProfilePage = () => {
         toast.success(
           academyProfile
             ? "Your academy profile has been updated."
-            : "Your academy profile has been created."
+            : "Your academy profile has been created.",
         );
         setIsEditing(false);
       }
@@ -669,7 +654,7 @@ const AcademyProfilePage = () => {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { id, value } = e.target;
     setFormState((prev) => ({ ...prev, [id]: value }));
@@ -694,7 +679,7 @@ const AcademyProfilePage = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await apiClient.patch(ACADEMY_PROFILE_API, {
+      const response = await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
         academy_name: academyProfile.academy_name,
         description: academyProfile.description,
         website_url: academyProfile.website_url || null,
@@ -743,7 +728,7 @@ const AcademyProfilePage = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await apiClient.patch(ACADEMY_PROFILE_API, {
+      const response = await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
         academy_name: academyProfile.academy_name,
         description: academyProfile.description,
         website_url: null,
@@ -860,7 +845,7 @@ const AcademyProfilePage = () => {
           normalizedUrl = `https://${normalizedUrl}`;
         }
 
-        const response = await apiClient.patch(ACADEMY_PROFILE_API, {
+        const response = await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
           academy_name: academyProfile.academy_name,
           description: academyProfile.description,
           website_url: normalizedUrl || null,
@@ -881,7 +866,7 @@ const AcademyProfilePage = () => {
           toast.success(
             editingPlatform === "website"
               ? "Website updated successfully."
-              : "Website added successfully."
+              : "Website added successfully.",
           );
 
           setIsSocialLinkModalOpen(false);
@@ -906,7 +891,7 @@ const AcademyProfilePage = () => {
 
       if (!academyId || !userEmail) {
         throw new Error(
-          "Missing required information: academy ID or user email"
+          "Missing required information: academy ID or user email",
         );
       }
 
@@ -963,7 +948,7 @@ const AcademyProfilePage = () => {
                   Authorization: `Bearer ${token}`,
                   "Content-Type": "application/json",
                 },
-              }
+              },
             );
             console.log("✅ Social link created via POST:", response.data);
           } catch (postError) {
@@ -1013,7 +998,7 @@ const AcademyProfilePage = () => {
       } catch (refreshError) {
         console.warn(
           "⚠️ Could not refresh social links from server:",
-          refreshError
+          refreshError,
         );
         // Don't throw - we already updated local state, so continue
       }
@@ -1021,7 +1006,7 @@ const AcademyProfilePage = () => {
       toast.success(
         editingPlatform
           ? "Social link updated successfully."
-          : "Social link added successfully."
+          : "Social link added successfully.",
       );
 
       setIsSocialLinkModalOpen(false);
@@ -1050,7 +1035,7 @@ const AcademyProfilePage = () => {
 
   // Profile image upload handler
   const handleImageUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1078,16 +1063,16 @@ const AcademyProfilePage = () => {
 
       const token = localStorage.getItem("authToken");
 
-      // Upload the image
+      // Upload the image (academy profile - do not use /api/profile/ which returns 403 for academy)
       const uploadResponse = await apiClient.patch(
-        API_ENDPOINTS.AUTH.PROFILE,
+        API_ENDPOINTS.ACADEMY.PROFILE,
         formData,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : undefined,
             "Content-Type": "multipart/form-data",
           },
-        }
+        },
       );
 
       console.log("✅ Image upload response:", uploadResponse.data);
@@ -1157,27 +1142,27 @@ const AcademyProfilePage = () => {
       const token = localStorage.getItem("authToken");
 
       const response = await apiClient.patch(
-        API_ENDPOINTS.AUTH.PROFILE,
+        API_ENDPOINTS.ACADEMY.PROFILE,
         { profile_image: null },
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : undefined,
           },
-        }
+        },
       );
 
       console.log("✅ Image removal response:", response.data);
 
       setProfileImage(null);
 
-      // Refresh profile data
-      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
+      // Refresh academy profile (do not use /api/profile/ - 403 for academy)
+      const profileResponse = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE, {
         headers: {
           Authorization: token ? `Bearer ${token}` : undefined,
         },
       });
       if (profileResponse.data) {
-        // Update any profile data state if needed
+        setAcademyProfile((prev) => (prev ? { ...prev, ...profileResponse.data } : null));
       }
 
       toast.success("Profile image has been removed.");
@@ -1217,7 +1202,7 @@ const AcademyProfilePage = () => {
 
       if (!academyId || !userEmail) {
         throw new Error(
-          "Missing required information: academy ID or user email"
+          "Missing required information: academy ID or user email",
         );
       }
 
@@ -1277,13 +1262,13 @@ const AcademyProfilePage = () => {
           setSocialLinks(refreshedLinks);
           console.log(
             "✅ Social links refreshed from server after deletion:",
-            refreshedLinks
+            refreshedLinks,
           );
         }
       } catch (refreshError) {
         console.warn(
           "⚠️ Could not refresh social links from server:",
-          refreshError
+          refreshError,
         );
         // Don't throw - we already updated local state
       }
@@ -1585,8 +1570,8 @@ const AcademyProfilePage = () => {
                             {isSendingCode
                               ? "Sending..."
                               : codeSent
-                              ? "Resend code"
-                              : "Send verification code"}
+                                ? "Resend code"
+                                : "Send verification code"}
                           </Button>
                           {resendCooldown > 0 && (
                             <span className="text-xs text-orange-700 dark:text-orange-300">
@@ -1606,7 +1591,7 @@ const AcademyProfilePage = () => {
                                 setCodeInput(
                                   event.target.value
                                     .replace(/\D/g, "")
-                                    .slice(0, 6)
+                                    .slice(0, 6),
                                 )
                               }
                               className="sm:max-w-[200px]"
@@ -1662,7 +1647,7 @@ const AcademyProfilePage = () => {
                 <div className="space-y-3">
                   {/* Social Links */}
                   {Object.entries(socialLinks).some(
-                    ([_, url]) => url && url.trim() !== ""
+                    ([_, url]) => url && url.trim() !== "",
                   ) ? (
                     (Object.entries(socialLinks) as [SocialPlatform, string][])
                       .filter(([_, url]) => url && url.trim() !== "")
@@ -1680,7 +1665,7 @@ const AcademyProfilePage = () => {
                             <div className="bg-breneo-blue/10 rounded-full p-2">
                               {getSocialIcon(
                                 platform,
-                                "h-[18px] w-[18px] text-breneo-blue"
+                                "h-[18px] w-[18px] text-breneo-blue",
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -1937,8 +1922,8 @@ const AcademyProfilePage = () => {
                   {editingPlatform === "website"
                     ? "Edit Website"
                     : editingPlatform
-                    ? "Edit Social Link"
-                    : "Add Link"}
+                      ? "Edit Social Link"
+                      : "Add Link"}
                 </DrawerTitle>
               </DrawerHeader>
               <div className="px-4 pb-4">
@@ -1973,7 +1958,7 @@ const AcademyProfilePage = () => {
                                 <span>{platformLabels[platform]}</span>
                               </div>
                             </SelectItem>
-                          )
+                          ),
                         )}
                       </SelectContent>
                     </Select>
@@ -2006,8 +1991,8 @@ const AcademyProfilePage = () => {
                   {savingSocialLink
                     ? "Saving..."
                     : editingPlatform
-                    ? "Update"
-                    : "Add"}
+                      ? "Update"
+                      : "Add"}
                 </Button>
                 <DrawerClose asChild>
                   <Button variant="outline" disabled={savingSocialLink}>
@@ -2028,8 +2013,8 @@ const AcademyProfilePage = () => {
                   {editingPlatform === "website"
                     ? "Edit Website"
                     : editingPlatform
-                    ? "Edit Social Link"
-                    : "Add Link"}
+                      ? "Edit Social Link"
+                      : "Add Link"}
                 </DialogTitle>
               </DialogHeader>
               <div className="py-4">
@@ -2064,7 +2049,7 @@ const AcademyProfilePage = () => {
                                 <span>{platformLabels[platform]}</span>
                               </div>
                             </SelectItem>
-                          )
+                          ),
                         )}
                       </SelectContent>
                     </Select>
@@ -2108,8 +2093,8 @@ const AcademyProfilePage = () => {
                   {savingSocialLink
                     ? "Saving..."
                     : editingPlatform
-                    ? "Update"
-                    : "Add"}
+                      ? "Update"
+                      : "Add"}
                 </Button>
               </DialogFooter>
             </DialogContent>
