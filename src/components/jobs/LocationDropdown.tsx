@@ -249,7 +249,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                   "pl-9 pr-3 h-9 text-sm",
                   "bg-white dark:bg-gray-800",
                   "border-gray-200 dark:border-gray-700",
-                  "focus-visible:ring-1 focus-visible:ring-breneo-accent",
+                  "focus-visible:outline-none focus-visible:ring-0",
                 )}
               />
             </div>

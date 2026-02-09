@@ -12,9 +12,7 @@ import axios, {
 } from "axios";
 import { TokenManager } from "./tokenManager";
 import { API_ENDPOINTS } from "./endpoints";
-
-// Base API configuration
-const API_BASE_URL = "https://breneo.onrender.com";
+import { API_BASE_URL } from "./config";
 
 // Create axios instance with base configuration
 const apiClient: AxiosInstance = axios.create({

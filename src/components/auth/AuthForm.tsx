@@ -330,7 +330,7 @@ export function AuthForm({
                       international
                       countryCallingCodeEditable={false}
                       disabled={loading}
-                      className="flex h-12 w-full rounded-[14px] border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-12 w-full rounded-[14px] border border-input bg-background px-3 py-2 text-sm focus-within:outline-none focus-within:ring-0 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                   </div>
 

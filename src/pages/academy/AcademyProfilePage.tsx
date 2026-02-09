@@ -54,9 +54,10 @@ import { AxiosError } from "axios";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
+import { API_BASE_URL } from "@/api/auth/config";
 
 // Academy Profile API endpoint
-const ACADEMY_PROFILE_API = "https://breneo.onrender.com/api/academy/profile/";
+const ACADEMY_PROFILE_API = `${API_BASE_URL}/api/academy/profile/`;
 
 interface AcademyProfile {
   id: string;

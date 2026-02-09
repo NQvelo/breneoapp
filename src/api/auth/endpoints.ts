@@ -22,6 +22,14 @@ export const API_ENDPOINTS = {
     SKILLS: "/api/user/skills/",
     TESTS: "/api/user/tests/",
   },
+  // Profile page: me profile, educations, work-experiences, skills
+  ME: {
+    PROFILE: "/api/me/profile/",
+    SKILLS: "/api/me/skills/",
+  },
+  EDUCATIONS: "/api/educations/",
+  WORK_EXPERIENCES: "/api/work-experiences/",
+  SKILLS_SEARCH: "/api/skills/",
   ACADEMY: {
     PROFILE: "/api/academy/profile/",
     DETAIL: "/api/academy/", // For academy detail by ID: /api/academy/<academy_id>/

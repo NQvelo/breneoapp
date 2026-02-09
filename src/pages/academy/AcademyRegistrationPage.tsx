@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTheme } from "next-themes";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { API_BASE_URL } from "@/api/auth/config";
 
 const AcademyRegistrationPage = () => {
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ const AcademyRegistrationPage = () => {
     const phoneNumber = `${selectedCountry?.dial_code}${phone}`;
     try {
       const response = await fetch(
-        "https://breneo.onrender.com/api/academy/register/",
+        `${API_BASE_URL}/api/academy/register/`,
         {
           method: "POST",
           headers: {

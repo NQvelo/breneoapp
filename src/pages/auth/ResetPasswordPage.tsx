@@ -9,8 +9,7 @@ import { toast } from "sonner";
 import { ImageIcon } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
-
-const API_BASE = "https://breneo.onrender.com";
+import { API_BASE_URL } from "@/api/auth/config";
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -69,7 +68,7 @@ const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/password-reset/request/`, {
+      const res = await axios.post(`${API_BASE_URL}/password-reset/request/`, {
         email,
       });
       toast.success(res.data.message || "Code sent to your email!");
@@ -94,7 +93,7 @@ const ResetPasswordPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/password-reset/verify/`, {
+      const res = await axios.post(`${API_BASE_URL}/password-reset/verify/`, {
         email,
         code: codeString,
       });
@@ -143,7 +142,7 @@ const ResetPasswordPage: React.FC = () => {
     setIsLoading(true);
     try {
       const codeString = code.join("");
-      const res = await axios.post(`${API_BASE}/password-reset/set-new/`, {
+      const res = await axios.post(`${API_BASE_URL}/password-reset/set-new/`, {
         email,
         code: codeString,
         new_password: newPassword,

@@ -6,9 +6,7 @@
  */
 
 import axios from "axios";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://breneo.onrender.com";
+import { API_BASE_URL } from "./config";
 
 // ✅ Session restoration flag to prevent token clearing during session restoration
 let isSessionRestoration = false;

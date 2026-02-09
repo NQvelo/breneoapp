@@ -697,10 +697,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         typeof window !== "undefined"
           ? localStorage.getItem("authToken")
           : null;
-      // console.log(
-      //   "🔑 Verified stored authToken:",
-      //   storedToken ? "present" : "missing"
-      // );
+      // Log auth token to console when user logs in (for debugging)
+      if (typeof window !== "undefined") {
+        console.log("User auth token:", token);
+      }
 
       // Wait a moment to ensure token is stored before making profile request
       await new Promise((resolve) => setTimeout(resolve, 100));

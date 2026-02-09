@@ -4,12 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
 import {
-  LogOut,
   Edit,
   Phone,
   Mail,
   Plus,
-  Settings,
   Award,
   Camera,
   Trash2,
@@ -42,21 +40,11 @@ import {
   LabelList,
 } from "recharts";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerFooter,
-  DrawerClose,
-} from "@/components/ui/drawer";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -79,6 +67,7 @@ import {
   MapPin,
   Heart,
   Loader2,
+  X,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -90,6 +79,18 @@ import {
   getMatchQualityLabel,
 } from "@/utils/jobMatchUtils";
 import { ApiJob } from "@/api/jobs/types";
+import { profileApi } from "@/api/profile";
+import type {
+  EducationEntry,
+  WorkExperienceEntry,
+  UserSkill,
+} from "@/api/profile/types";
+import {
+  EditPersonalInfoModal,
+  EditEducationModal,
+  EditWorkExperienceModal,
+  EditSkillsModal,
+} from "@/components/profile";
 
 interface SkillTestResult {
   final_role?: string;
@@ -294,12 +295,14 @@ const platformLabels: Record<SocialPlatform, string> = {
 };
 
 // Helper function to extract skills from job data (copied from JobsPage.tsx for consistency)
-const extractJobSkills = (job: any): string[] => {
+const extractJobSkills = (job: Record<string, unknown>): string[] => {
   const skills: string[] = [];
   const textToSearch = [
-    job.job_title || job.title || "",
-    job.description || job.job_description || "",
-    job.job_required_experience || job.required_experience || "",
+    (job.job_title as string) || (job.title as string) || "",
+    (job.description as string) || (job.job_description as string) || "",
+    (job.job_required_experience as string) ||
+      (job.required_experience as string) ||
+      "",
   ]
     .join(" ")
     .toLowerCase();
@@ -433,10 +436,6 @@ const ProfilePage = () => {
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
 
   // Contact Information edit modal state (combined phone and email)
-  const [isContactEditModalOpen, setIsContactEditModalOpen] = useState(false);
-  const [phoneEditValue, setPhoneEditValue] = useState("");
-  const [emailEditValue, setEmailEditValue] = useState("");
-  const [updatingContact, setUpdatingContact] = useState(false);
 
   // Social links state
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({
@@ -447,22 +446,21 @@ const ProfilePage = () => {
     dribbble: "",
     behance: "",
   });
-  const [loadingSocialLinks, setLoadingSocialLinks] = useState(false);
-  const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
-  const [editingPlatform, setEditingPlatform] = useState<SocialPlatform | null>(
-    null,
+
+  // Profile sections (Personal info, Education, Work experience, Skills)
+  const [educations, setEducations] = useState<EducationEntry[]>([]);
+  const [workExperiences, setWorkExperiences] = useState<WorkExperienceEntry[]>(
+    [],
   );
-  const [socialLinkForm, setSocialLinkForm] = useState<{
-    platform: SocialPlatform | "";
-    url: string;
-  }>({
-    platform: "",
-    url: "",
-  });
-  const [savingSocialLink, setSavingSocialLink] = useState(false);
-
-  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
-
+  const [profileSkills, setProfileSkills] = useState<UserSkill[]>([]);
+  const [loadingEducations, setLoadingEducations] = useState(false);
+  const [loadingWorkExperiences, setLoadingWorkExperiences] = useState(false);
+  const [loadingProfileSkills, setLoadingProfileSkills] = useState(false);
+  const [isPersonalInfoModalOpen, setIsPersonalInfoModalOpen] = useState(false);
+  const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
+  const [isWorkExperienceModalOpen, setIsWorkExperienceModalOpen] =
+    useState(false);
+  const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
   // Ref to track manual updates to prevent useEffect from overwriting
   const manualSocialLinkUpdateRef = useRef(false);
   const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1059,7 +1057,7 @@ const ProfilePage = () => {
           : {};
 
         // console.log("🌐 Making authenticated request to /api/profile/");
-        // console.log("🌐 Request URL: https://breneo.onrender.com/api/profile/");
+        // console.log("🌐 Request URL: (api base)/api/profile/");
         // console.log("🌐 Request Method: GET");
         // console.log("🌐 Request Headers:", requestHeaders);
         // console.log("🌐 Bearer Token being sent:", token ? "✅ YES" : "❌ NO");
@@ -1222,6 +1220,51 @@ const ProfilePage = () => {
     fetchProfileData();
   }, [user]);
 
+  // Fetch educations, work experiences, profile skills for profile sections
+  const fetchEducations = async () => {
+    if (!user?.id) return;
+    setLoadingEducations(true);
+    try {
+      const data = await profileApi.getEducations();
+      setEducations(Array.isArray(data) ? data : []);
+    } catch {
+      setEducations([]);
+    } finally {
+      setLoadingEducations(false);
+    }
+  };
+  const fetchWorkExperiences = async () => {
+    if (!user?.id) return;
+    setLoadingWorkExperiences(true);
+    try {
+      const data = await profileApi.getWorkExperiences();
+      setWorkExperiences(Array.isArray(data) ? data : []);
+    } catch {
+      setWorkExperiences([]);
+    } finally {
+      setLoadingWorkExperiences(false);
+    }
+  };
+  const fetchProfileSkills = async () => {
+    if (!user?.id) return;
+    setLoadingProfileSkills(true);
+    try {
+      const data = await profileApi.getMySkills();
+      setProfileSkills(Array.isArray(data) ? data : []);
+    } catch {
+      setProfileSkills([]);
+    } finally {
+      setLoadingProfileSkills(false);
+    }
+  };
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchEducations();
+    fetchWorkExperiences();
+    fetchProfileSkills();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only refetch when user id changes
+  }, [user?.id]);
+
   // Extract social links from profile data (fetched from /api/profile/ endpoint)
   useEffect(() => {
     if (!user) return;
@@ -1260,8 +1303,6 @@ const ProfilePage = () => {
 
     // Mark this profileData as processed
     processedProfileDataRef.current = profileDataKey;
-
-    setLoadingSocialLinks(true);
 
     try {
       // Extract social links from profile data
@@ -1400,8 +1441,6 @@ const ProfilePage = () => {
           behance: "",
         };
       });
-    } finally {
-      setLoadingSocialLinks(false);
     }
     // The ref check inside prevents duplicate processing even if profileData object reference changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1409,9 +1448,10 @@ const ProfilePage = () => {
 
   // Cleanup timeout on unmount
   useEffect(() => {
+    const timeoutRef = socialLinksUpdateTimeoutRef;
     return () => {
-      if (socialLinksUpdateTimeoutRef.current) {
-        clearTimeout(socialLinksUpdateTimeoutRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, []);
@@ -1458,19 +1498,6 @@ const ProfilePage = () => {
       </DashboardLayout>
     );
   }
-
-  const handleLogout = () => {
-    setIsLogoutConfirmOpen(true);
-  };
-
-  const handleConfirmLogout = () => {
-    setIsLogoutConfirmOpen(false);
-    logout();
-  };
-
-  const handleCancelLogout = () => {
-    setIsLogoutConfirmOpen(false);
-  };
 
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -1612,578 +1639,90 @@ const ProfilePage = () => {
     setIsAboutMeModalOpen(true);
   };
 
-  // Handler to open social link modal (add new)
-  const handleOpenSocialLinkModal = () => {
-    setEditingPlatform(null);
-    setSocialLinkForm({ platform: "", url: "" });
-    setIsSocialLinkModalOpen(true);
-  };
-
-  // Handler to open social link modal (edit existing)
-  const handleEditSocialLink = (platform: SocialPlatform) => {
-    setEditingPlatform(platform);
-    setSocialLinkForm({
-      platform: platform,
-      url: socialLinks[platform] || "",
-    });
-    setIsSocialLinkModalOpen(true);
-  };
-
-  // Helper function to validate and normalize URL
-  const normalizeUrl = (urlString: string): string => {
-    const trimmed = urlString.trim();
-    if (!trimmed) return trimmed;
-
-    // If it already starts with http:// or https://, return as is
-    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-      return trimmed;
-    }
-
-    // Otherwise, add https://
-    return `https://${trimmed}`;
-  };
-
-  // Helper function to validate URL
-  const isValidUrl = (urlString: string): boolean => {
-    try {
-      const url = new URL(normalizeUrl(urlString));
-      return url.protocol === "http:" || url.protocol === "https:";
-    } catch {
-      return false;
-    }
-  };
-
-  // Handler to save/update social link
-  const handleSaveSocialLink = async () => {
-    console.log("🚀 handleSaveSocialLink called");
-    console.log("🚀 Form data:", socialLinkForm);
-    console.log("🚀 User:", user);
-    console.log("🚀 Current social links:", socialLinks);
-
-    if (!user) {
-      console.error("❌ No user found");
-      toast.error("Please log in to save social links.");
-      return;
-    }
-
-    if (!socialLinkForm.platform || !socialLinkForm.url.trim()) {
-      console.error("❌ Missing platform or URL");
-      toast.error("Please select a platform and provide a URL.");
-      return;
-    }
-
-    // Validate URL
-    if (!isValidUrl(socialLinkForm.url)) {
-      console.error("❌ Invalid URL:", socialLinkForm.url);
-      toast.error(
-        "Please enter a valid URL (e.g., https://example.com or example.com).",
-      );
-      return;
-    }
-
-    console.log("✅ Validation passed, starting save...");
-    setSavingSocialLink(true);
-
-    try {
-      const platform = socialLinkForm.platform as SocialPlatform;
-      const token = localStorage.getItem("authToken");
-
-      // Normalize the URL before saving
-      const normalizedUrl = normalizeUrl(socialLinkForm.url.trim());
-
-      // Prepare updated social links object with all existing links plus the new one
-      const updatedSocialLinks = {
-        ...socialLinks,
-        [platform]: normalizedUrl,
-      };
-
-      // Filter out empty strings - only send platforms with values
-      const socialLinksToSend: Record<string, string> = {};
-      Object.entries(updatedSocialLinks).forEach(([key, value]) => {
-        if (value && value.trim() !== "") {
-          socialLinksToSend[key] = value;
-        }
+  // Profile section modal handlers
+  const handleSavePersonalInfo = async (
+    payload: Parameters<typeof profileApi.updateProfile>[0],
+  ) => {
+    await profileApi.updateProfile(payload);
+    const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+    const data = res.data as Record<string, unknown>;
+    const profileObj = data?.profile as Record<string, unknown> | undefined;
+    const userObj = data?.user as Record<string, unknown> | undefined;
+    setProfileData(data as ProfileData);
+    setAboutMe(
+      (data?.about_me ?? profileObj?.about_me ?? userObj?.about_me) as
+        | string
+        | null,
+    );
+    setProfileImage(
+      (data?.profile_image ??
+        profileObj?.profile_image ??
+        userObj?.profile_image) as string | null,
+    );
+    if (data?.social_links && typeof data.social_links === "object") {
+      const sl = data.social_links as Record<string, string>;
+      setSocialLinks({
+        github: sl.github ?? "",
+        linkedin: sl.linkedin ?? "",
+        facebook: sl.facebook ?? "",
+        instagram: sl.instagram ?? "",
+        dribbble: sl.dribbble ?? "",
+        behance: sl.behance ?? "",
       });
-
-      console.log("📤 Sending social links to API:", socialLinksToSend);
-      console.log("📤 Platform:", platform);
-      console.log("📤 Normalized URL:", normalizedUrl);
-      console.log(
-        "📤 Full payload:",
-        JSON.stringify({ social_links: socialLinksToSend }, null, 2),
-      );
-
-      // Set flag to prevent useEffect from overwriting - MUST BE SET BEFORE ANY STATE UPDATES
-      manualSocialLinkUpdateRef.current = true;
-
-      // Clear any existing timeout
-      if (socialLinksUpdateTimeoutRef.current) {
-        clearTimeout(socialLinksUpdateTimeoutRef.current);
-      }
-
-      console.log("🔒 Manual update flag set to true");
-
-      // Update local state immediately for UI feedback
-      setSocialLinks(updatedSocialLinks);
-      console.log("✅ Updated local state immediately:", updatedSocialLinks);
-
-      // Save to profile endpoint with social_links object
-      // Try sending as nested object first, if that fails, try sending individual fields
-      let response;
-      try {
-        console.log("📤 Attempting PATCH with social_links object...");
-        response = await apiClient.patch(
-          API_ENDPOINTS.AUTH.PROFILE,
-          {
-            social_links: socialLinksToSend,
-          },
-          {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : undefined,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-        console.log("✅ PATCH successful with social_links object");
-      } catch (apiError) {
-        console.error(
-          "❌ PATCH with social_links object failed, error:",
-          apiError,
-        );
-
-        // Check if it's a validation error about the format
-        const error = apiError as {
-          response?: {
-            data?: unknown;
-            status?: number;
-          };
-        };
-
-        // If 400 error, try sending individual fields instead
-        if (error.response?.status === 400) {
-          console.log(
-            "🔄 Trying alternative format - sending individual fields...",
-          );
-          try {
-            // Try sending social links as individual fields on the profile
-            const individualFieldsPayload: Record<string, unknown> = {};
-            Object.entries(socialLinksToSend).forEach(([key, value]) => {
-              individualFieldsPayload[key] = value;
-            });
-
-            console.log(
-              "📤 Trying individual fields payload:",
-              individualFieldsPayload,
-            );
-            response = await apiClient.patch(
-              API_ENDPOINTS.AUTH.PROFILE,
-              individualFieldsPayload,
-              {
-                headers: {
-                  Authorization: token ? `Bearer ${token}` : undefined,
-                  "Content-Type": "application/json",
-                },
-              },
-            );
-            console.log("✅ PATCH successful with individual fields");
-          } catch (individualError) {
-            console.error(
-              "❌ PATCH with individual fields also failed:",
-              individualError,
-            );
-            // Reset flag on error
-            manualSocialLinkUpdateRef.current = false;
-            throw apiError; // Throw original error
-          }
-        } else {
-          // Reset flag on error
-          manualSocialLinkUpdateRef.current = false;
-          throw apiError;
-        }
-      }
-
-      console.log("✅ Response status:", response.status);
-      console.log("✅ Response data:", JSON.stringify(response.data, null, 2));
-      console.log("✅ Response headers:", response.headers);
-
-      // After successful PATCH, refetch the profile to get the latest data from server
-      // This ensures we have the most up-to-date social links
-      try {
-        console.log("🔄 Refetching profile data to verify save...");
-        const refreshedProfileResponse = await apiClient.get(
-          API_ENDPOINTS.AUTH.PROFILE,
-          {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : undefined,
-            },
-          },
-        );
-
-        console.log(
-          "✅ Refreshed profile data:",
-          JSON.stringify(refreshedProfileResponse.data, null, 2),
-        );
-
-        if (refreshedProfileResponse.data) {
-          const refreshedData = refreshedProfileResponse.data as Record<
-            string,
-            unknown
-          >;
-
-          // Update profile data
-          setProfileData(refreshedProfileResponse.data as ProfileData);
-
-          // Extract social links from refreshed data
-          const socialLinksFromRefreshed =
-            refreshedData?.social_links ||
-            (refreshedData?.profile as Record<string, unknown>)?.social_links ||
-            (refreshedData?.user as Record<string, unknown>)?.social_links ||
-            null;
-
-          console.log(
-            "🔍 Social links from refreshed profile:",
-            socialLinksFromRefreshed,
-          );
-
-          if (
-            socialLinksFromRefreshed &&
-            typeof socialLinksFromRefreshed === "object" &&
-            !Array.isArray(socialLinksFromRefreshed)
-          ) {
-            const extractedLinks = {
-              github:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .github as string) || "",
-              linkedin:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .linkedin as string) || "",
-              facebook:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .facebook as string) || "",
-              instagram:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .instagram as string) || "",
-              dribbble:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .dribbble as string) || "",
-              behance:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .behance as string) || "",
-            };
-            console.log(
-              "✅ Setting social links from refreshed data:",
-              extractedLinks,
-            );
-            setSocialLinks(extractedLinks);
-          } else {
-            console.log(
-              "⚠️ No social links in refreshed data, checking if our update was saved...",
-            );
-            // If no social links in response, check if our update should have been there
-            // This might indicate the API doesn't return social_links in the response
-            console.log("⚠️ Keeping local update:", updatedSocialLinks);
-          }
-        }
-      } catch (refreshError) {
-        console.error("❌ Error refreshing profile after save:", refreshError);
-        // Even if refresh fails, keep the local update since PATCH succeeded
-        console.log("⚠️ Keeping local update due to refresh error");
-      }
-
-      // Reset the manual update flag after a delay
-      if (socialLinksUpdateTimeoutRef.current) {
-        clearTimeout(socialLinksUpdateTimeoutRef.current);
-      }
-      socialLinksUpdateTimeoutRef.current = setTimeout(() => {
-        manualSocialLinkUpdateRef.current = false;
-        console.log("✅ Manual update flag reset after timeout");
-      }, 3000);
-
-      setIsSocialLinkModalOpen(false);
-      setSocialLinkForm({ platform: "", url: "" });
-      setEditingPlatform(null);
-
-      toast.success(
-        editingPlatform
-          ? "Social link updated successfully."
-          : "Social link added successfully.",
-      );
-    } catch (error) {
-      console.error("❌ Error saving social link:", error);
-      let errorMessage = "Failed to save social link. Please try again.";
-
-      if (error && typeof error === "object" && "response" in error) {
-        const axiosError = error as {
-          response?: {
-            data?: unknown;
-            status?: number;
-            statusText?: string;
-          };
-          message?: string;
-          request?: unknown;
-        };
-
-        console.error("❌ Full error object:", {
-          status: axiosError.response?.status,
-          statusText: axiosError.response?.statusText,
-          data: axiosError.response?.data,
-          message: axiosError.message,
-          request: axiosError.request,
-        });
-
-        if (axiosError.response?.data) {
-          const errorData = axiosError.response.data as {
-            detail?: string;
-            message?: string;
-            social_links?: unknown;
-            [key: string]: unknown;
-          };
-
-          // Check for field-specific errors
-          if (errorData.social_links) {
-            errorMessage =
-              typeof errorData.social_links === "string"
-                ? errorData.social_links
-                : "Invalid social links format. Please check your input.";
-          } else {
-            errorMessage =
-              errorData.detail || errorData.message || errorMessage;
-          }
-
-          console.error(
-            "❌ Error response data:",
-            JSON.stringify(errorData, null, 2),
-          );
-        }
-
-        // Provide more specific error messages based on status code
-        if (axiosError.response?.status === 400) {
-          errorMessage =
-            "Invalid request. Please check the URL format and try again.";
-        } else if (axiosError.response?.status === 401) {
-          errorMessage = "Authentication failed. Please log in again.";
-        } else if (axiosError.response?.status === 403) {
-          errorMessage = "You don't have permission to update social links.";
-        } else if (axiosError.response?.status === 500) {
-          errorMessage =
-            "Server error. Please try again later or contact support.";
-        }
-      } else if (error instanceof Error) {
-        console.error("❌ Error message:", error.message);
-        errorMessage = error.message || errorMessage;
-      }
-
-      toast.error(errorMessage);
-    } finally {
-      setSavingSocialLink(false);
     }
+    toast.success("Profile updated.");
   };
 
-  // Handler to delete social link (set to empty string)
-  const handleDeleteSocialLink = async (platform: SocialPlatform) => {
-    if (
-      !user ||
-      !confirm("Are you sure you want to remove this social link?")
-    ) {
-      return;
+  const handleSaveEducation = async (
+    created: {
+      school_name: string;
+      major?: string;
+      degree_type?: string;
+      gpa?: string | null;
+      start_date: string;
+      end_date?: string | null;
+      is_current: boolean;
+    }[],
+    updated: { id: number; payload: Partial<EducationEntry> }[],
+    deletedIds: number[],
+  ) => {
+    for (const c of created) {
+      await profileApi.createEducation(c);
     }
-
-    try {
-      const token = localStorage.getItem("authToken");
-
-      // Create a new object without the platform to remove
-      const updatedSocialLinks = { ...socialLinks };
-      delete updatedSocialLinks[platform];
-
-      // Filter out empty strings - only send platforms with values
-      const socialLinksToSend: Record<string, string> = {};
-      Object.entries(updatedSocialLinks).forEach(([key, value]) => {
-        if (value && value.trim() !== "") {
-          socialLinksToSend[key] = value;
-        }
-      });
-
-      console.log("📤 Removing social link, sending:", socialLinksToSend);
-      console.log(
-        "📤 Full payload:",
-        JSON.stringify({ social_links: socialLinksToSend }, null, 2),
-      );
-
-      // Set flag to prevent useEffect from overwriting - MUST BE SET BEFORE ANY STATE UPDATES
-      manualSocialLinkUpdateRef.current = true;
-
-      // Clear any existing timeout
-      if (socialLinksUpdateTimeoutRef.current) {
-        clearTimeout(socialLinksUpdateTimeoutRef.current);
-      }
-
-      console.log("🔒 Manual update flag set to true (delete)");
-
-      // Update local state immediately - set the removed platform to empty string
-      const finalSocialLinks = {
-        ...socialLinks,
-        [platform]: "",
-      };
-      setSocialLinks(finalSocialLinks);
-      console.log("✅ Updated local state immediately:", finalSocialLinks);
-
-      // Save to profile endpoint with updated social_links object (without the removed platform)
-      let response;
-      try {
-        response = await apiClient.patch(
-          API_ENDPOINTS.AUTH.PROFILE,
-          {
-            social_links: socialLinksToSend,
-          },
-          {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : undefined,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-      } catch (apiError) {
-        // Reset flag on error
-        manualSocialLinkUpdateRef.current = false;
-        throw apiError;
-      }
-
-      console.log("✅ Response status:", response.status);
-      console.log("✅ Response data:", JSON.stringify(response.data, null, 2));
-      console.log("✅ Response headers:", response.headers);
-
-      // After successful PATCH, refetch the profile to get the latest data from server
-      try {
-        console.log("🔄 Refetching profile data to verify delete...");
-        const refreshedProfileResponse = await apiClient.get(
-          API_ENDPOINTS.AUTH.PROFILE,
-          {
-            headers: {
-              Authorization: token ? `Bearer ${token}` : undefined,
-            },
-          },
-        );
-
-        console.log(
-          "✅ Refreshed profile data (delete):",
-          JSON.stringify(refreshedProfileResponse.data, null, 2),
-        );
-
-        if (refreshedProfileResponse.data) {
-          const refreshedData = refreshedProfileResponse.data as Record<
-            string,
-            unknown
-          >;
-
-          // Update profile data
-          setProfileData(refreshedProfileResponse.data as ProfileData);
-
-          // Extract social links from refreshed data
-          const socialLinksFromRefreshed =
-            refreshedData?.social_links ||
-            (refreshedData?.profile as Record<string, unknown>)?.social_links ||
-            (refreshedData?.user as Record<string, unknown>)?.social_links ||
-            null;
-
-          console.log(
-            "🔍 Social links from refreshed profile (delete):",
-            socialLinksFromRefreshed,
-          );
-
-          if (
-            socialLinksFromRefreshed &&
-            typeof socialLinksFromRefreshed === "object" &&
-            !Array.isArray(socialLinksFromRefreshed)
-          ) {
-            const extractedLinks = {
-              github:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .github as string) || "",
-              linkedin:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .linkedin as string) || "",
-              facebook:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .facebook as string) || "",
-              instagram:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .instagram as string) || "",
-              dribbble:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .dribbble as string) || "",
-              behance:
-                ((socialLinksFromRefreshed as Record<string, unknown>)
-                  .behance as string) || "",
-            };
-            console.log(
-              "✅ Setting social links from refreshed data (delete):",
-              extractedLinks,
-            );
-            setSocialLinks(extractedLinks);
-          } else {
-            console.log("⚠️ No social links in refreshed data after delete");
-            // The platform should be removed, so finalSocialLinks is correct
-            console.log(
-              "✅ Keeping local update (platform removed):",
-              finalSocialLinks,
-            );
-          }
-        }
-      } catch (refreshError) {
-        console.error(
-          "❌ Error refreshing profile after delete:",
-          refreshError,
-        );
-        // Keep the local update since PATCH succeeded
-      }
-
-      // Reset the manual update flag after a delay
-      if (socialLinksUpdateTimeoutRef.current) {
-        clearTimeout(socialLinksUpdateTimeoutRef.current);
-      }
-      socialLinksUpdateTimeoutRef.current = setTimeout(() => {
-        manualSocialLinkUpdateRef.current = false;
-        console.log("✅ Manual update flag reset after timeout (delete)");
-      }, 3000);
-
-      toast.success("Social link removed successfully.");
-    } catch (error) {
-      console.error("❌ Error deleting social link:", error);
-      let errorMessage = "Failed to remove social link. Please try again.";
-
-      if (error && typeof error === "object" && "response" in error) {
-        const axiosError = error as {
-          response?: {
-            data?: unknown;
-            status?: number;
-            statusText?: string;
-          };
-          message?: string;
-        };
-
-        console.error("❌ Full error object:", {
-          status: axiosError.response?.status,
-          statusText: axiosError.response?.statusText,
-          data: axiosError.response?.data,
-          message: axiosError.message,
-        });
-
-        if (axiosError.response?.data) {
-          const errorData = axiosError.response.data as {
-            detail?: string;
-            message?: string;
-            [key: string]: unknown;
-          };
-          errorMessage = errorData.detail || errorData.message || errorMessage;
-          console.error(
-            "❌ Error response data:",
-            JSON.stringify(errorData, null, 2),
-          );
-        }
-      }
-
-      toast.error(errorMessage);
+    for (const { id, payload } of updated) {
+      await profileApi.updateEducation(id, payload);
     }
+    for (const id of deletedIds) {
+      await profileApi.deleteEducation(id);
+    }
+    await fetchEducations();
+    toast.success("Education updated.");
+  };
+
+  const handleSaveWorkExperience = async (
+    created: {
+      job_title: string;
+      company: string;
+      job_type?: string | null;
+      location?: string | null;
+      start_date: string;
+      end_date?: string | null;
+      is_current: boolean;
+    }[],
+    updated: { id: number; payload: Partial<WorkExperienceEntry> }[],
+    deletedIds: number[],
+  ) => {
+    for (const c of created) {
+      await profileApi.createWorkExperience(c);
+    }
+    for (const { id, payload } of updated) {
+      await profileApi.updateWorkExperience(id, payload);
+    }
+    for (const id of deletedIds) {
+      await profileApi.deleteWorkExperience(id);
+    }
+    await fetchWorkExperiences();
+    toast.success("Work experience updated.");
   };
 
   // Handler to save About Me
@@ -2226,87 +1765,6 @@ const ProfilePage = () => {
       toast.error("Failed to update About Me. Please try again.");
     } finally {
       setUpdatingAboutMe(false);
-    }
-  };
-
-  // Handler to open contact information edit modal
-  const handleOpenContactEditModal = () => {
-    setPhoneEditValue(phone_number || "");
-    setEmailEditValue(email || "");
-    setIsContactEditModalOpen(true);
-  };
-
-  // Handler to save contact information (phone and email)
-  const handleSaveContact = async () => {
-    if (!user) return;
-
-    // Validate email
-    if (!emailEditValue.trim()) {
-      toast.error("Email cannot be empty.");
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailEditValue.trim())) {
-      toast.error("Please enter a valid email address.");
-      return;
-    }
-
-    setUpdatingContact(true);
-
-    try {
-      const token = localStorage.getItem("authToken");
-
-      // Prepare update payload
-      const updateData: { phone_number?: string; email: string } = {
-        email: emailEditValue.trim(),
-      };
-
-      // Only include phone_number if it's provided
-      if (phoneEditValue.trim()) {
-        updateData.phone_number = phoneEditValue.trim();
-      }
-
-      const response = await apiClient.patch(
-        API_ENDPOINTS.AUTH.PROFILE,
-        updateData,
-        {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
-          },
-        },
-      );
-
-      console.log("✅ Contact information updated:", response.data);
-
-      // Refresh profile data
-      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
-      });
-      setProfileData(profileResponse.data);
-
-      // Reload to update user context
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-
-      setIsContactEditModalOpen(false);
-
-      toast.success("Contact information has been updated successfully.");
-    } catch (error) {
-      console.error("❌ Error updating contact information:", error);
-      const errorMessage =
-        error && typeof error === "object" && "response" in error
-          ? (error as { response?: { data?: { detail?: string } } }).response
-              ?.data?.detail ||
-            "Failed to update contact information. Please try again."
-          : "Failed to update contact information. Please try again.";
-      toast.error(errorMessage);
-    } finally {
-      setUpdatingContact(false);
     }
   };
 
@@ -2415,7 +1873,7 @@ const ProfilePage = () => {
 
     const chartData = Object.entries(skills)
       .filter(([_, pct]) => parseFloat(String(pct).replace("%", "")) > 0)
-      .map(([skill, pct]) => {
+      .map(([skill, pct], idx) => {
         const percentage = parseFloat(String(pct).replace("%", ""));
 
         // Calculate opacity based on percentage
@@ -2430,10 +1888,13 @@ const ProfilePage = () => {
           opacity = 0.3 + (percentage / 40) * 0.7;
         }
 
-        // Create unique gradient ID for each opacity level
-        const gradientId = `gradient-primary-${Math.round(opacity * 100)}`;
+        // Unique id per entry so Recharts and gradient keys never collide
+        const safeName = String(skill).replace(/\s+/g, "-").slice(0, 30);
+        const uniqueId = `skill-${idx}-${safeName}`;
+        const gradientId = `gradient-primary-${uniqueId}`;
 
         return {
+          id: uniqueId,
           skill,
           percentage,
           displayPct: pct,
@@ -2726,14 +2187,15 @@ const ProfilePage = () => {
               }}
             />
             <Bar
+              key={`bar-${chartData.map((e) => e.id).join("-")}`}
               dataKey="percentage"
               radius={[8, 8, 8, 8]}
               animationDuration={1000}
               animationEasing="ease-out"
             >
-              {chartData.map((entry, index) => (
+              {chartData.map((entry) => (
                 <Cell
-                  key={`cell-${index}`}
+                  key={entry.id}
                   fill={`url(#${entry.gradientId})`}
                   style={{
                     transition: "all 0.3s ease",
@@ -2861,435 +2323,403 @@ const ProfilePage = () => {
       </div>
 
       {activeView === "profile" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 pb-32 md:pb-0">
-          {/* Left Column - Profile Summary, Contact Info, Social Networks */}
-          <div className="lg:col-span-1">
-            <div className="space-y-4 md:space-y-6">
-              {/* Profile Header Card */}
-              <Card className="bg-transparent border-0 md:bg-card md:border-0 md:rounded-3xl">
-                <CardContent className="pb-4 pt-6 px-6 md:pb-6">
-                  {/* Mobile: Horizontal layout, Desktop: Vertical centered */}
-                  <div className="flex flex-col md:items-center">
-                    {/* Top Section: Name/Info on left, Picture on right (Mobile) | Picture on top, Name below (Desktop) */}
-                    <div className="flex items-start justify-between gap-4 mb-4 md:flex-col md:items-center md:mb-4">
-                      {/* Profile Picture - Right side (Mobile) | Top (Desktop) */}
-                      <div className="relative flex-shrink-0 order-2 md:relative md:order-1">
-                        <div
-                          className="relative group cursor-pointer rounded-full overflow-hidden"
-                          onClick={handleImageModalClick}
-                        >
-                          <OptimizedAvatar
-                            key={`avatar-${imageTimestamp}`}
-                            src={displayProfileImage || undefined}
-                            alt="Profile photo"
-                            fallback={
-                              first_name
-                                ? first_name.charAt(0).toUpperCase()
-                                : "U"
-                            }
-                            size="lg"
-                            loading="eager"
-                            className="h-16 w-16 md:h-28 md:w-28 rounded-full"
-                          />
-                          {uploadingImage ? (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                            </div>
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                              <Camera className="h-5 w-5 md:h-7 md:w-7 text-white" />
-                            </div>
-                          )}
-                        </div>
+        <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
+          {/* 1. Personal information */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Personal information
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => setIsPersonalInfoModalOpen(true)}
+                aria-label="Edit personal information"
+              >
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              <div className="flex flex-row items-center gap-4 mb-4">
+                <div className="flex-shrink-0">
+                  <div
+                    className="relative group cursor-pointer rounded-full overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
+                    onClick={handleImageModalClick}
+                  >
+                    <OptimizedAvatar
+                      key={`avatar-${imageTimestamp}`}
+                      src={displayProfileImage || undefined}
+                      alt="Profile photo"
+                      fallback={
+                        first_name ? first_name.charAt(0).toUpperCase() : "U"
+                      }
+                      size="lg"
+                      loading="eager"
+                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                    />
+                    {uploadingImage ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                       </div>
-                      <input
-                        id="profile-image-input"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={uploadingImage}
-                      />
-
-                      {/* Name and Info - Left side (Mobile) | Below picture (Desktop) */}
-                      <div className="flex-1 min-w-0 order-1 md:text-center md:flex-none md:mb-4 md:order-2">
-                        <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                          {first_name} {last_name}
-                        </h1>
-                        {(user as { job_title?: string; position?: string })
-                          ?.job_title && (
-                          <p className="text-sm font-semibold md:font-normal text-gray-900 dark:text-gray-100 md:text-gray-600 md:dark:text-gray-400 mb-1">
-                            {(user as { job_title?: string }).job_title}
-                          </p>
-                        )}
-                        {(user as { city?: string; location?: string })
-                          ?.city ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {(user as { city?: string }).city}
-                            {(user as { country?: string })?.country &&
-                              `, ${(user as { country?: string }).country}`}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {phone_number || "Location not specified"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Hidden Profile Badge */}
-                    {(user as { is_profile_hidden?: boolean })
-                      ?.is_profile_hidden && (
-                      <div className="mb-4 md:text-center">
-                        <Badge className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border-0">
-                          <Eye size={12} className="mr-1" />
-                          Hidden Profile
-                        </Badge>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                       </div>
                     )}
-
-                    {/* Bottom Section: Settings and Logout Buttons */}
-                    <div className="flex items-center gap-2 w-full pt-3 md:mt-2 md:pt-0">
-                      <Button
-                        variant="outline"
-                        className="flex-[5] md:flex-1 flex items-center justify-center gap-2 h-12 px-6 bg-breneo-blue/10 text-breneo-blue border-0 hover:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
-                        onClick={() => navigate("/settings")}
-                      >
-                        <Settings size={16} />
-                        <span>Settings</span>
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="icon"
-                        onClick={handleLogout}
-                        className="h-12 w-12 bg-red-100 text-red-600 hover:bg-red-200 active:bg-red-300 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50 dark:active:bg-red-900/70"
-                      >
-                        <LogOut size={16} />
-                      </Button>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Contact Information Card */}
-              <Card className="border-0 rounded-3xl">
-                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    Contact Information
-                  </h3>
-                  <Button
-                    variant="link"
-                    className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                    onClick={handleOpenContactEditModal}
-                  >
-                    Edit
-                  </Button>
-                </CardHeader>
-                <CardContent className="space-y-0 p-0">
-                  <div className="px-6 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
-                        <Phone size={18} className="text-breneo-blue" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {phone_number || "Not provided"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="px-6 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
-                        <Mail size={18} className="text-breneo-blue" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {email}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Social Networks Card */}
-              <Card className="border-0 rounded-3xl">
-                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                    Social Networks
-                  </h3>
-                  <Button
-                    variant="link"
-                    className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                    onClick={handleOpenSocialLinkModal}
-                  >
-                    Add
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {loadingSocialLinks ? (
-                    <div className="text-center py-4 text-gray-500 text-sm px-6">
-                      Loading...
-                    </div>
-                  ) : Object.entries(socialLinks).some(
-                      ([_, url]) => url && url.trim() !== "",
-                    ) ? (
-                    <div>
-                      {(
-                        Object.entries(socialLinks) as [
-                          SocialPlatform,
-                          string,
-                        ][]
-                      )
-                        .filter(([_, url]) => url && url.trim() !== "")
-                        .map(([platform, url], index, filteredArray) => (
-                          <div
-                            key={platform}
-                            className={`px-6 py-4 ${
-                              index < filteredArray.length - 1
-                                ? "border-b-0"
-                                : ""
-                            } group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-3 flex-1 min-w-0"
-                              >
-                                <div className="bg-breneo-blue/10 rounded-full p-2 flex-shrink-0">
-                                  {getSocialIcon(
-                                    platform,
-                                    "h-[18px] w-[18px] text-breneo-blue",
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                    {platformLabels[platform]}
-                                  </p>
-                                  <p className="text-xs text-gray-500 truncate">
-                                    {url
-                                      .replace(/^https?:\/\//, "")
-                                      .replace(/^www\./, "")}
-                                  </p>
-                                </div>
-                              </a>
-                              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                                <button
-                                  type="button"
-                                  className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 dark:hover:bg-gray-700"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditSocialLink(platform);
-                                  }}
-                                >
-                                  <Edit
-                                    size={14}
-                                    className="text-gray-600 dark:text-gray-400"
-                                  />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="h-8 w-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/10 dark:hover:bg-primary/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteSocialLink(platform);
-                                  }}
-                                >
-                                  <Trash2
-                                    size={14}
-                                    className="text-gray-600 dark:text-gray-400"
-                                  />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500 text-sm px-6">
-                      No social links added yet. Click "Add" to add your social
-                      media profiles.
-                    </div>
+                  <input
+                    id="profile-image-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    {first_name} {last_name}
+                  </h1>
+                  {(user as { job_title?: string })?.job_title && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      {(user as { job_title?: string }).job_title}
+                    </p>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(profileData as Record<string, unknown>)?.country_region ||
+                (profileData as Record<string, unknown>)?.city ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                    <MapPin className="h-4 w-4 text-gray-500" />
+                    {[
+                      (profileData as Record<string, unknown>)?.country_region,
+                      (profileData as Record<string, unknown>)?.city,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || "Location not set"}
+                  </span>
+                ) : null}
+                {email && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                    <Mail className="h-4 w-4 text-gray-500" />
+                    {email}
+                  </span>
+                )}
+                {phone_number && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                    <Phone className="h-4 w-4 text-gray-500" />
+                    {phone_number}
+                  </span>
+                )}
+                {(Object.entries(socialLinks) as [SocialPlatform, string][])
+                  .filter(([_, url]) => url?.trim())
+                  .map(([platform, url]) => (
+                    <a
+                      key={platform}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
+                    >
+                      {getSocialIcon(platform, "h-4 w-4 text-gray-500")}
+                      {url.length > 35
+                        ? `${url.slice(0, 32)}...`
+                        : url.replace(/^https?:\/\/(www\.)?/, "")}
+                    </a>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Skill Test Card */}
-              <Card
-                className="bg-white transition-all w-auto flex-shrink-0 rounded-3xl border-0 hover:shadow-soft transition-shadow cursor-pointer"
-                style={{
-                  boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
-                }}
+          {/* 2. About Me */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                About Me
+              </h3>
+              <Button
+                variant="link"
+                className="text-breneo-blue p-0 h-auto font-normal hover:underline"
+                onClick={handleOpenAboutMeModal}
               >
-                <CardContent className="p-4 md:p-4">
-                  <Link to="/skill-test" className="block cursor-pointer group">
-                    <div className="flex items-center gap-3 md:gap-4">
-                      {/* Left side - Content */}
-                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                        <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
-                          {t.home.skillTestTitle}
-                        </h3>
-                        <p className="text-sm md:text-sm text-gray-900">
-                          {t.home.skillTestSubtitle}
+                Edit
+              </Button>
+            </CardHeader>
+            <CardContent className="px-6 py-4">
+              {loadingProfile ? (
+                <div className="text-center py-4 text-gray-500">Loading...</div>
+              ) : aboutMe ? (
+                <div>
+                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
+                    {aboutMe.length > 200
+                      ? `${aboutMe.substring(0, 200)}...`
+                      : aboutMe}
+                  </p>
+                  {aboutMe.length > 200 && (
+                    <Button
+                      variant="link"
+                      className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
+                      onClick={handleOpenAboutMeModal}
+                    >
+                      View More
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">
+                  No information available. Add some details about yourself!
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 3. Education */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Education
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => setIsEducationModalOpen(true)}
+                aria-label="Edit education"
+              >
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              {loadingEducations ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : educations.length === 0 ? (
+                <p className="text-sm text-gray-500">No education added yet.</p>
+              ) : (
+                <div className="relative">
+                  {educations.map((entry, index) => (
+                    <div key={entry.id} className="flex gap-4 pb-6 last:pb-0">
+                      <div className="flex flex-col items-center">
+                        <div className="h-3 w-3 rounded-full bg-emerald-400 dark:bg-emerald-500 shrink-0" />
+                        {index < educations.length - 1 && (
+                          <div className="w-px flex-1 min-h-[2rem] bg-emerald-200 dark:bg-emerald-800 mt-1" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                          {entry.start_date}
+                          {entry.is_current
+                            ? " → Present"
+                            : entry.end_date
+                              ? ` → ${entry.end_date}`
+                              : ""}
+                        </p>
+                        <p className="font-bold text-gray-900 dark:text-gray-100">
+                          {entry.school_name}
+                        </p>
+                        {(entry.degree_type || entry.major) && (
+                          <p className="text-sm text-gray-600 dark:text-gray-300">
+                            {[entry.degree_type, entry.major]
+                              .filter(Boolean)
+                              .join(" in ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 4. Work experience */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Work experience
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => setIsWorkExperienceModalOpen(true)}
+                aria-label="Edit work experience"
+              >
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              {loadingWorkExperiences ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : workExperiences.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No work experience added yet.
+                </p>
+              ) : (
+                <div className="relative">
+                  {workExperiences.map((entry, index) => (
+                    <div key={entry.id} className="flex gap-4 pb-6 last:pb-0">
+                      <div className="flex flex-col items-center">
+                        <div className="h-3 w-3 rounded-full bg-emerald-400 dark:bg-emerald-500 shrink-0" />
+                        {index < workExperiences.length - 1 && (
+                          <div className="w-px flex-1 min-h-[2rem] bg-emerald-200 dark:bg-emerald-800 mt-1" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+                          {entry.start_date}
+                          {entry.is_current
+                            ? " → Present"
+                            : entry.end_date
+                              ? ` → ${entry.end_date}`
+                              : ""}
+                        </p>
+                        <p className="font-bold text-gray-900 dark:text-gray-100">
+                          {entry.company}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {entry.job_title}
                         </p>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-                      {/* Right side - Illustration / Icon */}
-                      <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
-                        <img
-                          src="/lovable-uploads/3dicons-target-front-color.png"
-                          alt="Skill test target"
-                          className="w-full h-full object-contain"
-                        />
+          {/* 5. Skills */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Skills
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => setIsSkillsModalOpen(true)}
+                aria-label="Edit skills"
+              >
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              {loadingProfileSkills ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : profileSkills.length === 0 ? (
+                <p className="text-sm text-gray-500">No skills added yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {profileSkills.map((s) => (
+                    <span
+                      key={s.id}
+                      className="rounded-full bg-gray-200 dark:bg-gray-700 px-3 py-1 text-sm text-gray-900 dark:text-gray-100"
+                    >
+                      {s.skill_name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Personal Skills Card */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Personal Skills
+              </h3>
+            </CardHeader>
+            <CardContent className="px-6 py-4">
+              {loadingResults ? (
+                <div className="text-center py-4 text-gray-500">
+                  Loading skill results...
+                </div>
+              ) : skillResults &&
+                (skillResults?.final_role || getAllSkills().length > 0) ? (
+                <div className="space-y-4">
+                  {/* Final Role */}
+                  {skillResults?.final_role && (
+                    <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-breneo-blue/10 rounded-full p-2">
+                          <Award className="h-5 w-5 text-breneo-blue" />
+                        </div>
+                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                          Recommended Role
+                        </span>
+                      </div>
+                      <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
+                        {skillResults?.final_role}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Skills with Charts */}
+                  {skillResults?.skills_json && (
+                    <div>
+                      <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
+                        Top Skills
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Technical Skills */}
+                        {skillResults?.skills_json?.tech &&
+                          Object.keys(skillResults.skills_json.tech).length >
+                            0 && (
+                            <Card className="border-0 rounded-3xl">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                  Technical Skills
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-2 pt-0 pb-4">
+                                {renderSkillsChart(
+                                  skillResults.skills_json.tech,
+                                  "Technical Skills",
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
+
+                        {/* Soft Skills */}
+                        {skillResults?.skills_json?.soft &&
+                          Object.keys(skillResults.skills_json.soft).length >
+                            0 && (
+                            <Card className="border-0 rounded-3xl">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                  Soft Skills
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-2 pt-0 pb-4">
+                                {renderSkillsChart(
+                                  skillResults.skills_json.soft,
+                                  "Soft Skills",
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
                       </div>
                     </div>
-                  </Link>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                  )}
 
-          {/* Right Column - Details */}
-          <div className="lg:col-span-2 space-y-4 md:space-y-6">
-            {/* About Me Card */}
-            <Card className="border-0 rounded-3xl">
-              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  About Me
-                </h3>
-                <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                  onClick={handleOpenAboutMeModal}
-                >
-                  Edit
-                </Button>
-              </CardHeader>
-              <CardContent className="px-6 py-4">
-                {loadingProfile ? (
-                  <div className="text-center py-4 text-gray-500">
-                    Loading...
-                  </div>
-                ) : aboutMe ? (
-                  <div>
-                    <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
-                      {aboutMe.length > 200
-                        ? `${aboutMe.substring(0, 200)}...`
-                        : aboutMe}
-                    </p>
-                    {aboutMe.length > 200 && (
-                      <Button
-                        variant="link"
-                        className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
-                        onClick={handleOpenAboutMeModal}
-                      >
-                        View More
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500 italic">
-                    No information available. Add some details about yourself!
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Personal Skills Card */}
-            <Card className="border-0 rounded-3xl">
-              <CardHeader className="p-4 pb-3 border-b-0">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Personal Skills
-                </h3>
-              </CardHeader>
-              <CardContent className="px-6 py-4">
-                {loadingResults ? (
-                  <div className="text-center py-4 text-gray-500">
-                    Loading skill results...
-                  </div>
-                ) : skillResults &&
-                  (skillResults?.final_role || getAllSkills().length > 0) ? (
-                  <div className="space-y-4">
-                    {/* Final Role */}
-                    {skillResults?.final_role && (
-                      <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="bg-breneo-blue/10 rounded-full p-2">
-                            <Award className="h-5 w-5 text-breneo-blue" />
-                          </div>
-                          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                            Recommended Role
-                          </span>
-                        </div>
-                        <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
-                          {skillResults?.final_role}
-                        </Badge>
-                      </div>
-                    )}
-
-                    {/* Skills with Charts */}
-                    {skillResults?.skills_json && (
-                      <div>
-                        <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
-                          Top Skills
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Technical Skills */}
-                          {skillResults?.skills_json?.tech &&
-                            Object.keys(skillResults.skills_json.tech).length >
-                              0 && (
-                              <Card className="border-0 rounded-3xl">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="flex items-center gap-2 text-sm">
-                                    Technical Skills
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-2 pt-0 pb-4">
-                                  {renderSkillsChart(
-                                    skillResults.skills_json.tech,
-                                    "Technical Skills",
-                                  )}
-                                </CardContent>
-                              </Card>
-                            )}
-
-                          {/* Soft Skills */}
-                          {skillResults?.skills_json?.soft &&
-                            Object.keys(skillResults.skills_json.soft).length >
-                              0 && (
-                              <Card className="border-0 rounded-3xl">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="flex items-center gap-2 text-sm">
-                                    Soft Skills
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-2 pt-0 pb-4">
-                                  {renderSkillsChart(
-                                    skillResults.skills_json.soft,
-                                    "Soft Skills",
-                                  )}
-                                </CardContent>
-                              </Card>
-                            )}
-                        </div>
-                      </div>
-                    )}
-
-                    {getAllSkills().length === 0 && !loadingResults && (
-                      <div className="text-center py-4 text-gray-500 text-sm">
-                        No skill test results available. Take a skill test to
-                        see your results here.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500 text-sm">
-                    No skill test results available. Take a skill test to see
-                    your results here.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  {getAllSkills().length === 0 && !loadingResults && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
+                      No skill test results available. Take a skill test to see
+                      your results here.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500 text-sm">
+                  No skill test results available. Take a skill test to see your
+                  results here.
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <div className="max-w-7xl mx-auto pb-32 md:pb-6">
@@ -3582,491 +3012,139 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* Logout Confirmation */}
-      {isMobile ? (
-        <Drawer onOpenChange={setIsLogoutConfirmOpen}>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Log out</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Are you sure you want to log out?
-              </p>
-            </div>
-            <DrawerFooter>
-              <Button
-                onClick={handleConfirmLogout}
-                className="bg-red-500 text-white hover:bg-red-600 active:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 dark:active:bg-red-800"
-              >
-                Log out
-              </Button>
-              <DrawerClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog
-          open={isLogoutConfirmOpen}
-          onOpenChange={setIsLogoutConfirmOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Log out</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to log out?
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleCancelLogout}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmLogout}
-                className="bg-red-500 text-white hover:bg-red-600 active:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 dark:active:bg-red-800"
-              >
-                Log out
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Profile section modals */}
+      <EditPersonalInfoModal
+        open={isPersonalInfoModalOpen}
+        onOpenChange={setIsPersonalInfoModalOpen}
+        initial={{
+          first_name:
+            first_name ??
+            ((user as Record<string, unknown>)?.first_name as string),
+          last_name:
+            last_name ??
+            ((user as Record<string, unknown>)?.last_name as string),
+          email: email ?? "",
+          phone_number: phone_number ?? "",
+          country_region: (profileData as Record<string, unknown>)
+            ?.country_region as string,
+          city: (profileData as Record<string, unknown>)?.city as string,
+          about_me: aboutMe,
+          social_links: { ...socialLinks } as Record<string, string>,
+        }}
+        onSave={handleSavePersonalInfo}
+      />
+      <EditEducationModal
+        open={isEducationModalOpen}
+        onOpenChange={setIsEducationModalOpen}
+        entries={educations}
+        onSave={handleSaveEducation}
+      />
+      <EditWorkExperienceModal
+        open={isWorkExperienceModalOpen}
+        onOpenChange={setIsWorkExperienceModalOpen}
+        entries={workExperiences}
+        onSave={handleSaveWorkExperience}
+      />
+      <EditSkillsModal
+        open={isSkillsModalOpen}
+        onOpenChange={setIsSkillsModalOpen}
+        skills={profileSkills}
+        onAddSkill={async (name) => {
+          await profileApi.addSkill(name);
+        }}
+        onRemoveSkill={(skillId) => profileApi.removeSkill(skillId)}
+        onRefresh={fetchProfileSkills}
+      />
 
       {/* About Me Edit Modal */}
-      {isMobile ? (
-        <Drawer open={isAboutMeModalOpen} onOpenChange={setIsAboutMeModalOpen}>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Edit About Me</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="about-me">Tell us about yourself</Label>
-                  <Textarea
-                    id="about-me"
-                    placeholder="Share something about yourself..."
-                    value={aboutMeText}
-                    onChange={(e) => setAboutMeText(e.target.value)}
-                    className="mt-2 min-h-[200px]"
-                    disabled={updatingAboutMe}
-                  />
-                </div>
-              </div>
-            </div>
-            <DrawerFooter>
-              <Button onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
+      <Sheet open={isAboutMeModalOpen} onOpenChange={setIsAboutMeModalOpen}>
+        <SheetContent
+          side="rightProfile"
+          overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
+          className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
+        >
+          <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
+            <SheetTitle className="flex-1 min-w-0">Edit About Me</SheetTitle>
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <Button size="sm" onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
                 {updatingAboutMe ? "Saving..." : "Save Changes"}
               </Button>
-              <DrawerClose asChild>
-                <Button variant="outline" disabled={updatingAboutMe}>
-                  Cancel
-                </Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog open={isAboutMeModalOpen} onOpenChange={setIsAboutMeModalOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit About Me</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="about-me">Tell us about yourself</Label>
-                  <Textarea
-                    id="about-me"
-                    placeholder="Share something about yourself..."
-                    value={aboutMeText}
-                    onChange={(e) => setAboutMeText(e.target.value)}
-                    className="mt-2 min-h-[200px]"
-                    disabled={updatingAboutMe}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
               <Button
-                variant="outline"
+                variant="secondary"
+                size="sm"
+                className="h-10 w-10 p-0 shrink-0"
                 onClick={() => setIsAboutMeModalOpen(false)}
                 disabled={updatingAboutMe}
+                aria-label="Cancel"
               >
-                Cancel
+                <X className="h-4 w-4" />
               </Button>
-              <Button onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
-                {updatingAboutMe ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            </div>
+          </SheetHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+            <div>
+              <Label htmlFor="about-me">Tell us about yourself</Label>
+              <Textarea
+                id="about-me"
+                placeholder="Share something about yourself..."
+                value={aboutMeText}
+                onChange={(e) => setAboutMeText(e.target.value)}
+                className="mt-2 min-h-[200px]"
+                disabled={updatingAboutMe}
+              />
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Profile Image Options Modal */}
-      {isMobile ? (
-        <Drawer
-          open={isProfileImageModalOpen}
-          onOpenChange={setIsProfileImageModalOpen}
+      <Sheet
+        open={isProfileImageModalOpen}
+        onOpenChange={setIsProfileImageModalOpen}
+      >
+        <SheetContent
+          side="rightProfile"
+          overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
+          className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
         >
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Profile Photo</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4">
-              <div className="space-y-2">
-                <Button
-                  onClick={handleUploadFromModal}
-                  className="w-full justify-start gap-3"
-                  variant="ghost"
-                  disabled={uploadingImage}
-                >
-                  <Upload className="h-5 w-5" />
-                  {displayProfileImage ? "Update Photo" : "Upload Photo"}
-                </Button>
-                {displayProfileImage && (
-                  <Button
-                    onClick={handleRemoveImage}
-                    className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
-                    variant="ghost"
-                    disabled={uploadingImage}
-                  >
-                    <Trash2 className="h-5 w-5" />
-                    Remove Photo
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog
-          open={isProfileImageModalOpen}
-          onOpenChange={setIsProfileImageModalOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Profile Photo</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <div className="space-y-2">
-                <Button
-                  onClick={handleUploadFromModal}
-                  className="w-full justify-start gap-3"
-                  variant="ghost"
-                  disabled={uploadingImage}
-                >
-                  <Upload className="h-5 w-5" />
-                  {displayProfileImage ? "Update Photo" : "Upload Photo"}
-                </Button>
-                {displayProfileImage && (
-                  <Button
-                    onClick={handleRemoveImage}
-                    className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
-                    variant="ghost"
-                    disabled={uploadingImage}
-                  >
-                    <Trash2 className="h-5 w-5" />
-                    Remove Photo
-                  </Button>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
+          <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
+            <SheetTitle className="flex-1 min-w-0">Profile Photo</SheetTitle>
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
               <Button
-                variant="outline"
+                variant="secondary"
+                size="sm"
+                className="h-10 w-10 p-0 shrink-0"
                 onClick={() => setIsProfileImageModalOpen(false)}
+                aria-label="Cancel"
               >
-                Cancel
+                <X className="h-4 w-4" />
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Social Link Add/Edit Modal */}
-      {isMobile ? (
-        <Drawer
-          open={isSocialLinkModalOpen}
-          onOpenChange={setIsSocialLinkModalOpen}
-        >
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>
-                {editingPlatform ? "Edit Social Link" : "Add Social Link"}
-              </DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="social-platform">Platform *</Label>
-                  <Select
-                    value={socialLinkForm.platform}
-                    onValueChange={(value) =>
-                      setSocialLinkForm({
-                        ...socialLinkForm,
-                        platform: value as SocialPlatform,
-                      })
-                    }
-                    disabled={savingSocialLink || !!editingPlatform}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select a platform" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(platformLabels) as SocialPlatform[]).map(
-                        (platform) => (
-                          <SelectItem key={platform} value={platform}>
-                            <div className="flex items-center gap-2">
-                              {getSocialIcon(platform, "h-4 w-4")}
-                              <span>{platformLabels[platform]}</span>
-                            </div>
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="social-url">URL *</Label>
-                  <Input
-                    id="social-url"
-                    type="url"
-                    placeholder="https://..."
-                    value={socialLinkForm.url}
-                    onChange={(e) =>
-                      setSocialLinkForm({
-                        ...socialLinkForm,
-                        url: e.target.value,
-                      })
-                    }
-                    className="mt-2"
-                    disabled={savingSocialLink}
-                    required
-                  />
-                </div>
-              </div>
             </div>
-            <DrawerFooter>
+          </SheetHeader>
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+            <Button
+              onClick={handleUploadFromModal}
+              className="w-full justify-start gap-3"
+              variant="ghost"
+              disabled={uploadingImage}
+            >
+              <Upload className="h-5 w-5" />
+              {displayProfileImage ? "Update Photo" : "Upload Photo"}
+            </Button>
+            {displayProfileImage && (
               <Button
-                onClick={handleSaveSocialLink}
-                disabled={savingSocialLink}
+                onClick={handleRemoveImage}
+                className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+                variant="ghost"
+                disabled={uploadingImage}
               >
-                {savingSocialLink
-                  ? "Saving..."
-                  : editingPlatform
-                    ? "Update"
-                    : "Add"}
+                <Trash2 className="h-5 w-5" />
+                Remove Photo
               </Button>
-              <DrawerClose asChild>
-                <Button variant="outline" disabled={savingSocialLink}>
-                  Cancel
-                </Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog
-          open={isSocialLinkModalOpen}
-          onOpenChange={setIsSocialLinkModalOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingPlatform ? "Edit Social Link" : "Add Social Link"}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="social-platform-desktop">Platform *</Label>
-                  <Select
-                    value={socialLinkForm.platform}
-                    onValueChange={(value) =>
-                      setSocialLinkForm({
-                        ...socialLinkForm,
-                        platform: value as SocialPlatform,
-                      })
-                    }
-                    disabled={savingSocialLink || !!editingPlatform}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select a platform" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(platformLabels) as SocialPlatform[]).map(
-                        (platform) => (
-                          <SelectItem key={platform} value={platform}>
-                            <div className="flex items-center gap-2">
-                              {getSocialIcon(platform, "h-4 w-4")}
-                              <span>{platformLabels[platform]}</span>
-                            </div>
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="social-url-desktop">URL *</Label>
-                  <Input
-                    id="social-url-desktop"
-                    type="url"
-                    placeholder="https://..."
-                    value={socialLinkForm.url}
-                    onChange={(e) =>
-                      setSocialLinkForm({
-                        ...socialLinkForm,
-                        url: e.target.value,
-                      })
-                    }
-                    className="mt-2"
-                    disabled={savingSocialLink}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsSocialLinkModalOpen(false);
-                  setSocialLinkForm({ platform: "", url: "" });
-                  setEditingPlatform(null);
-                }}
-                disabled={savingSocialLink}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveSocialLink}
-                disabled={savingSocialLink}
-              >
-                {savingSocialLink
-                  ? "Saving..."
-                  : editingPlatform
-                    ? "Update"
-                    : "Add"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Contact Information Edit Modal (Phone and Email) */}
-      {isMobile ? (
-        <Drawer
-          open={isContactEditModalOpen}
-          onOpenChange={setIsContactEditModalOpen}
-        >
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Edit Contact Information</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="phone-number">Phone Number</Label>
-                  <Input
-                    id="phone-number"
-                    type="tel"
-                    placeholder="+995591552495"
-                    value={phoneEditValue}
-                    onChange={(e) => setPhoneEditValue(e.target.value)}
-                    className="mt-2"
-                    disabled={updatingContact}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email-address">Email Address</Label>
-                  <Input
-                    id="email-address"
-                    type="email"
-                    placeholder="example@email.com"
-                    value={emailEditValue}
-                    onChange={(e) => setEmailEditValue(e.target.value)}
-                    className="mt-2"
-                    disabled={updatingContact}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            <DrawerFooter>
-              <Button
-                onClick={handleSaveContact}
-                disabled={updatingContact || !emailEditValue.trim()}
-              >
-                {updatingContact ? "Saving..." : "Save Changes"}
-              </Button>
-              <DrawerClose asChild>
-                <Button variant="outline" disabled={updatingContact}>
-                  Cancel
-                </Button>
-              </DrawerClose>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog
-          open={isContactEditModalOpen}
-          onOpenChange={setIsContactEditModalOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Contact Information</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="phone-number-desktop">Phone Number</Label>
-                  <Input
-                    id="phone-number-desktop"
-                    type="tel"
-                    placeholder="+995591552495"
-                    value={phoneEditValue}
-                    onChange={(e) => setPhoneEditValue(e.target.value)}
-                    className="mt-2"
-                    disabled={updatingContact}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email-address-desktop">Email Address</Label>
-                  <Input
-                    id="email-address-desktop"
-                    type="email"
-                    placeholder="example@email.com"
-                    value={emailEditValue}
-                    onChange={(e) => setEmailEditValue(e.target.value)}
-                    className="mt-2"
-                    disabled={updatingContact}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsContactEditModalOpen(false)}
-                disabled={updatingContact}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveContact}
-                disabled={updatingContact || !emailEditValue.trim()}
-              >
-                {updatingContact ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </DashboardLayout>
   );
 };

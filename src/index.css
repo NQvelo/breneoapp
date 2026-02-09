@@ -170,6 +170,17 @@
       background-color 0.3s ease,
       color 0.3s ease;
   }
+
+  /* Remove blue/default focus and hover ring from inputs platform-wide */
+  input:focus,
+  input:hover,
+  textarea:focus,
+  textarea:hover,
+  select:focus,
+  select:hover {
+    outline: none;
+    box-shadow: none;
+  }
 }
 
 @layer utilities {

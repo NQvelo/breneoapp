@@ -32,6 +32,14 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Download,
   Mail,
   Bell,
@@ -39,6 +47,7 @@ import {
   BookOpen,
   AlertCircle,
   Info,
+  LogOut,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 import { useMobile } from "@/hooks/use-mobile";
@@ -105,6 +114,7 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
     getInitialSection(),
   );
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   // Handle payment redirect status
   useEffect(() => {
@@ -617,60 +627,6 @@ export default function SettingsPage() {
           <div className="space-y-8">
             <h1 className="text-3xl font-bold">Account Settings</h1>
 
-            {/* Personal Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
-                  Update your name and contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSaveProfile();
-                  }}
-                  className="space-y-4"
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => {
-                        isEditingRef.current = true;
-                        setFirstName(e.target.value);
-                      }}
-                      placeholder="Enter your first name"
-                      disabled={profileLoading}
-                      className="h-[3.2rem]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => {
-                        isEditingRef.current = true;
-                        setLastName(e.target.value);
-                      }}
-                      placeholder="Enter your last name"
-                      disabled={profileLoading}
-                      className="h-[3.2rem]"
-                    />
-                  </div>
-
-                  <Separator />
-
-                  <Button type="submit" disabled={profileLoading}>
-                    {profileLoading ? "Saving..." : "Save Changes"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
             {/* Email & Password */}
             <Card>
               <CardHeader>
@@ -759,6 +715,26 @@ export default function SettingsPage() {
                     </form>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Log out */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Log out</CardTitle>
+                <CardDescription>
+                  Sign out of your account on this device
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 dark:border-red-900/50 dark:hover:bg-red-900/20"
+                  onClick={() => setLogoutConfirmOpen(true)}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Log out
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -1378,6 +1354,31 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log out</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to log out?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLogoutConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-500 text-white hover:bg-red-600"
+              onClick={() => {
+                setLogoutConfirmOpen(false);
+                logout();
+              }}
+            >
+              Log out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
