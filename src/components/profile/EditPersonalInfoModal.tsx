@@ -8,7 +8,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2, X } from "lucide-react";
 import type { ProfilePayload } from "@/api/profile/types";
 
@@ -42,7 +41,6 @@ export function EditPersonalInfoModal({
     initial.country_region ?? "",
   );
   const [city, setCity] = useState(initial.city ?? "");
-  const [about_me, setAbout_me] = useState(initial.about_me ?? "");
   const [github, setGithub] = useState(initial.social_links?.github ?? "");
   const [linkedin, setLinkedin] = useState(
     initial.social_links?.linkedin ?? "",
@@ -70,7 +68,6 @@ export function EditPersonalInfoModal({
       setPhone_number(initial.phone_number ?? "");
       setCountry_region(initial.country_region ?? "");
       setCity(initial.city ?? "");
-      setAbout_me(initial.about_me ?? "");
       setGithub(initial.social_links?.github ?? "");
       setLinkedin(initial.social_links?.linkedin ?? "");
       setFacebook(initial.social_links?.facebook ?? "");
@@ -98,7 +95,6 @@ export function EditPersonalInfoModal({
         phone_number: phone_number.trim() || undefined,
         country_region: country_region.trim() || undefined,
         city: city.trim() || undefined,
-        about_me: about_me.trim() || null,
         social_links: Object.keys(social_links).length
           ? social_links
           : undefined,
@@ -209,53 +205,58 @@ export function EditPersonalInfoModal({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="about_me">About me (optional)</Label>
-            <Textarea
-              id="about_me"
-              value={about_me}
-              onChange={(e) => setAbout_me(e.target.value)}
-              rows={3}
-              className="resize-none"
-            />
-          </div>
-          <div className="space-y-2">
             <Label>Social links (optional)</Label>
-            <div className="space-y-2">
-              <Input
-                id="github"
-                type="url"
-                placeholder="GitHub URL"
-                value={github}
-                onChange={(e) => setGithub(e.target.value)}
-              />
-              <Input
-                id="linkedin"
-                type="url"
-                placeholder="LinkedIn URL"
-                value={linkedin}
-                onChange={(e) => setLinkedin(e.target.value)}
-              />
-              <Input
-                id="facebook"
-                type="url"
-                placeholder="Facebook URL"
-                value={facebook}
-                onChange={(e) => setFacebook(e.target.value)}
-              />
-              <Input
-                id="instagram"
-                type="url"
-                placeholder="Instagram URL"
-                value={instagram}
-                onChange={(e) => setInstagram(e.target.value)}
-              />
-              <Input
-                id="dribbble"
-                type="url"
-                placeholder="Dribbble URL"
-                value={dribbble}
-                onChange={(e) => setDribbble(e.target.value)}
-              />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="github">GitHub</Label>
+                <Input
+                  id="github"
+                  type="url"
+                  placeholder="https://github.com/username"
+                  value={github}
+                  onChange={(e) => setGithub(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="linkedin">LinkedIn</Label>
+                <Input
+                  id="linkedin"
+                  type="url"
+                  placeholder="https://linkedin.com/in/username"
+                  value={linkedin}
+                  onChange={(e) => setLinkedin(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="facebook">Facebook</Label>
+                <Input
+                  id="facebook"
+                  type="url"
+                  placeholder="https://facebook.com/username"
+                  value={facebook}
+                  onChange={(e) => setFacebook(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="instagram">Instagram</Label>
+                <Input
+                  id="instagram"
+                  type="url"
+                  placeholder="https://instagram.com/username"
+                  value={instagram}
+                  onChange={(e) => setInstagram(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="dribbble">Dribbble</Label>
+                <Input
+                  id="dribbble"
+                  type="url"
+                  placeholder="https://dribbble.com/username"
+                  value={dribbble}
+                  onChange={(e) => setDribbble(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           </div>

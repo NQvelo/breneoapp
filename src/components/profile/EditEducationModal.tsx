@@ -171,7 +171,12 @@ export function EditEducationModal({
         <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
           <SheetTitle className="flex-1 min-w-0">Edit education</SheetTitle>
           <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <Button type="submit" form="edit-education-form" size="sm" disabled={saving}>
+            <Button
+              type="submit"
+              form="edit-education-form"
+              size="sm"
+              disabled={saving}
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -200,117 +205,120 @@ export function EditEducationModal({
           className="flex flex-col flex-1 min-h-0"
         >
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-          {error && (
-            <p className="text-sm text-destructive font-medium">{error}</p>
-          )}
-          <div className="space-y-4">
-            {rows.map((row, index) => (
-              <div
-                key={row.id ?? `new-${index}`}
-                className="p-4 rounded-lg space-y-3 bg-gray-100 dark:bg-[#242424]"
+            {error && (
+              <p className="text-sm text-destructive font-medium">{error}</p>
+            )}
+            <div className="space-y-4">
+              {rows.map((row, index) => (
+                <div
+                  key={row.id ?? `new-${index}`}
+                  className="p-4 rounded-lg space-y-3 bg-gray-100 dark:bg-[#242424]"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">
+                      Education {index + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => removeRow(index)}
+                      aria-label={`Remove education ${index + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>School name</Label>
+                    <Input
+                      value={row.school_name}
+                      onChange={(e) =>
+                        updateRow(index, "school_name", e.target.value)
+                      }
+                      placeholder="University or school name"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Major</Label>
+                      <Input
+                        value={row.major}
+                        onChange={(e) =>
+                          updateRow(index, "major", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Degree type</Label>
+                      <Input
+                        value={row.degree_type}
+                        onChange={(e) =>
+                          updateRow(index, "degree_type", e.target.value)
+                        }
+                        placeholder="e.g. Bachelor's, Master's"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>GPA (optional)</Label>
+                    <Input
+                      value={row.gpa}
+                      onChange={(e) => updateRow(index, "gpa", e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Start date</Label>
+                      <Input
+                        type="date"
+                        value={row.start_date}
+                        onChange={(e) =>
+                          updateRow(index, "start_date", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End date</Label>
+                      <Input
+                        type="date"
+                        value={row.end_date}
+                        onChange={(e) =>
+                          updateRow(index, "end_date", e.target.value)
+                        }
+                        disabled={row.is_current}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`current-${index}`}
+                      checked={row.is_current}
+                      onCheckedChange={(checked) =>
+                        updateRow(index, "is_current", checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor={`current-${index}`}
+                      className="cursor-pointer"
+                    >
+                      Currently studying here
+                    </Label>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {rows.length < 10 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addRow}
+                className="w-full"
               >
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Entry {index + 1}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => removeRow(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <Label>School name</Label>
-                  <Input
-                    value={row.school_name}
-                    onChange={(e) =>
-                      updateRow(index, "school_name", e.target.value)
-                    }
-                    placeholder="University or school name"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label>Major</Label>
-                    <Input
-                      value={row.major}
-                      onChange={(e) =>
-                        updateRow(index, "major", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Degree type</Label>
-                    <Input
-                      value={row.degree_type}
-                      onChange={(e) =>
-                        updateRow(index, "degree_type", e.target.value)
-                      }
-                      placeholder="e.g. Bachelor's, Master's"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>GPA (optional)</Label>
-                  <Input
-                    value={row.gpa}
-                    onChange={(e) => updateRow(index, "gpa", e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label>Start date</Label>
-                    <Input
-                      type="date"
-                      value={row.start_date}
-                      onChange={(e) =>
-                        updateRow(index, "start_date", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End date</Label>
-                    <Input
-                      type="date"
-                      value={row.end_date}
-                      onChange={(e) =>
-                        updateRow(index, "end_date", e.target.value)
-                      }
-                      disabled={row.is_current}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={`current-${index}`}
-                    checked={row.is_current}
-                    onCheckedChange={(checked) =>
-                      updateRow(index, "is_current", checked === true)
-                    }
-                  />
-                  <Label
-                    htmlFor={`current-${index}`}
-                    className="cursor-pointer"
-                  >
-                    Currently studying here
-                  </Label>
-                </div>
-              </div>
-            ))}
-          </div>
-          {rows.length < 10 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addRow}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add education
-            </Button>
-          )}
+                <Plus className="h-4 w-4 mr-2" />
+                Add education
+              </Button>
+            )}
           </div>
         </form>
       </SheetContent>

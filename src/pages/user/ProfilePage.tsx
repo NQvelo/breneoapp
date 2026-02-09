@@ -1199,12 +1199,15 @@ const ProfilePage = () => {
         // console.log("✅ Full user profile data retrieved from /api/profile/");
         // console.log("═══════════════════════════════════════════");
       } catch (error) {
-        const status = error && typeof error === "object" && "response" in error
-          ? (error as { response?: { status?: number } }).response?.status
-          : undefined;
+        const status =
+          error && typeof error === "object" && "response" in error
+            ? (error as { response?: { status?: number } }).response?.status
+            : undefined;
         if (status === 401) {
           // Session expired or invalid; apiClient interceptor will refresh or redirect to login
-          console.warn("Profile request unauthorized (401). Session may have expired.");
+          console.warn(
+            "Profile request unauthorized (401). Session may have expired.",
+          );
         } else {
           console.error("Error fetching profile data:", error);
         }
@@ -2344,49 +2347,49 @@ const ProfilePage = () => {
                 <div className="flex-shrink-0">
                   <div
                     className="relative group cursor-pointer rounded-full overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
-                          onClick={handleImageModalClick}
-                        >
-                          <OptimizedAvatar
-                            key={`avatar-${imageTimestamp}`}
-                            src={displayProfileImage || undefined}
-                            alt="Profile photo"
-                            fallback={
+                    onClick={handleImageModalClick}
+                  >
+                    <OptimizedAvatar
+                      key={`avatar-${imageTimestamp}`}
+                      src={displayProfileImage || undefined}
+                      alt="Profile photo"
+                      fallback={
                         first_name ? first_name.charAt(0).toUpperCase() : "U"
-                            }
-                            size="lg"
-                            loading="eager"
+                      }
+                      size="lg"
+                      loading="eager"
                       className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
-                          />
-                          {uploadingImage ? (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                    />
+                    {uploadingImage ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                            </div>
-                          ) : (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                        <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                            </div>
-                          )}
                       </div>
-                      <input
-                        id="profile-image-input"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={uploadingImage}
-                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="profile-image-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                          {first_name} {last_name}
-                        </h1>
+                    {first_name} {last_name}
+                  </h1>
                   {(user as { job_title?: string })?.job_title && (
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                            {(user as { job_title?: string }).job_title}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                      {(user as { job_title?: string }).job_title}
+                    </p>
+                  )}
+                </div>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {(profileData as Record<string, unknown>)?.country_region ||
                 (profileData as Record<string, unknown>)?.city ? (
@@ -2428,24 +2431,26 @@ const ProfilePage = () => {
                         : url.replace(/^https?:\/\/(www\.)?/, "")}
                     </a>
                   ))}
-                  </div>
-                </CardContent>
-              </Card>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* 2. About Me */}
-              <Card className="border-0 rounded-3xl">
-                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                About Me
-                  </h3>
-                  <Button
-                    variant="link"
-                    className="text-breneo-blue p-0 h-auto font-normal hover:underline"
-                onClick={handleOpenAboutMeModal}
-                  >
-                    Edit
-                  </Button>
-                </CardHeader>
+          <Card className="border-0 rounded-3xl">
+          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              About Me
+            </h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full"
+              onClick={handleOpenAboutMeModal}
+              aria-label="Edit about me"
+            >
+              <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </Button>
+          </CardHeader>
             <CardContent className="px-6 py-4">
               {loadingProfile ? (
                 <div className="text-center py-4 text-gray-500">Loading...</div>
@@ -2465,22 +2470,22 @@ const ProfilePage = () => {
                       View More
                     </Button>
                   )}
-                      </div>
+                </div>
               ) : (
                 <p className="text-sm text-gray-500 italic">
                   No information available. Add some details about yourself!
                 </p>
               )}
-                </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
 
           {/* 3. Education */}
-              <Card className="border-0 rounded-3xl">
-                <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Education
-                  </h3>
-                  <Button
+              </h3>
+              <Button
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 rounded-full"
@@ -2488,8 +2493,8 @@ const ProfilePage = () => {
                 aria-label="Edit education"
               >
                 <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                  </Button>
-                </CardHeader>
+              </Button>
+            </CardHeader>
             <CardContent className="px-6 pb-6">
               {loadingEducations ? (
                 <p className="text-sm text-gray-500">Loading...</p>
@@ -2500,11 +2505,11 @@ const ProfilePage = () => {
                   {educations.map((entry, index) => (
                     <div key={entry.id} className="flex gap-4 pb-6 last:pb-0">
                       <div className="flex flex-col items-center">
-                        <div className="h-3 w-3 rounded-full bg-emerald-400 dark:bg-emerald-500 shrink-0" />
+                        <div className="h-3 w-3 rounded-full bg-[#36B0E3] shrink-0" />
                         {index < educations.length - 1 && (
-                          <div className="w-px flex-1 min-h-[2rem] bg-emerald-200 dark:bg-emerald-800 mt-1" />
-                                  )}
-                                </div>
+                          <div className="w-px flex-1 min-h-[2rem] bg-[#36B0E3]/30 mt-1" />
+                        )}
+                      </div>
                       <div className="flex-1 min-w-0 pt-0.5">
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
                           {entry.start_date}
@@ -2524,20 +2529,20 @@ const ProfilePage = () => {
                               .join(" in ")}
                           </p>
                         )}
-                            </div>
-                          </div>
-                        ))}
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* 4. Work experience */}
           <Card className="border-0 rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Work experience
-                        </h3>
+              </h3>
               <Button
                 variant="ghost"
                 size="icon"
@@ -2560,9 +2565,9 @@ const ProfilePage = () => {
                   {workExperiences.map((entry, index) => (
                     <div key={entry.id} className="flex gap-4 pb-6 last:pb-0">
                       <div className="flex flex-col items-center">
-                        <div className="h-3 w-3 rounded-full bg-emerald-400 dark:bg-emerald-500 shrink-0" />
+                        <div className="h-3 w-3 rounded-full bg-[#36B0E3] shrink-0" />
                         {index < workExperiences.length - 1 && (
-                          <div className="w-px flex-1 min-h-[2rem] bg-emerald-200 dark:bg-emerald-800 mt-1" />
+                          <div className="w-px flex-1 min-h-[2rem] bg-[#36B0E3]/30 mt-1" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
@@ -2585,16 +2590,16 @@ const ProfilePage = () => {
                   ))}
                 </div>
               )}
-                </CardContent>
-              </Card>
+            </CardContent>
+          </Card>
 
           {/* 5. Skills */}
-            <Card className="border-0 rounded-3xl">
-              <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Skills
-                </h3>
-                <Button
+              </h3>
+              <Button
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 rounded-full"
@@ -2602,8 +2607,8 @@ const ProfilePage = () => {
                 aria-label="Edit skills"
               >
                 <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                </Button>
-              </CardHeader>
+              </Button>
+            </CardHeader>
             <CardContent className="px-6 pb-6">
               {loadingProfileSkills ? (
                 <p className="text-sm text-gray-500">Loading...</p>
@@ -2612,113 +2617,114 @@ const ProfilePage = () => {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {profileSkills.map((s) => (
-                    <span
+                    <Badge
                       key={s.id}
-                      className="rounded-full bg-gray-200 dark:bg-gray-700 px-3 py-1 text-sm text-gray-900 dark:text-gray-100"
+                      variant="outline"
+                      className="capitalize px-3 py-1.5 text-xs rounded-[10px] bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
                     >
                       {s.skill_name}
-                    </span>
+                    </Badge>
                   ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            {/* Personal Skills Card */}
-            <Card className="border-0 rounded-3xl">
-              <CardHeader className="p-4 pb-3 border-b-0">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Personal Skills
-                </h3>
-              </CardHeader>
-              <CardContent className="px-6 py-4">
-                {loadingResults ? (
-                  <div className="text-center py-4 text-gray-500">
-                    Loading skill results...
-                  </div>
-                ) : skillResults &&
-                  (skillResults?.final_role || getAllSkills().length > 0) ? (
-                  <div className="space-y-4">
-                    {/* Final Role */}
-                    {skillResults?.final_role && (
-                      <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="bg-breneo-blue/10 rounded-full p-2">
-                            <Award className="h-5 w-5 text-breneo-blue" />
-                          </div>
-                          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                            Recommended Role
-                          </span>
+          {/* Personal Skills Card */}
+          <Card className="border-0 rounded-3xl">
+            <CardHeader className="p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Personal Skills
+              </h3>
+            </CardHeader>
+            <CardContent className="px-6 py-4">
+              {loadingResults ? (
+                <div className="text-center py-4 text-gray-500">
+                  Loading skill results...
+                </div>
+              ) : skillResults &&
+                (skillResults?.final_role || getAllSkills().length > 0) ? (
+                <div className="space-y-4">
+                  {/* Final Role */}
+                  {skillResults?.final_role && (
+                    <div className="bg-gradient-to-r from-breneo-blue/10 to-breneo-blue/5 dark:from-breneo-blue/20 dark:to-breneo-blue/10 p-4 rounded-3xl border-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="bg-breneo-blue/10 rounded-full p-2">
+                          <Award className="h-5 w-5 text-breneo-blue" />
                         </div>
-                        <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
-                          {skillResults?.final_role}
-                        </Badge>
+                        <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                          Recommended Role
+                        </span>
                       </div>
-                    )}
+                      <Badge className="text-sm px-3 py-1.5 bg-breneo-blue hover:bg-breneo-blue/90 text-white border-0">
+                        {skillResults?.final_role}
+                      </Badge>
+                    </div>
+                  )}
 
-                    {/* Skills with Charts */}
-                    {skillResults?.skills_json && (
-                      <div>
-                        <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
-                          Top Skills
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {/* Technical Skills */}
-                          {skillResults?.skills_json?.tech &&
-                            Object.keys(skillResults.skills_json.tech).length >
-                              0 && (
-                              <Card className="border-0 rounded-3xl">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="flex items-center gap-2 text-sm">
-                                    Technical Skills
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-2 pt-0 pb-4">
-                                  {renderSkillsChart(
-                                    skillResults.skills_json.tech,
-                                    "Technical Skills",
-                                  )}
-                                </CardContent>
-                              </Card>
-                            )}
+                  {/* Skills with Charts */}
+                  {skillResults?.skills_json && (
+                    <div>
+                      <h4 className="font-semibold text-base text-gray-900 dark:text-gray-100 mb-4">
+                        Top Skills
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* Technical Skills */}
+                        {skillResults?.skills_json?.tech &&
+                          Object.keys(skillResults.skills_json.tech).length >
+                            0 && (
+                            <Card className="border-0 rounded-3xl">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                  Technical Skills
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-2 pt-0 pb-4">
+                                {renderSkillsChart(
+                                  skillResults.skills_json.tech,
+                                  "Technical Skills",
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
 
-                          {/* Soft Skills */}
-                          {skillResults?.skills_json?.soft &&
-                            Object.keys(skillResults.skills_json.soft).length >
-                              0 && (
-                              <Card className="border-0 rounded-3xl">
-                                <CardHeader className="pb-2">
-                                  <CardTitle className="flex items-center gap-2 text-sm">
-                                    Soft Skills
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-2 pt-0 pb-4">
-                                  {renderSkillsChart(
-                                    skillResults.skills_json.soft,
-                                    "Soft Skills",
-                                  )}
-                                </CardContent>
-                              </Card>
-                            )}
-                        </div>
+                        {/* Soft Skills */}
+                        {skillResults?.skills_json?.soft &&
+                          Object.keys(skillResults.skills_json.soft).length >
+                            0 && (
+                            <Card className="border-0 rounded-3xl">
+                              <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
+                                  Soft Skills
+                                </CardTitle>
+                              </CardHeader>
+                              <CardContent className="p-2 pt-0 pb-4">
+                                {renderSkillsChart(
+                                  skillResults.skills_json.soft,
+                                  "Soft Skills",
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {getAllSkills().length === 0 && !loadingResults && (
-                      <div className="text-center py-4 text-gray-500 text-sm">
+                  {getAllSkills().length === 0 && !loadingResults && (
+                    <div className="text-center py-4 text-gray-500 text-sm">
                       No skill test results available. Take a skill test to see
                       your results here.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500 text-sm">
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500 text-sm">
                   No skill test results available. Take a skill test to see your
                   results here.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <div className="max-w-7xl mx-auto pb-32 md:pb-6">
@@ -3065,7 +3071,11 @@ const ProfilePage = () => {
           <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
             <SheetTitle className="flex-1 min-w-0">Edit About Me</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
-              <Button size="sm" onClick={handleSaveAboutMe} disabled={updatingAboutMe}>
+              <Button
+                size="sm"
+                onClick={handleSaveAboutMe}
+                disabled={updatingAboutMe}
+              >
                 {updatingAboutMe ? "Saving..." : "Save Changes"}
               </Button>
               <Button
@@ -3078,29 +3088,29 @@ const ProfilePage = () => {
               >
                 <X className="h-4 w-4" />
               </Button>
-                </div>
+            </div>
           </SheetHeader>
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-                <div>
-                  <Label htmlFor="about-me">Tell us about yourself</Label>
-                  <Textarea
-                    id="about-me"
-                    placeholder="Share something about yourself..."
-                    value={aboutMeText}
-                    onChange={(e) => setAboutMeText(e.target.value)}
-                    className="mt-2 min-h-[200px]"
-                    disabled={updatingAboutMe}
-                  />
-                </div>
-              </div>
+            <div>
+              <Label htmlFor="about-me">Tell us about yourself</Label>
+              <Textarea
+                id="about-me"
+                placeholder="Share something about yourself..."
+                value={aboutMeText}
+                onChange={(e) => setAboutMeText(e.target.value)}
+                className="mt-2 min-h-[200px]"
+                disabled={updatingAboutMe}
+              />
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 
       {/* Profile Image Options Modal */}
       <Sheet
-          open={isProfileImageModalOpen}
-          onOpenChange={setIsProfileImageModalOpen}
-        >
+        open={isProfileImageModalOpen}
+        onOpenChange={setIsProfileImageModalOpen}
+      >
         <SheetContent
           side="rightProfile"
           overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
@@ -3109,7 +3119,7 @@ const ProfilePage = () => {
           <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
             <SheetTitle className="flex-1 min-w-0">Profile Photo</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
-                  <Button
+              <Button
                 variant="secondary"
                 size="sm"
                 className="h-10 w-10 p-0 shrink-0"
@@ -3117,31 +3127,31 @@ const ProfilePage = () => {
                 aria-label="Cancel"
               >
                 <X className="h-4 w-4" />
-                  </Button>
-              </div>
+              </Button>
+            </div>
           </SheetHeader>
           <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
-                <Button
-                  onClick={handleUploadFromModal}
-                  className="w-full justify-start gap-3"
-                  variant="ghost"
-                  disabled={uploadingImage}
-                >
-                  <Upload className="h-5 w-5" />
-                  {displayProfileImage ? "Update Photo" : "Upload Photo"}
-                </Button>
-                {displayProfileImage && (
-                  <Button
-                    onClick={handleRemoveImage}
-                    className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
-                    variant="ghost"
-                    disabled={uploadingImage}
-                  >
-                    <Trash2 className="h-5 w-5" />
-                    Remove Photo
-                  </Button>
-                )}
-              </div>
+            <Button
+              onClick={handleUploadFromModal}
+              className="w-full justify-start gap-3"
+              variant="ghost"
+              disabled={uploadingImage}
+            >
+              <Upload className="h-5 w-5" />
+              {displayProfileImage ? "Update Photo" : "Upload Photo"}
+            </Button>
+            {displayProfileImage && (
+              <Button
+                onClick={handleRemoveImage}
+                className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+                variant="ghost"
+                disabled={uploadingImage}
+              >
+                <Trash2 className="h-5 w-5" />
+                Remove Photo
+              </Button>
+            )}
+          </div>
         </SheetContent>
       </Sheet>
     </DashboardLayout>

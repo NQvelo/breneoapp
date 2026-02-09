@@ -171,9 +171,16 @@ export function EditWorkExperienceModal({
         className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
       >
         <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
-          <SheetTitle className="flex-1 min-w-0">Edit work experience</SheetTitle>
+          <SheetTitle className="flex-1 min-w-0">
+            Edit work experience
+          </SheetTitle>
           <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <Button type="submit" form="edit-work-experience-form" size="sm" disabled={saving}>
+            <Button
+              type="submit"
+              form="edit-work-experience-form"
+              size="sm"
+              disabled={saving}
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -202,118 +209,121 @@ export function EditWorkExperienceModal({
           className="flex flex-col flex-1 min-h-0"
         >
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-          {error && (
-            <p className="text-sm text-destructive font-medium">{error}</p>
-          )}
-          <div className="space-y-4">
-            {rows.map((row, index) => (
-              <div
-                key={row.id ?? `new-${index}`}
-                className="p-4 rounded-lg space-y-3 bg-gray-100 dark:bg-[#242424]"
+            {error && (
+              <p className="text-sm text-destructive font-medium">{error}</p>
+            )}
+            <div className="space-y-4">
+              {rows.map((row, index) => (
+                <div
+                  key={row.id ?? `new-${index}`}
+                  className="p-4 rounded-lg space-y-3 bg-gray-100 dark:bg-[#242424]"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">
+                      Work experience {index + 1}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => removeRow(index)}
+                      aria-label={`Remove work experience ${index + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Job title</Label>
+                    <Input
+                      value={row.job_title}
+                      onChange={(e) =>
+                        updateRow(index, "job_title", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Company</Label>
+                    <Input
+                      value={row.company}
+                      onChange={(e) =>
+                        updateRow(index, "company", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Job type (optional)</Label>
+                      <Input
+                        value={row.job_type}
+                        onChange={(e) =>
+                          updateRow(index, "job_type", e.target.value)
+                        }
+                        placeholder="e.g. Full-time"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Location (optional)</Label>
+                      <Input
+                        value={row.location}
+                        onChange={(e) =>
+                          updateRow(index, "location", e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Start date</Label>
+                      <Input
+                        type="date"
+                        value={row.start_date}
+                        onChange={(e) =>
+                          updateRow(index, "start_date", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End date</Label>
+                      <Input
+                        type="date"
+                        value={row.end_date}
+                        onChange={(e) =>
+                          updateRow(index, "end_date", e.target.value)
+                        }
+                        disabled={row.is_current}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={`current-we-${index}`}
+                      checked={row.is_current}
+                      onCheckedChange={(checked) =>
+                        updateRow(index, "is_current", checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor={`current-we-${index}`}
+                      className="cursor-pointer"
+                    >
+                      I currently work here
+                    </Label>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {rows.length < 10 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addRow}
+                className="w-full"
               >
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Entry {index + 1}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive"
-                    onClick={() => removeRow(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <Label>Job title</Label>
-                  <Input
-                    value={row.job_title}
-                    onChange={(e) =>
-                      updateRow(index, "job_title", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Company</Label>
-                  <Input
-                    value={row.company}
-                    onChange={(e) =>
-                      updateRow(index, "company", e.target.value)
-                    }
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label>Job type (optional)</Label>
-                    <Input
-                      value={row.job_type}
-                      onChange={(e) =>
-                        updateRow(index, "job_type", e.target.value)
-                      }
-                      placeholder="e.g. Full-time"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Location (optional)</Label>
-                    <Input
-                      value={row.location}
-                      onChange={(e) =>
-                        updateRow(index, "location", e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
-                    <Label>Start date</Label>
-                    <Input
-                      type="date"
-                      value={row.start_date}
-                      onChange={(e) =>
-                        updateRow(index, "start_date", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End date</Label>
-                    <Input
-                      type="date"
-                      value={row.end_date}
-                      onChange={(e) =>
-                        updateRow(index, "end_date", e.target.value)
-                      }
-                      disabled={row.is_current}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={`current-we-${index}`}
-                    checked={row.is_current}
-                    onCheckedChange={(checked) =>
-                      updateRow(index, "is_current", checked === true)
-                    }
-                  />
-                  <Label
-                    htmlFor={`current-we-${index}`}
-                    className="cursor-pointer"
-                  >
-                    I currently work here
-                  </Label>
-                </div>
-              </div>
-            ))}
-          </div>
-          {rows.length < 10 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addRow}
-              className="w-full"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add work experience
-            </Button>
-          )}
+                <Plus className="h-4 w-4 mr-2" />
+                Add work experience
+              </Button>
+            )}
           </div>
         </form>
       </SheetContent>

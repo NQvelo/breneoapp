@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, X } from "lucide-react";
 import type { UserSkill, SkillSuggestion } from "@/api/profile/types";
 import { profileApi } from "@/api/profile/profileApi";
@@ -142,6 +143,16 @@ export function EditSkillsModal({
             >
               Done
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-10 w-10 p-0 shrink-0"
+              onClick={() => onOpenChange(false)}
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </SheetHeader>
         <div className="flex flex-col flex-1 min-h-0">
@@ -192,9 +203,10 @@ export function EditSkillsModal({
                 </p>
               ) : (
                 skills.map((s) => (
-                  <span
+                  <Badge
                     key={s.id}
-                    className="inline-flex items-center gap-1 rounded-full bg-gray-200 dark:bg-gray-700 px-3 py-1 text-sm text-gray-900 dark:text-gray-100"
+                    variant="outline"
+                    className="inline-flex items-center gap-1 capitalize px-3 py-1.5 text-xs rounded-[10px] bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
                   >
                     {s.skill_name}
                     <button
@@ -210,7 +222,7 @@ export function EditSkillsModal({
                         <X className="h-3 w-3" />
                       )}
                     </button>
-                  </span>
+                  </Badge>
                 ))
               )}
             </div>
