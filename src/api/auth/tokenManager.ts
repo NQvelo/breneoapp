@@ -145,39 +145,22 @@ export const TokenManager = {
       // console.log("⚠️ Token refresh response missing access token");
     } catch (error: any) {
       const status = error?.response?.status;
-      const isServerError = status >= 500; // 500, 502, 503, etc.
-      const isAuthError = status === 401 || status === 403;
 
       console.error("Token refresh failed:", {
         status,
-        isServerError,
-        isAuthError,
         error: error?.message,
       });
 
-      // ✅ CRITICAL FIX: Only clear tokens on actual authentication failures (401/403)
-      // Don't clear tokens on server errors (500+) - these are temporary issues
-      // Also don't clear during session restoration
-      if (!isSessionRestoration && isAuthError) {
-        // console.log(
-        //   "⚠️ Token refresh returned auth error (401/403), clearing tokens"
-        // );
-        // Only clear tokens if it's an authentication error, not a server error
-        TokenManager.clearTokens(false);
-      } else if (isServerError) {
-        // console.log(
-        //   "⚠️ Token refresh failed due to server error (500+), preserving tokens"
-        // );
-        // Don't clear tokens on server errors - the server might be having issues
-        // The original token might still be valid
-      } else if (isSessionRestoration) {
-        // During session restoration, do NOT clear tokens - preserve everything.
-        // AuthContext will use JWT data as fallback and user can retry or re-login later.
-      } else {
-        // Other errors - be conservative and don't clear tokens
-        // console.log(
-        //   "⚠️ Token refresh failed with unknown error, preserving tokens"
-        // );
+      // Any refresh failure means we can no longer trust the session.
+      // Clear tokens and force the user to sign in again – this also
+      // applies when the backend returns 500.
+      TokenManager.clearTokens(false);
+
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.includes("/auth/")
+      ) {
+        window.location.href = "/auth/login";
       }
     }
 
