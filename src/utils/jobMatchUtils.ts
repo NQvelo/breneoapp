@@ -1,6 +1,6 @@
 /**
  * Job Matching Algorithm Utilities
- * 
+ *
  * Provides a more precise and exact percentage-based matching algorithm
  * that considers:
  * - Exact vs partial skill matches (weighted)
@@ -13,7 +13,15 @@
 // Common tech skills keywords for extraction from job text
 // Moved here from UserHome.tsx / JobsPage.tsx to ensure consistency
 const skillKeywords: Record<string, string[]> = {
-  javascript: ["javascript", "js", "node.js", "nodejs", "react", "vue", "angular"],
+  javascript: [
+    "javascript",
+    "js",
+    "node.js",
+    "nodejs",
+    "react",
+    "vue",
+    "angular",
+  ],
   python: ["python", "django", "flask", "fastapi"],
   java: ["java", "spring", "spring boot"],
   "c++": ["c++", "cpp", "c plus plus"],
@@ -45,7 +53,12 @@ const skillKeywords: Record<string, string[]> = {
   azure: ["azure", "microsoft azure"],
   gcp: ["gcp", "google cloud", "google cloud platform"],
   linux: ["linux", "unix"],
-  "machine learning": ["machine learning", "ml", "deep learning", "neural network"],
+  "machine learning": [
+    "machine learning",
+    "ml",
+    "deep learning",
+    "neural network",
+  ],
   "data science": ["data science", "data analysis", "data analytics"],
   ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
   blockchain: ["blockchain", "ethereum", "solidity", "web3"],
@@ -60,9 +73,9 @@ const skillKeywords: Record<string, string[]> = {
  */
 export const extractJobSkills = (job: any): string[] => {
   if (!job) return [];
-  
+
   const skills: string[] = [];
-  
+
   // Collect all text fields to search through
   const fieldsToSearch = [
     job.title,
@@ -78,34 +91,35 @@ export const extractJobSkills = (job: any): string[] => {
   ];
 
   const textToSearch = fieldsToSearch
-    .filter(val => typeof val === 'string' && val.length > 0)
+    .filter((val) => typeof val === "string" && val.length > 0)
     .join(" ")
     .toLowerCase();
 
   // Check for each defined skill keyword
   Object.keys(skillKeywords).forEach((skill) => {
     const keywords = skillKeywords[skill];
-    if (keywords.some((keyword) => textToSearch.includes(keyword.toLowerCase()))) {
+    if (
+      keywords.some((keyword) => textToSearch.includes(keyword.toLowerCase()))
+    ) {
       skills.push(skill);
     }
   });
 
   // Also include any skills already listed in arrays but not caught by keywords
   const explicitSkills = [
-     ...(Array.isArray(job.required_skills) ? job.required_skills : []),
-     ...(Array.isArray(job.skills) ? job.skills : []),
-     ...(Array.isArray(job.job_skills) ? job.job_skills : []),
-  ].filter(s => typeof s === 'string');
-  
-  explicitSkills.forEach(skill => {
+    ...(Array.isArray(job.required_skills) ? job.required_skills : []),
+    ...(Array.isArray(job.skills) ? job.skills : []),
+    ...(Array.isArray(job.job_skills) ? job.job_skills : []),
+  ].filter((s) => typeof s === "string");
+
+  explicitSkills.forEach((skill) => {
     if (!skills.includes(skill.toLowerCase())) {
-        skills.push(skill.toLowerCase());
+      skills.push(skill.toLowerCase());
     }
   });
 
   return [...new Set(skills)]; // Remove duplicates
 };
-
 
 interface MatchResult {
   exactMatches: string[];
@@ -127,7 +141,7 @@ const normalizeSkill = (skill: string): string => {
  */
 const checkSkillMatch = (
   userSkill: string,
-  jobSkill: string
+  jobSkill: string,
 ): "exact" | "partial" | null => {
   const normalizedUser = normalizeSkill(userSkill);
   const normalizedJob = normalizeSkill(jobSkill);
@@ -145,15 +159,20 @@ const checkSkillMatch = (
       normalizedJob.includes(normalizedUser)
     ) {
       // Avoid matching very short substrings (e.g., "js" matching "javascript" is okay, but "a" matching "java" is not)
-      const shorter = normalizedUser.length < normalizedJob.length 
-        ? normalizedUser 
-        : normalizedJob;
-      const longer = normalizedUser.length >= normalizedJob.length 
-        ? normalizedUser 
-        : normalizedJob;
-      
+      const shorter =
+        normalizedUser.length < normalizedJob.length
+          ? normalizedUser
+          : normalizedJob;
+      const longer =
+        normalizedUser.length >= normalizedJob.length
+          ? normalizedUser
+          : normalizedJob;
+
       // If shorter is at least 3 chars or is at least 50% of longer, it's a valid partial match
-      if (shorter.length >= minLength || shorter.length / longer.length >= 0.5) {
+      if (
+        shorter.length >= minLength ||
+        shorter.length / longer.length >= 0.5
+      ) {
         return "partial";
       }
     }
@@ -168,7 +187,7 @@ const checkSkillMatch = (
 const findMatches = (
   userSkills: string[],
   jobSkills: string[],
-  jobTitle?: string
+  jobTitle?: string,
 ): MatchResult => {
   const normalizedUserSkills = userSkills.map(normalizeSkill);
   const normalizedJobSkills = jobSkills.map(normalizeSkill);
@@ -191,7 +210,7 @@ const findMatches = (
         // Check if any word in job title contains the user skill or vice versa
         const titleWords = normalizedJobTitle.split(/\s+/);
         const hasMatch = titleWords.some(
-          (word) => word.includes(userSkill) || userSkill.includes(word)
+          (word) => word.includes(userSkill) || userSkill.includes(word),
         );
         if (hasMatch && !titleMatches.includes(userSkill)) {
           titleMatches.push(userSkill);
@@ -244,7 +263,7 @@ const findMatches = (
 
 /**
  * Calculate match percentage with improved precision
- * 
+ *
  * Algorithm:
  * 1. Weight exact matches higher than partial matches
  * 2. Weight title matches higher than description matches
@@ -255,7 +274,7 @@ const findMatches = (
 export const calculateMatchPercentage = (
   userSkills: string[],
   jobSkills: string[],
-  jobTitle?: string
+  jobTitle?: string,
 ): number => {
   if (userSkills.length === 0) {
     return 0;
@@ -326,9 +345,8 @@ export const calculateMatchPercentage = (
 
   // Calculate base match percentage from weighted score
   // Normalize to 0-100 range
-  const baseMatch = maxPossibleScore > 0
-    ? (weightedScore / maxPossibleScore) * 100
-    : 0;
+  const baseMatch =
+    maxPossibleScore > 0 ? (weightedScore / maxPossibleScore) * 100 : 0;
 
   // Combine coverage and relevance with base match
   // Coverage is more important (60%) as it shows how well the job matches user's skills
@@ -340,7 +358,7 @@ export const calculateMatchPercentage = (
   if (matches.titleMatches.length > 0) {
     const titleBonus = Math.min(
       (matches.titleMatches.length / totalUserSkills) * 15, // Up to 15% bonus
-      15
+      15,
     );
     finalMatch = Math.min(finalMatch + titleBonus, 100);
   }
@@ -349,7 +367,7 @@ export const calculateMatchPercentage = (
   if (jobSkills.length === 0 && matches.titleMatches.length > 0) {
     finalMatch = Math.min(
       (matches.titleMatches.length / totalUserSkills) * 100,
-      75 // Cap at 75% if no job skills available
+      75, // Cap at 75% if no job skills available
     );
   }
 
@@ -378,4 +396,3 @@ export const getMatchQualityLabel = (matchPercentage?: number): string => {
   }
   return "Bad match";
 };
-

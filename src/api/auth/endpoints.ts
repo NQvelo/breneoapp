@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   ME: {
     PROFILE: "/api/me/profile/",
     SKILLS: "/api/me/skills/",
+    INDUSTRY_PROFILE: "/api/me/industry-profile/",
   },
   EDUCATIONS: "/api/educations/",
   WORK_EXPERIENCES: "/api/work-experiences/",

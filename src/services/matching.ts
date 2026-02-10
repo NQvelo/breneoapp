@@ -13,6 +13,8 @@ import type {
   SeniorityLevel,
 } from "@/types/matching";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
+import { parseIndustryTags } from "@/services/industry/industry_taxonomy";
+import { computeIndustryMatch as computeIndustryMatchNew } from "@/services/industry/computeIndustryMatch";
 
 // ---------------------------------------------------------------------------
 // Canonical skill catalog: variant -> canonical name (same as jobMatchUtils)
@@ -416,9 +418,13 @@ function computeExpLevelMatch(job: StructuredJob, user: UserMatchProfile): Match
   };
 }
 
-// ---------- Industry matching ----------
+// ---------- Industry matching (deterministic: exact/related + years boost) ----------
 function computeIndustryMatch(job: StructuredJob, user: UserMatchProfile): MatchBucket {
-  if (job.industryTags.length === 0) {
+  const jobTagsCanonical =
+    job.industryTags.length > 0
+      ? parseIndustryTags(job.industryTags.join(","))
+      : [];
+  if (jobTagsCanonical.length === 0) {
     return {
       percent: null,
       reasons: ["Industry not specified for this job."],
@@ -426,45 +432,24 @@ function computeIndustryMatch(job: StructuredJob, user: UserMatchProfile): Match
     };
   }
 
-  const userTags = new Set(
-    (user.industryTags || []).map((t) => t.trim()).filter(Boolean)
-  );
-  const overlap = job.industryTags.filter((t) => userTags.has(t)).length;
-  let baseCoverage = overlap / job.industryTags.length;
-
-  let boost = 0;
   const yearsByIndustry = user.yearsExperienceByIndustry || {};
-  for (const tag of job.industryTags) {
-    const years = yearsByIndustry[tag];
+  const userIndustryYears: Record<string, number> = {};
+  for (const [tag, years] of Object.entries(yearsByIndustry)) {
     if (years != null && years > 0) {
-      boost = Math.min(0.2, boost + (years / 5) * 0.2);
+      const key = tag.trim().toLowerCase();
+      userIndustryYears[key] = (userIndustryYears[key] ?? 0) + years;
     }
   }
-  const industryCoverage = Math.min(1, Math.max(0, baseCoverage + boost));
-  const industryPercent = Math.round(industryCoverage * 100);
 
-  const reasons: string[] = [];
-  reasons.push(`Job industries: ${job.industryTags.slice(0, 5).join(", ")}`);
-  const matchingTags = job.industryTags.filter((t) => userTags.has(t));
-  if (matchingTags.length) {
-    reasons.push(`Your matching industries: ${matchingTags.join(", ")}`);
-    const withYears = matchingTags
-      .filter((t) => yearsByIndustry[t] != null)
-      .map((t) => `${t} (${yearsByIndustry[t]} yrs)`);
-    if (withYears.length) reasons.push(withYears.join(", "));
-  } else {
-    reasons.push("No overlapping industry experience.");
-  }
-
+  const result = computeIndustryMatchNew(jobTagsCanonical, userIndustryYears);
   return {
-    percent: industryPercent,
-    reasons,
+    percent: result.percent,
+    reasons: result.reasons,
     details: {
-      overlap,
-      totalJobTags: job.industryTags.length,
-      baseCoverage,
-      boost,
-      matchingTags: matchingTags.slice(0, 10),
+      matchedExact: result.matchedExact,
+      matchedRelated: result.matchedRelated,
+      missing: result.missing,
+      isNa: result.isNa,
     },
   };
 }

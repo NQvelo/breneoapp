@@ -16,6 +16,7 @@ import {
   Link2,
   AlertCircle,
   Eye,
+  Settings,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -91,6 +92,7 @@ import {
   EditWorkExperienceModal,
   EditSkillsModal,
 } from "@/components/profile";
+import { refreshUserIndustryProfile } from "@/services/industry/refreshUserIndustryProfile";
 
 interface SkillTestResult {
   final_role?: string;
@@ -1723,7 +1725,15 @@ const ProfilePage = () => {
     for (const id of deletedIds) {
       await profileApi.deleteWorkExperience(id);
     }
-    await fetchWorkExperiences();
+    const freshList = await profileApi.getWorkExperiences().catch(() => []);
+    setWorkExperiences(Array.isArray(freshList) ? freshList : []);
+    if (user?.id) {
+      try {
+        await refreshUserIndustryProfile(String(user.id), Array.isArray(freshList) ? freshList : []);
+      } catch {
+        // Industry profile is a cache; non-blocking if Supabase unavailable or wrong auth
+      }
+    }
     toast.success("Work experience updated.");
   };
 
@@ -2332,15 +2342,26 @@ const ProfilePage = () => {
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Personal information
               </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => setIsPersonalInfoModalOpen(true)}
-                aria-label="Edit personal information"
-              >
-                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={() => navigate("/settings")}
+                  aria-label="Settings"
+                >
+                  <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={() => setIsPersonalInfoModalOpen(true)}
+                  aria-label="Edit personal information"
+                >
+                  <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="px-6 pb-6">
               <div className="flex flex-row items-center gap-4 mb-4">

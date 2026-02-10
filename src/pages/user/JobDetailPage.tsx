@@ -72,6 +72,7 @@ import {
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
+import { profileApi } from "@/api/profile";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -140,39 +141,58 @@ const JobDetailPage = () => {
     enabled: !!user,
   });
 
-  // Fetch user skills for matching
-  const { data: userSkills = [], isLoading: isLoadingUserSkills } = useQuery<
-    string[]
-  >({
-    queryKey: ["userSkills", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      try {
-        const response = await apiClient.get(
-          `/api/skilltest/results/?user=${user.id}`,
-        );
+  // Fetch user skills from profile (user skills table, same as ProfilePage)
+  const { data: profileSkills = [], isLoading: isLoadingProfileSkills } =
+    useQuery({
+      queryKey: ["profileSkills", user?.id],
+      queryFn: () => profileApi.getMySkills(),
+      enabled: !!user,
+    });
 
-        let skillTestData = null;
-        if (Array.isArray(response.data) && response.data.length > 0) {
-          skillTestData = response.data[0];
-        } else if (response.data && typeof response.data === "object") {
-          skillTestData = response.data;
-        }
+  // Fetch user skills from skill test for matching
+  const { data: skillTestSkills = [], isLoading: isLoadingSkillTestSkills } =
+    useQuery<string[]>({
+      queryKey: ["userSkills", user?.id],
+      queryFn: async () => {
+        if (!user) return [];
+        try {
+          const response = await apiClient.get(
+            `/api/skilltest/results/?user=${user.id}`,
+          );
 
-        if (skillTestData && skillTestData.skills_json) {
-          const skillsJson = skillTestData.skills_json || {};
-          const techSkills = Object.keys(skillsJson.tech || {});
-          const softSkills = Object.keys(skillsJson.soft || {});
-          return [...techSkills, ...softSkills];
+          let skillTestData = null;
+          if (Array.isArray(response.data) && response.data.length > 0) {
+            skillTestData = response.data[0];
+          } else if (response.data && typeof response.data === "object") {
+            skillTestData = response.data;
+          }
+
+          if (skillTestData && skillTestData.skills_json) {
+            const skillsJson = skillTestData.skills_json || {};
+            const techSkills = Object.keys(skillsJson.tech || {});
+            const softSkills = Object.keys(skillsJson.soft || {});
+            return [...techSkills, ...softSkills];
+          }
+          return [];
+        } catch (error) {
+          console.error("Error fetching user skills for matching:", error);
+          return [];
         }
-        return [];
-      } catch (error) {
-        console.error("Error fetching user skills for matching:", error);
-        return [];
-      }
-    },
-    enabled: !!user,
-  });
+      },
+      enabled: !!user,
+    });
+
+  // Combined user skills: profile table (skill_name) + skill test, normalized for comparison
+  const userSkills = useMemo(() => {
+    const fromProfile = (profileSkills || []).map((s) =>
+      normalizeSkillName(s.skill_name),
+    );
+    const fromTest = (skillTestSkills || []).map((s) => normalizeSkillName(s));
+    return [...new Set([...fromProfile, ...fromTest])];
+  }, [profileSkills, skillTestSkills]);
+
+  const isLoadingUserSkills =
+    isLoadingProfileSkills || isLoadingSkillTestSkills;
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
@@ -1165,19 +1185,18 @@ const JobDetailPage = () => {
     selectedSkillsInitedForJobRef.current = null;
   }, [jobDetailId]);
 
-  // Initialize selected required skills: pre-select those the user already has
+  // Initialize selected required skills: pre-select job qualifications that user already has (profile skills table + skill test)
   useEffect(() => {
-    if (!jobDetail || requiredSkillsList.length === 0) return;
+    if (!jobDetail || requiredSkillsList.length === 0 || isLoadingUserSkills)
+      return;
     const jobKey = String(jobDetail.id ?? jobDetail.job_id ?? "");
     if (selectedSkillsInitedForJobRef.current === jobKey) return;
     selectedSkillsInitedForJobRef.current = jobKey;
-    const userSet = new Set(
-      (userSkills || []).map((s) => normalizeSkillName(s)),
-    );
+    const userSet = new Set(userSkills);
     setSelectedRequiredSkills(
       new Set(requiredSkillsList.filter((r) => userSet.has(r))),
     );
-  }, [jobDetail, requiredSkillsList, userSkills]);
+  }, [jobDetail, requiredSkillsList, userSkills, isLoadingUserSkills]);
 
   // Get education requirements
   const getEducationRequired = () => {
@@ -1836,7 +1855,7 @@ const JobDetailPage = () => {
                                   key={skill}
                                   variant="outline"
                                   className={cn(
-                                    "cursor-pointer transition-colors capitalize px-4 py-2 text-sm min-h-[2.25rem] rounded-lg",
+                                    "cursor-pointer transition-colors capitalize px-4 py-2 text-sm min-h-[2.25rem] rounded-lg select-none",
                                     selected
                                       ? "bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700 dark:hover:bg-sky-800/50"
                                       : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700",
