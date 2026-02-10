@@ -15,6 +15,8 @@ export {
   COMPANY_INDUSTRY_MAP,
 } from "./company_industry_map";
 
+export { getIndustriesForPosition } from "./position_to_industry";
+
 export {
   buildIndustryYearsFromWorkExperience,
   computeYearsForRow,

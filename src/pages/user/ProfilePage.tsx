@@ -1730,8 +1730,16 @@ const ProfilePage = () => {
     if (user?.id) {
       try {
         await refreshUserIndustryProfile(String(user.id), Array.isArray(freshList) ? freshList : []);
-      } catch {
-        // Industry profile is a cache; non-blocking if Supabase unavailable or wrong auth
+      } catch (err) {
+        const status = err && typeof err === "object" && "response" in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+        console.error("[Industry profile] refresh failed:", status, err);
+        if (status === 404) {
+          console.warn("[Industry profile] 404 – is PUT /api/me/industry-profile/ registered in Django?");
+        } else if (status === 401) {
+          console.warn("[Industry profile] 401 – auth token may be missing or invalid.");
+        }
       }
     }
     toast.success("Work experience updated.");

@@ -31,6 +31,15 @@ export const INDUSTRY_SYNONYMS: Record<string, string> = {
   software: "technology",
   cloud: "cloud",
   "cloud computing": "cloud",
+  design: "design",
+  "ui/ux": "design",
+  marketing: "marketing",
+  sales: "sales",
+  hr: "hr",
+  "human resources": "hr",
+  "customer service": "customer service",
+  consulting: "consulting",
+  content: "content",
 };
 
 /** Canonical tag → related industry tags (for partial match) */
@@ -44,10 +53,14 @@ export const INDUSTRY_RELATED: Record<string, string[]> = {
   healthcare: ["medtech", "pharma"],
   medtech: ["healthcare", "pharma"],
   pharma: ["healthcare", "medtech"],
-  technology: ["saas", "cloud"],
+  technology: ["saas", "cloud", "design"],
   saas: ["technology", "enterprise software"],
   "enterprise software": ["saas", "technology"],
   cloud: ["technology"],
+  design: ["technology", "content"],
+  marketing: ["sales", "content"],
+  sales: ["marketing"],
+  content: ["design", "marketing"],
 };
 
 /**

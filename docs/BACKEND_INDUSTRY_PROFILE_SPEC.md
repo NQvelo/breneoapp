@@ -142,4 +142,26 @@ When you add “Industry Experience Match %” to job detail or job list:
 
 ---
 
+---
+
+## 7. Troubleshooting: “Nothing is written” when user saves work experience
+
+If the frontend runs but the `UserIndustryProfile` table stays empty:
+
+1. **Check the browser console** (F12 → Console) after the user saves work experience. The frontend now logs:
+   - `[Industry profile] refresh failed:` plus status code and error.
+   - If **404**: the URL is wrong or not registered. Ensure Django has a route for `PUT /api/me/industry-profile/` (with trailing slash if your app uses it).
+   - If **401**: the auth token is not sent or invalid. Ensure the same Bearer token used for `/api/work-experiences/` is sent for this endpoint (frontend uses the same `apiClient`).
+   - If **500**: inspect Django logs; likely a bug in the view or model save.
+
+2. **Confirm the endpoint in Django:**
+   - URL pattern must match exactly what the frontend calls: `PUT /api/me/industry-profile/` (base URL + this path).
+   - View must require authentication and use the authenticated user to create/update the row.
+
+3. **Confirm the request body:** Frontend sends `{ "industry_years_json": {...}, "updated_at": "ISO8601" }`. The view must read these keys and save to the model (field names may be snake_case in Django).
+
+4. **Empty `industry_years_json`:** If the user’s companies are not in the frontend’s company→industry map, the frontend still sends `{}`. The backend must **still create/update** the row with `industry_years_json = {}` so that “no industries” is stored. If the backend only creates a row when the dict is non-empty, the table will stay empty for those users.
+
+---
+
 **End of spec.** Implement the model and `PUT /api/me/industry-profile/` as above and the frontend will work with it.

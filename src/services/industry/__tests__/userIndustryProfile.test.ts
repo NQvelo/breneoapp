@@ -55,36 +55,33 @@ describe("computeYearsForRow", () => {
 });
 
 describe("buildIndustryYearsFromWorkExperience", () => {
-  it("assigns industries only for known companies", () => {
+  it("assigns industries from job title / position only", () => {
     const rows: WorkExperienceRow[] = [
       {
-        company: "PayPal",
+        jobTitle: "UI/UX Designer",
         startDate: "2020-01-01",
         endDate: "2022-06-01",
       },
       {
-        company: "Unknown Corp",
+        jobTitle: "Random Job Title",
         startDate: "2018-01-01",
         endDate: "2020-01-01",
       },
     ];
     const profile = buildIndustryYearsFromWorkExperience("user-1", rows);
     expect(profile.userId).toBe("user-1");
-    expect(profile.industryYearsJson.payments).toBeGreaterThan(0);
-    expect(profile.industryYearsJson.fintech).toBeGreaterThan(0);
-    expect(Object.keys(profile.industryYearsJson)).not.toContain("unknown");
+    expect(profile.industryYearsJson.design).toBeGreaterThan(0);
+    expect(Object.keys(profile.industryYearsJson)).not.toContain("random");
   });
 
   it("sums years across multiple roles in same industry", () => {
     const rows: WorkExperienceRow[] = [
-      { company: "PayPal", startDate: "2020-01-01", endDate: "2021-01-01" },
-      { company: "Stripe", startDate: "2021-01-01", endDate: "2022-01-01" },
+      { jobTitle: "Software Engineer", startDate: "2020-01-01", endDate: "2021-01-01" },
+      { jobTitle: "Frontend Developer", startDate: "2021-01-01", endDate: "2022-01-01" },
     ];
     const profile = buildIndustryYearsFromWorkExperience("u", rows);
-    const payments = profile.industryYearsJson.payments ?? 0;
-    const fintech = profile.industryYearsJson.fintech ?? 0;
-    expect(payments).toBeGreaterThan(1.5);
-    expect(fintech).toBeGreaterThan(1.5);
+    const tech = profile.industryYearsJson.technology ?? 0;
+    expect(tech).toBeGreaterThan(1.5);
   });
 
   it("includes updatedAt", () => {

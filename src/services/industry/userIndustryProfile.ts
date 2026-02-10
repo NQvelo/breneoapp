@@ -1,9 +1,9 @@
 /**
  * User industry profile: derive industry years from work experience using
- * COMPANY_INDUSTRY_MAP. Unknown companies are skipped (no industry assigned).
+ * job title / position (e.g. "UI/UX Designer" → design). Company is not used.
  */
 
-import { getIndustriesForCompany } from "./company_industry_map";
+import { getIndustriesForPosition } from "./position_to_industry";
 
 /** Max years to count per single work experience row (avoid bad data) */
 const MAX_YEARS_PER_ROW = 10;
@@ -66,7 +66,8 @@ export function computeYearsForRow(
 
 /**
  * Build industry years map from work experience rows.
- * Only assigns industry for companies in COMPANY_INDUSTRY_MAP.
+ * Uses job title / position to infer industries (e.g. "UI/UX Designer" → design).
+ * Rows with no matching position keywords are skipped.
  */
 export function buildIndustryYearsFromWorkExperience(
   userId: string,
@@ -75,8 +76,8 @@ export function buildIndustryYearsFromWorkExperience(
   const industryYears: Record<string, number> = {};
 
   for (const row of rows) {
-    const company = row.company ?? row.companyName ?? "";
-    const industries = getIndustriesForCompany(company);
+    const position = row.jobTitle ?? "";
+    const industries = getIndustriesForPosition(position);
     if (industries.length === 0) continue;
 
     const years = computeYearsForRow(

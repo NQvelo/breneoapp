@@ -5,15 +5,16 @@ Deterministic logic to compute **Industry Experience Match %** between a user an
 ## Data
 
 - **Job**: `industryTags` stored as comma-separated string (e.g. `"FinTech, Banking, Payments"`).
-- **User**: Industry years derived from **work experience** via `COMPANY_INDUSTRY_MAP` (unknown companies are skipped). Cached in `UserIndustryProfile.industryYearsJson`.
+- **User**: Industry years derived from **work experience** via **job title / position** (e.g. "UI/UX Designer" → design, "Software Engineer" → technology). See `position_to_industry.ts`. Cached in `UserIndustryProfile.industryYearsJson`.
 
 ## Modules
 
 | File | Purpose |
 |------|--------|
 | `industry_taxonomy.ts` | `parseIndustryTags(tagsString)`, `INDUSTRY_SYNONYMS`, `INDUSTRY_RELATED` |
-| `company_industry_map.ts` | `normalizeCompanyName`, `getIndustriesForCompany`, extendable map |
-| `userIndustryProfile.ts` | `computeYearsForRow`, `buildIndustryYearsFromWorkExperience`, cache types |
+| `company_industry_map.ts` | `normalizeCompanyName`, `getIndustriesForCompany` (optional; not used for industry profile) |
+| `position_to_industry.ts` | `getIndustriesForPosition(jobTitle)` — maps position to industries (e.g. "UI/UX Designer" → design) |
+| `userIndustryProfile.ts` | `computeYearsForRow`, `buildIndustryYearsFromWorkExperience` (uses position, not company), cache types |
 | `computeIndustryMatch.ts` | `computeIndustryMatch(jobIndustryTags, userIndustryYears)` → percent, reasons, matchedExact, matchedRelated, missing |
 | `types.ts` | `IndustryMatchApi` for API response shape |
 
