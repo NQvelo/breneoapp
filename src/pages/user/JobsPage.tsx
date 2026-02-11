@@ -71,6 +71,13 @@ import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { countries, Country } from "@/data/countries";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
+import { profileApi } from "@/api/profile";
+import {
+  matchJobDetailToUser,
+  buildUserMatchProfileFromSkillTest,
+  normalizeSkillName,
+} from "@/services/matching";
+import type { JobDetail } from "@/api/jobs/types";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { useMobile } from "@/hooks/use-mobile";
 import apiClient from "@/api/auth/apiClient";
@@ -84,11 +91,7 @@ import {
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
-import {
-  calculateMatchPercentage,
-  getMatchQualityLabel,
-  extractJobSkills,
-} from "@/utils/jobMatchUtils";
+import { getMatchQualityLabel, extractJobSkills } from "@/utils/jobMatchUtils";
 import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 
 // Updated Job interface for the new API
@@ -743,10 +746,24 @@ const JobsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
 
-  // State for user's top skills from test results
+  // State for user's top skills from test results (for filters and match)
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [loadingSkills, setLoadingSkills] = useState(true);
   const skillsInitializedRef = React.useRef(false);
+
+  // Profile skills (same source as JobDetailPage for identical total match)
+  const { data: profileSkills = [] } = useQuery({
+    queryKey: ["profileSkills", user?.id],
+    queryFn: () => profileApi.getMySkills(),
+    enabled: !!user,
+  });
+  const userSkillsForMatch = useMemo(() => {
+    const fromProfile = (profileSkills || []).map((s) =>
+      normalizeSkillName(s.skill_name),
+    );
+    const fromTest = (userTopSkills || []).map((s) => normalizeSkillName(s));
+    return [...new Set([...fromProfile, ...fromTest])];
+  }, [profileSkills, userTopSkills]);
 
   // Pagination state for regular jobs
   const [regularJobsPage, setRegularJobsPage] = useState(1);
@@ -1690,13 +1707,14 @@ const JobsPage = () => {
             workArrangement = "Hybrid";
           }
 
-          // Calculate match percentage
-          const jobSkills = extractJobSkills(job);
-          const matchPercentage = calculateMatchPercentage(
-            userTopSkills,
-            jobSkills,
-            jobTitle,
-          );
+          // Total match % (same logic as job detail page)
+          const matchPercentage =
+            user && userSkillsForMatch.length >= 0
+              ? matchJobDetailToUser(
+                  job as unknown as JobDetail,
+                  buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                ).overallPercent
+              : undefined;
 
           return {
             id: jobId,
@@ -1722,7 +1740,7 @@ const JobsPage = () => {
         return [];
       }
     },
-    [savedJobs, userTopSkills],
+    [savedJobs, user, userSkillsForMatch],
   );
 
   const transformedJobs = React.useMemo(
@@ -2128,13 +2146,14 @@ const JobsPage = () => {
             workArrangement = "Hybrid";
           }
 
-          // Calculate match percentage
-          const jobSkills = extractJobSkills(job);
-          const matchPercentage = calculateMatchPercentage(
-            userTopSkills,
-            jobSkills,
-            jobTitle,
-          );
+          // Total match % (same logic as job detail page)
+          const matchPercentage =
+            user && userSkillsForMatch.length >= 0
+              ? matchJobDetailToUser(
+                  job as unknown as JobDetail,
+                  buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                ).overallPercent
+              : undefined;
 
           return {
             id: jobId,
@@ -2159,7 +2178,7 @@ const JobsPage = () => {
       console.error("Error transforming internship jobs:", error);
       return [];
     }
-  }, [internshipJobsRaw, savedJobs, userTopSkills]);
+  }, [internshipJobsRaw, savedJobs, user, userSkillsForMatch]);
 
   // All internship jobs - no filtering
   const internJobs = useMemo(() => {
@@ -2401,13 +2420,14 @@ const JobsPage = () => {
           // Determine work arrangement - always Remote for remote jobs
           const workArrangement = "Remote";
 
-          // Calculate match percentage
-          const jobSkills = extractJobSkills(job);
-          const matchPercentage = calculateMatchPercentage(
-            userTopSkills,
-            jobSkills,
-            jobTitle,
-          );
+          // Total match % (same logic as job detail page)
+          const matchPercentage =
+            user && userSkillsForMatch.length >= 0
+              ? matchJobDetailToUser(
+                  job as unknown as JobDetail,
+                  buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                ).overallPercent
+              : undefined;
 
           return {
             id: jobId,
@@ -2434,7 +2454,7 @@ const JobsPage = () => {
       console.error("Error transforming remote jobs:", error);
       return [];
     }
-  }, [allRemoteJobs, savedJobs, userTopSkills]);
+  }, [allRemoteJobs, savedJobs, user, userSkillsForMatch]);
 
   // All remote jobs - no filtering
   const remoteJobs = useMemo(() => {
@@ -2508,7 +2528,7 @@ const JobsPage = () => {
   // Debug logging
   useEffect(() => {
     console.log(
-      "🌐 Job API Endpoint: https://breneo-job-aggregator-k7ti.onrender.com/api/search",
+      "🌐 Job API Endpoint: https://breneo-job-aggregator.up.railway.app/api/search",
     );
     console.log("📊 JobsPage State:", {
       isLoading,
@@ -3223,7 +3243,7 @@ const JobsPage = () => {
                       )}
                     </div>
 
-                    {/* Match percentage & Save button */}
+                    {/* Match percentage & Save button (same total match as job detail page) */}
                     <div className="mt-7 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <RadialProgress
@@ -3385,7 +3405,7 @@ const JobsPage = () => {
                       )}
                     </div>
 
-                    {/* Match percentage & Save button */}
+                    {/* Match percentage & Save button (same total match as job detail page) */}
                     <div className="mt-7 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <RadialProgress

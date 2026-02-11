@@ -101,6 +101,15 @@ export const profileApi = {
     return Array.isArray(data) ? data : (data?.results ?? data?.items ?? []);
   },
 
+  /** GET user industry profile (industry -> years). Backend may return industry_years or industry_years_json. */
+  async getIndustryProfile(): Promise<Record<string, number>> {
+    const { data } = await apiClient.get(API_ENDPOINTS.ME.INDUSTRY_PROFILE);
+    const raw = data as Record<string, unknown> | undefined;
+    if (!raw || typeof raw !== "object") return {};
+    const years = (raw.industry_years ?? raw.industry_years_json) as Record<string, number> | undefined;
+    return years && typeof years === "object" ? years : {};
+  },
+
   async addSkill(name: string): Promise<UserSkill> {
     const { data } = await apiClient.post(API_ENDPOINTS.ME.SKILLS, { name });
     return data as UserSkill;

@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
       mode === "development"
         ? {
             "/api/job-details": {
-              target: "https://breneo-job-aggregator-k7ti.onrender.com/",
+              target: "https://breneo-job-aggregator.up.railway.app/",
               changeOrigin: true,
               secure: false,
               rewrite: (path) => path, // Keep the path as-is

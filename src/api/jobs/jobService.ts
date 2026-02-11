@@ -9,7 +9,7 @@
 import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
 import { countries } from "@/data/countries";
 
-const API_BASE = "https://breneo-job-aggregator-k7ti.onrender.com";
+const API_BASE = "https://breneo-job-aggregator.up.railway.app";
 
 // Primary: multi-value filters (comma-separated), recommended for full filtering
 const JOB_SEARCH_API = `${API_BASE}/api/search`;
@@ -158,6 +158,7 @@ const mapSearchJobToApiJob = (job: Record<string, unknown>): ApiJob => {
     posted_at: (job.posted_at as string) || (job.fetched_at as string) || "",
     fetched_at: (job.fetched_at as string) || "",
     status: "active",
+    industry_tags: (job.industry_tags as string) || undefined,
     ...job,
   } as ApiJob;
 };
@@ -652,7 +653,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   const isDevelopment = import.meta.env.DEV;
   const JOB_DETAIL_API_BASE = isDevelopment
     ? "/api/job-details" // Relative path goes through Vite proxy to http://127.0.0.1:8000
-    : "https://breneo-job-aggregator-k7ti.onrender.com/api/job-details"; // Direct URL in production
+    : "https://breneo-job-aggregator.up.railway.app/api/job-details"; // Direct URL in production
 
   const queryParams = new URLSearchParams();
   queryParams.set("job_id", jobId); // Use the "id" field from the job

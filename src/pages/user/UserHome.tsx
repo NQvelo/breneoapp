@@ -50,15 +50,18 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
+import { profileApi } from "@/api/profile";
+import {
+  matchJobDetailToUser,
+  buildUserMatchProfileFromSkillTest,
+  normalizeSkillName,
+} from "@/services/matching";
+import type { JobDetail } from "@/api/jobs/types";
 // Removed filterATSJobs import - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
-import {
-  calculateMatchPercentage,
-  getMatchQualityLabel,
-  extractJobSkills,
-} from "@/utils/jobMatchUtils";
+import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 
 // extractJobSkills is now imported from @/utils/jobMatchUtils
@@ -289,6 +292,20 @@ const UserHome = () => {
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
   const [isBetaModalOpen, setIsBetaModalOpen] = useState(false);
+
+  // Profile skills (same source as job detail page for identical total match)
+  const { data: profileSkills = [] } = useQuery({
+    queryKey: ["profileSkills", user?.id],
+    queryFn: () => profileApi.getMySkills(),
+    enabled: !!user,
+  });
+  const userSkillsForMatch = useMemo(() => {
+    const fromProfile = (profileSkills || []).map((s) =>
+      normalizeSkillName(s.skill_name),
+    );
+    const fromTest = (userTopSkills || []).map((s) => normalizeSkillName(s));
+    return [...new Set([...fromProfile, ...fromTest])];
+  }, [profileSkills, userTopSkills]);
 
   // Fetch user's top skills from skill test results
   useEffect(() => {
@@ -699,15 +716,15 @@ const UserHome = () => {
     // No filtering - display all jobs
     const filteredJobs = jobs || [];
 
-    // Transform all jobs first to calculate match percentages
+    // Transform all jobs first – same total match % as job detail page
     const jobsWithMatchPercentage = filteredJobs.map((job: ApiJob) => {
-      const jobSkills = extractJobSkills(job);
-      const jobTitle = job.title || job.job_title || job.position || "";
-      const matchPercentage = calculateMatchPercentage(
-        userTopSkills,
-        jobSkills,
-        jobTitle,
-      );
+      const matchPercentage =
+        user && userSkillsForMatch.length >= 0
+          ? matchJobDetailToUser(
+              job as unknown as JobDetail,
+              buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+            ).overallPercent
+          : undefined;
       return { job, matchPercentage };
     });
 
@@ -858,13 +875,14 @@ const UserHome = () => {
           workArrangement = "Hybrid";
         }
 
-        // Calculate skill-based match percentage using all user top skills
-        const jobSkills = extractJobSkills(job);
-        const matchPercentage = calculateMatchPercentage(
-          userTopSkills,
-          jobSkills,
-          jobTitle,
-        );
+        // Total match % (same logic as job detail page)
+        const matchPercentage =
+          user && userSkillsForMatch.length >= 0
+            ? matchJobDetailToUser(
+                job as unknown as JobDetail,
+                buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+              ).overallPercent
+            : undefined;
 
         const transformedJob: Job = {
           id: jobId,
@@ -895,7 +913,7 @@ const UserHome = () => {
         return transformedJob;
       })
       .filter((job): job is Job => job !== null); // Filter out null jobs (already limited to 9 above)
-  }, [jobs, savedJobs, userTopSkills]);
+  }, [jobs, savedJobs, user, userSkillsForMatch]);
 
   // State to store fetched logos
   const [jobLogos, setJobLogos] = useState<Record<string, string>>({});
@@ -1269,14 +1287,21 @@ const UserHome = () => {
                               className="text-breneo-blue"
                             />
                             <span className="text-xs font-semibold text-gray-700">
-                              {job.matchPercentage !== undefined
-                                ? job.matchPercentage >= 85
-                                  ? "Best match"
-                                  : job.matchPercentage >= 70
-                                    ? "Good match"
-                                    : job.matchPercentage >= 50
-                                      ? "Fair match"
-                                      : "Poor match"
+                              {job.matchPercentage != null
+                                ? (() => {
+                                    const p = job.matchPercentage!;
+                                    const key =
+                                      p >= 95
+                                        ? "excellentMatch"
+                                        : p >= 85
+                                          ? "bestMatch"
+                                          : p >= 70
+                                            ? "goodMatch"
+                                            : p >= 50
+                                              ? "fairMatch"
+                                              : "badMatch";
+                                    return t.jobMatch[key];
+                                  })()
                                 : ""}
                             </span>
                           </div>

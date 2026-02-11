@@ -127,7 +127,7 @@ interface JobFilters {
 
 ### Breneo Job Aggregator API
 
-- **Endpoint:** `https://breneo-job-aggregator-k7ti.onrender.com/api/`
+- **Endpoint:** `https://breneo-job-aggregator.up.railway.app/api/`
 - **Status:** ✅ Active
 - **Rate Limit:** 1 request per second (enforced client-side)
 - **Authentication:** No API key required
@@ -170,7 +170,7 @@ All types are exported from `@/api/jobs/types`:
 The API endpoint is configured in `jobService.ts`:
 
 ```typescript
-const JOB_API_BASE = "https://breneo-job-aggregator-k7ti.onrender.com/api/";
+const JOB_API_BASE = "https://breneo-job-aggregator.up.railway.app/api/";
 ```
 
 No API key is required for the Breneo Job Aggregator API. All filtering is performed client-side after fetching the full job list from the aggregator.

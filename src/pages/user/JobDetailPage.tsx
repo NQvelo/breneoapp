@@ -73,9 +73,15 @@ import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
 import { profileApi } from "@/api/profile";
+import { useUserIndustryProfile } from "@/hooks/useUserIndustryProfile";
+import {
+  parseJobIndustryTags,
+  computeIndustryMatchPercent,
+} from "@/utils/industryMatch";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
+  const { industryYears } = useUserIndustryProfile();
   const t = useTranslation();
   // Decode the job ID in case it was URL-encoded
   const jobId = rawJobId ? decodeURIComponent(rawJobId) : undefined;
@@ -739,7 +745,7 @@ const JobDetailPage = () => {
       try {
         // Fetch from the company API endpoint
         const encodedCompanyName = encodeURIComponent(companyName.trim());
-        const companyApiUrl = `https://breneo-job-aggregator-k7ti.onrender.com/api/companies/${encodedCompanyName}`;
+        const companyApiUrl = `https://breneo-job-aggregator.up.railway.app/api/companies/${encodedCompanyName}`;
 
         console.log("🔍 Fetching company details from:", companyApiUrl);
 
@@ -1513,6 +1519,17 @@ const JobDetailPage = () => {
   }, [jobDetail, user, userSkills, selectedRequiredSkills]);
 
   const effectiveMatchResult = displayMatchResult ?? matchResult;
+
+  const industryMatchForBar = useMemo(() => {
+    const tags = parseJobIndustryTags(
+      (jobDetail as Record<string, unknown>)?.industry_tags as
+        | string
+        | undefined
+    );
+    const result = computeIndustryMatchPercent(tags, industryYears);
+    return result.percent;
+  }, [jobDetail, industryYears]);
+
   const matchQualityKey = effectiveMatchResult
     ? effectiveMatchResult.overallPercent >= 95
       ? "excellentMatch"
@@ -1741,7 +1758,7 @@ const JobDetailPage = () => {
                         strokeWidth={4}
                         showLabel={false}
                         percentageTextSize="sm"
-                        className="flex-shrink-0"
+                        className="flex-shrink-0 text-breneo-blue"
                       />
                       <div className="flex flex-col items-start text-left min-w-0">
                         <span className="text-sm font-bold text-black dark:text-white capitalize">
@@ -1765,7 +1782,7 @@ const JobDetailPage = () => {
                               ? undefined
                               : "N/A"
                           }
-                          className="flex-shrink-0"
+                          className="flex-shrink-0 text-breneo-blue"
                         />
                         <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-widest mt-2">
                           {t.jobMatch.expLevel}
@@ -1783,7 +1800,7 @@ const JobDetailPage = () => {
                               ? undefined
                               : "N/A"
                           }
-                          className="flex-shrink-0"
+                          className="flex-shrink-0 text-breneo-blue"
                         />
                         <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-widest mt-2">
                           {t.jobMatch.skill}
@@ -1791,17 +1808,15 @@ const JobDetailPage = () => {
                       </div>
                       <div className="flex flex-col items-center flex-shrink-0 w-[90px] min-w-[80px]">
                         <RadialProgress
-                          value={effectiveMatchResult.industry.percent ?? 0}
+                          value={industryMatchForBar ?? 0}
                           size={52}
                           strokeWidth={4}
                           showLabel={false}
                           percentageTextSize="sm"
                           centerLabel={
-                            effectiveMatchResult.industry.percent != null
-                              ? undefined
-                              : "N/A"
+                            industryMatchForBar != null ? undefined : "N/A"
                           }
-                          className="flex-shrink-0"
+                          className="flex-shrink-0 text-breneo-blue"
                         />
                         <span className="text-[10px] font-bold text-black dark:text-white uppercase tracking-widest mt-2">
                           {t.jobMatch.industryExp}

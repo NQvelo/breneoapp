@@ -5,7 +5,7 @@
  * Falls back to existing logo fields if API doesn't have the logo
  */
 
-const COMPANY_API_BASE = "https://breneo-job-aggregator-k7ti.onrender.com/api/companies";
+const COMPANY_API_BASE = "https://breneo-job-aggregator.up.railway.app/api/companies";
 
 /**
  * Cache for company logos to avoid repeated API calls

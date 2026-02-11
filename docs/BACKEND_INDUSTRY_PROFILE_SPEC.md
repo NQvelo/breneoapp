@@ -21,7 +21,12 @@ Add to our Django backend:
    - Accept empty industry_years_json {} and save it
    - Return 200 on success, 401 if not authenticated, 400 for invalid body
 
-Frontend already calls this after user saves work experience (add/edit/delete). No need to compute industry on backend; frontend sends the computed payload.
+3. Same URL GET /api/me/industry-profile/:
+   - Auth required. Return the authenticated user's industry profile.
+   - Response: { "industry_years_json": {...} } or { "industry_years": {...} } (frontend accepts both).
+   - If no row exists, return 200 with empty object: { "industry_years_json": {} }.
+
+Frontend calls PUT after user saves work experience. Frontend calls GET to show Industry Experience Match on job cards and job detail.
 ```
 
 ---
