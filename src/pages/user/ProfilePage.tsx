@@ -17,6 +17,8 @@ import {
   AlertCircle,
   Eye,
   Settings,
+  Clock,
+  Tag,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -2756,128 +2758,234 @@ const ProfilePage = () => {
           </Card>
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto pb-32 md:pb-6">
+        <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
           {/* Saved Courses Tab */}
           {activeSavedTab === "courses" && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-                Saved Courses
-              </h2>
+            <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
+              <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  Saved Courses
+                </h2>
+              </div>
               {loadingSavedCourses ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Card key={i} className="border-0 rounded-3xl">
-                      <CardContent className="p-0">
-                        <Skeleton className="h-40 w-full rounded-t-3xl" />
-                        <div className="p-4">
-                          <Skeleton className="h-5 w-3/4 mb-2" />
-                          <Skeleton className="h-4 w-1/2 mb-3" />
-                          <Skeleton className="h-3 w-full" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="flex flex-col justify-center items-center py-20 bg-white/50 dark:bg-[#242424]/50">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
+                  <p className="text-sm text-gray-500 font-medium">Loading...</p>
                 </div>
               ) : savedCourses.length === 0 ? (
-                <Card className="rounded-3xl border-0 shadow-sm bg-card/50">
-                  <CardContent className="p-12 text-center">
-                    <GraduationCap className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No saved courses
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      Start saving courses to view them here!
-                    </p>
-                    <Button
-                      onClick={() => navigate("/courses")}
-                      variant="default"
-                    >
-                      Browse Courses
-                    </Button>
-                  </CardContent>
-                </Card>
+                <div className="p-12 text-center bg-card/50">
+                  <GraduationCap className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No saved courses
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Start saving courses to view them here!
+                  </p>
+                  <Button
+                    onClick={() => navigate("/courses")}
+                    variant="default"
+                  >
+                    Browse Courses
+                  </Button>
+                </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
                   {savedCourses.map((course) => {
                     const isCourseSaved = savedCourseIds.includes(
                       String(course.id),
                     );
                     return (
-                      <Link
+                      <div
                         key={course.id}
-                        to={`/course/${course.id}`}
-                        className="block"
+                        className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                        onClick={() => navigate(`/course/${course.id}`)}
                       >
-                        <Card className="relative transition-all duration-200 cursor-pointer group border-0 rounded-3xl w-full flex flex-col h-full bg-card hover:shadow-soft">
-                          <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
-                            <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
-                              <img
-                                src={course.image || "/placeholder.svg"}
-                                alt={course.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "/placeholder.svg";
-                                }}
-                              />
-                            </div>
-                            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
-                              <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
-                                {course.title}
-                              </h3>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                                {course.provider}
-                              </p>
-                              <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {course.duration && (
-                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                                      {course.duration}
-                                    </Badge>
+                        <div
+                          className={
+                            isMobile
+                              ? "px-5 pt-5 pb-4 flex flex-col flex-grow"
+                              : "p-0"
+                          }
+                        >
+                          {isMobile ? (
+                            <>
+                              {/* Top row: image + provider info + save button (top right) */}
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="flex-shrink-0 relative w-10 h-10">
+                                  {course.image ? (
+                                    <img
+                                      src={course.image}
+                                      alt={course.title}
+                                      className="w-10 h-10 rounded-md object-cover"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src =
+                                          "/placeholder.svg";
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-md bg-breneo-blue/10 flex items-center justify-center">
+                                      <GraduationCap className="h-5 w-5 text-breneo-blue" />
+                                    </div>
                                   )}
-                                  {course.level && (
-                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                                      {course.level}
-                                    </Badge>
-                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">
+                                    {course.provider}
+                                  </h3>
+                                  <p className="mt-0.5 text-xs text-gray-500 truncate">
+                                    {course.level || "Level not specified"}
+                                  </p>
                                 </div>
                                 <Button
                                   variant="secondary"
                                   size="icon"
                                   onClick={(e) => {
-                                    e.preventDefault();
                                     e.stopPropagation();
                                     saveCourseMutation.mutate(
                                       String(course.id),
                                     );
                                   }}
-                                  disabled={saveCourseMutation.isPending}
-                                  aria-label="Unsave course"
+                                  aria-label={
+                                    isCourseSaved
+                                      ? "Unsave course"
+                                      : "Save course"
+                                  }
                                   className={cn(
-                                    "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
+                                    "flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                     isCourseSaved
                                       ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
                                       : "text-black dark:text-white",
                                   )}
                                 >
-                                  {saveCourseMutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Heart
-                                      className={cn(
-                                        "h-4 w-4 transition-colors",
-                                        isCourseSaved
-                                          ? "text-red-500 fill-red-500"
-                                          : "text-black dark:text-white",
+                                  <Heart
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
+                                      isCourseSaved
+                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        : "text-black dark:text-white",
+                                    )}
+                                  />
+                                </Button>
+                              </div>
+
+                              {/* Course Title */}
+                              <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem] text-gray-900 dark:text-gray-100">
+                                {course.title}
+                              </h4>
+
+                              {/* Chips */}
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
+                                {course.duration && (
+                                  <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 border-0">
+                                    {course.duration}
+                                  </Badge>
+                                )}
+                                {course.category && (
+                                  <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 border-0">
+                                    {course.category}
+                                  </Badge>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex gap-4">
+                              {/* Left Section - Course Details (desktop) */}
+                              <div className="flex-1 p-4 min-w-0">
+                                <div className="flex items-start gap-4">
+                                  {/* Course Image */}
+                                  <div className="flex-shrink-0 relative w-12 h-12">
+                                    {course.image ? (
+                                      <img
+                                        src={course.image}
+                                        alt={course.title}
+                                        className="w-12 h-12 rounded-md object-cover"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).src =
+                                            "/placeholder.svg";
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center">
+                                        <GraduationCap className="h-6 w-6 text-breneo-blue" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Course Info */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="mb-1 md:mb-2">
+                                      <h3 className="font-normal text-sm text-gray-600 dark:text-gray-400 mb-1 line-clamp-1">
+                                        {course.provider}
+                                      </h3>
+                                      <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3 text-gray-900 dark:text-gray-100">
+                                        {course.title}
+                                      </h4>
+                                    </div>
+
+                                    {/* Desktop: Details */}
+                                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                      {course.level && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Award className="h-4 w-4" />
+                                          <span>{course.level}</span>
+                                        </div>
                                       )}
-                                    />
+                                      {course.duration && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="h-4 w-4" />
+                                          <span>{course.duration}</span>
+                                        </div>
+                                      )}
+                                      {course.category && (
+                                        <div className="flex items-center gap-1.5">
+                                          <Tag className="h-4 w-4" />
+                                          <span>{course.category}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Save button */}
+                              <div className="flex-shrink-0 py-4 pl-4 pr-6 relative flex flex-col items-center justify-center">
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveCourseMutation.mutate(
+                                      String(course.id),
+                                    );
+                                  }}
+                                  aria-label={
+                                    isCourseSaved
+                                      ? "Unsave course"
+                                      : "Save course"
+                                  }
+                                  className={cn(
+                                    "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                                    isCourseSaved
+                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      : "text-black dark:text-white",
                                   )}
+                                >
+                                  <Heart
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
+                                      isCourseSaved
+                                        ? "text-red-500 fill-red-500"
+                                        : "text-black dark:text-white",
+                                    )}
+                                  />
                                 </Button>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </Link>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
@@ -2887,45 +2995,38 @@ const ProfilePage = () => {
 
           {/* Saved Jobs Tab */}
           {activeSavedTab === "jobs" && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">
-                Saved Jobs
-              </h2>
+            <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
+              <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  Saved Jobs
+                </h2>
+              </div>
               {loadingSavedJobs ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Card key={i} className="border-0 rounded-3xl">
-                      <CardContent className="p-4">
-                        <Skeleton className="h-4 w-20 mb-2" />
-                        <Skeleton className="h-6 w-3/4 mb-4" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="flex flex-col justify-center items-center py-20 bg-white/50 dark:bg-[#242424]/50">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
+                  <p className="text-sm text-gray-500 font-medium">Loading...</p>
                 </div>
               ) : savedJobs.length === 0 ? (
-                <Card className="rounded-3xl border-0 shadow-sm bg-card/50">
-                  <CardContent className="p-12 text-center">
-                    <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No saved jobs
-                    </h3>
-                    <p className="text-gray-500 mb-4">
-                      Start saving jobs to view them here!
-                    </p>
-                    <Button onClick={() => navigate("/jobs")} variant="default">
-                      Browse Jobs
-                    </Button>
-                  </CardContent>
-                </Card>
+                <div className="p-12 text-center bg-card/50">
+                  <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No saved jobs
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Start saving jobs to view them here!
+                  </p>
+                  <Button onClick={() => navigate("/jobs")} variant="default">
+                    Browse Jobs
+                  </Button>
+                </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
                   {savedJobs.map((job) => {
                     const isJobSaved = savedJobIds.includes(String(job.id));
                     return (
-                      <Card
+                      <div
                         key={job.id}
-                        className="group flex flex-col transition-all duration-200 border-0 overflow-hidden rounded-3xl cursor-pointer bg-card hover:shadow-soft"
+                        className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
                         onClick={() => {
                           if (job.url) {
                             window.open(job.url, "_blank");
@@ -2934,109 +3035,238 @@ const ProfilePage = () => {
                           }
                         }}
                       >
-                        <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
-                          {/* Company Logo and Info */}
-                          <div className="flex items-start gap-3 mb-3">
-                            <div className="flex-shrink-0 relative w-10 h-10">
-                              {job.company_logo ? (
-                                <img
-                                  src={job.company_logo}
-                                  alt={`${job.company} logo`}
-                                  className="w-10 h-10 rounded-md object-cover flex-shrink-0 border border-gray-200 dark:border-gray-700 relative z-10"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                    const fallback =
-                                      target.nextElementSibling as HTMLElement;
-                                    if (fallback) {
-                                      fallback.classList.remove("hidden");
-                                      fallback.classList.add("flex");
-                                    }
+                        <div
+                          className={
+                            isMobile
+                              ? "px-5 pt-5 pb-4 flex flex-col flex-grow"
+                              : "p-0"
+                          }
+                        >
+                          {isMobile ? (
+                            <>
+                              {/* Top row: logo + company info + save button (top right) */}
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="flex-shrink-0 relative w-10 h-10">
+                                  {job.company_logo ? (
+                                    <img
+                                      src={job.company_logo}
+                                      alt={`${job.company} logo`}
+                                      className="w-10 h-10 rounded-full object-cover"
+                                      loading="lazy"
+                                      onError={(e) => {
+                                        const target =
+                                          e.target as HTMLImageElement;
+                                        target.style.display = "none";
+                                        const fallback =
+                                          target.nextElementSibling as HTMLElement;
+                                        if (fallback) {
+                                          fallback.style.display = "flex";
+                                        }
+                                      }}
+                                    />
+                                  ) : null}
+                                  <div
+                                    className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center ${
+                                      job.company_logo
+                                        ? "hidden absolute inset-0"
+                                        : ""
+                                    }`}
+                                  >
+                                    <Briefcase className="h-5 w-5 text-white" />
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">
+                                    {job.company}
+                                  </h3>
+                                  <p className="mt-0.5 text-xs text-gray-500 truncate">
+                                    {job.location}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveJobMutation.mutate(job.id);
                                   }}
-                                />
-                              ) : null}
-                              <div
-                                className={`w-10 h-10 rounded-md bg-breneo-blue/10 flex items-center justify-center ${job.company_logo ? "hidden absolute inset-0" : ""}`}
-                              >
-                                <Briefcase className="h-5 w-5 text-breneo-blue" />
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-sm truncate text-gray-600 dark:text-gray-400">
-                                {job.company}
-                              </h3>
-                              <p className="mt-0.5 text-xs text-gray-500 truncate">
-                                {job.location}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Job Title */}
-                          <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem] group-hover:text-breneo-blue transition-colors">
-                            {job.title}
-                          </h4>
-
-                          {/* Job Details as chips */}
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            {job.employment_type && (
-                              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
-                                {job.employment_type}
-                              </Badge>
-                            )}
-                            {job.work_arrangement && (
-                              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
-                                {job.work_arrangement}
-                              </Badge>
-                            )}
-                          </div>
-
-                          {/* Match percentage & Save button */}
-                          <div className="mt-7 flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                              <RadialProgress
-                                value={job.matchPercentage ?? 0}
-                                size={44}
-                                strokeWidth={5}
-                                showLabel={false}
-                                percentageTextSize="sm"
-                                className="text-breneo-blue"
-                              />
-                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
-                                {getMatchQualityLabel(job.matchPercentage)}
-                              </span>
-                            </div>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                saveJobMutation.mutate(job.id);
-                              }}
-                              disabled={saveJobMutation.isPending}
-                              aria-label="Unsave job"
-                              className={cn(
-                                "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 border-0",
-                                isJobSaved
-                                  ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                  : "text-black dark:text-white",
-                              )}
-                            >
-                              {saveJobMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Heart
+                                  aria-label={
+                                    isJobSaved ? "Unsave job" : "Save job"
+                                  }
                                   className={cn(
-                                    "h-4 w-4 transition-colors",
+                                    "flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                     isJobSaved
-                                      ? "text-red-500 fill-red-500"
+                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
                                       : "text-black dark:text-white",
                                   )}
-                                />
-                              )}
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
+                                >
+                                  <Heart
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
+                                      isJobSaved
+                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        : "text-black dark:text-white",
+                                    )}
+                                  />
+                                </Button>
+                              </div>
+
+                              {/* Job Title */}
+                              <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem] text-gray-900 dark:text-gray-100">
+                                {job.title}
+                              </h4>
+
+                              {/* Chips left; matching bar + text on the right */}
+                              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {job.employment_type && (
+                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
+                                      {job.employment_type}
+                                    </Badge>
+                                  )}
+                                  {job.work_arrangement && (
+                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
+                                      {job.work_arrangement}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <RadialProgress
+                                    value={job.matchPercentage ?? 0}
+                                    size={40}
+                                    strokeWidth={4}
+                                    showLabel={false}
+                                    percentageTextSize="sm"
+                                    className="text-breneo-blue flex-shrink-0"
+                                  />
+                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-100 whitespace-nowrap">
+                                    {getMatchQualityLabel(job.matchPercentage)}
+                                  </span>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex gap-4">
+                              {/* Left Section - Job Details (desktop) */}
+                              <div className="flex-1 p-4 min-w-0">
+                                <div className="flex items-start gap-4">
+                                  {/* Company Logo */}
+                                  <div className="flex-shrink-0 relative w-12 h-12">
+                                    {job.company_logo ? (
+                                      <img
+                                        src={job.company_logo}
+                                        alt={job.company}
+                                        className="w-12 h-12 rounded-md object-cover absolute inset-0 z-10"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          const target =
+                                            e.target as HTMLImageElement;
+                                          target.style.display = "none";
+                                          const fallback =
+                                            target.parentElement?.querySelector(
+                                              ".logo-fallback",
+                                            ) as HTMLElement;
+                                          if (fallback) {
+                                            fallback.style.display = "flex";
+                                            fallback.style.zIndex = "10";
+                                          }
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div
+                                      className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center logo-fallback absolute inset-0 ${
+                                        job.company_logo ? "z-0" : "z-10"
+                                      }`}
+                                      style={{
+                                        display: job.company_logo
+                                          ? "none"
+                                          : "flex",
+                                      }}
+                                    >
+                                      <Briefcase className="h-6 w-6 text-breneo-blue" />
+                                    </div>
+                                  </div>
+
+                                  {/* Job Info */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="mb-1 md:mb-2">
+                                      <h3 className="font-normal text-sm text-gray-600 dark:text-gray-400 mb-1 line-clamp-1">
+                                        {job.company}
+                                      </h3>
+                                      <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3 text-gray-900 dark:text-gray-100">
+                                        {job.title}
+                                      </h4>
+                                    </div>
+
+                                    {/* Desktop: Details */}
+                                    <div className="space-y-2">
+                                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                        <div className="flex items-center gap-1.5">
+                                          <MapPin className="h-4 w-4" />
+                                          <span>{job.location}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <Clock className="h-4 w-4" />
+                                          <span>{job.employment_type}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <Briefcase className="h-4 w-4" />
+                                          <span>{job.work_arrangement}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: default = match bar + text; hover = save button */}
+                              <div className="flex-shrink-0 py-4 pl-4 pr-14 relative w-24 min-h-[88px] flex flex-col items-center justify-center">
+                                {/* Default: matching bar */}
+                                <div className="flex flex-col items-center gap-2 px-2 transition-opacity duration-200 group-hover:opacity-0 group-hover:pointer-events-none">
+                                  <RadialProgress
+                                    value={job.matchPercentage ?? 0}
+                                    size={48}
+                                    strokeWidth={4}
+                                    showLabel={false}
+                                    percentageTextSize="md"
+                                    className="flex-shrink-0 text-gray-400 dark:text-gray-500"
+                                  />
+                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap text-center">
+                                    {getMatchQualityLabel(job.matchPercentage)}
+                                  </span>
+                                </div>
+                                {/* Hover: save button */}
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveJobMutation.mutate(job.id);
+                                  }}
+                                  aria-label={
+                                    isJobSaved ? "Unsave job" : "Save job"
+                                  }
+                                  className={cn(
+                                    "absolute top-4 right-4 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-10 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                                    isJobSaved
+                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      : "text-black dark:text-white",
+                                  )}
+                                >
+                                  <Heart
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
+                                      isJobSaved
+                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        : "text-black dark:text-white",
+                                    )}
+                                  />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>

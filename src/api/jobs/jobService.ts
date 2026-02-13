@@ -778,7 +778,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
     Object.keys(jobData).forEach((key) => {
       if (!(key in jobDetail)) {
         (jobDetail as Record<string, unknown>)[key] = (
-          jobData as Record<string, unknown>
+          jobData as unknown as Record<string, unknown>
         )[key];
       }
     });

@@ -33,16 +33,16 @@ export const OptimizedAvatar: React.FC<OptimizedAvatarProps> = ({
   // Simplified: just use the AvatarImage component directly
   // The browser and Avatar component will handle loading naturally
   return (
-    <Avatar className={cn(sizeClasses[size], className, "rounded-3xl")}>
+    <Avatar className={cn(sizeClasses[size], "rounded-3xl", className)}>
       {src && (
         <AvatarImage
           src={src}
           alt={alt}
-          className="aspect-square h-full w-full rounded-3xl"
+          className="aspect-square h-full w-full"
           loading={loading}
         />
       )}
-      <AvatarFallback className="bg-[#AAF0FF] text-[#099DBC] text-2xl font-semibold rounded-3xl">
+      <AvatarFallback className="bg-[#AAF0FF] text-[#099DBC] text-2xl font-semibold rounded-none">
         {fallback}
       </AvatarFallback>
     </Avatar>

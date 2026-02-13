@@ -1192,7 +1192,7 @@ const JobSearchResultsPage = () => {
               {/* Work Types Field - Hidden on mobile, shown on desktop */}
               {!isMobile && (
                 <>
-                  <div className="w-px bg-gray-300 dark:bg-gray-600 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
+                  <div className="w-px bg-gray-300 dark:bg-gray-700 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
                   <div className="flex items-center flex-1 min-w-0 relative">
                     <WorkTypeDropdown
                       selectedWorkTypes={activeFilters.jobTypes}
@@ -1217,7 +1217,7 @@ const JobSearchResultsPage = () => {
                       }}
                     />
                   </div>
-                  <div className="w-px bg-gray-300 dark:bg-gray-600 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
+                  <div className="w-px bg-gray-300 dark:bg-gray-700 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
                   <div className="flex items-center flex-1 min-w-0 relative">
                     <LocationDropdown
                       selectedLocations={activeFilters.countries}
@@ -1360,7 +1360,7 @@ const JobSearchResultsPage = () => {
             <p className="text-sm">{t.jobs.tryAdjustingFilters}</p>
           </div>
         ) : (
-          <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden divide-y divide-gray-200 dark:divide-gray-600">
+          <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden divide-y divide-gray-200 dark:divide-gray-700">
             {regularJobsWithLogos.map((job) => (
               <div
                 key={job.id}

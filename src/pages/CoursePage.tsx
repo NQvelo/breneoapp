@@ -431,7 +431,7 @@ const CoursePage = () => {
                     academyName ? academyName.charAt(0).toUpperCase() : "A"
                   }
                   size="sm"
-                  className="flex-shrink-0 !h-10 !w-10 !rounded-full"
+                  className="flex-shrink-0 !h-10 !w-10 !rounded-sm"
                 />
                 <span className="text-gray-600 text-base font-medium">
                   {academyName}
@@ -612,56 +612,7 @@ const CoursePage = () => {
               </div>
 
               {/* About Academy Section */}
-              {academyProfile && (
-                <div className="py-6">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-                    About Academy
-                  </h2>
-                  <div className="flex flex-col sm:flex-row gap-4 items-start">
-                    {/* Academy Logo */}
-                    <div className="flex-shrink-0">
-                      <OptimizedAvatar
-                        src={academyImageUrl || undefined}
-                        alt={academyName}
-                        fallback={
-                          academyName
-                            ? academyName.charAt(0).toUpperCase()
-                            : "A"
-                        }
-                        size="lg"
-                        className="!h-16 !w-16 !rounded-full"
-                      />
-                    </div>
 
-                    {/* Academy Info */}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                        {academyName}
-                      </h3>
-                      {academyProfile.description ? (
-                        <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
-                          {academyProfile.description}
-                        </p>
-                      ) : (
-                        <p className="text-gray-500 dark:text-gray-500 italic mb-4">
-                          No description available.
-                        </p>
-                      )}
-
-                      {/* View Academy Button */}
-                      <Link to={academyUrl}>
-                        <Button
-                          variant="outline"
-                          className="flex items-center gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View Academy
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Chips - Moved to bottom */}
               <div className="flex flex-wrap gap-2 py-6">
@@ -676,6 +627,74 @@ const CoursePage = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* About Academy Section - Separate Card */}
+          {academyProfile && (
+            <Card className="rounded-m border-0 shadow-none bg-white dark:bg-white mt-6">
+              <CardContent className="p-6 sm:p-6">
+                <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
+                  About Academy
+                </h2>
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  {/* Academy Logo */}
+                  <div className="flex-shrink-0">
+                    <OptimizedAvatar
+                      src={academyImageUrl || undefined}
+                      alt={academyName}
+                      fallback={
+                        academyName ? academyName.charAt(0).toUpperCase() : "A"
+                      }
+                      size="lg"
+                      className="!h-16 !w-16 !rounded-sm"
+                    />
+                  </div>
+
+                  {/* Academy Info */}
+                  <div className="flex-1 w-full">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                          {academyName}
+                        </h3>
+                        {academyProfile.description ? (
+                          <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {academyProfile.description}
+                          </p>
+                        ) : (
+                          <p className="text-gray-500 dark:text-gray-500 italic">
+                            No description available.
+                          </p>
+                        )}
+                      </div>
+
+                      <Link to={academyUrl} className="hidden sm:block flex-shrink-0">
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Academy
+                        </Button>
+                      </Link>
+                    </div>
+
+                    {/* Mobile View Academy Button */}
+                    <div className="block sm:hidden mt-4 w-full">
+                      <Link to={academyUrl}>
+                        <Button
+                          variant="outline"
+                          className="w-full flex items-center gap-2 justify-center"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Academy
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </DashboardLayout>
