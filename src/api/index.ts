@@ -17,3 +17,6 @@ export { TokenManager as defaultTokenManager } from './auth/tokenManager';
 export * from './jobs';
 export { default as jobService } from './jobs/jobService';
 
+// BOG API
+export { default as bogService } from './bog/bogService';
+

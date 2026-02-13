@@ -55,6 +55,8 @@ import HelpCenter from "@/pages/HelpCenter";
 import SubscriptionPage from "@/pages/SubscriptionPage";
 import NotFound from "@/pages/NotFound";
 import WebinarsPage from "@/pages/user/WebinarsPage";
+import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
+import PaymentFailurePage from "@/pages/PaymentFailurePage";
 
 /**
  * Helper component to create routes with language prefixes
@@ -275,6 +277,18 @@ export const AppRoutes = () => {
         "/subscription",
         <ProtectedRoute>
           <SubscriptionPage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/success",
+        <ProtectedRoute>
+          <PaymentSuccessPage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/failure",
+        <ProtectedRoute>
+          <PaymentFailurePage />
         </ProtectedRoute>
       )}
 

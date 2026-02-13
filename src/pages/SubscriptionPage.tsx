@@ -8,51 +8,85 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { bogService } from "@/api";
+import { toast } from "sonner";
 
 export default function SubscriptionPage() {
   const plans = [
     {
-      name: "Free",
-      price: "$0",
-      period: "forever",
+      name: "Test",
+      price: "0.1",
+      currency: "₾",
+      amount: 0.1,
+      period: "per month",
       features: [
+        "Test payment integration",
         "Access to basic courses",
         "Limited skill tests",
         "Basic profile features",
-        "Community support",
       ],
       popular: false,
     },
     {
-      name: "Pro",
-      price: "$9.99",
+      name: "Basic",
+      price: "5",
+      currency: "₾",
+      amount: 5,
       period: "per month",
       features: [
-        "All free features",
-        "Unlimited courses",
+        "Access to all courses",
         "Unlimited skill tests",
         "Advanced profile features",
         "Priority support",
         "Certificates",
       ],
-      popular: true,
-    },
-    {
-      name: "Enterprise",
-      price: "Custom",
-      period: "contact us",
-      features: [
-        "All Pro features",
-        "Custom integrations",
-        "Dedicated support",
-        "Team management",
-        "Analytics dashboard",
-        "Custom branding",
-      ],
       popular: false,
     },
+    {
+      name: "Premium",
+      price: "10",
+      currency: "₾",
+      amount: 10,
+      period: "per month",
+      features: [
+        "All Basic features",
+        "AI-powered recommendations",
+        "1-on-1 mentorship sessions",
+        "Exclusive webinars",
+        "Job placement assistance",
+        "Lifetime access to materials",
+      ],
+      popular: true,
+    },
   ];
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handleSubscribe = async (amount: number, planName: string) => {
+    setIsLoading(true);
+    setLoadingPlan(planName);
+    try {
+      const response = await bogService.createOrder(amount);
+      const { redirect_url, order_id } = response;
+
+      if (redirect_url && order_id) {
+        // Store order_id for handling the return
+        localStorage.setItem("bog_order_id", order_id);
+        // Redirect to BOG
+        window.location.href = redirect_url;
+      } else {
+        throw new Error("Invalid response from payment server");
+      }
+    } catch (error) {
+      console.error("Checkout failed:", error);
+      toast.error("Failed to initiate checkout. Please try again.");
+      setIsLoading(false);
+      setLoadingPlan(null);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -84,23 +118,17 @@ export default function SubscriptionPage() {
               <CardHeader>
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  {plan.period !== "forever" &&
-                    plan.period !== "contact us" && (
-                      <span className="text-muted-foreground">
-                        /{plan.period}
-                      </span>
-                    )}
-                  {plan.period === "contact us" && (
-                    <span className="text-muted-foreground block text-sm mt-1">
-                      {plan.period}
-                    </span>
-                  )}
+                  <span className="text-4xl font-bold">
+                    {plan.currency}{plan.price}
+                  </span>
+                  <span className="text-muted-foreground">
+                    /{plan.period}
+                  </span>
                 </div>
                 <CardDescription className="mt-4">
-                  {plan.name === "Free" && "Perfect for getting started"}
-                  {plan.name === "Pro" && "Best for serious learners"}
-                  {plan.name === "Enterprise" && "For teams and organizations"}
+                  {plan.name === "Test" && "Perfect for testing payments"}
+                  {plan.name === "Basic" && "Best for serious learners"}
+                  {plan.name === "Premium" && "Complete learning experience"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -115,8 +143,17 @@ export default function SubscriptionPage() {
                 <Button
                   className="w-full"
                   variant={plan.popular ? "default" : "outline"}
+                  onClick={() => handleSubscribe(plan.amount, plan.name)}
+                  disabled={isLoading && loadingPlan === plan.name}
                 >
-                  {plan.name === "Enterprise" ? "Contact Sales" : "Get Started"}
+                  {isLoading && loadingPlan === plan.name ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Subscribe Now"
+                  )}
                 </Button>
               </CardContent>
             </Card>
