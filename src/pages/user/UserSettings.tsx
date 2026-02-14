@@ -1017,7 +1017,7 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Payment Methods</CardTitle>
+                <CardTitle>Payment Methods 2</CardTitle>
                 <CardDescription>Manage your payment methods</CardDescription>
               </CardHeader>
               <CardContent>
