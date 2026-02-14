@@ -1032,7 +1032,9 @@ export default function SettingsPage() {
                         </div>
                         <div>
                           <p className="font-medium">
-                            {subscriptionInfo.card_type || "Card"} ( {subscriptionInfo.card_mask} )
+                            {subscriptionInfo.card_mask && subscriptionInfo.card_mask !== "N/A" 
+                              ? `${subscriptionInfo.card_type || "Card"} ( ${subscriptionInfo.card_mask} )` 
+                              : "Saved Card"}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Saved via Bank of Georgia
