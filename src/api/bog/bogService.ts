@@ -7,13 +7,29 @@ import apiClient from "../auth/apiClient";
  */
 export const bogService = {
   /**
+   * List all active subscription plans
+   * @returns Promise with array of plans
+   */
+  fetchPlans: async () => {
+    try {
+      const response = await apiClient.get(
+        "https://web-production-80ed8.up.railway.app/api/subscription-plans/",
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching subscription plans:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Initiate a payment order
-   * @param amount The amount in GEL to charge
+   * @param planId The ID of the subscription plan
    * @returns Promise with redirect_url and order_id
    */
-  createOrder: async (amount: number = 10) => {
+  createOrder: async (planId: number) => {
     try {
-      const response = await apiClient.post("/api/bog/create-order/", { amount });
+      const response = await apiClient.post("/api/bog/create-order/", { plan_id: planId });
       return response.data;
     } catch (error) {
       console.error("Error creating BOG order:", error);
@@ -24,11 +40,12 @@ export const bogService = {
   /**
    * Confirm and save the card for recurring payments
    * @param orderId The order ID returned from createOrder
+   * @param planId Optional plan ID to associate with the subscription
    * @returns Promise with success message and parent_order_id
    */
-  saveCard: async (orderId: string) => {
+  saveCard: async (orderId: string, planId?: number) => {
     try {
-      const response = await apiClient.post(`/api/bog/save-card/${orderId}/`);
+      const response = await apiClient.post(`/api/bog/save-card/${orderId}/`, { plan_id: planId });
       return response.data;
     } catch (error) {
       console.error(`Error saving card for order ${orderId}:`, error);

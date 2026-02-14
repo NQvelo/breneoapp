@@ -46,7 +46,6 @@ import {
   CreditCard,
   BookOpen,
   AlertCircle,
-  Info,
   LogOut,
 } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
@@ -959,9 +958,13 @@ export default function SettingsPage() {
                       Access to basic features
                     </p>
                   </div>
-                  <Link to="/subscription">
-                    <Button>Upgrade to Pro</Button>
-                  </Link>
+                  <Button 
+                    onClick={() => {
+                      setSearchParams({ section: "subscription", upgrade: "true" }, { replace: true });
+                    }}
+                  >
+                    Upgrade to Pro
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -995,54 +998,11 @@ export default function SettingsPage() {
                     </div>
                   )}
                   {bogAuthError && (
-                    <Alert
-                      variant={
-                        bogAuthError.includes("not found") ||
-                        bogAuthError.includes("endpoint")
-                          ? "default"
-                          : "destructive"
-                      }
-                    >
-                      {bogAuthError.includes("not found") ||
-                      bogAuthError.includes("endpoint") ? (
-                        <Info className="h-4 w-4" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4" />
-                      )}
-                      <AlertTitle>
-                        {bogAuthError.includes("not found") ||
-                        bogAuthError.includes("endpoint")
-                          ? "Backend Setup Required"
-                          : "Payment Error"}
-                      </AlertTitle>
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Payment Error</AlertTitle>
                       <AlertDescription className="text-sm">
-                        {bogAuthError.includes("not found") ||
-                        bogAuthError.includes("endpoint") ? (
-                          <div className="space-y-2">
-                            <p>
-                              The payment backend endpoint is not yet
-                              implemented. To enable payments:
-                            </p>
-                            <ol className="list-decimal list-inside space-y-1 ml-2">
-                              <li>
-                                Implement{" "}
-                                <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                                  POST /api/payments/bog/orders/
-                                </code>{" "}
-                                on your backend server
-                              </li>
-                              <li>
-                                See{" "}
-                                <code className="text-xs bg-muted px-1 py-0.5 rounded">
-                                  BACKEND_PAYMENT_SETUP.md
-                                </code>{" "}
-                                for implementation details
-                              </li>
-                            </ol>
-                          </div>
-                        ) : (
-                          bogAuthError
-                        )}
+                        {bogAuthError}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1075,7 +1035,9 @@ export default function SettingsPage() {
                   >
                     {bogAuthLoading && !pendingPlan
                       ? "Authorizing..."
-                      : "Refresh Authorization"}
+                      : bogTokenInfo
+                        ? "Refresh Authorization"
+                        : "Authenticate with Bank of Georgia"}
                   </Button>
                 </div>
               </CardContent>

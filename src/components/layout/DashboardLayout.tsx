@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { DashboardHeader } from "./DashboardHeader";
 import { AcademyVerifiedCongratsModal } from "@/components/common/AcademyVerifiedCongratsModal";
+import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
 import { cn } from "@/lib/utils";
 
 interface DashboardLayoutProps {
@@ -19,10 +21,26 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const mainContentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (searchParams.get("upgrade") === "true") {
+      setIsSubscriptionModalOpen(true);
+      // Clean up the URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("upgrade");
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => !prev);
+  };
+
+  const openSubscriptionModal = () => {
+    setIsSubscriptionModalOpen(true);
   };
 
   useEffect(() => {
@@ -56,6 +74,7 @@ export function DashboardLayout({
         <AppSidebar
           collapsed={sidebarCollapsed}
           toggleSidebar={toggleSidebar}
+          onUpgradeClick={openSubscriptionModal}
         />
       )}
       {showHeader && (
@@ -78,6 +97,10 @@ export function DashboardLayout({
         <div className="h-full">{children}</div>
       </main>
       <AcademyVerifiedCongratsModal />
+      <SubscriptionModal 
+        isOpen={isSubscriptionModalOpen} 
+        onClose={() => setIsSubscriptionModalOpen(false)} 
+      />
     </div>
   );
 }

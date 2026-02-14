@@ -29,7 +29,7 @@ export default function PaymentFailurePage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-4 mt-4">
             <Button 
-              onClick={() => navigate("/subscription")} 
+              onClick={() => navigate("/home?upgrade=true")} 
               className="w-full"
             >
               Back to Subscriptions

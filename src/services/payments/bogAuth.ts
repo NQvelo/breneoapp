@@ -69,7 +69,7 @@ export const requestBogAccessToken =
         // Provide helpful error messages for common status codes
         if (axiosError.response.status === 404) {
           throw new Error(
-            "Payment authentication endpoint not found. Please ensure the backend payment endpoint is implemented. See BACKEND_PAYMENT_SETUP.md for details."
+            "Payment service is currently unavailable. Please try again later."
           );
         }
         const errorMessage =
@@ -133,7 +133,7 @@ export const createBogOrder = async (
       // Provide helpful error messages for common status codes
       if (axiosError.response.status === 404) {
         throw new Error(
-          "Payment endpoint not found. Please ensure the backend payment endpoint is implemented. See BACKEND_PAYMENT_SETUP.md for details."
+          "Payment service is currently unavailable. Please try again later."
         );
       }
       const errorMessage =

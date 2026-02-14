@@ -52,7 +52,6 @@ import AddCoursePage from "@/pages/academy/AddCoursePage";
 // Common pages (Available to all authenticated users)
 import TermsOfUse from "@/pages/TermsOfUse";
 import HelpCenter from "@/pages/HelpCenter";
-import SubscriptionPage from "@/pages/SubscriptionPage";
 import NotFound from "@/pages/NotFound";
 import WebinarsPage from "@/pages/user/WebinarsPage";
 import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
@@ -271,12 +270,6 @@ export const AppRoutes = () => {
         "/help",
         <ProtectedRoute>
           <HelpCenter />
-        </ProtectedRoute>
-      )}
-      {createLocalizedRoute(
-        "/subscription",
-        <ProtectedRoute>
-          <SubscriptionPage />
         </ProtectedRoute>
       )}
       {createLocalizedRoute(

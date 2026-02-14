@@ -783,7 +783,7 @@ export default function AcademySettingsPage() {
               </CardHeader>
               <CardContent>
                 <Link
-                  to="/subscription"
+                  to="/academy/settings?upgrade=true"
                   className="block text-sm text-foreground hover:text-primary transition-colors"
                 >
                   Choose a plan

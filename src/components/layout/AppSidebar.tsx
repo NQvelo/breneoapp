@@ -27,9 +27,14 @@ import { BreneoLogo } from "@/components/common/BreneoLogo";
 interface AppSidebarProps {
   collapsed: boolean;
   toggleSidebar: () => void;
+  onUpgradeClick?: () => void;
 }
 
-export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
+export function AppSidebar({
+  collapsed,
+  toggleSidebar,
+  onUpgradeClick,
+}: AppSidebarProps) {
   const location = useLocation();
   // ✅ Get the user object directly from the context
   const { loading, user, academyDisplay } = useAuth();
@@ -169,11 +174,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F3F3F4]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 ">
         <nav className="flex justify-around items-center py-2">
           {mobileNavItems.map((item, index) => {
-            // Check if current path matches the item href
-            // Handle home/dashboard equivalence (both routes go to same page)
             let isActive = currentPath === item.href;
-
-            // Special handling for home item - it should be active on both /home and /dashboard
             if (item.href === "/home") {
               isActive =
                 currentPath === "/home" ||
@@ -187,7 +188,6 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                 rawPathname.includes("/academy/home") ||
                 rawPathname.includes("/academy/dashboard");
             } else {
-              // For other items, check if pathname ends with the href (handles language prefixes)
               isActive =
                 currentPath === item.href || rawPathname.endsWith(item.href);
             }
@@ -224,6 +224,17 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
               </LocalizedLink>
             );
           })}
+          
+          {/* Mobile Upgrade Button */}
+          {!isAcademy && (
+            <button
+              onClick={onUpgradeClick}
+              className="flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-1"
+            >
+              <ArrowRight size={20} className="text-[#00E676] mb-1" />
+              <span className="text-xs font-bold text-gray-700">Pro</span>
+            </button>
+          )}
         </nav>
       </div>
 
@@ -375,12 +386,12 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
 
               {/* Breneo Pro Plan Widget - Desktop Only */}
               {!isAcademy && (
-                <LocalizedLink
-                  to="/subscription"
+                <button
+                  onClick={onUpgradeClick}
                   className={cn(
-                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                    "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                     "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
-                    "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50",
+                    "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50 text-left",
                     collapsed && "justify-center px-4",
                   )}
                 >
@@ -393,7 +404,7 @@ export function AppSidebar({ collapsed, toggleSidebar }: AppSidebarProps) {
                       {t.subscription.upgrade}
                     </span>
                   )}
-                </LocalizedLink>
+                </button>
               )}
             </div>
 
