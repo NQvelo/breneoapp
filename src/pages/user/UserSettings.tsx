@@ -1032,9 +1032,18 @@ export default function SettingsPage() {
                         </div>
                         <div>
                           <p className="font-medium">
-                            {subscriptionInfo.card_mask && subscriptionInfo.card_mask !== "N/A" 
-                              ? `${subscriptionInfo.card_type || "Card"} ( ${subscriptionInfo.card_mask} )` 
-                              : "Saved Card"}
+                            {(() => {
+                              const mask = subscriptionInfo.card_mask;
+                              const type = subscriptionInfo.card_type || "Card";
+                              
+                              if (mask && mask !== "N/A") {
+                                // If it's a full mask like ************1234, take last 4
+                                const last4 = mask.length > 4 ? mask.slice(-4) : mask;
+                                return `${type} •••• ${last4}`;
+                              }
+                              // Fallback if mask is missing but we know it's a saved card
+                              return `${type} ••••`;
+                            })()}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Saved via Bank of Georgia
