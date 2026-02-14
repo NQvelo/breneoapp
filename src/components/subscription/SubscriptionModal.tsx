@@ -89,6 +89,15 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
       if (redirect_url && order_id) {
         localStorage.setItem("bog_order_id", order_id);
         localStorage.setItem("selected_plan_id", planId.toString());
+        
+        // Register intent to save card BEFORE redirecting to payment
+        // This is required by BOG for recurring payments
+        try {
+          await bogService.saveCard(order_id, planId);
+        } catch (e) {
+          console.warn("Card registration intent failed, but continuing to payment:", e);
+        }
+        
         window.location.href = redirect_url;
       } else {
         throw new Error("Invalid response from payment server");

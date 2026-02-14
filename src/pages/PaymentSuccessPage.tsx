@@ -55,15 +55,11 @@ export default function PaymentSuccessPage() {
       const finalPlanId = savedPlanId || urlPlanId;
       const planId = finalPlanId ? parseInt(finalPlanId, 10) : undefined;
 
-      if (!orderId) {
-        setStatus("error");
-        setMessage("Order ID not found. Please contact support.");
-        return;
-      }
-
       try {
-        await bogService.saveCard(orderId, planId);
-        // Clear order ID and plan ID after successful save
+        // We no longer call bogService.saveCard(orderId, planId) here
+        // because it must happen BEFORE the payment redirect.
+        
+        // Clear order ID and plan ID after successful flow
         localStorage.removeItem("bog_order_id");
         localStorage.removeItem("selected_plan_id");
         // Update user state to premium
