@@ -47,7 +47,13 @@ export default function PaymentSuccessPage() {
     const finalizePayment = async () => {
       const orderId = localStorage.getItem("bog_order_id");
       const savedPlanId = localStorage.getItem("selected_plan_id");
-      const planId = savedPlanId ? parseInt(savedPlanId, 10) : undefined;
+      
+      // Fallback to URL query parameter if localStorage is missing
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlPlanId = urlParams.get("plan_id");
+      
+      const finalPlanId = savedPlanId || urlPlanId;
+      const planId = finalPlanId ? parseInt(finalPlanId, 10) : undefined;
 
       if (!orderId) {
         setStatus("error");
