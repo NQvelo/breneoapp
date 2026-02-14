@@ -31,6 +31,7 @@ import axios from "axios";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -51,11 +52,8 @@ import {
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import {
-  BogAccessTokenResponse,
-  requestBogAccessToken,
-  createBogOrder,
-} from "@/services/payments/bogAuth";
+import { bogService } from "@/api/bog/bogService";
+import { PaymentTransaction } from "@/api/bog/bogService";
 
 type SettingsSection =
   | "account"
@@ -191,11 +189,16 @@ export default function SettingsPage() {
   const [newsletter, setNewsletter] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(false);
 
-  const [bogAuthLoading, setBogAuthLoading] = useState(false);
-  const [bogAuthError, setBogAuthError] = useState<string | null>(null);
-  const [bogTokenInfo, setBogTokenInfo] =
-    useState<BogAccessTokenResponse | null>(null);
-  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<{
+    is_active: boolean;
+    plan_name?: string;
+    next_payment_date?: string;
+    card_mask?: string;
+    card_type?: string;
+  } | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentTransaction[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Privacy & Security
   const [showSkills, setShowSkills] = useState(true);
@@ -291,6 +294,33 @@ export default function SettingsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch subscription info and payment history
+  useEffect(() => {
+    if (!mounted || activeSection !== "subscription") return;
+
+    const loadData = async () => {
+      try {
+        setSubscriptionLoading(true);
+        setHistoryLoading(true);
+        
+        const [subData, historyData] = await Promise.all([
+          bogService.fetchSubscription(),
+          bogService.fetchPaymentHistory()
+        ]);
+        
+        setSubscriptionInfo(subData);
+        setPaymentHistory(historyData);
+      } catch (error) {
+        console.error("Failed to fetch subscription data:", error);
+      } finally {
+        setSubscriptionLoading(false);
+        setHistoryLoading(false);
+      }
+    };
+
+    loadData();
+  }, [mounted, activeSection]);
 
   // Update URL when section changes (only after component is mounted)
   useEffect(() => {
@@ -951,20 +981,36 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold">Free Plan</p>
+                <div className="flex items-center justify-between p-6 border rounded-3xl bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-2xl font-bold">
+                        {subscriptionLoading ? "..." : (subscriptionInfo?.plan_name || "Free Plan")}
+                      </p>
+                      {subscriptionInfo?.is_active && (
+                        <Badge className="bg-green-500 text-white border-0 text-[10px] h-5 uppercase px-2 font-bold tracking-tight">
+                          Active Now
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
-                      Access to basic features
+                      {subscriptionInfo?.is_active 
+                        ? `Next automatic renewal: ${subscriptionInfo.next_payment_date || "Monthly"}` 
+                        : "Basic access with limited features"}
                     </p>
                   </div>
-                  <Button 
-                    onClick={() => {
-                      setSearchParams({ section: "subscription", upgrade: "true" }, { replace: true });
-                    }}
-                  >
-                    Upgrade to Pro
-                  </Button>
+                  {!subscriptionInfo?.is_active && !subscriptionLoading && (
+                    <Button 
+                      className="relative z-10 shadow-lg shadow-primary/20"
+                      onClick={() => {
+                        setSearchParams({ section: "subscription", upgrade: "true" }, { replace: true });
+                      }}
+                    >
+                      Unlock Pro Features
+                    </Button>
+                  )}
+                  {/* Decorative background element */}
+                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
                 </div>
               </CardContent>
             </Card>
@@ -976,84 +1022,110 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {!bogTokenInfo && (
+                  {subscriptionLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading payment methods...</p>
+                  ) : subscriptionInfo?.card_mask ? (
+                    <div className="flex items-center justify-between p-4 border rounded-2xl bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-primary/10 p-2 rounded-full">
+                          <CreditCard className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {subscriptionInfo.card_type || "Card"} ( {subscriptionInfo.card_mask} )
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Saved via Bank of Georgia
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] uppercase">Default</Badge>
+                    </div>
+                  ) : (
                     <p className="text-sm text-muted-foreground">
-                      Authenticate with Bank of Georgia to add a payment method.
+                  No payment methods saved. Subscribe to a plan to save your card.
                     </p>
                   )}
-                  {bogTokenInfo && (
-                    <div className="rounded-3xl border border-primary/40 bg-primary/5 p-4 text-sm">
-                      <p className="font-medium text-primary">
-                        Bank of Georgia authorization ready
-                      </p>
-                      <p className="text-muted-foreground">
-                        Token type: {bogTokenInfo.token_type}
-                      </p>
-                      <p className="text-muted-foreground">
-                        Expires in: {bogTokenInfo.expires_in} seconds
-                      </p>
-                      <p className="text-muted-foreground break-all">
-                        Access token: {bogTokenInfo.access_token}
-                      </p>
-                    </div>
-                  )}
-                  {bogAuthError && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Payment Error</AlertTitle>
-                      <AlertDescription className="text-sm">
-                        {bogAuthError}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      setPendingPlan(null);
-                      setBogAuthError(null);
-                      try {
-                        setBogAuthLoading(true);
-                        const token = await requestBogAccessToken();
-                        setBogTokenInfo(token);
-                        toast.success(
-                          "Bank of Georgia authentication successful.",
-                        );
-                      } catch (error) {
-                        const message =
-                          error instanceof Error
-                            ? error.message
-                            : "Authentication failed with Bank of Georgia.";
-                        setBogAuthError(message);
-                        toast.error(
-                          "Unable to authenticate with Bank of Georgia.",
-                        );
-                      } finally {
-                        setBogAuthLoading(false);
-                      }
-                    }}
-                    disabled={bogAuthLoading}
-                  >
-                    {bogAuthLoading && !pendingPlan
-                      ? "Authorizing..."
-                      : bogTokenInfo
-                        ? "Refresh Authorization"
-                        : "Authenticate with Bank of Georgia"}
-                  </Button>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Billing History</CardTitle>
-                <CardDescription>
-                  View and download your invoices
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Billing History</CardTitle>
+                    <CardDescription>
+                      View and manage your recent transactions
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider px-2.5">
+                    BOG Checkout
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  No billing history available
-                </p>
+                {historyLoading ? (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-sm text-muted-foreground">Fetching transaction history...</p>
+                  </div>
+                ) : paymentHistory.length > 0 ? (
+                  <div className="overflow-hidden rounded-xl border">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-medium">Date</th>
+                            <th className="px-4 py-3 text-left font-medium">Description</th>
+                            <th className="px-4 py-3 text-right font-medium">Amount</th>
+                            <th className="px-4 py-3 text-center font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {paymentHistory.map((transaction) => (
+                            <tr key={transaction.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3 text-muted-foreground tabular-nums whitespace-nowrap">
+                                {new Date(transaction.date).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-3 font-medium">
+                                <div className="flex flex-col">
+                                  <span>{transaction.description || "Subscription Payment"}</span>
+                                  {transaction.card_mask && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {transaction.payment_method}: {transaction.card_mask}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right font-semibold">
+                                {transaction.amount} {transaction.currency}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Badge 
+                                  variant={transaction.status === "completed" ? "default" : "secondary"}
+                                  className={`text-[10px] uppercase h-5 px-1.5 ${transaction.status === "completed" ? "bg-green-500/10 text-green-600 border-green-200" : ""}`}
+                                >
+                                  {transaction.status}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed rounded-3xl bg-muted/20">
+                    <div className="bg-muted p-3 rounded-full mb-3">
+                      <Download className="h-6 w-6 text-muted-foreground/50" />
+                    </div>
+                    <CardTitle className="text-base mb-1">No transaction history found</CardTitle>
+                    <CardDescription className="max-w-[250px]">
+                      When you start subscribing to plans, your payment history will appear here.
+                    </CardDescription>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

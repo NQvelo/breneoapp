@@ -1,5 +1,25 @@
 import apiClient from "../auth/apiClient";
 
+export interface UserSubscriptionInfo {
+  is_active: boolean;
+  plan_name?: string;
+  next_payment_date?: string;
+  card_mask?: string;
+  card_type?: string;
+}
+
+export interface PaymentTransaction {
+  id: number;
+  order_id: string;
+  amount: string;
+  currency: string;
+  status: string;
+  payment_method: string;
+  card_mask?: string;
+  description?: string;
+  date: string;
+}
+
 /**
  * BOG Payment Service
  * 
@@ -13,7 +33,7 @@ export const bogService = {
   fetchPlans: async () => {
     try {
       const response = await apiClient.get(
-        "https://web-production-80ed8.up.railway.app/api/subscription-plans/",
+        "/api/subscription-plans/",
       );
       return response.data;
     } catch (error) {
@@ -49,6 +69,32 @@ export const bogService = {
       return response.data;
     } catch (error) {
       console.error(`Error saving card for order ${orderId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch current user subscription details
+   */
+  fetchSubscription: async (): Promise<UserSubscriptionInfo> => {
+    try {
+      const response = await apiClient.get("/api/me/subscription/");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch user payment history
+   */
+  fetchPaymentHistory: async (): Promise<PaymentTransaction[]> => {
+    try {
+      const response = await apiClient.get("/api/me/payment-history/");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching payment history:", error);
       throw error;
     }
   },
