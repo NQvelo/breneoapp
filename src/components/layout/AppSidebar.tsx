@@ -225,16 +225,6 @@ export function AppSidebar({
             );
           })}
           
-          {/* Mobile Upgrade Button */}
-          {!isAcademy && (
-            <button
-              onClick={onUpgradeClick}
-              className="flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-1"
-            >
-              <ArrowRight size={20} className="text-[#00E676] mb-1" />
-              <span className="text-xs font-bold text-gray-700">Pro</span>
-            </button>
-          )}
         </nav>
       </div>
 
