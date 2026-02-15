@@ -12,6 +12,7 @@ import { bogService } from "@/api";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface SubscriptionFeature {
   title: string;
@@ -37,6 +38,7 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingPlanId, setLoadingPlanId] = useState<number | null>(null);
+  const { subscriptionInfo } = useSubscription();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -161,6 +163,12 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
                   {plan.name} Plan
                 </h3>
                 {hasFire && <span className="text-base">🔥</span>}
+                {subscriptionInfo?.is_active &&
+                  subscriptionInfo.plan_name === plan.name && (
+                    <Badge className="ml-2 bg-green-100 text-green-700 hover:bg-green-100 border-green-200">
+                      Current Plan
+                    </Badge>
+                  )}
               </div>
 
               <div className="px-4 pt-3 pb-4">
@@ -186,12 +194,24 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
 
               <Button
                 onClick={() => handleSubscribe(plan.id)}
-                disabled={isProcessing}
-                variant="default"
+                disabled={
+                  isProcessing ||
+                  (subscriptionInfo?.is_active &&
+                    subscriptionInfo.plan_name === plan.name)
+                }
+                variant={
+                  subscriptionInfo?.is_active &&
+                  subscriptionInfo.plan_name === plan.name
+                    ? "secondary"
+                    : "default"
+                }
                 className="w-full rounded-none rounded-b-2xl"
               >
                 {isProcessing && loadingPlanId === plan.id ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
+                ) : subscriptionInfo?.is_active &&
+                  subscriptionInfo.plan_name === plan.name ? (
+                  "Current Plan"
                 ) : (
                   "Upgrade Now"
                 )}
@@ -232,9 +252,9 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogPortal>
-        <DialogOverlay className="bg-white/95 dark:bg-black/70 backdrop-blur-md z-[100] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-150" />
+        <DialogOverlay className="bg-white/95 dark:bg-black/70 backdrop-blur-md z-[100] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-300" />
         <DialogContent
-          className="fixed inset-0 z-[101] w-full h-full max-w-none rounded-none border-none p-0 overflow-y-auto bg-[#F2F2F3] dark:bg-[#181818] shadow-none outline-none transform-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100 data-[state=open]:slide-in-from-top-[50%] data-[state=closed]:slide-out-to-top-[50%] duration-150"
+          className="fixed inset-0 z-[101] w-full h-full max-w-none rounded-none border-none p-0 overflow-y-auto bg-[#F2F2F3] dark:bg-[#181818] shadow-none outline-none transform-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0 duration-300"
           onInteractOutside={(e) => e.preventDefault()}
         >
           <div className="w-full min-h-full pt-20 pb-20 px-4 sm:px-12 md:px-20 lg:px-32">

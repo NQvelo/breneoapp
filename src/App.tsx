@@ -13,6 +13,7 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { FontSizeProvider } from "./contexts/FontSizeContext";
+import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import { AppRoutes } from "./routes/AppRoutes";
 
 const queryClient = new QueryClient();
@@ -34,7 +35,9 @@ const App = () => (
         <FontSizeProvider>
           <LanguageProvider>
             <AuthProvider>
-              <AppRoutes />
+              <SubscriptionProvider>
+                <AppRoutes />
+              </SubscriptionProvider>
             </AuthProvider>
           </LanguageProvider>
         </FontSizeProvider>

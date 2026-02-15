@@ -15,11 +15,13 @@ import {
   Video,
   ArrowRight,
   Globe,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
@@ -38,6 +40,7 @@ export function AppSidebar({
   const location = useLocation();
   // ✅ Get the user object directly from the context
   const { loading, user, academyDisplay } = useAuth();
+  const { subscriptionInfo } = useSubscription();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const t = useTranslation();
@@ -385,13 +388,22 @@ export function AppSidebar({
                     collapsed && "justify-center px-4",
                   )}
                 >
-                  <ArrowRight
-                    size={22}
-                    className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
-                  />
+                  {subscriptionInfo?.is_active ? (
+                    <Sparkles
+                      size={22}
+                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
+                    />
+                  ) : (
+                    <ArrowRight
+                      size={22}
+                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                    />
+                  )}
                   {!collapsed && (
                     <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
-                      {t.subscription.upgrade}
+                      {subscriptionInfo?.is_active
+                        ? subscriptionInfo.plan_name || "Pro Plan"
+                        : t.subscription.upgrade}
                     </span>
                   )}
                 </button>

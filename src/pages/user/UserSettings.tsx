@@ -54,6 +54,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { bogService } from "@/api/bog/bogService";
 import { PaymentTransaction } from "@/api/bog/bogService";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 type SettingsSection =
   | "account"
@@ -188,15 +189,8 @@ export default function SettingsPage() {
   const [inAppProgress, setInAppProgress] = useState(true);
   const [newsletter, setNewsletter] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(false);
-
-  const [subscriptionInfo, setSubscriptionInfo] = useState<{
-    is_active: boolean;
-    plan_name?: string;
-    next_payment_date?: string;
-    card_mask?: string;
-    card_type?: string;
-  } | null>(null);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  
+  const { subscriptionInfo, loading: subscriptionLoading } = useSubscription();
   const [paymentHistory, setPaymentHistory] = useState<PaymentTransaction[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -227,7 +221,6 @@ export default function SettingsPage() {
       setFirstName(user.first_name || "");
       setLastName(user.last_name || "");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.first_name, user?.last_name]); // Update when user ID or name fields change
 
   // Sync fontSize and language with context
@@ -248,12 +241,10 @@ export default function SettingsPage() {
         const saved = localStorage.getItem(key);
         if (saved !== null) {
           const parsed = JSON.parse(saved);
-          // Validate the parsed value matches the expected type
           return parsed;
         }
       } catch (error) {
         console.error(`Error loading preference ${key}:`, error);
-        // Clear invalid data
         localStorage.removeItem(key);
       }
       return defaultValue;
@@ -274,52 +265,40 @@ export default function SettingsPage() {
     setAiRecommendationFrequency(
       loadPreference("ai_recommendation_frequency", "weekly"),
     );
-    // Font size is now managed by FontSizeContext, but we keep local state for UI
     const savedFontSize = loadPreference(
       "breneo-font-size",
       contextFontSize,
     ) as string;
-    // Map "large" to "big" if needed for backward compatibility
     const mappedFontSize = savedFontSize === "large" ? "big" : savedFontSize;
     if (["small", "medium", "big"].includes(mappedFontSize)) {
       setFontSize(mappedFontSize as "small" | "medium" | "big");
       setContextFontSize(mappedFontSize as "small" | "medium" | "big");
     }
     const savedLanguage = loadPreference("accessibility_language", "en");
-    // Ensure only valid language codes are used
     if (savedLanguage === "en" || savedLanguage === "ka") {
       setLanguage(savedLanguage);
     } else {
       setLanguage("en");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch subscription info and payment history
+  // Fetch only payment history (subscription comes from context)
   useEffect(() => {
     if (!mounted || activeSection !== "subscription") return;
 
-    const loadData = async () => {
+    const loadPaymentHistory = async () => {
       try {
-        setSubscriptionLoading(true);
         setHistoryLoading(true);
-        
-        const [subData, historyData] = await Promise.all([
-          bogService.fetchSubscription(),
-          bogService.fetchPaymentHistory()
-        ]);
-        
-        setSubscriptionInfo(subData);
+        const historyData = await bogService.fetchPaymentHistory();
         setPaymentHistory(historyData);
       } catch (error) {
-        console.error("Failed to fetch subscription data:", error);
+        console.error("Failed to fetch payment history:", error);
       } finally {
-        setSubscriptionLoading(false);
         setHistoryLoading(false);
       }
     };
 
-    loadData();
+    loadPaymentHistory();
   }, [mounted, activeSection]);
 
   // Update URL when section changes (only after component is mounted)
@@ -654,7 +633,7 @@ export default function SettingsPage() {
       case "account":
         return (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Account Settings</h1>
+            <h1 className="text-xl font-bold">Account Settings</h1>
 
             {/* Email & Password */}
             <Card>
@@ -758,7 +737,7 @@ export default function SettingsPage() {
               <CardContent>
                 <Button
                   variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 dark:border-red-900/50 dark:hover:bg-red-900/20"
+                  className="text-red-600 border-red-200 hover:border-red-300 dark:border-red-900/50 dark:text-red-600 dark:hover:border-red-800 hover:bg-red-300/20 dark:hover:bg-red-900/20"
                   onClick={() => setLogoutConfirmOpen(true)}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -772,7 +751,7 @@ export default function SettingsPage() {
       case "notifications":
         return (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Notifications</h1>
+            <h1 className="text-xl font-bold">Notifications</h1>
 
             <Card>
               <CardHeader>
@@ -897,7 +876,7 @@ export default function SettingsPage() {
       case "privacy": {
         return (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Privacy & Security</h1>
+            <h1 className="text-xl font-bold">Privacy & Security</h1>
 
             <Card>
               <CardHeader>
@@ -971,7 +950,7 @@ export default function SettingsPage() {
       case "subscription":
         return (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Subscription & Billing</h1>
+            <h1 className="text-xl font-bold">Subscription & Billing</h1>
 
             <Card>
               <CardHeader>
@@ -981,7 +960,7 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-6 border rounded-3xl bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 p-6 rounded-3xl relative overflow-hidden">
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-2xl font-bold">
@@ -998,26 +977,46 @@ export default function SettingsPage() {
                         ? `Next automatic renewal: ${subscriptionInfo.next_payment_date || "Monthly"}` 
                         : "Basic access with limited features"}
                     </p>
-                  </div>
-                  {!subscriptionInfo?.is_active && !subscriptionLoading && (
-                    <Button 
-                      className="relative z-10 shadow-lg shadow-primary/20"
-                      onClick={() => {
-                        setSearchParams({ section: "subscription", upgrade: "true" }, { replace: true });
-                      }}
-                    >
-                      Unlock Pro Features
-                    </Button>
-                  )}
-                  {/* Decorative background element */}
-                  <div className="absolute -right-10 -top-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl" />
+
+                    </div>
+                    {subscriptionInfo?.is_active ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="relative z-10 shadow-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white dark:text-white border-0 h-8 text-xs px-3 font-semibold"
+                        onClick={() => {
+                          setSearchParams(
+                            { section: "subscription", upgrade: "true" },
+                            { replace: true },
+                          );
+                        }}
+                      >
+                        Change Plan
+                      </Button>
+                    ) : (
+                      !subscriptionLoading && (
+                        <Button
+                          className="relative z-10 shadow-lg shadow-primary/20"
+                          onClick={() => {
+                            setSearchParams(
+                              { section: "subscription", upgrade: "true" },
+                              { replace: true },
+                            );
+                          }}
+                        >
+                          Unlock Pro Features
+                        </Button>
+                      )
+                    )}
+                    {/* Decorative background element */}
+
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Payment Methods 2</CardTitle>
+                <CardTitle>Payment Methods</CardTitle>
                 <CardDescription>Manage your payment methods</CardDescription>
               </CardHeader>
               <CardContent>
@@ -1025,9 +1024,9 @@ export default function SettingsPage() {
                   {subscriptionLoading ? (
                     <p className="text-sm text-muted-foreground">Loading payment methods...</p>
                   ) : subscriptionInfo?.card_mask ? (
-                    <div className="flex items-center justify-between p-4 border rounded-2xl bg-muted/30">
+                    <div className="flex items-center justify-between p-4 rounded-2xl">
                       <div className="flex items-center gap-3">
-                        <div className="bg-primary/10 p-2 rounded-full">
+                        <div className="p-2 rounded-full">
                           <CreditCard className="h-5 w-5 text-primary" />
                         </div>
                         <div>
@@ -1082,43 +1081,23 @@ export default function SettingsPage() {
                     <p className="text-sm text-muted-foreground">Fetching transaction history...</p>
                   </div>
                 ) : paymentHistory.length > 0 ? (
-                  <div className="overflow-hidden rounded-xl border">
+                  <div className="w-full rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-muted/50 border-b">
+                        <thead className="border-b">
                           <tr>
                             <th className="px-4 py-3 text-left font-medium">Date</th>
                             <th className="px-4 py-3 text-left font-medium">Description</th>
-                            <th className="px-4 py-3 text-right font-medium">Amount</th>
-                            <th className="px-4 py-3 text-center font-medium">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {paymentHistory.map((transaction) => (
-                            <tr key={transaction.id} className="hover:bg-muted/30 transition-colors">
+                            <tr key={transaction.id} className="transition-colors">
                               <td className="px-4 py-3 text-muted-foreground tabular-nums whitespace-nowrap">
                                 {new Date(transaction.date).toLocaleDateString()}
                               </td>
                               <td className="px-4 py-3 font-medium">
-                                <div className="flex flex-col">
-                                  <span>{transaction.description || "Subscription Payment"}</span>
-                                  {transaction.card_mask && (
-                                    <span className="text-[10px] text-muted-foreground">
-                                      {transaction.payment_method}: {transaction.card_mask}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-right font-semibold">
-                                {transaction.amount} {transaction.currency}
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <Badge 
-                                  variant={transaction.status === "completed" ? "default" : "secondary"}
-                                  className={`text-[10px] uppercase h-5 px-1.5 ${transaction.status === "completed" ? "bg-green-500/10 text-green-600 border-green-200" : ""}`}
-                                >
-                                  {transaction.status}
-                                </Badge>
+                                {transaction.description || "Subscription Payment"}
                               </td>
                             </tr>
                           ))}
@@ -1127,8 +1106,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed rounded-3xl bg-muted/20">
-                    <div className="bg-muted p-3 rounded-full mb-3">
+                  <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed rounded-3xl">
+                    <div className="p-3 rounded-full mb-3">
                       <Download className="h-6 w-6 text-muted-foreground/50" />
                     </div>
                     <CardTitle className="text-base mb-1">No transaction history found</CardTitle>
@@ -1139,13 +1118,14 @@ export default function SettingsPage() {
                 )}
               </CardContent>
             </Card>
+
           </div>
         );
 
       case "learning":
         return (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Learning Preferences</h1>
+            <h1 className="text-xl font-bold">Learning Preferences</h1>
 
             <Card>
               <CardHeader>
@@ -1192,7 +1172,7 @@ export default function SettingsPage() {
       case "accessibility":
         return (
           <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Theme & Accessibility</h1>
+            <h1 className="text-xl font-bold">Theme & Accessibility</h1>
 
             <Card>
               <CardHeader>
@@ -1371,26 +1351,45 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">Settings</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
-                  {settingsSections.map((section) => (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSectionChange(section.id);
-                      }}
-                      className={cn(
-                        "w-full text-left text-sm transition-colors",
-                        activeSection === section.id
-                          ? "text-primary font-medium"
-                          : "text-foreground hover:text-primary",
-                      )}
-                    >
-                      {section.label}
-                    </button>
-                  ))}
+                <CardContent className="p-3">
+                  <div className="relative rounded-full p-1">
+                    {settingsSections.map((section) => {
+                      const isActive = activeSection === section.id;
+                      
+                      return (
+                        <motion.button
+                          key={section.id}
+                          layout
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSectionChange(section.id);
+                          }}
+                          className={cn(
+                            "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none",
+                            isActive
+                              ? "text-gray-900 dark:text-gray-100 font-bold"
+                              : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
+                          )}
+                        >
+                          {isActive && (
+                            <motion.div
+                              layoutId="active-settings-pill-desktop"
+                              className="absolute inset-0 bg-gray-200 dark:bg-gray-800 rounded-full"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 40,
+                                mass: 1,
+                              }}
+                            />
+                          )}
+                          <span className="relative z-10">{section.label}</span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
                 </CardContent>
               </Card>
 
