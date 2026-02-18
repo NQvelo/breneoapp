@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +54,18 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, LabelList, Cell } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  LabelList,
+  Cell,
+  AreaChart,
+  Area,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 
 interface JobPath {
   title: string;
@@ -68,6 +79,33 @@ interface JobPath {
   jobs?: ApiJob[]; // Actual job listings for this path
   summary?: string; // AI-generated role summary
   aiGeneratedSkills?: string[]; // AI-generated required skills
+}
+
+// New Interface matching the user's provided JSON
+export interface SalaryInfo {
+  max: number;
+  min: number;
+  display: string;
+  currency: string;
+}
+
+export interface ProfessionDetails {
+  id: number;
+  title: string;
+  description: string;
+  skills: string[];
+  salary_info: Record<string, SalaryInfo>;
+  market_popularity: { year: string; value: number }[];
+  relevant_courses: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MatchedProfession {
+  id: number;
+  profession: ProfessionDetails;
+  match_score: number;
+  created_at: string;
 }
 
 interface CourseRecommendation {
@@ -489,6 +527,7 @@ const generateJobPaths = (
 const SkillPathPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [hasTestAnswers, setHasTestAnswers] = useState(false);
   const [skillScores, setSkillScores] = useState<Record<string, number>>({});
@@ -498,6 +537,7 @@ const SkillPathPage = () => {
   const [techSkills, setTechSkills] = useState<Record<string, string>>({});
   const [softSkills, setSoftSkills] = useState<Record<string, string>>({});
   const [jobPaths, setJobPaths] = useState<JobPath[]>([]);
+  const [matchedProfessions, setMatchedProfessions] = useState<MatchedProfession[]>([]);
   const [courseRecommendations, setCourseRecommendations] = useState<
     CourseRecommendation[]
   >([]);
@@ -505,9 +545,29 @@ const SkillPathPage = () => {
   const [finalRole, setFinalRole] = useState<string | null>(null);
   const [userCountry, setUserCountry] = useState<string>("Georgia");
   const [roleExplanation, setRoleExplanation] = useState<string>("");
-  const [activeView, setActiveView] = useState<"skills" | "matchedRoles">(
-    "skills",
+  const [activeView, setActiveView] = useState<"skills" | "matchedProfessions">(
+    searchParams.get("section") === "matchedprofessions" ? "matchedProfessions" : "skills"
   );
+
+  // Sync state with query parameters
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section === "matchedprofessions") {
+      setActiveView("matchedProfessions");
+    } else {
+      setActiveView("skills");
+    }
+  }, [searchParams]);
+
+  // Handle view change and update URL
+  const handleViewChange = (view: "skills" | "matchedProfessions") => {
+    setActiveView(view);
+    if (view === "matchedProfessions") {
+      setSearchParams({ section: "matchedprofessions" });
+    } else {
+      setSearchParams({});
+    }
+  };
   const [userSkillsSet, setUserSkillsSet] = useState<Set<string>>(new Set());
 
   // Fetch user country from profile
@@ -695,6 +755,18 @@ const SkillPathPage = () => {
     [],
   );
 
+  const fetchMatchedProfessions = useCallback(async () => {
+    try {
+      const response = await apiClient.get<MatchedProfession[]>(/* "/api/me/profession/" */ API_ENDPOINTS.ME.MATCHED_PROFESSIONS);
+      if (Array.isArray(response.data)) {
+        setMatchedProfessions(response.data);
+      }
+    } catch(err) {
+      console.error("Error fetching matched professions:", err);
+      // Fallback or empty state handling if needed
+    }
+  }, []);
+
   const loadSkillData = useCallback(async () => {
     try {
       // console.log("🚀 Starting loadSkillData");
@@ -773,6 +845,9 @@ const SkillPathPage = () => {
             paths,
             country,
           );
+
+          // Fetch matched professions from the new API
+          fetchMatchedProfessions();
 
           // Store user skills for comparison
           const allUserSkills = [...techSkillsArray, ...softSkillsArray].map(
@@ -1637,7 +1712,7 @@ const SkillPathPage = () => {
         >
           <motion.button
             layout
-            onClick={() => setActiveView("skills")}
+            onClick={() => handleViewChange("skills")}
             className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
               activeView === "skills"
                 ? "text-gray-900 dark:text-gray-100 font-bold"
@@ -1661,14 +1736,14 @@ const SkillPathPage = () => {
 
           <motion.button
             layout
-            onClick={() => setActiveView("matchedRoles")}
+            onClick={() => handleViewChange("matchedProfessions")}
             className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
-              activeView === "matchedRoles"
+              activeView === "matchedProfessions"
                 ? "text-gray-900 dark:text-gray-100 font-bold"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
-            {activeView === "matchedRoles" && (
+            {activeView === "matchedProfessions" && (
               <motion.div
                 layoutId="active-pill"
                 className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
@@ -1680,7 +1755,7 @@ const SkillPathPage = () => {
                 }}
               />
             )}
-            <span className="relative z-10">Matched Roles</span>
+            <span className="relative z-10">Matched Professions</span>
           </motion.button>
         </motion.div>
       </div>
@@ -1761,129 +1836,123 @@ const SkillPathPage = () => {
           </>
         )}
 
-        {/* Matched Roles Section - shown when "Matched Roles" is active */}
-        {activeView === "matchedRoles" && (
+        {/* Matched Professions Section - shown when "Matched Professions" is active */}
+        {activeView === "matchedProfessions" && (
           <div className="space-y-4">
-            {jobPaths.length > 0 ? (
-              jobPaths.map((job, index) => (
-                <Card
-                  key={job.title}
-                  className={index === 0 ? "bg-primary/5" : ""}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <CardTitle className="text-xl flex-1">
-                          {job.title}
+            {matchedProfessions.length > 0 ? (
+              // Find the highest match score to highlight the best match
+              (() => {
+                const maxScore = Math.max(...matchedProfessions.map(p => p.match_score));
+                
+                return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {matchedProfessions.map((item, index) => {
+                  const profession = item.profession;
+                  const isBestMatch = item.match_score === maxScore && maxScore > 0;
+                
+                // Calculate market trend for chart
+                const popularity = profession.market_popularity || [];
+                const chartData = popularity.map(p => ({ 
+                    year: p.year, 
+                    value: p.value 
+                }));
+                
+                // Calculate growth percentage (last vs first or last vs prev?)
+                // User image showed "15%". 
+                // Let's calculate total growth over the period provided?
+                // Or last year growth? 
+                // Given values 78 -> 85, total growth is ((85-78)/78)*100 = 9%.
+                // Let's show the total growth over the dataset period as it represents "Future Growth" or "Trend".
+                
+                const firstVal = popularity[0]?.value || 0;
+                const lastVal = popularity[popularity.length - 1]?.value || 0;
+                const totalGrowth = firstVal > 0 ? Math.round(((lastVal - firstVal) / firstVal) * 100) : 0;
+                
+                return (
+                  <Card
+                    key={item.id}
+                    className={`cursor-pointer transition-all hover:bg-accent/50 relative overflow-visible ${
+                      isBestMatch 
+                        ? "border-blue-500 border-2 bg-blue-50/10 dark:bg-blue-900/10" 
+                        : index === 0 ? "border-primary/50 bg-primary/5" : ""
+                    }`}
+                    onClick={() => {
+                       navigate(
+                         `/skill-path/${profession.id}`,
+                         { state: { profession: item } },
+                       );
+                    }}
+                  >
+                    {isBestMatch && (
+                      <div className="absolute -top-3 left-6 bg-blue-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-full shadow-sm z-20 flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-white" />
+                        Perfect match for you
+                      </div>
+                    )}
+                    <CardContent className="p-6 flex items-center justify-between">
+                      <div className="flex-1 pr-4">
+                        <CardTitle className="text-xl mb-1">
+                          {profession.title}
                         </CardTitle>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            navigate(
-                              `/skill-path/${encodeURIComponent(job.title)}`,
-                              { state: { jobPath: job } },
-                            );
-                          }}
-                        >
-                          View Details
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
+                         {/* Minimal subtitle if needed, or just keep title as requested */}
+                         <p className="text-xs text-muted-foreground">
+                            View details
+                            <ArrowRight className="h-3 w-3 inline ml-1" />
+                         </p>
                       </div>
 
-                      {/* Salary and Brief Cards - Side by Side */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Salary Information Card */}
-                        <Card className="bg-gray-50 dark:bg-gray-800/50">
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-primary" />
-                              Salary Information
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="bg-gray-100 dark:bg-gray-700/50 p-4 rounded-lg">
-                              <div className="text-lg font-bold text-primary mb-2">
-                                {job.salaryRange || "Salary data not available"}
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                Average salary range based on current market
-                                data
-                              </p>
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Role Brief Card */}
-                        <Card className="bg-gray-50 dark:bg-gray-800/50">
-                          <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                              Role Brief
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="bg-gray-100 dark:bg-gray-700/50 p-4 rounded-lg">
-                              <div className="text-base text-gray-700 dark:text-gray-300 leading-relaxed">
-                                {job.summary ? (
-                                  job.summary.split("**").map((part, index) =>
-                                    index % 2 === 1 ? (
-                                      <strong
-                                        key={index}
-                                        className="text-primary font-semibold"
-                                      >
-                                        {part}
-                                      </strong>
-                                    ) : (
-                                      part
-                                    ),
-                                  )
-                                ) : (
-                                  <span className="text-muted-foreground italic">
-                                    Generating role brief...
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                      {/* Market Popularity Chart */}
+                      <div className="h-[60px] w-[140px] relative">
+                         {/* Growth Label */}
+                         <Badge 
+                            variant="secondary" 
+                            className="absolute -top-3 right-0 z-10 text-[10px] h-5 px-1.5 bg-background shadow-sm border"
+                         >
+                            {totalGrowth > 0 ? '+' : ''}{totalGrowth}%
+                         </Badge>
+                         
+                         <ResponsiveContainer width="100%" height="100%">
+                           <AreaChart data={chartData}>
+                              <defs>
+                                <linearGradient id={`gradient-${item.id}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                </linearGradient>
+                              </defs>
+                              <Tooltip 
+                                 content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                    return (
+                                        <div className="rounded-lg border bg-background p-2 shadow-sm text-xs">
+                                        <span className="font-bold text-muted-foreground">
+                                            {payload[0].payload.year}:
+                                        </span>
+                                        <span className="font-bold ml-1">
+                                            {payload[0].value}
+                                        </span>
+                                        </div>
+                                    );
+                                    }
+                                    return null;
+                                }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="value"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                fill={`url(#gradient-${item.id})`}
+                              />
+                           </AreaChart>
+                         </ResponsiveContainer>
                       </div>
-
-                      <div>
-                        <h4 className="font-medium mb-2">Required Skills</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {(job.aiGeneratedSkills || job.requiredSkills).map(
-                            (skill, index) => {
-                              const hasSkill = userSkillsSet.has(
-                                skill.toLowerCase(),
-                              );
-                              return (
-                                <div
-                                  key={index}
-                                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors ${
-                                    hasSkill
-                                      ? "bg-green-500 text-white"
-                                      : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                  }`}
-                                >
-                                  <div className="flex-shrink-0">
-                                    {hasSkill ? (
-                                      <CheckCircle className="h-4 w-4 text-white" />
-                                    ) : (
-                                      <XCircle className="h-4 w-4" />
-                                    )}
-                                  </div>
-                                  <span className="text-sm font-medium whitespace-nowrap">
-                                    {skill}
-                                  </span>
-                                </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    </CardContent>
+                  </Card>
+                );
+                })}
+                </div>
+                );
+              })()
             ) : (
               <Card>
                 <CardContent className="text-center py-8">

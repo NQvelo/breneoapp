@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Plus, Trash2, X, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MonthYearPicker } from "@/components/profile/MonthYearPicker";
 import type {
   WorkExperienceEntry,
   WorkExperiencePayload,
@@ -255,6 +256,27 @@ type FormEntry = {
   is_current: boolean;
 };
 
+function toMonthValue(dateValue?: string | null): string {
+  if (!dateValue) return "";
+  return dateValue.slice(0, 7);
+}
+
+function monthToStartDate(monthValue: string): string {
+  return monthValue ? `${monthValue}-01` : "";
+}
+
+function monthToEndDate(monthValue: string): string {
+  if (!monthValue) return "";
+  const [yearRaw, monthRaw] = monthValue.split("-");
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return "";
+  }
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${monthValue}-${String(lastDay).padStart(2, "0")}`;
+}
+
 function toFormEntry(e: WorkExperienceEntry): FormEntry {
   return {
     id: e.id,
@@ -262,8 +284,8 @@ function toFormEntry(e: WorkExperienceEntry): FormEntry {
     company: e.company ?? "",
     job_type: e.job_type ?? "",
     location: e.location ?? "",
-    start_date: e.start_date ?? "",
-    end_date: e.is_current ? "" : (e.end_date ?? ""),
+    start_date: toMonthValue(e.start_date),
+    end_date: e.is_current ? "" : toMonthValue(e.end_date),
     is_current: e.is_current ?? false,
   };
 }
@@ -357,8 +379,10 @@ export function EditWorkExperienceModal({
           company: r.company.trim(),
           job_type: r.job_type.trim() || null,
           location: r.location.trim() || null,
-          start_date: r.start_date,
-          end_date: r.is_current ? undefined : r.end_date.trim() || undefined,
+          start_date: monthToStartDate(r.start_date.trim()),
+          end_date: r.is_current
+            ? undefined
+            : monthToEndDate(r.end_date.trim()) || undefined,
           is_current: r.is_current,
         };
         if (r.id == null) {
@@ -493,22 +517,16 @@ export function EditWorkExperienceModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="space-y-2">
                       <Label>Start date</Label>
-                      <Input
-                        type="date"
+                      <MonthYearPicker
                         value={row.start_date}
-                        onChange={(e) =>
-                          updateRow(index, "start_date", e.target.value)
-                        }
+                        onChange={(nextValue) => updateRow(index, "start_date", nextValue)}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>End date</Label>
-                      <Input
-                        type="date"
+                      <MonthYearPicker
                         value={row.end_date}
-                        onChange={(e) =>
-                          updateRow(index, "end_date", e.target.value)
-                        }
+                        onChange={(nextValue) => updateRow(index, "end_date", nextValue)}
                         disabled={row.is_current}
                       />
                     </div>

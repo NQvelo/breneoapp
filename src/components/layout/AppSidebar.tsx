@@ -175,7 +175,7 @@ export function AppSidebar({
 
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F3F3F4]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 ">
-        <nav className="flex justify-around items-center py-2">
+        <nav className="flex justify-around items-center py-3">
           {mobileNavItems.map((item, index) => {
             let isActive = currentPath === item.href;
             if (item.href === "/home") {
@@ -199,7 +199,7 @@ export function AppSidebar({
                 key={index}
                 to={item.href}
                 className={cn(
-                  "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-1",
+                  "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-0",
                   isActive
                     ? "text-gray-600"
                     : "text-gray-600 hover:text-breneo-blue",
@@ -208,7 +208,7 @@ export function AppSidebar({
                 <item.icon
                   size={20}
                   className={cn(
-                    "transition-colors duration-200 mb-1",
+                    "transition-colors duration-200 mb-0.5",
                     isActive
                       ? "text-breneo-blue"
                       : "text-gray-600 group-hover:text-breneo-blue",
