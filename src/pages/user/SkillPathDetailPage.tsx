@@ -813,10 +813,10 @@ const SkillPathDetailPage = () => {
                   </div>
                 </div>
 
-                <div className="flex-1 space-y-3">
-                  <div className="rounded-2xl border bg-background/80 p-4">
+                <div className="flex flex-1 flex-col justify-center gap-3">
+                  <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                      Estimated Monthly Range
+                      Estimated yearly Range
                     </p>
                     <div className="text-3xl font-bold text-foreground tracking-tight">
                       {salaryInfo}

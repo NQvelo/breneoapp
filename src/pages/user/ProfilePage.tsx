@@ -51,6 +51,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -95,6 +96,8 @@ import {
   EditSkillsModal,
 } from "@/components/profile";
 import { refreshUserIndustryProfile } from "@/services/industry/refreshUserIndustryProfile";
+import { parseResumePdf } from "@/services/resume/resumeImportService";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface SkillTestResult {
   final_role?: string;
@@ -378,6 +381,9 @@ const extractJobSkills = (job: Record<string, unknown>): string[] => {
   return [...new Set(skills)];
 };
 
+const normalizeSkillName = (value: string): string =>
+  value.replace(/\s+/g, " ").trim();
+
 const ProfilePage = () => {
   // ✅ Get user, loading state, and logout function from AuthContext
   const { user, loading, logout } = useAuth();
@@ -386,6 +392,7 @@ const ProfilePage = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const t = useTranslation();
+  const { subscriptionInfo, loading: subscriptionLoading } = useSubscription();
 
   // State for skill test results
   const [skillResults, setSkillResults] = useState<SkillTestResult | null>(
@@ -403,6 +410,8 @@ const ProfilePage = () => {
     "courses",
   );
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [importingCv, setImportingCv] = useState(false);
+  const [cvImportProgress, setCvImportProgress] = useState(0);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
 
   // Update active view based on hash
@@ -1731,16 +1740,24 @@ const ProfilePage = () => {
     setWorkExperiences(Array.isArray(freshList) ? freshList : []);
     if (user?.id) {
       try {
-        await refreshUserIndustryProfile(String(user.id), Array.isArray(freshList) ? freshList : []);
+        await refreshUserIndustryProfile(
+          String(user.id),
+          Array.isArray(freshList) ? freshList : [],
+        );
       } catch (err) {
-        const status = err && typeof err === "object" && "response" in err
-          ? (err as { response?: { status?: number } }).response?.status
-          : undefined;
+        const status =
+          err && typeof err === "object" && "response" in err
+            ? (err as { response?: { status?: number } }).response?.status
+            : undefined;
         console.error("[Industry profile] refresh failed:", status, err);
         if (status === 404) {
-          console.warn("[Industry profile] 404 – is PUT /api/me/industry-profile/ registered in Django?");
+          console.warn(
+            "[Industry profile] 404 – is PUT /api/me/industry-profile/ registered in Django?",
+          );
         } else if (status === 401) {
-          console.warn("[Industry profile] 401 – auth token may be missing or invalid.");
+          console.warn(
+            "[Industry profile] 401 – auth token may be missing or invalid.",
+          );
         }
       }
     }
@@ -1788,6 +1805,167 @@ const ProfilePage = () => {
     } finally {
       setUpdatingAboutMe(false);
     }
+  };
+
+  const toEducationKey = (entry: {
+    school_name?: string;
+    major?: string;
+    start_date?: string;
+    end_date?: string | null;
+  }) =>
+    [
+      (entry.school_name || "").trim().toLowerCase(),
+      (entry.major || "").trim().toLowerCase(),
+      (entry.start_date || "").trim(),
+      (entry.end_date || "").trim(),
+    ].join("|");
+
+  const toWorkKey = (entry: {
+    company?: string;
+    job_title?: string;
+    start_date?: string;
+    end_date?: string | null;
+  }) =>
+    [
+      (entry.company || "").trim().toLowerCase(),
+      (entry.job_title || "").trim().toLowerCase(),
+      (entry.start_date || "").trim(),
+      (entry.end_date || "").trim(),
+    ].join("|");
+
+  const handleCvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (subscriptionInfo?.is_active !== true) {
+      navigate({
+        pathname: location.pathname,
+        search: "?upgrade=true",
+      });
+      return;
+    }
+
+    const isPdf =
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Please upload a PDF CV file.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("CV file size must be 10MB or less.");
+      return;
+    }
+
+    setImportingCv(true);
+    setCvImportProgress(3);
+    try {
+      const parsed = await parseResumePdf(file, (percent) => {
+        setCvImportProgress((prev) => Math.max(prev, percent));
+      });
+      setCvImportProgress((prev) => Math.max(prev, 92));
+
+      let createdEducationCount = 0;
+      let createdWorkCount = 0;
+      let createdSkillCount = 0;
+      let aboutMeUpdated = false;
+
+      if (parsed.aboutMe?.trim()) {
+        await profileApi.updateProfile({ about_me: parsed.aboutMe.trim() });
+        setAboutMe(parsed.aboutMe.trim());
+        setAboutMeText(parsed.aboutMe.trim());
+        aboutMeUpdated = true;
+      }
+
+      const existingEducationKeys = new Set(
+        educations.map((e) => toEducationKey(e)),
+      );
+      for (const education of parsed.educations) {
+        const key = toEducationKey(education);
+        if (existingEducationKeys.has(key)) continue;
+        await profileApi.createEducation(education);
+        existingEducationKeys.add(key);
+        createdEducationCount += 1;
+      }
+
+      const existingWorkKeys = new Set(
+        workExperiences.map((w) => toWorkKey(w)),
+      );
+      for (const work of parsed.workExperiences) {
+        const key = toWorkKey(work);
+        if (existingWorkKeys.has(key)) continue;
+        await profileApi.createWorkExperience(work);
+        existingWorkKeys.add(key);
+        createdWorkCount += 1;
+      }
+
+      const existingSkills = new Set(
+        profileSkills.map((s) =>
+          normalizeSkillName(s.skill_name).toLowerCase(),
+        ),
+      );
+      for (const skill of parsed.skills) {
+        const normalized = normalizeSkillName(skill).toLowerCase();
+        if (!normalized || existingSkills.has(normalized)) continue;
+        await profileApi.addSkill(skill);
+        existingSkills.add(normalized);
+        createdSkillCount += 1;
+      }
+
+      await fetchEducations();
+      const freshWork = await profileApi.getWorkExperiences().catch(() => []);
+      setWorkExperiences(Array.isArray(freshWork) ? freshWork : []);
+      await fetchProfileSkills();
+
+      if (user?.id) {
+        try {
+          await refreshUserIndustryProfile(
+            String(user.id),
+            Array.isArray(freshWork) ? freshWork : [],
+          );
+        } catch (err) {
+          console.error(
+            "[Industry profile] refresh after CV import failed:",
+            err,
+          );
+        }
+      }
+
+      const insertedTotal =
+        createdEducationCount + createdWorkCount + createdSkillCount;
+      if (!insertedTotal && !aboutMeUpdated) {
+        toast.info("CV parsed, but no new profile data was found to import.");
+      } else {
+        toast.success(
+          `CV imported: ${createdEducationCount} education, ${createdWorkCount} work experience, ${createdSkillCount} skills${aboutMeUpdated ? ", about me updated" : ""}.`,
+        );
+      }
+      setCvImportProgress(100);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to parse and import CV.";
+      toast.error(message);
+    } finally {
+      setTimeout(() => {
+        setImportingCv(false);
+        setCvImportProgress(0);
+      }, 600);
+    }
+  };
+
+  const triggerCvUpload = () => {
+    if (subscriptionLoading) return;
+    const isPremium = subscriptionInfo?.is_active === true;
+    if (!isPremium) {
+      navigate({
+        pathname: location.pathname,
+        search: "?upgrade=true",
+      });
+      return;
+    }
+    document.getElementById("cv-upload-input")?.click();
   };
 
   const handleSendPhoneVerification = async () => {
@@ -2374,6 +2552,14 @@ const ProfilePage = () => {
               </div>
             </CardHeader>
             <CardContent className="px-6 pb-6">
+              <input
+                id="cv-upload-input"
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                onChange={handleCvUpload}
+                disabled={importingCv}
+              />
               <div className="flex flex-row items-center gap-4 mb-4">
                 <div className="flex-shrink-0">
                   <div
@@ -2466,22 +2652,123 @@ const ProfilePage = () => {
             </CardContent>
           </Card>
 
+          {/* Skill/Resume Quick Actions */}
+          <div className="grid grid-cols-2 gap-3 md:gap-4 w-full">
+            <Card className="bg-white transition-all w-full rounded-3xl border-0 hover:shadow-soft transition-shadow cursor-pointer">
+              <CardContent className="p-3 md:p-4">
+                {loadingResults ? (
+                  <div className="flex items-center justify-center min-h-[96px] md:min-h-[120px]">
+                    <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                  </div>
+                ) : skillResults?.final_role || getAllSkills().length > 0 ? (
+                  <Link to="/skill-path" className="block cursor-pointer group">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                        <h3 className="font-bold text-base md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[2.4rem] md:min-h-[3rem]">
+                          {t.home.skillPathTitle}
+                        </h3>
+                        <p className="hidden md:block text-sm text-gray-900">
+                          {t.home.skillPathSubtitle}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0 w-16 h-16 md:w-28 md:h-28 flex items-center justify-center">
+                        <img
+                          src="/lovable-uploads/checklisto.png"
+                          alt="Checklist"
+                          className="w-14 h-14 md:w-24 md:h-24 object-contain"
+                        />
+                      </div>
+                    </div>
+                  </Link>
+                ) : (
+                  <Link to="/skill-test" className="block cursor-pointer group">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                        <h3 className="font-bold text-base md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[2.4rem] md:min-h-[3rem]">
+                          {t.home.skillTestTitle}
+                        </h3>
+                        <p className="hidden md:block text-sm text-gray-900">
+                          {t.home.skillTestSubtitle}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0 w-16 h-16 md:w-28 md:h-28 flex items-center justify-center">
+                        <img
+                          src="/lovable-uploads/3dicons-target-front-color.png"
+                          alt="Skill test"
+                          className="w-14 h-14 md:w-full md:h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white transition-all w-full rounded-3xl border-0 hover:shadow-soft transition-shadow cursor-pointer">
+              <CardContent className="p-3 md:p-4">
+                <button
+                  type="button"
+                  onClick={triggerCvUpload}
+                  disabled={importingCv || subscriptionLoading}
+                  className="w-full text-left group disabled:opacity-70"
+                >
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                      <h3 className="font-bold text-base md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[2.4rem] md:min-h-[3rem]">
+                        {importingCv ? "Importing Resume..." : "Import Resume"}
+                      </h3>
+                      <p className="text-xs font-semibold text-breneo-blue">
+                        Premium feature
+                      </p>
+                      <p className="hidden md:block text-sm text-gray-900">
+                        Upload a PDF CV and auto-fill profile, education, work
+                        experience, and skills.
+                      </p>
+                      {importingCv && (
+                        <div className="mt-1.5 space-y-1">
+                          <Progress
+                            value={cvImportProgress}
+                            className="h-2 bg-blue-100"
+                          />
+                          <p className="text-xs text-gray-600">
+                            {cvImportProgress}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 w-16 h-16 md:w-28 md:h-28 flex items-center justify-center">
+                      {importingCv ? (
+                        <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
+                      ) : (
+                        <img
+                          src="/lovable-uploads/document-uploado.png"
+                          alt="Document upload"
+                          className="w-14 h-14 md:w-24 md:h-24 object-contain"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </button>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* 2. About Me */}
           <Card className="border-0 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              About Me
-            </h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-full"
-              onClick={handleOpenAboutMeModal}
-              aria-label="Edit about me"
-            >
-              <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-            </Button>
-          </CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                About Me
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={handleOpenAboutMeModal}
+                aria-label="Edit about me"
+              >
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+            </CardHeader>
             <CardContent className="px-6 py-4">
               {loadingProfile ? (
                 <div className="text-center py-4 text-gray-500">Loading...</div>
@@ -2770,7 +3057,9 @@ const ProfilePage = () => {
               {loadingSavedCourses ? (
                 <div className="flex flex-col justify-center items-center py-20 bg-white/50 dark:bg-[#242424]/50">
                   <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
-                  <p className="text-sm text-gray-500 font-medium">Loading...</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Loading...
+                  </p>
                 </div>
               ) : savedCourses.length === 0 ? (
                 <div className="p-12 text-center bg-card/50">
@@ -3004,14 +3293,14 @@ const ProfilePage = () => {
               {loadingSavedJobs ? (
                 <div className="flex flex-col justify-center items-center py-20 bg-white/50 dark:bg-[#242424]/50">
                   <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
-                  <p className="text-sm text-gray-500 font-medium">Loading...</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Loading...
+                  </p>
                 </div>
               ) : savedJobs.length === 0 ? (
                 <div className="p-12 text-center bg-card/50">
                   <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    No saved jobs
-                  </h3>
+                  <h3 className="text-lg font-semibold mb-2">No saved jobs</h3>
                   <p className="text-gray-500 mb-4">
                     Start saving jobs to view them here!
                   </p>
