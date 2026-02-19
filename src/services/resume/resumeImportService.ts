@@ -316,7 +316,6 @@ async function callResumeApi(
 
   const raw = await new Promise<UnknownRecord>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.withCredentials = true;
 
     xhr.upload.onprogress = (event) => {
       if (!event.lengthComputable || event.total <= 0) return;

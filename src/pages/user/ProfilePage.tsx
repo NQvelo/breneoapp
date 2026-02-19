@@ -53,6 +53,19 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+} from "@/components/ui/drawer";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -412,6 +425,7 @@ const ProfilePage = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [importingCv, setImportingCv] = useState(false);
   const [cvImportProgress, setCvImportProgress] = useState(0);
+  const [isCvUploadDoneModalOpen, setIsCvUploadDoneModalOpen] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
 
   // Update active view based on hash
@@ -1941,6 +1955,7 @@ const ProfilePage = () => {
         );
       }
       setCvImportProgress(100);
+      setIsCvUploadDoneModalOpen(true);
     } catch (error) {
       const message =
         error instanceof Error
@@ -2523,7 +2538,7 @@ const ProfilePage = () => {
       </div>
 
       {activeView === "profile" ? (
-        <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
+        <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
           {/* 1. Personal information */}
           <Card className="border-0 rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
@@ -3706,6 +3721,52 @@ const ProfilePage = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* CV Upload Completed Modal (same pattern as filter modals: desktop dialog, mobile drawer) */}
+      {isMobile ? (
+        <Drawer
+          open={isCvUploadDoneModalOpen}
+          onOpenChange={setIsCvUploadDoneModalOpen}
+        >
+          <DrawerContent className="rounded-t-3xl">
+            <DrawerHeader>
+              <DrawerTitle>CV Upload Completed</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-2 text-sm text-gray-700 dark:text-gray-300">
+              CV uploading process finished. You can now see the result in your
+              profile.
+            </div>
+            <DrawerFooter>
+              <Button onClick={() => setIsCvUploadDoneModalOpen(false)}>
+                Got it
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog
+          open={isCvUploadDoneModalOpen}
+          onOpenChange={setIsCvUploadDoneModalOpen}
+        >
+          <DialogContent className="sm:max-w-md rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>CV Upload Completed</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              CV uploading process finished. You can now see the result in your
+              profile.
+            </p>
+            <div className="pt-2">
+              <Button
+                className="w-full"
+                onClick={() => setIsCvUploadDoneModalOpen(false)}
+              >
+                Got it
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 };
