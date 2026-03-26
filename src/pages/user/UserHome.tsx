@@ -63,6 +63,7 @@ import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { getCompanyLogo } from "@/utils/companyLogoFetcher";
+import { OnboardingModal } from "@/components/common/OnboardingModal";
 
 // extractJobSkills is now imported from @/utils/jobMatchUtils
 
@@ -291,7 +292,7 @@ const UserHome = () => {
   const coursesScrollRef = useRef<HTMLDivElement>(null);
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
-  const [isBetaModalOpen, setIsBetaModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // Profile skills (same source as job detail page for identical total match)
   const { data: profileSkills = [] } = useQuery({
@@ -457,10 +458,18 @@ const UserHome = () => {
     fetchUserSkills();
   }, [user]);
 
-  // Open beta modal when component mounts
+  // Open onboarding modal if it's user's first time
   useEffect(() => {
-    setIsBetaModalOpen(true);
+    const onboardingShown = localStorage.getItem("breneo_onboarding_shown");
+    if (!onboardingShown) {
+      setIsOnboardingOpen(true);
+    }
   }, []);
+
+  const handleCloseOnboarding = () => {
+    setIsOnboardingOpen(false);
+    localStorage.setItem("breneo_onboarding_shown", "true");
+  };
 
   // Fetch saved jobs
   const { data: savedJobs = [] } = useQuery<string[]>({
@@ -1485,6 +1494,11 @@ const UserHome = () => {
           </div>
         </div>
       </div>
+      <OnboardingModal 
+        isOpen={isOnboardingOpen} 
+        onClose={handleCloseOnboarding} 
+      />
+      <BetaVersionModal />
     </DashboardLayout>
   );
 };

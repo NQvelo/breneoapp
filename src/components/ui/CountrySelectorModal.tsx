@@ -88,7 +88,7 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
   if (isMobile) {
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="h-[85vh]">
+        <DrawerContent className="h-[85vh] bg-white dark:bg-white border-none">
           <DrawerHeader>
             <DrawerTitle>Select Country</DrawerTitle>
           </DrawerHeader>

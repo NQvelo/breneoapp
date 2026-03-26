@@ -172,7 +172,9 @@ const SkillTestPage = () => {
                   </span>
                 </div>
               )}
-              <BreneoLogo
+              <img
+                src="/lovable-uploads/breneo-only-logo.png"
+                alt="Breneo Logo"
                 className={`h-7 w-7 md:hidden object-contain transition-opacity duration-300 ${
                   logoLoaded ? "opacity-100" : "opacity-0"
                 }`}
@@ -303,7 +305,9 @@ const SkillTestPage = () => {
                 </span>
               </div>
             )}
-            <BreneoLogo
+            <img
+              src="/lovable-uploads/breneo-only-logo.png"
+              alt="Breneo Logo"
               className={`h-7 w-7 md:hidden object-contain transition-opacity duration-300 ${
                 logoLoaded ? "opacity-100" : "opacity-0"
               }`}

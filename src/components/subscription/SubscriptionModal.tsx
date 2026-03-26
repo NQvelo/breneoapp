@@ -160,7 +160,7 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
             >
               <div className="px-4 pt-4 pb-3 flex items-center gap-1 border-b border-gray-100 dark:border-gray-800">
                 <h3 className="text-xl font-black text-gray-900 dark:text-gray-100 leading-tight">
-                  {plan.name} Plan
+                 Breneo {plan.name}
                 </h3>
                 {hasFire && <span className="text-base">🔥</span>}
                 {subscriptionInfo?.is_active &&

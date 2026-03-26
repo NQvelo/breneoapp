@@ -131,6 +131,24 @@ const EmailVerification: React.FC = () => {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").trim();
+    
+    // Only process if it's a 6-digit number
+    if (/^\d{6}$/.test(pastedData)) {
+      const newCode = pastedData.split("");
+      setCode(newCode);
+      
+      // Focus the last input
+      inputRefs.current[5]?.focus();
+      
+      toast.success("Code pasted successfully");
+    } else {
+      toast.error("Please paste a valid 6-digit code");
+    }
+  };
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -299,6 +317,7 @@ const EmailVerification: React.FC = () => {
                       value={digit}
                       onChange={(e) => handleCodeChange(index, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(index, e)}
+                      onPaste={index === 0 ? handlePaste : undefined}
                       maxLength={1}
                       required
                       disabled={isLoading}
