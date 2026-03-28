@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 
 interface SavedCourse {
@@ -46,6 +45,20 @@ interface SavedJob {
   employment_type?: string;
   work_arrangement?: string;
 }
+
+type ApiCourse = {
+  id?: string | number | null;
+  title?: string | null;
+  academy_name?: string | null;
+  language?: string | null;
+  location?: string | null;
+  level?: string | null;
+  total_duration?: string | null;
+  cover_image_url?: string | null;
+  lecturer_photo_url?: string | null;
+  description?: string | null;
+  academy_id?: string | number | null;
+};
 
 /**
  * Normalizes image paths to ensure they're absolute
@@ -96,18 +109,33 @@ const SavedPage = () => {
         return [];
 
       try {
-        // Fetch course details from Supabase
-        const { data: coursesData, error: coursesError } = await supabase
-          .from("courses")
-          .select(
-            "id, title, provider, category, level, duration, image, description, academy_id",
-          )
-          .in("id", savedCourseIds);
-
-        if (coursesError) {
-          console.error("Error fetching saved course details:", coursesError);
+        const response = await fetch(
+          "https://web-production-80ed8.up.railway.app/api/courses/",
+        );
+        if (!response.ok) {
+          console.error("Error fetching courses:", response.statusText);
           return [];
         }
+
+        const data: unknown = await response.json();
+        const allCourses: ApiCourse[] = Array.isArray(data)
+          ? (data as ApiCourse[])
+          : [];
+
+        const coursesData = allCourses
+          .filter((c) => savedCourseIds.includes(String(c?.id)))
+          .map((c) => ({
+            id: String(c?.id ?? ""),
+            title: String(c?.title ?? ""),
+            provider: String(c?.academy_name ?? ""),
+            category: String(c?.language ?? c?.location ?? ""),
+            level: String(c?.level ?? ""),
+            duration: String(c?.total_duration ?? ""),
+            image: normalizeImagePath(c?.cover_image_url || c?.lecturer_photo_url),
+            description: String(c?.description ?? ""),
+            academy_id:
+              c?.academy_id != null ? String(c.academy_id) : (null as string | null),
+          }));
 
         // Get unique academy_ids
         const uniqueAcademyIds = [

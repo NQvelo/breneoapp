@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "@/api/auth/apiClient";
@@ -32,8 +33,19 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  /** Academy name, email, and verification status (set once per session) */
-  academyDisplay: { name: string; email: string; is_verified?: boolean } | null;
+  /** Academy name, email, photo (from academy profile row), verification — JWT alone does not refresh photo after upload */
+  academyDisplay: {
+    name: string;
+    email: string;
+    is_verified?: boolean;
+    profile_image?: string | null;
+  } | null;
+  updateAcademyDisplay: (partial: {
+    name?: string;
+    email?: string;
+    is_verified?: boolean;
+    profile_image?: string | null;
+  }) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   register: (email: string, password: string) => Promise<void>;
@@ -42,7 +54,7 @@ interface AuthContextType {
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(
-  undefined
+  undefined,
 );
 
 // ✅ START: FIX - Re-added helper function to find the user object
@@ -63,7 +75,7 @@ const extractUserFromData = (data: unknown): User | null => {
         const academyRole = obj.roles.find(
           (r: unknown) =>
             typeof r === "string" &&
-            (r === "academy" || r.toLowerCase() === "academy")
+            (r === "academy" || r.toLowerCase() === "academy"),
         );
         if (academyRole) return String(academyRole);
         return String(obj.roles[0]);
@@ -172,6 +184,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     name: string;
     email: string;
     is_verified?: boolean;
+    profile_image?: string | null;
   } | null>(null);
   const navigate = useNavigate();
   const { preloadImage } = useImagePreloader();
@@ -239,7 +252,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               const academyRole = payload.roles.find(
                 (r: unknown) =>
                   typeof r === "string" &&
-                  (r === "academy" || r.toLowerCase() === "academy")
+                  (r === "academy" || r.toLowerCase() === "academy"),
               );
               roleFromToken = academyRole || payload.roles[0];
             }
@@ -269,7 +282,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Only clear if we're certain it's invalid (e.g., malformed)
           // For now, preserve tokens and try to continue with API call
           console.warn(
-            "⚠️ JWT decode failed, but preserving token and attempting API call"
+            "⚠️ JWT decode failed, but preserving token and attempting API call",
           );
           // Don't clear tokens - let the API call determine if token is valid
           // If API call fails with 401, the interceptor will handle it
@@ -286,66 +299,66 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           userData = jwtUserData;
         } else {
           try {
-          const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+            const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
 
-          // console.log(
-          //   "🔍 Profile response raw data:",
-          //   JSON.stringify(res.data, null, 2)
-          // );
-
-          // ✅ DEBUG: Check for roles in user_roles array or similar structures
-          const responseData = res.data as Record<string, unknown>;
-          if (
-            responseData.user_roles &&
-            Array.isArray(responseData.user_roles)
-          ) {
             // console.log(
-            //   "🔍 Found user_roles array in response:",
-            //   responseData.user_roles
+            //   "🔍 Profile response raw data:",
+            //   JSON.stringify(res.data, null, 2)
             // );
-            // Try to find academy role
-            const academyRoleEntry = (
-              responseData.user_roles as Array<Record<string, unknown>>
-            ).find(
-              (roleEntry: Record<string, unknown>) =>
-                roleEntry.role === "academy" || roleEntry.role === "academy"
-            );
-            if (academyRoleEntry) {
+
+            // ✅ DEBUG: Check for roles in user_roles array or similar structures
+            const responseData = res.data as Record<string, unknown>;
+            if (
+              responseData.user_roles &&
+              Array.isArray(responseData.user_roles)
+            ) {
               // console.log(
-              //   "✅ Found academy role in user_roles:",
-              //   academyRoleEntry
+              //   "🔍 Found user_roles array in response:",
+              //   responseData.user_roles
               // );
-              // Add role to response data if not present
-              if (!responseData.user_type && !responseData.role) {
-                responseData.user_type = "academy";
-                // console.log("✅ Set user_type to 'academy' from user_roles");
+              // Try to find academy role
+              const academyRoleEntry = (
+                responseData.user_roles as Array<Record<string, unknown>>
+              ).find(
+                (roleEntry: Record<string, unknown>) =>
+                  roleEntry.role === "academy" || roleEntry.role === "academy",
+              );
+              if (academyRoleEntry) {
+                // console.log(
+                //   "✅ Found academy role in user_roles:",
+                //   academyRoleEntry
+                // );
+                // Add role to response data if not present
+                if (!responseData.user_type && !responseData.role) {
+                  responseData.user_type = "academy";
+                  // console.log("✅ Set user_type to 'academy' from user_roles");
+                }
               }
             }
-          }
 
-          userData = extractUserFromData(res.data);
-          // console.log("✅ Restored user data after extraction:", userData, {
-          //   user_type: userData?.user_type,
-          //   hasUserData: !!userData,
-          // });
+            userData = extractUserFromData(res.data);
+            // console.log("✅ Restored user data after extraction:", userData, {
+            //   user_type: userData?.user_type,
+            //   hasUserData: !!userData,
+            // });
 
-          if (userData) {
-            // If successfully extracted from profile, use JWT token for ID
-            const userIdFromToken = extractUserIdFromToken(token);
-            if (userIdFromToken) {
-              userData.id = userIdFromToken;
-              // console.log("Using user ID from JWT token:", userIdFromToken);
-            } else if (!userData.id && userData.email) {
-              userData.id = userData.email;
-              // console.log("Using email as ID fallback:", userData.email);
+            if (userData) {
+              // If successfully extracted from profile, use JWT token for ID
+              const userIdFromToken = extractUserIdFromToken(token);
+              if (userIdFromToken) {
+                userData.id = userIdFromToken;
+                // console.log("Using user ID from JWT token:", userIdFromToken);
+              } else if (!userData.id && userData.email) {
+                userData.id = userData.email;
+                // console.log("Using email as ID fallback:", userData.email);
+              }
             }
+          } catch (error) {
+            console.warn("⚠️ Profile API call failed, using JWT data:", error);
+            // ✅ FIX: Don't fail session restoration if profile API fails
+            // We can still restore using JWT data and localStorage
+            userData = jwtUserData;
           }
-        } catch (error) {
-          console.warn("⚠️ Profile API call failed, using JWT data:", error);
-          // ✅ FIX: Don't fail session restoration if profile API fails
-          // We can still restore using JWT data and localStorage
-          userData = jwtUserData;
-        }
         }
 
         // If we don't have user data yet, use JWT data
@@ -370,7 +383,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!userData?.user_type && !storedRoleFromLogin) {
           try {
             const academyCheck = await apiClient.get(
-              API_ENDPOINTS.ACADEMY.PROFILE
+              API_ENDPOINTS.ACADEMY.PROFILE,
             );
             if (academyCheck.data && academyCheck.status !== 404) {
               hasAcademyProfile = true;
@@ -480,12 +493,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     res.data as Parameters<
                       typeof normalizeAcademyProfileApiResponse
                     >[0],
-                    userData.id != null ? String(userData.id) : undefined
+                    userData.id != null ? String(userData.id) : undefined,
                   );
                   setAcademyDisplay({
                     name: normalized.academy_name || "",
                     email: normalized.contact_email || "",
                     is_verified: normalized.is_verified ?? false,
+                    profile_image: normalized.logo_url ?? null,
                   });
                 } else {
                   setAcademyDisplay(null);
@@ -524,12 +538,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     restoreSession();
   }, []); // Empty dependency array - only run once on mount
 
-  // Preload image when user data changes
+  // Preload avatar when user or academy display image URL changes
   useEffect(() => {
-    if (user?.profile_image) {
-      preloadImageRef.current(user.profile_image).catch(console.error);
+    for (const url of [
+      academyDisplay?.profile_image,
+      user?.profile_image,
+    ] as (string | null | undefined)[]) {
+      if (url) preloadImageRef.current(url).catch(console.error);
     }
-  }, [user?.profile_image]); // Only depend on the image URL
+  }, [academyDisplay?.profile_image, user?.profile_image]);
 
   // ✅ CRITICAL FIX: Redirect users ONLY when necessary
   // Preserves current route on refresh if user is on a valid route for their role
@@ -711,7 +728,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (!token) {
         throw new Error(
-          "Login succeeded but did not return the required token (access or token field)."
+          "Login succeeded but did not return the required token (access or token field).",
         );
       }
 
@@ -719,7 +736,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       TokenManager.setTokens(token, refreshToken || "");
       if (!refreshToken) {
         console.warn(
-          "Login: No refresh token in response. Session may expire when access token expires. Backend should return a refresh token for persistent sessions."
+          "Login: No refresh token in response. Session may expire when access token expires. Backend should return a refresh token for persistent sessions.",
         );
       }
 
@@ -782,7 +799,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         let hasAcademyProfile = false;
         try {
           const academyCheck = await apiClient.get(
-            API_ENDPOINTS.ACADEMY.PROFILE
+            API_ENDPOINTS.ACADEMY.PROFILE,
           );
           if (academyCheck.data && academyCheck.status !== 404) {
             hasAcademyProfile = true;
@@ -832,12 +849,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 res.data as Parameters<
                   typeof normalizeAcademyProfileApiResponse
                 >[0],
-                userData.id != null ? String(userData.id) : undefined
+                userData.id != null ? String(userData.id) : undefined,
               );
               setAcademyDisplay({
                 name: normalized.academy_name || "",
                 email: normalized.contact_email || "",
                 is_verified: normalized.is_verified ?? false,
+                profile_image: normalized.logo_url ?? null,
               });
             } else {
               setAcademyDisplay(null);
@@ -917,12 +935,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const updateAcademyDisplay = useCallback(
+    (partial: {
+      name?: string;
+      email?: string;
+      is_verified?: boolean;
+      profile_image?: string | null;
+    }) => {
+      setAcademyDisplay((prev) => ({
+        name: partial.name ?? prev?.name ?? "",
+        email: partial.email ?? prev?.email ?? "",
+        is_verified: partial.is_verified ?? prev?.is_verified ?? false,
+        profile_image:
+          partial.profile_image !== undefined
+            ? partial.profile_image
+            : (prev?.profile_image ?? null),
+      }));
+    },
+    [],
+  );
+
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
         academyDisplay,
+        updateAcademyDisplay,
         login,
         logout,
         register,

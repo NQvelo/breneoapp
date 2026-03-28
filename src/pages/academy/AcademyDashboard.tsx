@@ -17,7 +17,6 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeAcademyProfileApiResponse } from "@/api/academy";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
 // Interfaces
 interface Course {
@@ -34,7 +33,7 @@ interface Course {
   enrolled: boolean;
   popular: boolean;
   is_academy_course: boolean;
-  created_at: string;
+  created_at?: string;
 }
 
 interface AcademyProfile {
@@ -47,6 +46,22 @@ interface AcademyProfile {
   is_verified: boolean;
   logo_url: string | null;
 }
+
+type ApiCourseFull = {
+  id?: string | number | null;
+  title?: string | null;
+  description?: string | null;
+  language?: string | null;
+  location?: string | null;
+  level?: string | null;
+  total_duration?: string | null;
+  academy_name?: string | null;
+  required_skills?: unknown;
+  cover_image_url?: string | null;
+  lecturer_photo_url?: string | null;
+  is_enrolled?: boolean | null;
+  created_at?: string | null;
+};
 
 const AcademyDashboard = () => {
   const navigate = useNavigate();
@@ -85,10 +100,13 @@ const AcademyDashboard = () => {
         setAcademyProfile(academyProfile);
         console.log("✅ Academy profile loaded from API:", academyProfile);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to load academy profile:", error);
+      const axiosError = error as {
+        response?: { status?: number };
+      };
       // If 404, academy profile doesn't exist yet
-      if (error.response?.status === 404) {
+      if (axiosError.response?.status === 404) {
         toast.error("Please set up your academy profile first");
       } else {
         toast.error("Failed to load academy profile");
@@ -102,30 +120,57 @@ const AcademyDashboard = () => {
     if (!academyProfile) return;
 
     try {
-      // Fetch courses from Supabase filtered by academy_id
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("academy_id", academyProfile.id)
-        .order("created_at", { ascending: false });
+      const url = new URL(
+        "https://web-production-80ed8.up.railway.app/api/courses/",
+      );
+      url.searchParams.set("academy_name", academyProfile.academy_name);
 
-      if (error) {
-        throw error;
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(response.statusText);
       }
 
-      const coursesData = (data || []).map((course) => ({
-        ...course,
-        required_skills: course.required_skills || [],
-        topics: course.topics || [],
-        enrolled: course.enrolled || false,
-        popular: course.popular || false,
-        is_academy_course: course.is_academy_course || false,
-      })) as Course[];
+      const data: unknown = await response.json();
+      const coursesFromApi = Array.isArray(data) ? (data as ApiCourseFull[]) : [];
 
-      setCourses(coursesData);
-    } catch (error: any) {
+      setCourses(
+        coursesFromApi.map((course) => {
+          const id = course.id != null ? String(course.id) : "";
+          const imageCandidate =
+            course.cover_image_url || course.lecturer_photo_url || "";
+          const image =
+            imageCandidate &&
+            !imageCandidate.startsWith("/") &&
+            !imageCandidate.startsWith("http")
+              ? `/${imageCandidate}`
+              : imageCandidate || "/lovable-uploads/no_photo.png";
+
+          const requiredSkills = Array.isArray(course.required_skills)
+            ? course.required_skills.map((s) => String(s))
+            : [];
+
+          return {
+            id,
+            title: String(course.title ?? ""),
+            description: String(course.description ?? ""),
+            category: String(course.language ?? course.location ?? ""),
+            level: String(course.level ?? ""),
+            duration: String(course.total_duration ?? ""),
+            provider: String(course.academy_name ?? ""),
+            required_skills: requiredSkills,
+            topics: [],
+            image,
+            enrolled: Boolean(course.is_enrolled),
+            popular: false,
+            is_academy_course: true,
+            created_at:
+              course.created_at != null ? String(course.created_at) : undefined,
+          } satisfies Course;
+        }),
+      );
+    } catch (error: unknown) {
       console.error("Error fetching courses:", error);
-      toast.error(error.message || "Failed to load courses");
+      toast.error(error instanceof Error ? error.message : "Failed to load courses");
     }
   }, [academyProfile]);
 

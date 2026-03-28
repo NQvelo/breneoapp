@@ -25,7 +25,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Heart,
   MoreVertical,
@@ -600,16 +599,19 @@ const UserHome = () => {
   const { data: courses = [], isLoading: coursesLoading } = useQuery({
     queryKey: ["home-courses"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
+      try {
+        const response = await fetch(
+          "https://web-production-80ed8.up.railway.app/api/courses/",
+        );
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        const data: unknown = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
         console.error("Error fetching courses:", error);
         return [];
       }
-      return data || [];
     },
     enabled: !!user && !loadingSkills, // Wait for skills to load
   });

@@ -24,7 +24,9 @@ export const profileApi = {
     return data as Record<string, unknown>;
   },
 
-  async updateProfile(payload: ProfilePayload): Promise<Record<string, unknown>> {
+  async updateProfile(
+    payload: ProfilePayload,
+  ): Promise<Record<string, unknown>> {
     const { data } = await apiClient.patch(PROFILE_UPDATE, payload);
     return data as Record<string, unknown>;
   },
@@ -46,11 +48,11 @@ export const profileApi = {
 
   async updateEducation(
     id: number,
-    payload: Partial<EducationPayload>
+    payload: Partial<EducationPayload>,
   ): Promise<EducationEntry> {
     const { data } = await apiClient.patch(
       `${API_ENDPOINTS.EDUCATIONS}${id}/`,
-      payload
+      payload,
     );
     return data as EducationEntry;
   },
@@ -65,29 +67,29 @@ export const profileApi = {
   },
 
   async createWorkExperience(
-    payload: WorkExperiencePayload
+    payload: WorkExperiencePayload,
   ): Promise<WorkExperienceEntry> {
     const { data } = await apiClient.post(
       API_ENDPOINTS.WORK_EXPERIENCES,
-      payload
+      payload,
     );
     return data as WorkExperienceEntry;
   },
 
   async getWorkExperience(id: number): Promise<WorkExperienceEntry> {
     const { data } = await apiClient.get(
-      `${API_ENDPOINTS.WORK_EXPERIENCES}${id}/`
+      `${API_ENDPOINTS.WORK_EXPERIENCES}${id}/`,
     );
     return data as WorkExperienceEntry;
   },
 
   async updateWorkExperience(
     id: number,
-    payload: Partial<WorkExperiencePayload>
+    payload: Partial<WorkExperiencePayload>,
   ): Promise<WorkExperienceEntry> {
     const { data } = await apiClient.patch(
       `${API_ENDPOINTS.WORK_EXPERIENCES}${id}/`,
-      payload
+      payload,
     );
     return data as WorkExperienceEntry;
   },
@@ -106,7 +108,9 @@ export const profileApi = {
     const { data } = await apiClient.get(API_ENDPOINTS.ME.INDUSTRY_PROFILE);
     const raw = data as Record<string, unknown> | undefined;
     if (!raw || typeof raw !== "object") return {};
-    const years = (raw.industry_years ?? raw.industry_years_json) as Record<string, number> | undefined;
+    const years = (raw.industry_years ?? raw.industry_years_json) as
+      | Record<string, number>
+      | undefined;
     return years && typeof years === "object" ? years : {};
   },
 

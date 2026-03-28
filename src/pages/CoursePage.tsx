@@ -39,6 +39,78 @@ interface AcademyProfile {
   description?: string | null;
 }
 
+type ApiCourse = {
+  id?: string | number | null;
+  title?: string | null;
+  academy_id?: string | number | null;
+  academy_name?: string | null;
+  cover_image_url?: string | null;
+  lecturer_photo_url?: string | null;
+  description?: string | null;
+  level?: string | null;
+  language?: string | null;
+  location?: string | null;
+  total_duration?: string | null;
+  lessons_count?: number | null;
+  price?: string | number | null;
+  registration_link?: string | null;
+  required_skills?: unknown;
+  is_enrolled?: boolean | null;
+};
+
+type CourseUi = {
+  id: string;
+  title: string;
+  provider: string;
+  category: string;
+  level: string;
+  duration: string;
+  image: string;
+  description: string;
+  topics: string[];
+  required_skills: string[];
+  academy_id: string | null;
+  lessons_count: number;
+  price: string;
+  registration_link: string | null;
+  is_enrolled: boolean;
+};
+
+const normalizeCourseImage = (value: string | null | undefined) => {
+  if (!value) return "/lovable-uploads/no_photo.png";
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (value.startsWith("/")) return value;
+  return `/${value}`;
+};
+
+const normalizeApiCourseToUi = (api: ApiCourse): CourseUi => {
+  const requiredSkills = Array.isArray(api.required_skills)
+    ? api.required_skills.map((s) => String(s))
+    : [];
+
+  const imageCandidate = api.cover_image_url || api.lecturer_photo_url || "";
+
+  return {
+    id: api.id != null ? String(api.id) : "",
+    title: String(api.title ?? ""),
+    provider: String(api.academy_name ?? ""),
+    category: String(api.language ?? api.location ?? ""),
+    level: String(api.level ?? ""),
+    duration: String(api.total_duration ?? ""),
+    image: normalizeCourseImage(imageCandidate),
+    description: String(api.description ?? ""),
+    topics: [],
+    required_skills: requiredSkills,
+    academy_id: api.academy_id != null ? String(api.academy_id) : null,
+    lessons_count:
+      typeof api.lessons_count === "number" ? api.lessons_count : 0,
+    price: api.price != null ? String(api.price) : "0.00",
+    registration_link:
+      api.registration_link != null ? String(api.registration_link) : null,
+    is_enrolled: Boolean(api.is_enrolled),
+  };
+};
+
 const CoursePage = () => {
   const { courseId } = useParams();
   const { user } = useAuth();
@@ -49,17 +121,25 @@ const CoursePage = () => {
   const { data: course, isLoading } = useQuery({
     queryKey: ["course", courseId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("id", courseId)
-        .single();
-
-      if (error) {
+      try {
+        const response = await fetch(
+          "https://web-production-80ed8.up.railway.app/api/courses/",
+        );
+        if (!response.ok) {
+          throw new Error(response.statusText);
+        }
+        const data: unknown = await response.json();
+        const allCourses: ApiCourse[] = Array.isArray(data)
+          ? (data as ApiCourse[])
+          : [];
+        const match = allCourses.find(
+          (c) => String(c?.id) === String(courseId),
+        );
+        return match ? normalizeApiCourseToUi(match) : null;
+      } catch (error) {
         console.error("Error fetching course details:", error);
         return null;
       }
-      return data;
     },
     enabled: !!courseId,
   });
@@ -613,7 +693,6 @@ const CoursePage = () => {
 
               {/* About Academy Section */}
 
-
               {/* Chips - Moved to bottom */}
               <div className="flex flex-wrap gap-2 py-6">
                 {displayTags.slice(0, 3).map((tag, index) => (
@@ -667,7 +746,10 @@ const CoursePage = () => {
                         )}
                       </div>
 
-                      <Link to={academyUrl} className="hidden sm:block flex-shrink-0">
+                      <Link
+                        to={academyUrl}
+                        className="hidden sm:block flex-shrink-0"
+                      >
                         <Button
                           variant="outline"
                           className="flex items-center gap-2"

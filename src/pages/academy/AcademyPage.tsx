@@ -119,6 +119,29 @@ interface Course {
   required_skills: string[];
 }
 
+type ApiCourse = {
+  id?: string | number | null;
+  title?: string | null;
+  academy_id?: string | number | null;
+  academy_name?: string | null;
+  cover_image_url?: string | null;
+  lecturer_photo_url?: string | null;
+  description?: string | null;
+  level?: string | null;
+  language?: string | null;
+  location?: string | null;
+  total_duration?: string | null;
+  required_skills?: unknown;
+  is_enrolled?: boolean | null;
+};
+
+const normalizeCourseImage = (value: string | null | undefined) => {
+  if (!value) return "/lovable-uploads/no_photo.png";
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (value.startsWith("/")) return value;
+  return `/${value}`;
+};
+
 interface AcademyProfile {
   id: string;
   user_id?: string;
@@ -157,7 +180,7 @@ const AcademyPage = () => {
   const slug = !isAcademyId ? academySlug : null;
 
   // Helper function to normalize API response to AcademyProfile
-  const normalizeAcademyProfile = (data: any): AcademyProfile => {
+  const normalizeAcademyProfile = (data: Record<string, unknown>): AcademyProfile => {
     if (!data) return { id: "" };
 
     // Handle different possible field names from API
@@ -189,7 +212,8 @@ const AcademyPage = () => {
 
     return {
       id: getId(),
-      user_id: data.user_id,
+      user_id:
+        typeof data.user_id === "string" ? data.user_id : undefined,
       academy_name:
         getStringField([
           "academy_name",
@@ -211,8 +235,11 @@ const AcademyPage = () => {
         ]) || undefined,
       phone_number:
         getStringField(["phone_number", "phone", "phoneNumber"]) || undefined,
-      is_verified:
-        data.is_verified || data.isVerified || data.verified || false,
+      is_verified: Boolean(
+        (data as Record<string, unknown>).is_verified ??
+          (data as Record<string, unknown>).isVerified ??
+          (data as Record<string, unknown>).verified,
+      ),
       logo_url:
         getStringField([
           "logo_url",
@@ -250,7 +277,7 @@ const AcademyPage = () => {
     queryFn: async () => {
       if (!academySlug) return null;
 
-      let apiData: any = null;
+      let apiData: Record<string, unknown> | null = null;
       let targetAcademyId: string | null = null;
 
       try {
@@ -347,7 +374,7 @@ const AcademyPage = () => {
       const normalizedApi = apiData ? normalizeAcademyProfile(apiData) : null;
 
       // Fetch from Supabase as fallback or to supplement missing data
-      let supabaseData: any = null;
+      let supabaseData: Partial<AcademyProfile> | null = null;
       if (targetAcademyId || normalizedApi?.id) {
         const fetchId = targetAcademyId || normalizedApi?.id;
         try {
@@ -365,7 +392,7 @@ const AcademyPage = () => {
               error,
             );
           } else if (data) {
-            supabaseData = data;
+            supabaseData = data as unknown as Partial<AcademyProfile>;
             console.log(
               "✅ Academy profile fetched from Supabase:",
               supabaseData,
@@ -386,32 +413,48 @@ const AcademyPage = () => {
 
       // Merge data: prioritize API data, but use Supabase as fallback
       const merged: AcademyProfile = {
-        id: normalizedApi?.id || supabaseData?.id || targetAcademyId || "",
-        user_id: normalizedApi?.user_id || supabaseData?.user_id,
+        id: String(normalizedApi?.id || supabaseData?.id || targetAcademyId || ""),
+        user_id:
+          normalizedApi?.user_id ||
+          (typeof supabaseData?.user_id === "string"
+            ? supabaseData.user_id
+            : undefined),
         academy_name:
           normalizedApi?.academy_name ||
-          supabaseData?.academy_name ||
+          (typeof supabaseData?.academy_name === "string"
+            ? supabaseData.academy_name
+            : undefined) ||
           undefined,
         description:
-          normalizedApi?.description || supabaseData?.description || undefined,
+          normalizedApi?.description ||
+          (typeof supabaseData?.description === "string"
+            ? supabaseData.description
+            : undefined) ||
+          undefined,
         website_url:
-          normalizedApi?.website_url || supabaseData?.website_url || undefined,
+          normalizedApi?.website_url ||
+          (typeof supabaseData?.website_url === "string"
+            ? supabaseData.website_url
+            : undefined) ||
+          undefined,
         contact_email:
           normalizedApi?.contact_email ||
-          supabaseData?.contact_email ||
+          (typeof supabaseData?.contact_email === "string"
+            ? supabaseData.contact_email
+            : undefined) ||
           undefined,
         phone_number: normalizedApi?.phone_number || undefined,
         is_verified:
-          normalizedApi?.is_verified ?? supabaseData?.is_verified ?? false,
+          normalizedApi?.is_verified ?? Boolean(supabaseData?.is_verified),
         logo_url:
           normalizedApi?.logo_url ||
           normalizedApi?.profile_photo_url ||
-          supabaseData?.logo_url ||
+          (typeof supabaseData?.logo_url === "string" ? supabaseData.logo_url : undefined) ||
           undefined,
         profile_photo_url:
           normalizedApi?.profile_photo_url ||
           normalizedApi?.logo_url ||
-          supabaseData?.logo_url ||
+          (typeof supabaseData?.logo_url === "string" ? supabaseData.logo_url : undefined) ||
           undefined,
         social_links: normalizedApi?.social_links || undefined,
       };
@@ -435,43 +478,43 @@ const AcademyPage = () => {
   } = useQuery({
     queryKey: ["academy-courses", academyProfile?.id, academyId || slug],
     queryFn: async () => {
-      // Always fetch courses from Supabase using academy_id
-      const targetAcademyId = academyProfile?.id || academyId;
+      const academyName = academyProfile?.academy_name;
+      const response = await fetch(
+        "https://web-production-80ed8.up.railway.app/api/courses/",
+      );
+      if (!response.ok) return [];
+      const data: unknown = await response.json();
+      const allCourses: ApiCourse[] = Array.isArray(data)
+        ? (data as ApiCourse[])
+        : [];
 
-      if (!targetAcademyId) {
-        console.warn("⚠️ No academy ID available to fetch courses");
-        return [];
-      }
-
-      try {
-        // Fetch courses from Supabase filtered by academy_id
-        const { data, error } = await supabase
-          .from("courses")
-          .select("*")
-          .eq("academy_id", targetAcademyId)
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("❌ Error fetching courses from Supabase:", error);
-          throw error;
-        }
-
-        console.log("✅ Academy courses fetched from Supabase:", {
-          academyId: targetAcademyId,
-          courseCount: data?.length || 0,
-        });
-
-        return Array.isArray(data)
-          ? data.map((course: Course) => ({
-              ...course,
-              topics: course.topics || [],
-              required_skills: course.required_skills || [],
-            }))
+      const filtered = academyName
+        ? allCourses.filter(
+            (c) =>
+              String(c?.academy_name ?? "").toLowerCase() ===
+              academyName.toLowerCase(),
+          )
+        : academyId
+          ? allCourses.filter((c) => String(c?.academy_id) === String(academyId))
           : [];
-      } catch (error) {
-        console.error("❌ Error fetching courses from Supabase:", error);
-        return [];
-      }
+
+      return filtered.map((c) => ({
+        id: String(c?.id ?? ""),
+        title: String(c?.title ?? ""),
+        provider: String(c?.academy_name ?? ""),
+        category: String(c?.language ?? c?.location ?? ""),
+        level: String(c?.level ?? ""),
+        duration: String(c?.total_duration ?? ""),
+        enrolled: Boolean(c?.is_enrolled),
+        popular: false,
+        image: normalizeCourseImage(c?.cover_image_url || c?.lecturer_photo_url),
+        description: String(c?.description ?? ""),
+        topics: [],
+        required_skills: Array.isArray(c?.required_skills)
+          ? (c.required_skills as unknown[]).map((s) => String(s))
+          : [],
+        academy_id: c?.academy_id != null ? String(c.academy_id) : null,
+      })) as Course[];
     },
     enabled: !!(academyProfile?.id || academyId),
     retry: 1,

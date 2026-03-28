@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
@@ -6,6 +6,8 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
   normalizeAcademyProfileApiResponse,
   normalizeSocialLinksFromApi,
+  toAcademyProfilePayload,
+  toAcademyTablePayload,
   type AcademyProfileApiRaw,
 } from "@/api/academy";
 import { toast } from "sonner";
@@ -49,16 +51,11 @@ import {
   Trash2,
   Plus,
   Link2,
-  ExternalLink,
   Camera,
   Upload,
-  AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import usePhoneVerification from "@/hooks/usePhoneVerification";
 
 // Academy data is fetched from api/academy/profile/ (backend links academy to User in auth/user table)
 interface AcademyProfile {
@@ -68,6 +65,7 @@ interface AcademyProfile {
   website_url: string;
   contact_email: string;
   logo_url: string | null;
+  is_verified?: boolean;
 }
 
 interface SocialLinks {
@@ -191,33 +189,52 @@ const platformLabels: Record<SocialPlatform, string> = {
   behance: "Behance",
 };
 
-interface UserProfile {
-  profile_image?: string | null;
-  about_me?: string | null;
-  created_at?: string | null;
-  email?: string | null;
-  full_name?: string | null;
-  id?: string;
-  interests?: string[] | null;
-  onboarding_completed?: boolean | null;
-  updated_at?: string | null;
+/** Image URL from academy profile API responses (field names differ by backend). */
+function extractAcademyProfileImageUrl(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const nested = (key: string): Record<string, unknown> | null => {
+    const v = o[key];
+    return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+  };
+  const fromNested = (n: Record<string, unknown> | null, k: string) =>
+    n && typeof n[k] === "string" ? (n[k] as string) : null;
+  const profile = nested("profile");
+  const userObj = nested("user");
+  const candidates = [
+    o.profile_image,
+    o.logo_url,
+    o.profile_photo_url,
+    fromNested(profile, "profile_image"),
+    fromNested(userObj, "profile_image"),
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+
+function normalizeAcademyAvatarSrc(
+  src: string | null | undefined,
+): string | undefined {
+  if (!src?.trim()) return undefined;
+  const v = src.trim();
+  if (v.startsWith("http://") || v.startsWith("https://")) return v;
+  if (v.startsWith("/")) return v;
+  return `/${v}`;
 }
 
 const AcademyProfilePage = () => {
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading, updateUser, updateAcademyDisplay } =
+    useAuth();
   const navigate = useNavigate();
   const isMobile = useMobile();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [contactFormState, setContactFormState] = useState({
-    contact_email: "",
-  });
   const [formState, setFormState] = useState({
     academy_name: "",
     description: "",
@@ -251,80 +268,39 @@ const AcademyProfilePage = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [imageTimestamp, setImageTimestamp] = useState(Date.now());
 
-  const phoneVerifiedFromServer = useMemo(() => {
-    const getValue = (source: unknown, key: string) => {
-      if (source && typeof source === "object") {
-        return (source as Record<string, unknown>)[key];
-      }
-      return undefined;
-    };
+  /** Local upload / auth user / academy row (`logo_url` ↔ `profile_image` on API). */
+  const displayProfileImage =
+    profileImage ||
+    user?.profile_image ||
+    academyProfile?.logo_url ||
+    null;
+  const avatarDisplaySrc =
+    normalizeAcademyAvatarSrc(displayProfileImage) ?? displayProfileImage ?? undefined;
 
-    const candidates = [
-      getValue(user as unknown, "phone_verified"),
-      getValue(user as unknown, "is_phone_verified"),
-      getValue(userProfile as unknown, "phone_verified"),
-      getValue(userProfile as unknown, "is_phone_verified"),
-    ];
-
-    return candidates.some((value) => value === true || value === "true");
-  }, [user, userProfile]);
-
-  const {
-    isPhoneVerified,
-    isSendingCode,
-    isVerifyingCode,
-    codeSent,
-    codeInput,
-    resendCooldown,
-    sendCode: triggerPhoneVerificationCode,
-    verifyCode: confirmPhoneVerificationCode,
-    setCodeInput,
-  } = usePhoneVerification({
-    phoneNumber: user?.phone_number,
-    ownerId: user?.id,
-    role: user?.user_type ?? "academy",
-    initiallyVerified: phoneVerifiedFromServer,
-  });
-
-  const handleSendPhoneVerification = async () => {
-    try {
-      await triggerPhoneVerificationCode();
-      toast.info(
-        user?.phone_number
-          ? `We've sent a 6-digit code to ${user.phone_number}.`
-          : "We've sent a 6-digit code to your phone.",
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to send verification code. Please try again.";
-      toast.error(message);
-    }
-  };
-
-  const handleConfirmPhoneVerification = async () => {
-    try {
-      const success = await confirmPhoneVerificationCode();
-      if (success) {
-        toast.success("Your phone number has been verified successfully.");
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Verification failed. Please check the code and try again.";
-      toast.error(message);
-    }
-  };
-
-  // Initialize profile image from user context on mount
+  // Academy accounts are not authorized for GET/PATCH `/api/profile/` (403). Load photo from academy profile.
   useEffect(() => {
-    if (user?.profile_image) {
+    if (authLoading || !user) return;
+    if (user.profile_image) {
       setProfileImage(user.profile_image);
+      return;
     }
-  }, [user?.profile_image]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+        if (cancelled) return;
+        const url = extractAcademyProfileImageUrl(res.data);
+        if (url) setProfileImage(url);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user?.id, user?.profile_image]);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -354,22 +330,21 @@ const AcademyProfilePage = () => {
       try {
         // Fetch academy profile from API
         try {
-          const academyResponse = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+          const academyResponse = await apiClient.get(
+            API_ENDPOINTS.ACADEMY.PROFILE,
+          );
 
           if (academyResponse.data) {
             const data = academyResponse.data as AcademyProfileApiRaw;
             const normalized = normalizeAcademyProfileApiResponse(
               data,
-              user?.id != null ? String(user.id) : undefined
+              user?.id != null ? String(user.id) : undefined,
             );
             setAcademyProfile(normalized);
             setFormState({
               academy_name: normalized.academy_name,
               description: normalized.description,
               website_url: normalized.website_url,
-              contact_email: normalized.contact_email,
-            });
-            setContactFormState({
               contact_email: normalized.contact_email,
             });
             if (data.social_links && typeof data.social_links === "object") {
@@ -492,7 +467,7 @@ const AcademyProfilePage = () => {
           }
         }
 
-        // Academy users: do not call /api/profile/ (returns 403). Use academy profile and auth context only.
+        // Academy users: session restore may skip GET /api/profile/; display name is PATCH /api/academy/profile/ with JSON `name`.
       } catch (error: unknown) {
         // This outer catch is for unexpected errors
         const errorMessage =
@@ -556,7 +531,8 @@ const AcademyProfilePage = () => {
           });
         }
       } catch (error: unknown) {
-        const status = (error as { response?: { status?: number } })?.response?.status;
+        const status = (error as { response?: { status?: number } })?.response
+          ?.status;
         if (status === 404) socialLinksApiUnavailableRef.current = true;
         setSocialLinks({
           github: "",
@@ -598,45 +574,67 @@ const AcademyProfilePage = () => {
 
     setIsSubmitting(true);
     try {
-      // Use POST if profile doesn't exist, PATCH if it does
-      const method = academyProfile ? "patch" : "post";
-      const response = await apiClient[method](API_ENDPOINTS.ACADEMY.PROFILE, {
-        academy_name: formState.academy_name.trim(),
+      const trimmedName = formState.academy_name.trim();
+      const academyBody = toAcademyProfilePayload({
+        academy_name: trimmedName,
         description: formState.description.trim() || null,
         website_url: formState.website_url.trim() || null,
         contact_email: formState.contact_email.trim() || null,
       });
 
-      if (response.data) {
-        // Update academy profile state
+      const method = academyProfile ? "patch" : "post";
+      await apiClient[method](API_ENDPOINTS.ACADEMY.PROFILE, academyBody);
+
+      const refresh = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+      const refreshedRaw = refresh.data as AcademyProfileApiRaw;
+      const n = normalizeAcademyProfileApiResponse(
+        refreshedRaw,
+        user?.id != null ? String(user.id) : undefined,
+      );
+      const refreshedImage =
+        extractAcademyProfileImageUrl(refreshedRaw) || n.logo_url || null;
+
         const updatedProfile: AcademyProfile = {
-          id: academyProfile?.id || response.data.id || "",
-          academy_name: formState.academy_name.trim(),
-          description: formState.description.trim() || "",
-          website_url: formState.website_url.trim() || "",
-          contact_email: formState.contact_email.trim() || "",
-          logo_url: academyProfile?.logo_url || response.data.logo_url || null,
+        id: n.id || academyProfile?.id || String(refreshedRaw.id ?? ""),
+        academy_name: n.academy_name || trimmedName,
+        description: n.description,
+        website_url: n.website_url,
+        contact_email: n.contact_email,
+        logo_url: refreshedImage ?? academyProfile?.logo_url ?? null,
+        is_verified: n.is_verified,
         };
         setAcademyProfile(updatedProfile);
-        // Update form state to match the saved profile
         setFormState({
           academy_name: updatedProfile.academy_name,
           description: updatedProfile.description,
           website_url: updatedProfile.website_url,
           contact_email: updatedProfile.contact_email,
         });
+
+      updateUser({
+        first_name: n.first_name ?? trimmedName,
+      });
+      updateAcademyDisplay({
+        name: updatedProfile.academy_name,
+        email: updatedProfile.contact_email,
+        is_verified: n.is_verified,
+        profile_image: refreshedImage ?? null,
+      });
+
         toast.success(
           academyProfile
             ? "Your academy profile has been updated."
             : "Your academy profile has been created.",
         );
         setIsEditing(false);
-      }
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
       let errorMessage = "Failed to update profile. Please try again.";
 
-      if (axiosError.response?.data) {
+      if (axiosError.response?.status === 403) {
+        errorMessage =
+          "Could not update academy profile. Check that you are logged in as an academy user.";
+      } else if (axiosError.response?.data) {
         const errorData = axiosError.response.data as {
           detail?: string;
           message?: string;
@@ -665,75 +663,19 @@ const AcademyProfilePage = () => {
     navigate("/");
   };
 
-  const handleContactModalOpen = () => {
-    if (academyProfile) {
-      setContactFormState({
-        contact_email: academyProfile.contact_email || "",
-      });
-    }
-    setIsContactModalOpen(true);
-  };
-
-  const handleUpdateContactInfo = async () => {
-    if (!academyProfile) return;
-
-    setIsSubmitting(true);
-    try {
-      const response = await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
-        academy_name: academyProfile.academy_name,
-        description: academyProfile.description,
-        website_url: academyProfile.website_url || null,
-        contact_email: contactFormState.contact_email.trim() || null,
-      });
-
-      if (response && response.data) {
-        const updatedProfile: AcademyProfile = {
-          ...academyProfile,
-          contact_email: contactFormState.contact_email.trim() || "",
-        };
-        setAcademyProfile(updatedProfile);
-        setFormState((prev) => ({
-          ...prev,
-          contact_email: updatedProfile.contact_email,
-        }));
-        toast.success("Contact information has been updated.");
-        setIsContactModalOpen(false);
-      } else {
-        throw new Error("No response data received");
-      }
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError;
-      let errorMessage =
-        "Failed to update contact information. Please try again.";
-
-      if (axiosError.response?.data) {
-        const errorData = axiosError.response.data as {
-          detail?: string;
-          message?: string;
-        };
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      console.error("Error updating contact information:", error);
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleDeleteWebsite = async () => {
     if (!academyProfile) return;
 
     setIsSubmitting(true);
     try {
-      const response = await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
-        academy_name: academyProfile.academy_name,
+      const response = await apiClient.patch(
+        API_ENDPOINTS.ACADEMY.PROFILE,
+        toAcademyTablePayload({
         description: academyProfile.description,
         website_url: null,
         contact_email: academyProfile.contact_email,
-      });
+        }),
+      );
 
       if (response.data) {
         const updatedProfile: AcademyProfile = {
@@ -845,12 +787,14 @@ const AcademyProfilePage = () => {
           normalizedUrl = `https://${normalizedUrl}`;
         }
 
-        const response = await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
-          academy_name: academyProfile.academy_name,
+        const response = await apiClient.patch(
+          API_ENDPOINTS.ACADEMY.PROFILE,
+          toAcademyTablePayload({
           description: academyProfile.description,
           website_url: normalizedUrl || null,
           contact_email: academyProfile.contact_email,
-        });
+          }),
+        );
 
         if (response && response.data) {
           const updatedProfile: AcademyProfile = {
@@ -1033,69 +977,68 @@ const AcademyProfilePage = () => {
     }
   };
 
-  // Profile image upload handler
+  /** Photo lives on the academy row (`/api/academy/profile/`), same as AcademySettings — not `/api/profile/` (403 for academy). */
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file.");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image size should be less than 5MB.");
       return;
     }
 
     setUploadingImage(true);
-
-    // Clear current image to show fallback
     setProfileImage(null);
 
     try {
       const formData = new FormData();
       formData.append("profile_image", file);
 
-      const token = localStorage.getItem("authToken");
-
-      // Upload the image (academy profile - do not use /api/profile/ which returns 403 for academy)
       const uploadResponse = await apiClient.patch(
         API_ENDPOINTS.ACADEMY.PROFILE,
         formData,
         {
           headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
             "Content-Type": "multipart/form-data",
           },
         },
       );
 
-      console.log("✅ Image upload response:", uploadResponse.data);
-
-      // Update local state
       const newProfileImage =
-        uploadResponse.data?.profile_image ||
-        uploadResponse.data?.profile?.profile_image ||
-        uploadResponse.data?.user?.profile_image ||
+        extractAcademyProfileImageUrl(uploadResponse.data) ||
+        (uploadResponse.data?.profile_image as string | undefined) ||
+        (uploadResponse.data as { profile?: { profile_image?: string } })
+          ?.profile?.profile_image ||
+        (uploadResponse.data as { user?: { profile_image?: string } })?.user
+          ?.profile_image ||
+        (uploadResponse.data?.logo_url as string | undefined) ||
         null;
 
-      // Update the image with the new URL
       setProfileImage(newProfileImage);
+      setImageTimestamp(Date.now());
+      if (user) {
+        updateUser({ profile_image: newProfileImage });
+      }
+      updateAcademyDisplay({ profile_image: newProfileImage });
+      if (academyProfile) {
+        setAcademyProfile({
+          ...academyProfile,
+          logo_url: newProfileImage ?? academyProfile.logo_url,
+        });
+      }
 
       toast.success("Profile image has been updated successfully.");
 
-      // Reload page to refresh user context with new profile image
-      // This ensures the image persists and is available everywhere
       setTimeout(() => {
         window.location.reload();
       }, 500);
-
-      console.log("✅ Profile image uploaded successfully");
     } catch (error: unknown) {
       console.error("❌ Error uploading profile image:", error);
       const axiosError = error as AxiosError;
@@ -1126,7 +1069,6 @@ const AcademyProfilePage = () => {
     setIsProfileImageModalOpen(false);
   };
 
-  // Handler to remove profile image
   const handleRemoveImage = async () => {
     if (!user) return;
 
@@ -1139,40 +1081,23 @@ const AcademyProfilePage = () => {
     setIsProfileImageModalOpen(false);
 
     try {
-      const token = localStorage.getItem("authToken");
-
-      const response = await apiClient.patch(
-        API_ENDPOINTS.ACADEMY.PROFILE,
-        { profile_image: null },
-        {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
-          },
-        },
-      );
-
-      console.log("✅ Image removal response:", response.data);
+      await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, {
+        profile_image: null,
+      });
 
       setProfileImage(null);
-
-      // Refresh academy profile (do not use /api/profile/ - 403 for academy)
-      const profileResponse = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
-      });
-      if (profileResponse.data) {
-        setAcademyProfile((prev) => (prev ? { ...prev, ...profileResponse.data } : null));
+      setImageTimestamp(Date.now());
+      updateUser({ profile_image: null });
+      updateAcademyDisplay({ profile_image: null });
+      if (academyProfile) {
+        setAcademyProfile({ ...academyProfile, logo_url: null });
       }
 
       toast.success("Profile image has been removed.");
 
-      // Reload page to refresh user context
       setTimeout(() => {
         window.location.reload();
       }, 500);
-
-      console.log("✅ Profile image removed successfully");
     } catch (error: unknown) {
       console.error("❌ Error removing profile image:", error);
       toast.error("Failed to remove profile image. Please try again.");
@@ -1406,55 +1331,84 @@ const AcademyProfilePage = () => {
     );
   }
 
+  const displayName =
+    academyProfile?.academy_name?.trim() ||
+    user?.first_name?.trim() ||
+    "Academy";
+  const avatarFallback = displayName.charAt(0).toUpperCase() || "A";
+  const websiteRaw = academyProfile?.website_url?.trim() ?? "";
+  const websiteHref =
+    websiteRaw && !/^https?:\/\//i.test(websiteRaw)
+      ? `https://${websiteRaw}`
+      : websiteRaw;
+
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        {/* Left Column - Profile Summary */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Profile Header Card */}
-          <Card>
-            <CardContent className="flex flex-col items-center pb-6 pt-6">
-              <div
-                className="relative group cursor-pointer"
+      <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
+        {/* Personal information — matches user Profile layout */}
+        <Card className="border-0 rounded-3xl">
+          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              Personal information
+            </h3>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => navigate("/academy/settings")}
+                aria-label="Settings"
+              >
+                <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={handleSignOut}
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+              {academyProfile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={() => setIsEditing(true)}
+                  aria-label="Edit profile"
+                >
+                  <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex flex-row items-center gap-4 mb-4">
+              <div className="flex-shrink-0">
+                <div
+                  className="relative group cursor-pointer rounded-full overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
                 onClick={handleImageModalClick}
               >
                 <OptimizedAvatar
-                  src={
-                    profileImage ||
-                    user?.profile_image ||
-                    userProfile?.profile_image ||
-                    undefined
-                  }
-                  alt={academyProfile?.academy_name || "Academy"}
-                  fallback={(() => {
-                    if (academyProfile?.academy_name) {
-                      return academyProfile.academy_name
-                        .charAt(0)
-                        .toUpperCase();
-                    }
-                    if (user?.first_name) {
-                      return user.first_name.charAt(0).toUpperCase();
-                    }
-                    if (user?.email) {
-                      return user.email.charAt(0).toUpperCase();
-                    }
-                    return "A";
-                  })()}
-                  size="xl"
-                  loading="lazy"
-                  className="h-32 w-32"
+                    key={`avatar-${imageTimestamp}`}
+                    src={avatarDisplaySrc}
+                    alt="Profile photo"
+                    fallback={avatarFallback}
+                    size="lg"
+                    loading="eager"
+                    className="rounded-full"
                 />
                 {uploadingImage ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl z-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                   </div>
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                    <Camera className="h-8 w-8 text-white" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   </div>
                 )}
               </div>
-              {/* Hidden file input */}
               <input
                 id="profile-image-input"
                 type="file"
@@ -1463,288 +1417,151 @@ const AcademyProfilePage = () => {
                 disabled={uploadingImage}
                 className="hidden"
               />
-              {(user?.first_name || user?.last_name) && (
-                <h1 className="text-2xl font-bold mt-4 text-center">
-                  {`${user.first_name || ""} ${user.last_name || ""}`.trim()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  {displayName}
                 </h1>
-              )}
-              {academyProfile?.academy_name && (
-                <p className="text-lg text-gray-600 dark:text-gray-400 mt-2 text-center">
-                  {academyProfile.academy_name}
+                {academyProfile?.is_verified === true && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    Verified academy
                 </p>
               )}
-              <div className="mt-4 flex items-center gap-2 w-full">
-                <Button
-                  variant="outline"
-                  className="flex-[4] flex items-center justify-center gap-2"
-                  onClick={() => navigate("/academy/settings")}
-                >
-                  <Settings size={16} />
-                  Settings
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSignOut}
-                  className="flex-[1] flex items-center justify-center border-breneo-danger text-breneo-danger hover:bg-breneo-danger/10"
-                >
-                  <LogOut size={16} />
-                </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Contact Information Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Contact Information</h3>
-              {academyProfile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={handleContactModalOpen}
+            <div className="flex flex-wrap gap-2">
+              {websiteHref ? (
+                <a
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
                 >
-                  <Edit size={16} className="text-breneo-blue" />
-                </Button>
+                  <Globe className="h-4 w-4 text-gray-500" />
+                  {websiteRaw.length > 40
+                    ? `${websiteRaw.slice(0, 37)}...`
+                    : websiteRaw.replace(/^https?:\/\/(www\.)?/, "")}
+                </a>
+              ) : null}
+              {user?.email && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  <Mail className="h-4 w-4 text-gray-500" />
+                  {user.email}
+                </span>
               )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {user?.phone_number && (
-                <div className="flex items-center gap-3">
-                  <div className="bg-breneo-blue/10 rounded-full p-2">
-                    <Phone size={18} className="text-breneo-blue" />
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-                    <span className="text-sm">{user.phone_number}</span>
-                    <Badge
-                      variant={isPhoneVerified ? "secondary" : "outline"}
-                      className={
-                        isPhoneVerified
-                          ? "mt-1 sm:mt-0 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                          : "mt-1 sm:mt-0 border-orange-300 text-orange-600"
-                      }
-                    >
-                      {isPhoneVerified ? "Verified" : "Unverified"}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <div className="bg-breneo-blue/10 rounded-full p-2">
-                  <Mail size={18} className="text-breneo-blue" />
-                </div>
-                <span className="text-sm">{user?.email || "Not provided"}</span>
-              </div>
-              {academyProfile?.contact_email && (
-                <div className="flex items-center gap-3">
-                  <div className="bg-breneo-blue/10 rounded-full p-2">
-                    <Mail size={18} className="text-breneo-blue" />
-                  </div>
-                  <span className="text-sm">
+              {academyProfile?.contact_email &&
+                academyProfile.contact_email !== user?.email && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                    <Mail className="h-4 w-4 text-gray-500" />
                     {academyProfile.contact_email}
                   </span>
-                </div>
-              )}
-              {!isPhoneVerified && (
-                <Alert className="border-orange-300 bg-orange-50 dark:border-orange-900/60 dark:bg-orange-950/30">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-orange-600 mt-1" />
-                    <div className="flex-1 space-y-3">
-                      <div>
-                        <AlertTitle>Verify your phone number</AlertTitle>
-                        <AlertDescription>
-                          Confirm your phone number to ensure students and
-                          partners can trust your academy.
-                        </AlertDescription>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                          <Button
-                            onClick={handleSendPhoneVerification}
-                            disabled={
-                              !user?.phone_number ||
-                              isSendingCode ||
-                              (codeSent && resendCooldown > 0)
-                            }
-                          >
-                            {isSendingCode
-                              ? "Sending..."
-                              : codeSent
-                                ? "Resend code"
-                                : "Send verification code"}
-                          </Button>
-                          {resendCooldown > 0 && (
-                            <span className="text-xs text-orange-700 dark:text-orange-300">
-                              You can request a new code in {resendCooldown}s
+                )}
+              {user?.phone_number && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  <Phone className="h-4 w-4 text-gray-500" />
+                  {user.phone_number}
                             </span>
                           )}
-                        </div>
-                        {codeSent && (
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Input
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              maxLength={6}
-                              placeholder="Enter 6-digit code"
-                              value={codeInput}
-                              onChange={(event) =>
-                                setCodeInput(
-                                  event.target.value
-                                    .replace(/\D/g, "")
-                                    .slice(0, 6),
-                                )
-                              }
-                              className="sm:max-w-[200px]"
-                            />
-                            <Button
-                              onClick={handleConfirmPhoneVerification}
-                              disabled={
-                                codeInput.length !== 6 || isVerifyingCode
-                              }
-                            >
-                              {isVerifyingCode ? "Verifying..." : "Verify"}
-                            </Button>
-                          </div>
-                        )}
-                        {!user?.phone_number && (
-                          <div className="pt-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate("/academy/settings")}
-                            >
-                              Add phone number in settings
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Social Networks Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Social Networks</h3>
-              {academyProfile && (
-                <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto flex items-center gap-1"
-                  onClick={handleOpenSocialLinkModal}
-                >
-                  <Plus size={16} />
-                  Add
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {loadingSocialLinks ? (
-                <div className="text-center py-4 text-gray-500">Loading...</div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Social Links */}
-                  {Object.entries(socialLinks).some(
-                    ([_, url]) => url && url.trim() !== "",
-                  ) ? (
-                    (Object.entries(socialLinks) as [SocialPlatform, string][])
-                      .filter(([_, url]) => url && url.trim() !== "")
+              {(Object.entries(socialLinks) as [SocialPlatform, string][])
+                .filter(([_, url]) => url?.trim())
                       .map(([platform, url]) => (
-                        <div
+                  <span
                           key={platform}
-                          className="flex items-center justify-between group"
+                    className="inline-flex items-center gap-1.5 max-w-full"
                         >
                           <a
                             href={url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-3 flex-1 hover:text-breneo-blue transition-colors"
-                          >
-                            <div className="bg-breneo-blue/10 rounded-full p-2">
-                              {getSocialIcon(
-                                platform,
-                                "h-[18px] w-[18px] text-breneo-blue",
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                {platformLabels[platform]}
-                              </p>
-                            </div>
-                            <ExternalLink
-                              size={14}
-                              className="text-gray-400 group-hover:text-breneo-blue"
-                            />
-                          </a>
-                          <div className="flex items-center gap-1 ml-2">
+                      className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline max-w-full min-w-0"
+                    >
+                      {getSocialIcon(platform, "h-4 w-4 text-gray-500 shrink-0")}
+                      <span className="truncate">
+                        {url.length > 35
+                          ? `${url.slice(0, 32)}...`
+                          : url.replace(/^https?:\/\/(www\.)?/, "")}
+                      </span>
+                    </a>
                             <Button
                               variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 rounded-full"
                               onClick={() => handleEditSocialLink(platform)}
+                      aria-label={`Edit ${platformLabels[platform]}`}
                             >
-                              <Edit size={14} />
+                      <Edit className="h-3.5 w-3.5" />
                             </Button>
                             <Button
                               variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 rounded-full text-red-600 hover:text-red-700"
                               onClick={() => handleDeleteSocialLink(platform)}
+                      aria-label={`Remove ${platformLabels[platform]}`}
                             >
-                              <Trash2 size={14} />
+                      <Trash2 className="h-3.5 w-3.5" />
                             </Button>
+                  </span>
+                ))}
                           </div>
-                        </div>
-                      ))
-                  ) : (
-                    <div className="text-center py-4 text-gray-500">
-                      No social links added yet. Click "Add" to add your social
-                      media profiles or website.
-                    </div>
-                  )}
-                </div>
-              )}
+
+            {academyProfile && (
+              <Button
+                variant="link"
+                className="text-breneo-blue p-0 h-auto mt-3 text-sm font-normal"
+                onClick={handleOpenSocialLinkModal}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add social link or website
+              </Button>
+            )}
+
             </CardContent>
           </Card>
-        </div>
 
-        {/* Right Column - Details */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Academy Information Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <h3 className="text-lg font-bold">Academy Information</h3>
+        {/* About — same card pattern as user “About Me” */}
+        <Card className="border-0 rounded-3xl">
+          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              About
+            </h3>
               {academyProfile && (
                 <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
                   onClick={() => setIsEditing(true)}
+                aria-label="Edit about"
                 >
-                  <Edit size={16} className="mr-1" />
-                  Edit
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
                 </Button>
               )}
             </CardHeader>
-            <CardContent className="space-y-4">
-              {academyProfile?.academy_name && (
-                <div className="space-y-1">
-                  <h4 className="font-semibold">Academy Name</h4>
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {academyProfile.academy_name}
-                  </p>
-                </div>
+          <CardContent className="px-6 py-4">
+            {academyProfile?.description?.trim() ? (
+              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
+                {academyProfile.description.length > 200
+                  ? `${academyProfile.description.substring(0, 200)}...`
+                  : academyProfile.description}
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500 italic">
+                No description yet. Use Edit to tell students about your
+                academy.
+              </p>
+            )}
+            {academyProfile &&
+              (academyProfile.description?.trim().length ?? 0) > 200 && (
+                <Button
+                  variant="link"
+                  className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
+                  onClick={() => setIsEditing(true)}
+                >
+                  View more
+                </Button>
               )}
-              <div className="space-y-1">
-                <h4 className="font-semibold">Description</h4>
-                <p className="text-gray-700 dark:text-gray-300">
-                  {academyProfile?.description || "No description provided."}
-                </p>
-              </div>
             </CardContent>
           </Card>
-        </div>
 
         {/* Edit Dialog */}
         <Dialog open={isEditing} onOpenChange={setIsEditing}>
@@ -1817,98 +1634,6 @@ const AcademyProfilePage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Contact Information Edit Modal */}
-        {isMobile ? (
-          <Drawer
-            open={isContactModalOpen}
-            onOpenChange={setIsContactModalOpen}
-          >
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>Edit Contact Information</DrawerTitle>
-              </DrawerHeader>
-              <div className="px-4 pb-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_email_mobile">Contact Email</Label>
-                    <Input
-                      id="contact_email_mobile"
-                      type="email"
-                      value={contactFormState.contact_email}
-                      disabled
-                      className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
-                      placeholder="contact@academy.com"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Email cannot be changed or deleted
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <DrawerFooter className="pt-4">
-                <Button
-                  onClick={handleUpdateContactInfo}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Saving..." : "Save Changes"}
-                </Button>
-                <DrawerClose asChild>
-                  <Button variant="outline" disabled={isSubmitting}>
-                    Cancel
-                  </Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
-        ) : (
-          <Dialog
-            open={isContactModalOpen}
-            onOpenChange={setIsContactModalOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Edit Contact Information</DialogTitle>
-                <DialogDescription>
-                  Update your contact information. Email cannot be changed.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact_email">Contact Email</Label>
-                    <Input
-                      id="contact_email"
-                      type="email"
-                      value={contactFormState.contact_email}
-                      disabled
-                      className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
-                      placeholder="contact@academy.com"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Email cannot be changed or deleted
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsContactModalOpen(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateContactInfo}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Saving..." : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
 
         {/* Social Link Add/Edit Modal */}
         {isMobile ? (
@@ -2120,11 +1845,9 @@ const AcademyProfilePage = () => {
                     disabled={uploadingImage}
                   >
                     <Upload className="h-5 w-5" />
-                    {profileImage || user?.profile_image
-                      ? "Update Photo"
-                      : "Upload Photo"}
+                    {displayProfileImage ? "Update Photo" : "Upload Photo"}
                   </Button>
-                  {profileImage || user?.profile_image ? (
+                  {displayProfileImage ? (
                     <Button
                       onClick={handleRemoveImage}
                       className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
@@ -2157,11 +1880,9 @@ const AcademyProfilePage = () => {
                     disabled={uploadingImage}
                   >
                     <Upload className="h-5 w-5" />
-                    {profileImage || user?.profile_image
-                      ? "Update Photo"
-                      : "Upload Photo"}
+                    {displayProfileImage ? "Update Photo" : "Upload Photo"}
                   </Button>
-                  {profileImage || user?.profile_image ? (
+                  {displayProfileImage ? (
                     <Button
                       onClick={handleRemoveImage}
                       className="w-full justify-start gap-3 text-red-600 hover:text-red-700"

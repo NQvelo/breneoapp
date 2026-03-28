@@ -12,11 +12,11 @@ interface OptimizedAvatarProps {
   loading?: "lazy" | "eager";
 }
 
-const sizeClasses = {
-  sm: "h-8 w-8",
-  md: "h-10 w-10",
-  lg: "h-16 w-16",
-  xl: "h-32 w-32",
+const fallbackTextClasses: Record<"sm" | "md" | "lg" | "xl", string> = {
+  sm: "text-xs",
+  md: "text-sm",
+  lg: "text-lg",
+  xl: "text-2xl",
 };
 
 // Image cache to store loaded images
@@ -33,16 +33,26 @@ export const OptimizedAvatar: React.FC<OptimizedAvatarProps> = ({
   // Simplified: just use the AvatarImage component directly
   // The browser and Avatar component will handle loading naturally
   return (
-    <Avatar className={cn(sizeClasses[size], "rounded-3xl", className)}>
+    <Avatar
+      className={cn(
+        "relative flex h-full w-full min-h-0 min-w-0 shrink-0 overflow-hidden rounded-full",
+        className,
+      )}
+    >
       {src && (
         <AvatarImage
           src={src}
           alt={alt}
-          className="aspect-square h-full w-full"
+          className="absolute inset-0 z-[1] h-full w-full object-cover object-center"
           loading={loading}
         />
       )}
-      <AvatarFallback className="bg-[#AAF0FF] text-[#099DBC] text-2xl font-semibold rounded-none">
+      <AvatarFallback
+        className={cn(
+          "absolute inset-0 z-0 flex h-full w-full min-h-0 min-w-0 items-center justify-center bg-[#AAF0FF] text-[#099DBC] font-semibold rounded-full",
+          fallbackTextClasses[size],
+        )}
+      >
         {fallback}
       </AvatarFallback>
     </Avatar>

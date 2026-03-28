@@ -2590,7 +2590,7 @@ const ProfilePage = () => {
                       }
                       size="lg"
                       loading="eager"
-                      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                      className="rounded-full"
                     />
                     {uploadingImage ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
@@ -3051,18 +3051,18 @@ const ProfilePage = () => {
                   )}
                 </div>
               ) : (
-                  <div className="text-center py-4 text-gray-500 text-sm">
-                    No skill test results available. Take a skill test to see your
-                    results here.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                <div className="text-center py-4 text-gray-500 text-sm">
+                  No skill test results available. Take a skill test to see your
+                  results here.
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <p className="pt-1 text-center text-xs text-gray-500">
-              Version {__APP_VERSION__}
-            </p>
-          </div>
+          <p className="pt-1 text-center text-xs text-gray-500">
+            Version {__APP_VERSION__}
+          </p>
+        </div>
       ) : (
         <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
           {/* Saved Courses Tab */}

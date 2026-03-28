@@ -43,6 +43,8 @@ export interface AcademyProfileNormalized {
   description: string;
   website_url: string;
   contact_email: string;
+  /** From academys row / profile API (same source as name, email, website). */
+  phone_number: string;
   logo_url: string | null;
   is_verified?: boolean;
   first_name?: string;
@@ -72,6 +74,8 @@ export function normalizeAcademyProfileApiResponse(
     description: data.description ?? "",
     website_url: data.website ?? data.website_url ?? "",
     contact_email: data.email ?? data.contact_email ?? "",
+    phone_number:
+      typeof data.phone_number === "string" ? data.phone_number.trim() : "",
     logo_url:
       data.profile_image ?? data.logo_url ?? data.profile_photo_url ?? null,
     is_verified: data.is_verified,

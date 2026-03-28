@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   calculateSkillScores,
@@ -539,194 +538,82 @@ const CoursesPage = () => {
     // Use debounced search term and serialized filters for better caching
     queryKey: ["courses", savedCourses, debouncedSearchTerm, filtersKey],
     queryFn: async () => {
-      let query = supabase.from("courses").select("*");
+      const url = new URL(
+        `${window.location.origin}${API_ENDPOINTS.COURSES}`,
+      );
 
-      // Apply search filter using debounced term
       if (debouncedSearchTerm) {
-        query = query.or(
-          `title.ilike.%${debouncedSearchTerm}%,provider.ilike.%${debouncedSearchTerm}%,category.ilike.%${debouncedSearchTerm}%,description.ilike.%${debouncedSearchTerm}%`,
+        url.searchParams.set("name", debouncedSearchTerm);
+      }
+
+      if (activeFilters.skills.length > 0) {
+        // Backend expects `skills` as a query param; using comma-separated list.
+        url.searchParams.set(
+          "skills",
+          activeFilters.skills.length === 1
+            ? activeFilters.skills[0]
+            : activeFilters.skills.join(","),
         );
       }
 
-      const { data, error } = await query.order("created_at", {
-        ascending: false,
-      });
+      if (activeFilters.countries.length > 0) {
+        // Keep behavior consistent with the previous client-side filtering:
+        // match selected country *names* against academy/provider name on the backend.
+        const countryNames = activeFilters.countries
+          .map((code) => countries.find((c) => c.code === code)?.name)
+          .filter(Boolean) as string[];
+        if (countryNames.length > 0) {
+          url.searchParams.set(
+            "academy_name",
+            countryNames.length === 1 ? countryNames[0] : countryNames.join(","),
+          );
+        }
+      }
 
-      if (error) {
-        console.error("Error fetching courses:", error);
+      const response = await apiClient.get(url.pathname + url.search);
+      if (!response.data || !Array.isArray(response.data)) {
+        console.error("Error fetching courses: invalid response shape");
         return [];
       }
 
-      const coursesWithSaved = (data?.map((course) => {
-        // Normalize image path to ensure it's absolute
-        let imagePath = course.image || "/lovable-uploads/no_photo.png";
-        if (
-          imagePath &&
-          !imagePath.startsWith("/") &&
-          !imagePath.startsWith("http")
-        ) {
-          imagePath = `/${imagePath}`;
-        }
+      return (response.data as Array<Record<string, unknown>>).map((course) => {
+        const id = course.id != null ? String(course.id) : "";
+        const coverImageUrl =
+          (course.cover_image_url as string | undefined) ||
+          (course.lecturer_photo_url as string | undefined) ||
+          "/lovable-uploads/no_photo.png";
+
+        const image =
+          coverImageUrl &&
+          !coverImageUrl.startsWith("/") &&
+          !coverImageUrl.startsWith("http")
+            ? `/${coverImageUrl}`
+            : coverImageUrl;
+
+        const requiredSkills = Array.isArray(course.required_skills)
+          ? (course.required_skills as unknown[]).map((s) => String(s))
+          : [];
+
         return {
-          ...course,
-          image: imagePath,
+          id,
+          title: String(course.title ?? ""),
+          provider: String(course.academy_name ?? ""),
+          category: String(course.language ?? course.location ?? ""),
+          level: String(course.level ?? ""),
+          duration: String(course.total_duration ?? ""),
           match: 0,
-          topics: course.topics || [],
-          required_skills: course.required_skills || [],
-          is_saved: savedCourses?.includes(String(course.id)),
-        };
-      }) || []) as Course[];
-
-      // Get unique academy_ids and ensure they're all valid UUID strings
-      const uniqueAcademyIds = [
-        ...new Set(
-          coursesWithSaved
-            .map((c) => c.academy_id)
-            .filter((id): id is string => {
-              // Filter out null/undefined and ensure it's a string
-              if (!id) return false;
-              // Convert to string if it's a number (shouldn't happen, but safety check)
-              const idStr = String(id);
-              // Basic UUID format check (should be 36 chars with hyphens)
-              // Allow any non-empty string to be safe
-              return idStr.length > 0;
-            })
-            .map((id) => String(id)), // Ensure all are strings
-        ),
-      ];
-
-      // Fetch academy profiles from Django API
-      const apiAcademyProfilesMap = new Map<string, AcademyProfile>();
-
-      if (uniqueAcademyIds.length > 0) {
-        // Fetch academy data from Django API using academy_id
-        // Endpoint: /api/academy/<academy_id>/
-        await Promise.all(
-          uniqueAcademyIds.map(async (academyId) => {
-            try {
-              // Use the academy detail endpoint: /api/academy/<academy_id>/
-              const response = await apiClient.get(
-                `${API_ENDPOINTS.ACADEMY.DETAIL}${academyId}/`,
-              );
-
-              if (response.data) {
-                // API returns nested structure: { profile_data: {...}, profile_type: 'academy', ... }
-                const responseData = response.data as Record<string, unknown>;
-                const profileData =
-                  (responseData.profile_data as Record<string, unknown>) ||
-                  responseData;
-
-                const getStringField = (fields: string[]) => {
-                  for (const field of fields) {
-                    const value = profileData[field] || responseData[field];
-                    if (typeof value === "string") return value;
-                  }
-                  return undefined;
-                };
-
-                // Extract academy ID
-                const academyIdFromApi =
-                  getStringField(["academy_id", "id"]) || academyId;
-
-                // Extract academy name
-                const academyNameFromApi = getStringField([
-                  "academy_name",
-                  "name",
-                  "first_name",
-                  "firstName",
-                ]);
-
-                const descriptionFromApi = getStringField(["description"]);
-                const websiteFromApi = getStringField([
-                  "website_url",
-                  "websiteUrl",
-                ]);
-                const contactEmailFromApi = getStringField([
-                  "contact_email",
-                  "contactEmail",
-                  "email",
-                ]);
-
-                // Extract logo and profile photo with correct priority
-                // Matches AcademyDashboard.tsx: logo_url: data.profile_photo_url || data.logo_url
-                const profilePhotoFromApi = getStringField([
-                  "profile_photo_url",
-                  "profilePhotoUrl",
-                  "profile_photo",
-                  "profilePhoto",
-                ]);
-
-                const logoFromApi = getStringField([
-                  "logo_url",
-                  "logoUrl",
-                  "logo",
-                  "image_url",
-                  "imageUrl",
-                ]);
-
-                // Final image to use: prioritize profile_photo then logo (consistent with academy dashboard)
-                const finalImageUrl = profilePhotoFromApi || logoFromApi;
-
-                const slugFromApi = getStringField(["slug"]);
-
-                // Debug: Log what we found
-                if (process.env.NODE_ENV === "development") {
-                  console.log(`[Academy ${academyId}] Extracted values:`, {
-                    academy_id: academyIdFromApi,
-                    academy_name: academyNameFromApi,
-                    final_image_url: finalImageUrl,
-                    profile_photo_url: profilePhotoFromApi,
-                    logo_url: logoFromApi,
-                  });
-                }
-
-                apiAcademyProfilesMap.set(academyId, {
-                  id: academyIdFromApi || academyId,
-                  academy_name: academyNameFromApi || "",
-                  description: descriptionFromApi || "",
-                  website_url: websiteFromApi,
-                  contact_email: contactEmailFromApi,
-                  logo_url: logoFromApi,
-                  profile_photo_url: profilePhotoFromApi,
-                  profile_image_url: finalImageUrl,
-                  slug:
-                    slugFromApi || createAcademySlug(academyNameFromApi || ""),
-                });
-              }
-            } catch (error) {
-              console.debug(
-                `Could not fetch academy profile for ${academyId} from Django API`,
-              );
-            }
-          }),
-        );
-      }
-
-      // Join academy profile data with courses
-      // Match courses to academies by academy_id:
-      // - Courses come from Supabase (courses table with academy_id field)
-      // - Academy data comes from API endpoint (/api/academy/<academy_id>/)
-      // - If academy_id matches, the course belongs to that academy
-      return coursesWithSaved.map((course) => {
-        // Match course.academy_id with academy data from API
-        const apiAcademyData = course.academy_id
-          ? apiAcademyProfilesMap.get(course.academy_id)
-          : null;
-
-        let academyProfileData: AcademyProfile | null = null;
-
-        if (apiAcademyData) {
-          // Use API data
-          academyProfileData = apiAcademyData;
-        } else {
-          // No academy data available
-          academyProfileData = null;
-        }
-
-        return {
-          ...course,
-          academy_profile_data: academyProfileData,
-        };
+          enrolled: Boolean(course.is_enrolled),
+          popular: false,
+          image: image || "/lovable-uploads/no_photo.png",
+          description: String(course.description ?? ""),
+          topics: [],
+          required_skills: requiredSkills,
+          is_saved: savedCourses?.includes(id),
+          academy_id:
+            course.academy_id != null ? String(course.academy_id) : null,
+          academy_profiles: null,
+          academy_profile_data: null,
+        } satisfies Course;
       });
     },
     enabled: !!savedCourses,
@@ -743,32 +630,15 @@ const CoursesPage = () => {
   // or show all if no country filter is selected
   const coursesWithMatches = React.useMemo(() => {
     if (!courses) return [];
-
-    let filteredCourses = courses;
-
-    // Apply skill filter if skills are selected
-    if (activeFilters.skills.length > 0) {
-      filteredCourses = courses.filter((course) => {
-        // Check if course has any of the selected skills in required_skills
-        return course.required_skills.some((courseSkill) =>
-          activeFilters.skills.some(
-            (selectedSkill) =>
-              courseSkill.toLowerCase().includes(selectedSkill.toLowerCase()) ||
-              selectedSkill.toLowerCase().includes(courseSkill.toLowerCase()),
-          ),
-        );
-      });
-    }
-
-    // Calculate match percentage
+    // Match score is always based on the user's skill test, not on filter selection.
     if (!userTopSkills || userTopSkills.length === 0) {
-      return filteredCourses.map((course) => ({
+      return courses.map((course) => ({
         ...course,
-        match: 50, // Default match if no skills
+        match: 50,
       }));
     }
 
-    return filteredCourses
+    return courses
       .map((course) => {
         const matchingSkills = course.required_skills.filter((skill) =>
           userTopSkills.some(
@@ -789,31 +659,11 @@ const CoursesPage = () => {
         };
       })
       .sort((a, b) => b.match - a.match);
-  }, [userTopSkills, courses, activeFilters.skills]);
+  }, [userTopSkills, courses]);
 
   const filteredCourses = React.useMemo(() => {
-    let filtered = coursesWithMatches;
-
-    // Apply country filter if countries are selected
-    if (activeFilters.countries.length > 0) {
-      // Get country names from codes
-      const countryNames = activeFilters.countries
-        .map((code) => countries.find((c) => c.code === code)?.name)
-        .filter(Boolean) as string[];
-
-      // Filter courses where provider/academy name might contain country name
-      // This is a best-effort approach since courses don't have explicit country data
-      filtered = filtered.filter((course) => {
-        const academyName =
-          course.academy_profile_data?.academy_name || course.provider || "";
-        return countryNames.some((countryName) =>
-          academyName.toLowerCase().includes(countryName.toLowerCase()),
-        );
-      });
-    }
-
-    return filtered;
-  }, [coursesWithMatches, activeFilters.countries]);
+    return coursesWithMatches;
+  }, [coursesWithMatches]);
 
   useEffect(() => {
     if (coursesLoading) {

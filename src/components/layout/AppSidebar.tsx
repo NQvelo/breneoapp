@@ -85,6 +85,15 @@ export function AppSidebar({
     return user?.email ?? "";
   };
 
+  /**
+   * Academy: after `academyDisplay` is loaded from `/api/academy/profile/`, use that photo only (JWT `user.profile_image` does not update on upload).
+   * Before load completes, fall back to `user.profile_image`.
+   */
+  const sidebarAvatarUrl =
+    isAcademy && academyDisplay != null
+      ? academyDisplay.profile_image || undefined
+      : user?.profile_image;
+
   // Helper: Get avatar initials (academy name or user name/email)
   const getInitials = () => {
     if (isAcademy && academyDisplay?.name) {
@@ -421,15 +430,14 @@ export function AppSidebar({
                   className={cn(
                     "flex items-center justify-center w-8 h-8 rounded-[50px] text-sm font-semibold shrink-0",
                     // ✅ Changed userData to user
-                    user?.profile_image
+                    sidebarAvatarUrl
                       ? "overflow-hidden"
                       : "bg-[#AAF0FF] text-[#099DBC]",
                   )}
                 >
-                  {/* ✅ Changed userData to user */}
-                  {user?.profile_image ? (
+                  {sidebarAvatarUrl ? (
                     <img
-                      src={user.profile_image}
+                      src={sidebarAvatarUrl}
                       alt="Profile"
                       className="w-full h-full object-cover rounded-[12px]"
                     />

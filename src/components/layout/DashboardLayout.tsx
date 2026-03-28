@@ -11,6 +11,11 @@ interface DashboardLayoutProps {
   showSidebar?: boolean;
   showHeader?: boolean;
   background?: "default" | "white";
+  /**
+   * When false, `<main>` does not scroll internally; content grows with the page and the window scrolls.
+   * Use for long forms (e.g. add course) to avoid a nested scroll area.
+   */
+  containMainScroll?: boolean;
 }
 
 export function DashboardLayout({
@@ -18,6 +23,7 @@ export function DashboardLayout({
   showSidebar = true,
   showHeader = true,
   background = "default",
+  containMainScroll = true,
 }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -44,12 +50,10 @@ export function DashboardLayout({
   };
 
   useEffect(() => {
-    const mainEl = mainContentRef.current;
-    if (!mainEl) return;
-
     const handleScroll = () => {
-      const scrollTop = mainEl.scrollTop;
-      // Hide header if scrolled more than 50px, otherwise show it
+      const scrollTop = containMainScroll
+        ? mainContentRef.current?.scrollTop ?? 0
+        : window.scrollY || document.documentElement.scrollTop;
       if (scrollTop > 50) {
         setIsHeaderVisible(false);
       } else {
@@ -57,16 +61,22 @@ export function DashboardLayout({
       }
     };
 
-    mainEl.addEventListener("scroll", handleScroll);
-    return () => {
-      mainEl.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+    if (containMainScroll) {
+      const mainEl = mainContentRef.current;
+      if (!mainEl) return;
+      mainEl.addEventListener("scroll", handleScroll);
+      return () => mainEl.removeEventListener("scroll", handleScroll);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [containMainScroll]);
 
   return (
     <div
       className={cn(
-        "h-screen overflow-hidden",
+        containMainScroll ? "h-screen overflow-hidden" : "min-h-screen overflow-x-hidden",
         background === "white" ? "bg-white" : "bg-breneo-lightgray"
       )}
     >
@@ -87,14 +97,17 @@ export function DashboardLayout({
       <main
         ref={mainContentRef}
         className={cn(
-          "h-full overflow-y-auto transition-all duration-300",
+          "transition-all duration-300",
+          containMainScroll
+            ? "h-full overflow-y-auto"
+            : "h-auto min-h-[calc(100dvh-6rem)] overflow-visible md:min-h-[calc(100vh-6rem)]",
           showSidebar && (sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]"),
           // Adjusted top padding for the new header position
           showHeader && "pt-24 pb-32 md:pt-24 md:pb-0",
           (showSidebar || showHeader) && "px-2 md:px-6"
         )}
       >
-        <div className="h-full">{children}</div>
+        <div className={cn(containMainScroll && "h-full")}>{children}</div>
       </main>
       <AcademyVerifiedCongratsModal />
       <SubscriptionModal 

@@ -5,3 +5,4 @@ export {
   type AcademyProfileNormalized,
   type SocialLinksFromApi,
 } from "./normalize";
+export { toAcademyTablePayload, toAcademyProfilePayload } from "./academyProfileApi";

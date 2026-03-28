@@ -22,7 +22,6 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeAcademyProfileApiResponse } from "@/api/academy";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
 // Interfaces
 interface AcademyProfile {
@@ -41,8 +40,17 @@ interface Course {
   title: string;
   category: string;
   level: string;
-  created_at: string;
+  created_at?: string;
 }
+
+type ApiCourseLight = {
+  id?: string | number | null;
+  title?: string | null;
+  language?: string | null;
+  location?: string | null;
+  level?: string | null;
+  created_at?: string | null;
+};
 
 const AcademyHomePage = () => {
   const navigate = useNavigate();
@@ -75,9 +83,12 @@ const AcademyHomePage = () => {
         };
         setAcademyProfile(academyProfile);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to load academy profile:", error);
-      if (error.response?.status === 404) {
+      const axiosError = error as {
+        response?: { status?: number };
+      };
+      if (axiosError.response?.status === 404) {
         toast.error("Please set up your academy profile first");
         navigate("/academy/profile");
       } else {
@@ -92,19 +103,32 @@ const AcademyHomePage = () => {
     if (!academyProfile) return;
 
     try {
-      const { data, error } = await supabase
-        .from("courses")
-        .select("id, title, category, level, created_at")
-        .eq("academy_id", academyProfile.id)
-        .order("created_at", { ascending: false })
-        .limit(5);
+      const url = new URL(
+        "https://web-production-80ed8.up.railway.app/api/courses/",
+      );
+      url.searchParams.set("academy_name", academyProfile.academy_name);
 
-      if (error) {
-        throw error;
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new Error(response.statusText);
       }
 
-      setCourses(data || []);
-    } catch (error: any) {
+      const data: unknown = await response.json();
+      const coursesFromApi: ApiCourseLight[] = Array.isArray(data)
+        ? (data as ApiCourseLight[])
+        : [];
+
+      setCourses(
+        coursesFromApi.slice(0, 5).map((course) => ({
+          id: course.id != null ? String(course.id) : "",
+          title: String(course.title ?? ""),
+          category: String(course.language ?? course.location ?? ""),
+          level: String(course.level ?? ""),
+          created_at:
+            course.created_at != null ? String(course.created_at) : undefined,
+        })),
+      );
+    } catch (error: unknown) {
       console.error("Error fetching courses:", error);
     }
   }, [academyProfile]);
@@ -151,6 +175,7 @@ const AcademyHomePage = () => {
   const categories = new Set(courses.map((c) => c.category)).size;
   const recentCourses = courses.filter(
     (c) =>
+      !!c.created_at &&
       new Date(c.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000,
   ).length;
 

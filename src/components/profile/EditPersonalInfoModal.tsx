@@ -119,9 +119,16 @@ export function EditPersonalInfoModal({
         className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
       >
         <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
-          <SheetTitle className="flex-1 min-w-0">Edit personal information</SheetTitle>
+          <SheetTitle className="flex-1 min-w-0">
+            Edit personal information
+          </SheetTitle>
           <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <Button type="submit" form="edit-personal-info-form" size="sm" disabled={saving}>
+            <Button
+              type="submit"
+              form="edit-personal-info-form"
+              size="sm"
+              disabled={saving}
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -150,115 +157,115 @@ export function EditPersonalInfoModal({
           className="flex flex-col flex-1 min-h-0"
         >
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
-          {error && (
-            <p className="text-sm text-destructive font-medium">{error}</p>
-          )}
-          <div className="grid grid-cols-2 gap-3">
+            {error && (
+              <p className="text-sm text-destructive font-medium">{error}</p>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">First name</Label>
+                <Input
+                  id="first_name"
+                  value={first_name}
+                  onChange={(e) => setFirst_name(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="last_name">Last name</Label>
+                <Input
+                  id="last_name"
+                  value={last_name}
+                  onChange={(e) => setLast_name(e.target.value)}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="first_name">First name</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="first_name"
-                value={first_name}
-                onChange={(e) => setFirst_name(e.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="last_name">Last name</Label>
+              <Label htmlFor="phone_number">Phone number</Label>
               <Input
-                id="last_name"
-                value={last_name}
-                onChange={(e) => setLast_name(e.target.value)}
+                id="phone_number"
+                value={phone_number}
+                onChange={(e) => setPhone_number(e.target.value)}
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone_number">Phone number</Label>
-            <Input
-              id="phone_number"
-              value={phone_number}
-              onChange={(e) => setPhone_number(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="country_region">Country / Region</Label>
-            <Input
-              id="country_region"
-              value={country_region}
-              onChange={(e) => setCountry_region(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">City</Label>
-            <Input
-              id="city"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Social links (optional)</Label>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="github">GitHub</Label>
-                <Input
-                  id="github"
-                  type="url"
-                  placeholder="https://github.com/username"
-                  value={github}
-                  onChange={(e) => setGithub(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="linkedin">LinkedIn</Label>
-                <Input
-                  id="linkedin"
-                  type="url"
-                  placeholder="https://linkedin.com/in/username"
-                  value={linkedin}
-                  onChange={(e) => setLinkedin(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="facebook">Facebook</Label>
-                <Input
-                  id="facebook"
-                  type="url"
-                  placeholder="https://facebook.com/username"
-                  value={facebook}
-                  onChange={(e) => setFacebook(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="instagram">Instagram</Label>
-                <Input
-                  id="instagram"
-                  type="url"
-                  placeholder="https://instagram.com/username"
-                  value={instagram}
-                  onChange={(e) => setInstagram(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="dribbble">Dribbble</Label>
-                <Input
-                  id="dribbble"
-                  type="url"
-                  placeholder="https://dribbble.com/username"
-                  value={dribbble}
-                  onChange={(e) => setDribbble(e.target.value)}
-                />
+            <div className="space-y-2">
+              <Label htmlFor="country_region">Country / Region</Label>
+              <Input
+                id="country_region"
+                value={country_region}
+                onChange={(e) => setCountry_region(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Social links (optional)</Label>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="github">GitHub</Label>
+                  <Input
+                    id="github"
+                    type="url"
+                    placeholder="https://github.com/username"
+                    value={github}
+                    onChange={(e) => setGithub(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="linkedin">LinkedIn</Label>
+                  <Input
+                    id="linkedin"
+                    type="url"
+                    placeholder="https://linkedin.com/in/username"
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="facebook">Facebook</Label>
+                  <Input
+                    id="facebook"
+                    type="url"
+                    placeholder="https://facebook.com/username"
+                    value={facebook}
+                    onChange={(e) => setFacebook(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="instagram">Instagram</Label>
+                  <Input
+                    id="instagram"
+                    type="url"
+                    placeholder="https://instagram.com/username"
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="dribbble">Dribbble</Label>
+                  <Input
+                    id="dribbble"
+                    type="url"
+                    placeholder="https://dribbble.com/username"
+                    value={dribbble}
+                    onChange={(e) => setDribbble(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
           </div>
         </form>
       </SheetContent>

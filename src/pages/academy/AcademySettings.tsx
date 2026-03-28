@@ -25,9 +25,14 @@ import OptimizedAvatar, {
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
-import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
+import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { normalizeAcademyProfileApiResponse } from "@/api/academy";
+import {
+  normalizeAcademyProfileApiResponse,
+  toAcademyProfilePayload,
+  toAcademyTablePayload,
+  type AcademyProfileApiRaw,
+} from "@/api/academy";
 import axios, { AxiosError } from "axios";
 import { Link, useLocation } from "react-router-dom";
 import { Camera } from "lucide-react";
@@ -39,11 +44,13 @@ interface AcademyProfile {
   description: string;
   website_url: string;
   contact_email: string;
+  phone_number: string;
   logo_url: string | null;
 }
 
 export default function AcademySettingsPage() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, updateUser, updateAcademyDisplay } =
+    useAuth();
   const { theme, setTheme } = useTheme();
   const { preloadImage } = useImagePreloader();
   const location = useLocation();
@@ -153,7 +160,8 @@ export default function AcademySettingsPage() {
       }
 
       try {
-        setPhoneNumber(user.phone_number || "");
+        // Default from auth; overwritten when academy profile loads (same pattern as name/email).
+        setPhoneNumber(user?.phone_number || "");
 
         try {
           const academyResponse = await apiClient.get(
@@ -165,12 +173,15 @@ export default function AcademySettingsPage() {
             console.log("✅ Academy profile data:", data);
             const normalized = normalizeAcademyProfileApiResponse(
               data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
-              user?.id != null ? String(user.id) : undefined
+              user?.id != null ? String(user.id) : undefined,
             );
             setAcademyProfile(normalized);
             setAcademyName(normalized.academy_name);
             setWebsiteUrl(normalized.website_url);
             setContactEmail(normalized.contact_email);
+            setPhoneNumber(
+              normalized.phone_number || user?.phone_number || "",
+            );
           }
         } catch (error: unknown) {
           const academyError = error as AxiosError;
@@ -316,10 +327,12 @@ export default function AcademySettingsPage() {
 
     try {
       setPhotoUploading(true);
-      const formData = createFormDataRequest({ profile_image: file });
+      const formData = new FormData();
+      formData.append("profile_image", file);
 
+      // Profile photo is on the academys row (`/api/academy/profile/`). Display name uses PATCH `/api/profile/` { first_name }.
       const response = await apiClient.patch(
-        API_ENDPOINTS.AUTH.PROFILE,
+        API_ENDPOINTS.ACADEMY.PROFILE,
         formData,
         {
           headers: {
@@ -328,15 +341,20 @@ export default function AcademySettingsPage() {
         },
       );
 
-      if (response.data && user) {
-        const updatedUser = {
-          ...user,
-          profile_image: response.data.profile_image,
-        };
+      const newUrl =
+        response.data?.profile_image ||
+        response.data?.profile?.profile_image ||
+        response.data?.user?.profile_image ||
+        response.data?.logo_url ||
+        null;
 
-        if (response.data.profile_image) {
-          preloadImage(response.data.profile_image).catch(console.error);
+      if (response.data && user) {
+        if (newUrl) {
+          preloadImage(newUrl).catch(console.error);
         }
+
+        updateUser({ profile_image: newUrl });
+        updateAcademyDisplay({ profile_image: newUrl });
 
         toast.success("Profile photo updated successfully!");
         setImagePreview(null);
@@ -391,52 +409,68 @@ export default function AcademySettingsPage() {
     }
 
     try {
-      if (phoneNumber !== (user?.phone_number || "")) {
-        await apiClient.patch(API_ENDPOINTS.AUTH.PROFILE, {
-          phone_number: phoneNumber,
-        });
-        console.log("Phone number updated successfully");
-      }
-
       try {
-        const method = academyProfile ? "patch" : "post";
-        const academyData = {
-          academy_name: academyName.trim(),
+        const trimmedName = academyName.trim();
+        const payload = toAcademyProfilePayload({
+          academy_name: trimmedName,
           description: academyProfile?.description || "",
           website_url: websiteUrl.trim() || null,
           contact_email: contactEmail.trim() || null,
-        };
+          phone_number: phoneNumber.trim() || null,
+        });
 
-        const academyResponse = await apiClient[method](
-          API_ENDPOINTS.ACADEMY.PROFILE,
-          academyData,
-        );
-
-        if (academyResponse.data) {
-          const normalized = normalizeAcademyProfileApiResponse(
-            academyResponse.data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
-            user?.id != null ? String(user.id) : undefined
-          );
-          const updatedProfile: AcademyProfile = {
-            ...normalized,
-            academy_name: academyName.trim(),
-            description: normalized.description || academyProfile?.description || "",
-            website_url: websiteUrl.trim() || normalized.website_url,
-            contact_email: contactEmail.trim() || normalized.contact_email,
-          };
-          setAcademyProfile(updatedProfile);
-          console.log(
-            "✅ Academy profile updated successfully:",
-            updatedProfile,
-          );
+        if (academyProfile) {
+          await apiClient.patch(API_ENDPOINTS.ACADEMY.PROFILE, payload);
+        } else {
+          await apiClient.post(API_ENDPOINTS.ACADEMY.PROFILE, payload);
         }
+
+        const refreshRes = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+        const raw = refreshRes.data as AcademyProfileApiRaw;
+        const normalized = normalizeAcademyProfileApiResponse(
+          raw,
+          user?.id != null ? String(user.id) : undefined,
+        );
+        const phoneFromApi =
+          normalized.phone_number ||
+          (typeof raw.phone_number === "string" ? raw.phone_number : "") ||
+          phoneNumber;
+
+        const updatedProfile: AcademyProfile = {
+          id: normalized.id,
+          academy_name: normalized.academy_name || trimmedName,
+          description: normalized.description,
+          website_url: normalized.website_url,
+          contact_email: normalized.contact_email,
+          phone_number: phoneFromApi,
+          logo_url: normalized.logo_url,
+        };
+        setAcademyProfile(updatedProfile);
+        setAcademyName(updatedProfile.academy_name);
+        setWebsiteUrl(updatedProfile.website_url);
+        setContactEmail(updatedProfile.contact_email);
+        setPhoneNumber(phoneFromApi);
+
+        updateUser({
+          first_name: normalized.first_name ?? trimmedName,
+          phone_number: phoneFromApi,
+        });
+        updateAcademyDisplay({
+          name: updatedProfile.academy_name,
+          email: updatedProfile.contact_email,
+          is_verified: normalized.is_verified,
+          profile_image: normalized.logo_url ?? null,
+        });
       } catch (academyError: unknown) {
         console.error("Error updating academy profile:", academyError);
         const axiosError = academyError as AxiosError;
         let errorMessage =
           "Failed to update academy profile. Please try again.";
 
-        if (axiosError.response?.data) {
+        if (axiosError.response?.status === 403) {
+          errorMessage =
+            "Could not update academy profile. Check that you are logged in as an academy user.";
+        } else if (axiosError.response?.data) {
           const errorData = axiosError.response.data as {
             detail?: string;
             message?: string;
@@ -451,11 +485,6 @@ export default function AcademySettingsPage() {
 
       toast.success("Profile updated successfully!");
       setIsEditing(false);
-
-      // Reload to update user context with new phone number
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     } catch (err: unknown) {
       console.error("Error updating profile:", err);
       let errorMessage = "Failed to update profile.";
