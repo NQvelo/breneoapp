@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,13 +8,11 @@ import {
   GraduationCap,
   BookOpen,
   Users,
-  TrendingUp,
   Award,
   Globe,
   Mail,
   ExternalLink,
   Building2,
-  Calendar,
   CheckCircle2,
 } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
@@ -35,12 +33,20 @@ interface AcademyProfile {
   logo_url: string | null;
 }
 
-interface Course {
+type EnrolledUserRef = {
+  id: number | string;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
+interface AcademyCourseHome {
   id: string;
   title: string;
   category: string;
   level: string;
   created_at?: string;
+  enrolled_users: EnrolledUserRef[];
 }
 
 type ApiCourseLight = {
@@ -50,6 +56,25 @@ type ApiCourseLight = {
   location?: string | null;
   level?: string | null;
   created_at?: string | null;
+  enrolled_users?: unknown;
+};
+
+const parseEnrolledUsersFromApi = (raw: unknown): EnrolledUserRef[] => {
+  if (!Array.isArray(raw)) return [];
+  const out: EnrolledUserRef[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id = o.id;
+    if (id === null || id === undefined) continue;
+    out.push({
+      id: typeof id === "number" || typeof id === "string" ? id : String(id),
+      email: o.email != null ? String(o.email) : null,
+      first_name: o.first_name != null ? String(o.first_name) : null,
+      last_name: o.last_name != null ? String(o.last_name) : null,
+    });
+  }
+  return out;
 };
 
 const AcademyHomePage = () => {
@@ -58,7 +83,7 @@ const AcademyHomePage = () => {
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<AcademyCourseHome[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAcademyData = useCallback(async () => {
@@ -119,13 +144,14 @@ const AcademyHomePage = () => {
         : [];
 
       setCourses(
-        coursesFromApi.slice(0, 5).map((course) => ({
+        coursesFromApi.map((course) => ({
           id: course.id != null ? String(course.id) : "",
           title: String(course.title ?? ""),
           category: String(course.language ?? course.location ?? ""),
           level: String(course.level ?? ""),
           created_at:
             course.created_at != null ? String(course.created_at) : undefined,
+          enrolled_users: parseEnrolledUsersFromApi(course.enrolled_users),
         })),
       );
     } catch (error: unknown) {
@@ -142,6 +168,40 @@ const AcademyHomePage = () => {
       fetchCourses();
     }
   }, [academyProfile, fetchCourses]);
+
+  const studentAggregates = useMemo(() => {
+    const byKey = new Map<
+      string,
+      { user: EnrolledUserRef; courseTitles: string[] }
+    >();
+    for (const course of courses) {
+      for (const u of course.enrolled_users) {
+        const key = String(u.id);
+        const prev = byKey.get(key);
+        if (!prev) {
+          byKey.set(key, { user: u, courseTitles: [course.title] });
+        } else if (!prev.courseTitles.includes(course.title)) {
+          prev.courseTitles.push(course.title);
+        }
+      }
+    }
+    const rows = Array.from(byKey.values()).sort((a, b) => {
+      const nameA = [a.user.first_name, a.user.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+        .toLowerCase();
+      const nameB = [b.user.first_name, b.user.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+        .toLowerCase();
+      const labelA = nameA || String(a.user.email ?? a.user.id);
+      const labelB = nameB || String(b.user.email ?? b.user.id);
+      return labelA.localeCompare(labelB);
+    });
+    return { uniqueCount: rows.length, rows };
+  }, [courses]);
 
   if (loading) {
     return (
@@ -173,11 +233,6 @@ const AcademyHomePage = () => {
   // Calculate statistics
   const totalCourses = courses.length;
   const categories = new Set(courses.map((c) => c.category)).size;
-  const recentCourses = courses.filter(
-    (c) =>
-      !!c.created_at &&
-      new Date(c.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000,
-  ).length;
 
   return (
     <DashboardLayout>
@@ -242,16 +297,16 @@ const AcademyHomePage = () => {
           <Card className="min-w-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
               <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Recent Courses
+                Total Students
               </CardTitle>
-              <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
+              <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
               <div className="text-lg md:text-2xl font-bold">
-                {recentCourses}
+                {studentAggregates.uniqueCount}
               </div>
               <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Added in the last 30 days
+                Unique enrollments across your courses
               </p>
             </CardContent>
           </Card>
@@ -336,19 +391,19 @@ const AcademyHomePage = () => {
             </CardContent>
           </Card>
 
-          {/* Recent Courses */}
+          {/* Enrolled students across all courses */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                Recent Courses
+                <Users className="h-5 w-5" />
+                Enrolled students
               </CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate("/academy/courses")}
               >
-                View All
+                Manage courses
               </Button>
             </CardHeader>
             <CardContent>
@@ -363,36 +418,50 @@ const AcademyHomePage = () => {
                     Create Your First Course
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {courses.map((course) => (
-                    <div
-                      key={course.id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{course.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {course.category}
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs">
-                            {course.level}
-                          </Badge>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          navigate(`/academy/courses/edit/${course.id}`)
-                        }
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                  ))}
+              ) : studentAggregates.rows.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">
+                    No students have enrolled in your courses yet.
+                  </p>
                 </div>
+              ) : (
+                <ul className="max-h-[min(420px,50vh)] space-y-2 overflow-y-auto pr-1">
+                  {studentAggregates.rows.map(({ user, courseTitles }) => {
+                    const displayName = [user.first_name, user.last_name]
+                      .filter(Boolean)
+                      .join(" ")
+                      .trim();
+                    return (
+                      <li
+                        key={String(user.id)}
+                        className="rounded-lg border p-3 text-sm"
+                      >
+                        <div className="font-medium">
+                          {displayName ||
+                            user.email ||
+                            `Student #${user.id}`}
+                        </div>
+                        {user.email ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {user.email}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {courseTitles.map((title, idx) => (
+                            <Badge
+                              key={`${String(user.id)}-${idx}-${title}`}
+                              variant="secondary"
+                              className="text-[10px] font-normal"
+                            >
+                              {title}
+                            </Badge>
+                          ))}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </CardContent>
           </Card>

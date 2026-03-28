@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { createAcademySlug } from "@/utils/academyUtils";
+import axios from "axios";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
@@ -39,6 +40,13 @@ interface AcademyProfile {
   description?: string | null;
 }
 
+type EnrolledUserRef = {
+  id: number | string;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
 type ApiCourse = {
   id?: string | number | null;
   title?: string | null;
@@ -56,6 +64,7 @@ type ApiCourse = {
   registration_link?: string | null;
   required_skills?: unknown;
   is_enrolled?: boolean | null;
+  enrolled_users?: unknown;
 };
 
 type CourseUi = {
@@ -74,6 +83,7 @@ type CourseUi = {
   price: string;
   registration_link: string | null;
   is_enrolled: boolean;
+  enrolled_users: EnrolledUserRef[];
 };
 
 const normalizeCourseImage = (value: string | null | undefined) => {
@@ -83,12 +93,31 @@ const normalizeCourseImage = (value: string | null | undefined) => {
   return `/${value}`;
 };
 
+const parseEnrolledUsersFromApi = (raw: unknown): EnrolledUserRef[] => {
+  if (!Array.isArray(raw)) return [];
+  const out: EnrolledUserRef[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id = o.id;
+    if (id === null || id === undefined) continue;
+    out.push({
+      id: typeof id === "number" || typeof id === "string" ? id : String(id),
+      email: o.email != null ? String(o.email) : null,
+      first_name: o.first_name != null ? String(o.first_name) : null,
+      last_name: o.last_name != null ? String(o.last_name) : null,
+    });
+  }
+  return out;
+};
+
 const normalizeApiCourseToUi = (api: ApiCourse): CourseUi => {
   const requiredSkills = Array.isArray(api.required_skills)
     ? api.required_skills.map((s) => String(s))
     : [];
 
   const imageCandidate = api.cover_image_url || api.lecturer_photo_url || "";
+  const enrolledUsers = parseEnrolledUsersFromApi(api.enrolled_users);
 
   return {
     id: api.id != null ? String(api.id) : "",
@@ -108,6 +137,7 @@ const normalizeApiCourseToUi = (api: ApiCourse): CourseUi => {
     registration_link:
       api.registration_link != null ? String(api.registration_link) : null,
     is_enrolled: Boolean(api.is_enrolled),
+    enrolled_users: enrolledUsers,
   };
 };
 
@@ -418,6 +448,79 @@ const CoursePage = () => {
     },
   });
 
+  const enrollMutation = useMutation({
+    mutationFn: async (courseData: CourseUi): Promise<"noop" | void> => {
+      if (!user?.id) {
+        throw new Error(t.courses.enrollLoginRequired);
+      }
+      if (!courseData?.id) {
+        throw new Error(t.courses.enrollFailed);
+      }
+      const uid = user.id;
+      if (
+        courseData.is_enrolled ||
+        courseData.enrolled_users.some((e) => String(e.id) === String(uid))
+      ) {
+        return "noop";
+      }
+
+      const idForPayload =
+        typeof uid === "number"
+          ? uid
+          : Number.isFinite(Number(uid))
+            ? Number(uid)
+            : uid;
+
+      const patchEnrolledUsers = () =>
+        apiClient.patch(`${API_ENDPOINTS.COURSES}${courseData.id}/`, {
+          enrolled_users: [
+            ...courseData.enrolled_users,
+            {
+              id: idForPayload,
+              email: user.email,
+              first_name: user.first_name ?? "",
+              last_name: user.last_name ?? "",
+            },
+          ],
+        });
+
+      try {
+        await apiClient.post(
+          `${API_ENDPOINTS.COURSES}${courseData.id}/enroll/`,
+          {},
+        );
+      } catch (err: unknown) {
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        if (status === 404 || status === 405) {
+          await patchEnrolledUsers();
+        } else {
+          throw err;
+        }
+      }
+    },
+    onSuccess: (result) => {
+      if (result === "noop") return;
+      queryClient.invalidateQueries({ queryKey: ["course", courseId] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["home-courses"] });
+      queryClient.invalidateQueries({ queryKey: ["academy-courses"] });
+      toast.success(t.courses.enrollSuccess);
+    },
+    onError: (error: unknown) => {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        const data = error.response.data as Record<string, unknown>;
+        const detail = data.detail;
+        if (typeof detail === "string") {
+          toast.error(detail);
+          return;
+        }
+      }
+      const message =
+        error instanceof Error ? error.message : t.courses.enrollFailed;
+      toast.error(message);
+    },
+  });
+
   const handleSaveCourse = () => {
     if (!user || !course) {
       toast.error("Please log in to save courses.");
@@ -426,6 +529,15 @@ const CoursePage = () => {
     const courseId = String(course.id);
     saveCourseMutation.mutate(courseId);
   };
+
+  const isUserEnrolled = useMemo(() => {
+    if (!course) return false;
+    if (!user) return Boolean(course.is_enrolled);
+    return (
+      Boolean(course.is_enrolled) ||
+      course.enrolled_users.some((e) => String(e.id) === String(user.id))
+    );
+  }, [course, user]);
 
   if (isLoading) {
     return (
@@ -644,30 +756,64 @@ const CoursePage = () => {
                       )}
                     </Button>
 
-                    {(course as { registration_link?: string })
-                      .registration_link ? (
-                      <a
-                        href={
-                          (course as { registration_link?: string })
-                            .registration_link
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full sm:w-auto"
+                    {course.registration_link ? (
+                      <Button
+                        type="button"
+                        size="default"
+                        disabled={enrollMutation.isPending}
+                        className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                        onClick={() => {
+                          if (!user) {
+                            toast.error(t.courses.enrollLoginRequired);
+                            return;
+                          }
+                          if (isUserEnrolled) {
+                            window.open(
+                              course.registration_link!,
+                              "_blank",
+                              "noopener,noreferrer",
+                            );
+                            return;
+                          }
+                          enrollMutation.mutate(course, {
+                            onSuccess: (result) => {
+                              if (result === "noop") return;
+                              window.open(
+                                course.registration_link!,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            },
+                          });
+                        }}
                       >
-                        <Button
-                          size="default"
-                          className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
-                        >
-                          {t.courses.enroll}
-                        </Button>
-                      </a>
+                        {enrollMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isUserEnrolled ? (
+                          t.courses.enrolled
+                        ) : (
+                          t.courses.enroll
+                        )}
+                      </Button>
                     ) : (
                       <Button
+                        type="button"
                         size="default"
+                        disabled={
+                          !user ||
+                          isUserEnrolled ||
+                          enrollMutation.isPending
+                        }
+                        onClick={() => enrollMutation.mutate(course)}
                         className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
                       >
-                        {t.courses.enroll}
+                        {enrollMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isUserEnrolled ? (
+                          t.courses.enrolled
+                        ) : (
+                          t.courses.enroll
+                        )}
                       </Button>
                     )}
                   </div>

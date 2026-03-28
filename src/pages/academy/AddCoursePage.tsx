@@ -30,6 +30,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   UploadCloud,
   X,
   Trash2,
@@ -53,9 +59,35 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { profileApi } from "@/api/profile/profileApi";
 import type { SkillSuggestion } from "@/api/profile/types";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const MIN_CHARS_FOR_SKILL_SUGGESTIONS = 3;
 const SKILL_SUGGESTIONS_DEBOUNCE_MS = 250;
+
+type EnrolledUserRef = {
+  id: number | string;
+  email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+};
+
+const parseEnrolledUsersFromApi = (raw: unknown): EnrolledUserRef[] => {
+  if (!Array.isArray(raw)) return [];
+  const out: EnrolledUserRef[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id = o.id;
+    if (id === null || id === undefined) continue;
+    out.push({
+      id: typeof id === "number" || typeof id === "string" ? id : String(id),
+      email: o.email != null ? String(o.email) : null,
+      first_name: o.first_name != null ? String(o.first_name) : null,
+      last_name: o.last_name != null ? String(o.last_name) : null,
+    });
+  }
+  return out;
+};
 
 type ApiCourse = {
   id?: string | number | null;
@@ -75,6 +107,7 @@ type ApiCourse = {
   lecturer_name?: string | null;
   lecturer_photo_url?: string | null;
   is_enrolled?: boolean | null;
+  enrolled_users?: unknown;
 };
 
 interface AcademyProfile {
@@ -114,6 +147,7 @@ const AddCoursePage = () => {
   const { courseId } = useParams<{ courseId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const t = useTranslation();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
@@ -146,6 +180,9 @@ const AddCoursePage = () => {
   >({});
   const isEditMode = !!courseId;
   const [editingSection, setEditingSection] = useState<EditingSection>(null);
+  const [enrolledUsers, setEnrolledUsers] = useState<EnrolledUserRef[]>([]);
+  const [enrolledStudentsModalOpen, setEnrolledStudentsModalOpen] =
+    useState(false);
 
   const captureBaseline = (section: Exclude<EditingSection, null>) => {
     switch (section) {
@@ -418,6 +455,7 @@ const AddCoursePage = () => {
           initialCoverSnapshotRef.current = coverUrl;
           setLecturerPhotoFile(null);
           setLecturerPhotoPreview(null);
+          setEnrolledUsers(parseEnrolledUsersFromApi(data.enrolled_users));
         }
       } catch (error: unknown) {
         console.error("Error fetching course:", error);
@@ -437,6 +475,7 @@ const AddCoursePage = () => {
   useEffect(() => {
     if (!courseId) {
       initialCoverSnapshotRef.current = null;
+      setEnrolledUsers([]);
     }
   }, [courseId]);
 
@@ -639,6 +678,7 @@ const AddCoursePage = () => {
         registration_link: null,
         lecturer_name: courseForm.lecturer_name || "",
         lecturer_photo_url: courseForm.lecturer_photo_url || null,
+        enrolled_users: enrolledUsers,
       };
 
       const needsMultipart =
@@ -674,6 +714,9 @@ const AddCoursePage = () => {
             headers: { "Content-Type": "multipart/form-data" },
           },
         );
+        await apiClient.patch(`${API_ENDPOINTS.COURSES}${courseId}/`, {
+          enrolled_users: enrolledUsers,
+        });
       } else {
         await apiClient.patch(`${API_ENDPOINTS.COURSES}${courseId}/`, payload);
       }
@@ -746,6 +789,77 @@ const AddCoursePage = () => {
       />
       <div className="px-4 py-4 sm:px-6 sm:py-6 pb-40 sm:pb-44 mb-16 sm:mb-20">
         <div className="max-w-7xl mx-auto pb-20">
+          {isEditMode && (
+            <>
+              <div className="mb-6 w-full rounded-2xl bg-white p-4 ">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                    <Users className="h-4 w-4 shrink-0 text-breneo-blue" />
+                    <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                      {t.courses.enrolledStudentsBox}
+                    </span>
+                    <span className="text-sm font-medium tabular-nums tracking-wide text-gray-900 dark:text-gray-100">
+                      {enrolledUsers.length}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full shrink-0 sm:w-auto"
+                    onClick={() => setEnrolledStudentsModalOpen(true)}
+                  >
+                    {t.courses.viewEnrolledStudents}
+                  </Button>
+                </div>
+              </div>
+
+              <Dialog
+                open={enrolledStudentsModalOpen}
+                onOpenChange={setEnrolledStudentsModalOpen}
+              >
+                <DialogContent className="max-h-[85vh] max-w-lg gap-0 overflow-hidden p-0 sm:rounded-[36px]">
+                  <DialogHeader className="border-b border-border px-6 py-4 text-left">
+                    <DialogTitle>
+                      {t.courses.enrolledStudentsListTitle}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="max-h-[min(60vh,480px)] overflow-y-auto px-6 py-4">
+                    {enrolledUsers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t.courses.enrolledStudentsModalEmpty}
+                      </p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {enrolledUsers.map((u) => {
+                          const displayName = [u.first_name, u.last_name]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim();
+                          return (
+                            <li
+                              key={String(u.id)}
+                              className="flex flex-col gap-0.5 rounded-lg bg-gray-50 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2 dark:bg-white/5"
+                            >
+                              <span className="truncate font-medium text-gray-900 dark:text-gray-100">
+                                {displayName || u.email || `User ${u.id}`}
+                              </span>
+                              {u.email ? (
+                                <span className="truncate text-xs text-gray-500">
+                                  {u.email}
+                                </span>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+
           {/* Cover hero */}
           <div className="relative isolate mb-6 w-full overflow-hidden rounded-2xl sm:rounded-3xl h-44 sm:h-80">
             {imagePreview ? (

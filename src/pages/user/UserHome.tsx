@@ -249,6 +249,42 @@ interface Course {
   match?: number;
 }
 
+const normalizeHomeCourseCoverUrl = (
+  cover: unknown,
+  lecturer: unknown,
+): string => {
+  const raw =
+    (typeof cover === "string" && cover.trim() !== "" && cover) ||
+    (typeof lecturer === "string" && lecturer.trim() !== "" && lecturer) ||
+    "";
+  if (!raw) return "/lovable-uploads/no_photo.png";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("/")) return raw;
+  return `/${raw}`;
+};
+
+const mapApiCourseToHomeCourse = (
+  course: Record<string, unknown>,
+): Course => {
+  const id = course.id != null ? String(course.id) : "";
+  const requiredSkills = Array.isArray(course.required_skills)
+    ? (course.required_skills as unknown[]).map((s) => String(s))
+    : [];
+  return {
+    id,
+    title: String(course.title ?? ""),
+    provider: String(course.academy_name ?? ""),
+    category: String(course.language ?? course.location ?? ""),
+    level: String(course.level ?? ""),
+    duration: String(course.total_duration ?? ""),
+    image: normalizeHomeCourseCoverUrl(
+      course.cover_image_url,
+      course.lecturer_photo_url,
+    ),
+    required_skills: requiredSkills,
+  };
+};
+
 // Fetch jobs from job service API - no filtering
 const fetchJobs = async () => {
   try {
@@ -607,7 +643,10 @@ const UserHome = () => {
           throw new Error(response.statusText);
         }
         const data: unknown = await response.json();
-        return Array.isArray(data) ? data : [];
+        const list = Array.isArray(data) ? data : [];
+        return list.map((c) =>
+          mapApiCourseToHomeCourse(c as Record<string, unknown>),
+        );
       } catch (error) {
         console.error("Error fetching courses:", error);
         return [];
@@ -1429,13 +1468,13 @@ const UserHome = () => {
                           <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
                             <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
                               <img
-                                src={course.image || "/placeholder.svg"}
+                                src={course.image}
                                 alt={course.title}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200 origin-center"
                                 style={{ transformOrigin: "center center" }}
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).src =
-                                    "/placeholder.svg";
+                                    "/lovable-uploads/no_photo.png";
                                 }}
                               />
                             </div>
