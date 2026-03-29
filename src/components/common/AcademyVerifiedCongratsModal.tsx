@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
@@ -14,11 +14,12 @@ const STORAGE_KEY_PREFIX = "academy_verified_congrats_shown";
 /**
  * Shows a congratulations modal when the academy becomes verified.
  * Only shown once per user (first time); state is stored in localStorage.
+ * Syncs with `academyDisplay.is_verified` from auth (updated by profile/home/courses loads and refreshUser).
  */
 export function AcademyVerifiedCongratsModal() {
-  const { user, academyDisplay } = useAuth();
+  const { user, academyDisplay, refreshUser } = useAuth();
   const [open, setOpen] = useState(false);
-  const [checked, setChecked] = useState(false);
+  const prevVerifiedRef = useRef<boolean | undefined>(undefined);
 
   const isAcademy =
     user?.user_type === "academy" ||
@@ -29,24 +30,52 @@ export function AcademyVerifiedCongratsModal() {
   const storageKey = userId ? `${STORAGE_KEY_PREFIX}_${userId}` : null;
 
   useEffect(() => {
-    if (!isAcademy || !isVerified || !storageKey || checked) return;
+    prevVerifiedRef.current = undefined;
+  }, [storageKey]);
 
-    try {
-      const alreadyShown = localStorage.getItem(storageKey) === "true";
-      if (!alreadyShown) {
-        setOpen(true);
+  useEffect(() => {
+    if (!isAcademy || !storageKey) return;
+
+    const nowVerified = isVerified === true;
+    const prev = prevVerifiedRef.current;
+
+    if (nowVerified) {
+      try {
+        const alreadyShown = localStorage.getItem(storageKey) === "true";
+        if (!alreadyShown && (prev === undefined || prev === false)) {
+          setOpen(true);
+        }
+      } catch {
+        /* ignore */
       }
-    } finally {
-      setChecked(true);
     }
-  }, [isAcademy, isVerified, storageKey, checked]);
 
-  const handleClose = (openState: boolean) => {
+    prevVerifiedRef.current = nowVerified ? true : false;
+  }, [isAcademy, isVerified, storageKey]);
+
+  /** Pick up verification soon after admin approves (tab focus / return to app). */
+  useEffect(() => {
+    if (!isAcademy) return;
+    const sync = () => {
+      void refreshUser();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", sync);
+    };
+  }, [isAcademy, refreshUser]);
+
+  const handleOpenChange = (openState: boolean) => {
     if (!openState && storageKey) {
       try {
         localStorage.setItem(storageKey, "true");
       } catch {
-        // ignore
+        /* ignore */
       }
     }
     setOpen(openState);
@@ -55,7 +84,7 @@ export function AcademyVerifiedCongratsModal() {
   if (!isAcademy) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md rounded-3xl">
         <DialogHeader>
           <DialogTitle className="sr-only">Academy verified</DialogTitle>
@@ -71,7 +100,7 @@ export function AcademyVerifiedCongratsModal() {
             Your academy is now verified. Learners can trust your profile and
             you’ll stand out on the platform.
           </p>
-          <Button onClick={() => handleClose(false)} className="min-w-[140px]">
+          <Button onClick={() => handleOpenChange(false)} className="min-w-[140px]">
             Got it
           </Button>
         </div>

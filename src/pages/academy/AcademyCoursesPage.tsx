@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, BookOpen } from "lucide-react";
+import { Plus, Edit, BookOpen, Clock } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeAcademyProfileApiResponse } from "@/api/academy";
@@ -66,7 +67,7 @@ type ApiCourseFull = {
 
 const AcademyCoursesPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateAcademyDisplay } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
@@ -99,7 +100,12 @@ const AcademyCoursesPage = () => {
           is_verified: data.is_verified ?? false,
         };
         setAcademyProfile(academyProfile);
-        console.log("✅ Academy profile loaded from API:", academyProfile);
+        updateAcademyDisplay({
+          name: academyProfile.academy_name,
+          email: academyProfile.contact_email,
+          is_verified: academyProfile.is_verified,
+          profile_image: academyProfile.logo_url ?? null,
+        });
       }
     } catch (error) {
       console.error("Failed to load academy profile:", error);
@@ -117,7 +123,7 @@ const AcademyCoursesPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, updateAcademyDisplay]);
 
   const fetchCourses = useCallback(async () => {
     if (!academyProfile) return;
@@ -184,7 +190,7 @@ const AcademyCoursesPage = () => {
   }, [fetchAcademyData]);
 
   useEffect(() => {
-    if (academyProfile && academyProfile.id) {
+    if (academyProfile && academyProfile.id && academyProfile.is_verified) {
       fetchCourses();
     }
   }, [academyProfile, fetchCourses]);
@@ -211,6 +217,41 @@ const AcademyCoursesPage = () => {
               Please contact support to set up your academy profile.
             </p>
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!academyProfile.is_verified) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-md border-dashed shadow-none">
+            <CardContent className="space-y-4 pt-10 pb-10 text-center">
+              <Clock
+                className="mx-auto h-14 w-14 text-amber-500"
+                strokeWidth={1.25}
+                aria-hidden
+              />
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">
+                  Verification pending
+                </h1>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Your academy is not verified yet. The dashboard will appear
+                  here after our team completes verification.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2"
+                onClick={() => navigate("/academy/profile")}
+              >
+                Academy profile
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </DashboardLayout>
     );

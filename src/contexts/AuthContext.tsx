@@ -10,7 +10,10 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
-import { normalizeAcademyProfileApiResponse } from "@/api/academy";
+import {
+  normalizeAcademyProfileApiResponse,
+  type AcademyProfileApiRaw,
+} from "@/api/academy";
 import { useImagePreloader } from "@/components/ui/OptimizedAvatar";
 import {
   getLocalizedPath,
@@ -925,10 +928,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // --- Refresh user function ---
   const refreshUser = async () => {
     try {
-      const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-      const userData = extractUserFromData(res.data);
-      if (userData) {
-        setUser(userData);
+      let userData: User | null = null;
+      try {
+        const res = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        userData = extractUserFromData(res.data);
+        if (userData) {
+          setUser(userData);
+        }
+      } catch {
+        /* Academy accounts may receive 403 on generic user profile */
+      }
+      const isAcademyUser =
+        userData?.user_type === "academy" ||
+        user?.user_type === "academy" ||
+        (typeof window !== "undefined" &&
+          localStorage.getItem("userRole") === "academy");
+      const uid = userData?.id ?? user?.id;
+      if (isAcademyUser && uid != null) {
+        try {
+          const ar = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+          if (ar.data) {
+            const raw = ar.data as AcademyProfileApiRaw;
+            const normalized = normalizeAcademyProfileApiResponse(
+              raw,
+              String(uid),
+            );
+            setAcademyDisplay({
+              name: normalized.academy_name || "",
+              email: normalized.contact_email || "",
+              is_verified: raw.is_verified ?? normalized.is_verified ?? false,
+              profile_image: normalized.logo_url ?? null,
+            });
+          }
+        } catch {
+          /* ignore academy refresh errors */
+        }
       }
     } catch (err) {
       console.error("Failed to refresh user:", err);

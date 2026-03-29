@@ -13,6 +13,7 @@ import {
   Globe,
   Phone,
   Link2,
+  Check,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/api/auth/apiClient";
@@ -607,14 +608,24 @@ const AcademyPage = () => {
                     />
                   </div>
                   {academyProfile.academy_name && (
-                    <h1 className="text-2xl font-bold mt-4 text-center">
-                      {academyProfile.academy_name}
-                    </h1>
-                  )}
-                  {academyProfile.is_verified && (
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100 mt-2">
-                      Verified
-                    </Badge>
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 px-2">
+                      <h1 className="text-2xl font-bold text-center">
+                        {academyProfile.academy_name}
+                      </h1>
+                      {academyProfile.is_verified && (
+                        <span
+                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#5D78FF_0%,#3E506D_40%,#2EB9D1_100%)] text-white shadow-sm ring-2 ring-white dark:ring-gray-950"
+                          title="Verified academy"
+                          aria-label="Verified academy"
+                        >
+                          <Check
+                            className="h-3 w-3"
+                            strokeWidth={3.5}
+                            aria-hidden
+                          />
+                        </span>
+                      )}
+                    </div>
                   )}
                   {/* Total Courses */}
                   <div className="mt-4 text-center">

@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Building2,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -79,7 +80,7 @@ const parseEnrolledUsersFromApi = (raw: unknown): EnrolledUserRef[] => {
 
 const AcademyHomePage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateAcademyDisplay } = useAuth();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
@@ -107,6 +108,12 @@ const AcademyHomePage = () => {
           is_verified: data.is_verified ?? false,
         };
         setAcademyProfile(academyProfile);
+        updateAcademyDisplay({
+          name: academyProfile.academy_name,
+          email: academyProfile.contact_email,
+          is_verified: academyProfile.is_verified,
+          profile_image: academyProfile.logo_url ?? null,
+        });
       }
     } catch (error: unknown) {
       console.error("Failed to load academy profile:", error);
@@ -122,7 +129,7 @@ const AcademyHomePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, navigate]);
+  }, [user, navigate, updateAcademyDisplay]);
 
   const fetchCourses = useCallback(async () => {
     if (!academyProfile) return;
@@ -164,7 +171,7 @@ const AcademyHomePage = () => {
   }, [fetchAcademyData]);
 
   useEffect(() => {
-    if (academyProfile && academyProfile.id) {
+    if (academyProfile && academyProfile.id && academyProfile.is_verified) {
       fetchCourses();
     }
   }, [academyProfile, fetchCourses]);
@@ -225,6 +232,41 @@ const AcademyHomePage = () => {
               Please contact support to set up your academy profile.
             </p>
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!academyProfile.is_verified) {
+    return (
+      <DashboardLayout>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-md border-dashed shadow-none">
+            <CardContent className="space-y-4 pt-10 pb-10 text-center">
+              <Clock
+                className="mx-auto h-14 w-14 text-amber-500"
+                strokeWidth={1.25}
+                aria-hidden
+              />
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">
+                  Verification pending
+                </h1>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Your academy is not verified yet. The dashboard will appear
+                  here after our team completes verification.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2"
+                onClick={() => navigate("/academy/profile")}
+              >
+                Academy profile
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </DashboardLayout>
     );
