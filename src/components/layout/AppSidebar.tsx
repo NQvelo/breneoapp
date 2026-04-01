@@ -39,7 +39,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const location = useLocation();
   // ✅ Get the user object directly from the context
-  const { loading, user, academyDisplay } = useAuth();
+  const { loading, user, academyDisplay, employerDisplay } = useAuth();
   const { subscriptionInfo } = useSubscription();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
@@ -57,6 +57,11 @@ export function AppSidebar({
     (typeof window !== "undefined" &&
       localStorage.getItem("userRole") === "academy");
 
+  const isEmployer =
+    user?.user_type === "employer" ||
+    (typeof window !== "undefined" &&
+      localStorage.getItem("userRole") === "employer");
+
   // Handle mounted state to avoid hydration mismatch
   React.useEffect(() => {
     setMounted(true);
@@ -68,6 +73,7 @@ export function AppSidebar({
 
   // Helper: Get display name (academy name from context for academy users, else user name – no refetch on nav)
   const getDisplayName = () => {
+    if (isEmployer && employerDisplay?.name) return employerDisplay.name;
     if (isAcademy && academyDisplay?.name) return academyDisplay.name;
     if (!user) return "Member";
     const { first_name, last_name, email } = user;
@@ -81,6 +87,7 @@ export function AppSidebar({
 
   // Helper: Get display email (academy email from context for academy users, else user email)
   const getDisplayEmail = () => {
+    if (isEmployer && employerDisplay?.email) return employerDisplay.email;
     if (isAcademy && academyDisplay?.email) return academyDisplay.email;
     return user?.email ?? "";
   };
@@ -90,12 +97,17 @@ export function AppSidebar({
    * Before load completes, fall back to `user.profile_image`.
    */
   const sidebarAvatarUrl =
-    isAcademy && academyDisplay != null
-      ? academyDisplay.profile_image || undefined
-      : user?.profile_image;
+    isEmployer && employerDisplay != null
+      ? employerDisplay.logo_url || undefined
+      : isAcademy && academyDisplay != null
+        ? academyDisplay.profile_image || undefined
+        : user?.profile_image;
 
   // Helper: Get avatar initials (academy name or user name/email)
   const getInitials = () => {
+    if (isEmployer && employerDisplay?.name) {
+      return employerDisplay.name.slice(0, 2).toUpperCase();
+    }
     if (isAcademy && academyDisplay?.name) {
       return academyDisplay.name.slice(0, 2).toUpperCase();
     }
@@ -124,18 +136,31 @@ export function AppSidebar({
           href: "/academy/courses",
         },
       ]
-    : [
-        { icon: Home, label: t.nav.home, href: "/home" },
-        { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
-        { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
-        { icon: Video, label: t.nav.webinars, href: "/webinars" },
-      ];
+    : isEmployer
+      ? [
+          { icon: Home, label: t.nav.home, href: "/employer/home" },
+          { icon: Briefcase, label: t.nav.yourJobs, href: "/employer/jobs" },
+        ]
+      : [
+          { icon: Home, label: t.nav.home, href: "/home" },
+          { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
+          { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
+          { icon: Video, label: t.nav.webinars, href: "/webinars" },
+        ];
 
-  const profilePath = isAcademy ? "/academy/profile" : "/profile";
+  const profilePath = isAcademy
+    ? "/academy/profile"
+    : isEmployer
+      ? "/employer/profile"
+      : "/profile";
   const settingsPath = isAcademy ? "/academy/settings" : "/settings";
-  const homePath = isAcademy ? "/academy/home" : "/home";
+  const homePath = isAcademy
+    ? "/academy/home"
+    : isEmployer
+      ? "/employer/home"
+      : "/home";
 
-  // Mobile navigation
+  // Mobile navigation (includes profile for all roles, including employer)
   const mobileNavItems = [
     ...navItems,
     { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
@@ -199,6 +224,12 @@ export function AppSidebar({
                 currentPath === "/academy/dashboard" ||
                 rawPathname.includes("/academy/home") ||
                 rawPathname.includes("/academy/dashboard");
+            } else if (item.href === "/employer/home") {
+              isActive =
+                currentPath === "/employer/home" ||
+                currentPath === "/employer/dashboard" ||
+                rawPathname.includes("/employer/home") ||
+                rawPathname.includes("/employer/dashboard");
             } else {
               isActive =
                 currentPath === item.href || rawPathname.endsWith(item.href);
@@ -283,6 +314,16 @@ export function AppSidebar({
                     currentPath === "/academy/dashboard" ||
                     rawPathname.includes("/academy/home") ||
                     rawPathname.includes("/academy/dashboard");
+                } else if (item.href === "/employer/home") {
+                  isActive =
+                    currentPath === "/employer/home" ||
+                    currentPath === "/employer/dashboard" ||
+                    rawPathname.includes("/employer/home") ||
+                    rawPathname.includes("/employer/dashboard");
+                } else if (item.href === "/employer/jobs") {
+                  isActive =
+                    currentPath.startsWith("/employer/jobs") ||
+                    rawPathname.includes("/employer/jobs");
                 } else {
                   // For other items, check if pathname ends with the href (handles language prefixes)
                   isActive =
@@ -337,6 +378,7 @@ export function AppSidebar({
             <div className="mb-4"></div>
 
             {/* Settings, Help Center, Theme Toggle grouped together */}
+            {!isEmployer && (
             <div className="space-y-1 mb-4">
               <LocalizedLink
                 to={settingsPath}
@@ -418,12 +460,13 @@ export function AppSidebar({
                 </button>
               )}
             </div>
+            )}
 
-            {/* Profile */}
+            {/* Profile / employer company */}
             <div className="mt-4 pt-4">
               <LocalizedLink
                 to={profilePath}
-                className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 transition-all duration-200 group"
+                className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-[#2d2d2d] transition-all duration-200 group"
               >
                 {/* Avatar box */}
                 <div

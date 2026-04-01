@@ -48,6 +48,12 @@ import AcademySettings from "@/pages/academy/AcademySettings";
 import AcademyPage from "@/pages/academy/AcademyPage";
 import AcademyRegistrationPage from "@/pages/academy/AcademyRegistrationPage";
 import AddCoursePage from "@/pages/academy/AddCoursePage";
+import EmployerRegistrationPage from "@/pages/employer/EmployerRegistrationPage";
+import EmployerDashboardPage from "@/pages/employer/EmployerDashboardPage";
+import EmployerHomePage from "@/pages/employer/EmployerHomePage";
+import EmployerJobsPage from "@/pages/employer/EmployerJobsPage";
+import EmployerAddJobPage from "@/pages/employer/EmployerAddJobPage";
+import EmployerProfilePage from "@/pages/employer/EmployerProfilePage";
 
 // Common pages (Available to all authenticated users)
 import TermsOfUse from "@/pages/TermsOfUse";
@@ -205,6 +211,43 @@ export const AppRoutes = () => {
           ACADEMY-ONLY ROUTES - Require role "academy"
           ========================================== */}
       <Route path="/academy/register" element={<AcademyRegistrationPage />} />
+      <Route path="/employer/register" element={<EmployerRegistrationPage />} />
+      {createLocalizedRoute(
+        "/employer/dashboard",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerDashboardPage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/employer/home",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerHomePage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/employer/jobs",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerJobsPage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/employer/jobs/add",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerAddJobPage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/employer/jobs/edit/:jobId",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerAddJobPage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/employer/profile",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerProfilePage />
+        </ProtectedRoute>
+      )}
       {createLocalizedRoute(
         "/academy/home",
         <ProtectedRoute requiredRole="academy">

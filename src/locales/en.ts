@@ -9,6 +9,7 @@ export const en = {
     settings: "Settings",
     help: "Help Center",
     notifications: "Notifications",
+    yourJobs: "Your jobs",
   },
   // Common
   common: {

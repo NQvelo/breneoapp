@@ -16,9 +16,9 @@ interface ProtectedRouteProps {
   /**
    * Optional role requirement
    * If specified, only users with this role can access the route
-   * Options: 'user', 'academy', 'admin'
+   * Options: 'user', 'academy', 'employer', 'admin'
    */
-  requiredRole?: "user" | "academy" | "admin";
+  requiredRole?: "user" | "academy" | "employer" | "admin";
   /**
    * Redirect path if unauthorized (default: /auth/login)
    */
@@ -110,21 +110,22 @@ export function ProtectedRoute({
 
     // ✅ FIX: Direct comparison instead of isRole() to avoid double-calling getRole()
     if (userRole !== requiredRole) {
-      // User doesn't have required role - silently redirect to their dashboard
-      // This is expected behavior, not an error
+      if (userRole === "employer") {
+        const employerPath = getLocalizedPath("/employer/home", language);
+        return <Navigate to={employerPath} replace />;
+      }
+      if (requiredRole === "employer") {
+        if (userRole === "academy") {
+          const academyPath = getLocalizedPath("/academy/dashboard", language);
+          return <Navigate to={academyPath} replace />;
+        }
+        const homePath = getLocalizedPath("/home", language);
+        return <Navigate to={homePath} replace />;
+      }
       if (userRole === "academy") {
-        // Academy user trying to access user route - redirect to academy dashboard
-        // console.log(
-        //   "🔄 ProtectedRoute: Academy user accessing user route, redirecting to /academy/dashboard"
-        // );
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         return <Navigate to={academyPath} replace />;
       } else {
-        // Regular user trying to access academy route - redirect to user home
-        // Also handles unknown role by defaulting to user home
-        // console.log(
-        //   `🔄 ProtectedRoute: User role '${userRole}' doesn't match required '${requiredRole}', redirecting to /home`
-        // );
         const homePath = getLocalizedPath("/home", language);
         return <Navigate to={homePath} replace />;
       }

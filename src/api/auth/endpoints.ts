@@ -47,4 +47,13 @@ export const API_ENDPOINTS = {
   JOBS: {
     SAVE_JOB: "/api/save-job/", // Use with job_id: /api/save-job/<job_id>/
   },
+  INDUSTRIES: "/api/industries/",
+  EMPLOYER: {
+    REGISTER: "/api/employer/register/",
+    VERIFY_EMAIL: "/api/employer/verify-email/",
+    LOGIN: "/api/employer/login/",
+    PROFILE: "/api/employer/profile/",
+    /** List/create employer-owned jobs (trailing slash for Django) */
+    JOBS: "/api/employer/jobs/",
+  },
 } as const;

@@ -53,6 +53,9 @@ apiClient.interceptors.request.use(
       !config.url?.includes("/api/register/") &&
       !config.url?.includes("/api/refresh/") &&
       !config.url?.includes("/api/verify-code/") &&
+      !config.url?.includes("/api/employer/register/") &&
+      !config.url?.includes("/api/employer/verify-email/") &&
+      !config.url?.includes("/api/employer/login/") &&
       !config.headers?.Authorization
     ) {
       // console.log("✅ Adding Bearer token to request");
@@ -107,7 +110,10 @@ apiClient.interceptors.response.use(
         originalRequest.url?.includes("/api/login/") ||
         originalRequest.url?.includes("/api/academy/login/") ||
         originalRequest.url?.includes("/api/register/") ||
-        originalRequest.url?.includes("/api/refresh/")
+        originalRequest.url?.includes("/api/refresh/") ||
+        originalRequest.url?.includes("/api/employer/register/") ||
+        originalRequest.url?.includes("/api/employer/verify-email/") ||
+        originalRequest.url?.includes("/api/employer/login/")
       ) {
         return Promise.reject(error);
       }
@@ -124,6 +130,9 @@ apiClient.interceptors.response.use(
         "/api/academy/profile/"
       );
       const isAcademyEndpoint = originalRequest.url?.includes("/api/academy/");
+      const isEmployerEndpoint = originalRequest.url?.includes(
+        "/api/employer/",
+      );
 
       try {
         // console.log("🔄 Attempting token refresh for 401 error...");
@@ -147,7 +156,7 @@ apiClient.interceptors.response.use(
 
             // If retry still fails with 401, check if it's an academy endpoint
             // For academy endpoints, don't logout - let component handle it
-            if (retryStatus === 401 && isAcademyEndpoint) {
+            if (retryStatus === 401 && (isAcademyEndpoint || isEmployerEndpoint)) {
               // console.log(
               //   "⚠️ Academy endpoint returned 401 after token refresh - not logging out, letting component handle it"
               // );
@@ -163,8 +172,11 @@ apiClient.interceptors.response.use(
           //   "⚠️ Token refresh returned null but original token still exists - might be server error"
           // );
 
-          // For academy endpoints, always let component handle it
-          if (isAcademyEndpoint && !inSessionRestoration) {
+          // For academy / employer endpoints, always let component handle it
+          if (
+            (isAcademyEndpoint || isEmployerEndpoint) &&
+            !inSessionRestoration
+          ) {
             // console.log(
             //   "⚠️ Token refresh failed for academy endpoint but token preserved - not logging out, letting component handle it"
             // );
@@ -184,7 +196,10 @@ apiClient.interceptors.response.use(
           // Token refresh failed and token was cleared
 
           // Token refresh failed - check if this is an academy endpoint
-          if (isAcademyEndpoint && !inSessionRestoration) {
+          if (
+            (isAcademyEndpoint || isEmployerEndpoint) &&
+            !inSessionRestoration
+          ) {
             return Promise.reject(error);
           }
         }
@@ -193,12 +208,15 @@ apiClient.interceptors.response.use(
 
         // Check if token still exists after error
         const tokenStillExists = TokenManager.getAccessToken();
-        if (tokenStillExists && isAcademyEndpoint) {
+        if (tokenStillExists && (isAcademyEndpoint || isEmployerEndpoint)) {
           return Promise.reject(error);
         }
 
-        // If refresh throws an error and this is an academy endpoint, don't logout
-        if (isAcademyEndpoint && !inSessionRestoration) {
+        // If refresh throws an error and this is an academy / employer endpoint, don't logout
+        if (
+          (isAcademyEndpoint || isEmployerEndpoint) &&
+          !inSessionRestoration
+        ) {
           return Promise.reject(error);
         }
       }
@@ -206,7 +224,7 @@ apiClient.interceptors.response.use(
       // ✅ Only clear tokens and redirect if NOT during session restoration
       // AND NOT an academy endpoint (academy endpoints might return 401 legitimately)
       // Note: We check isAcademyEndpoint (broader) to cover all academy endpoints
-      if (!inSessionRestoration && !isAcademyEndpoint) {
+      if (!inSessionRestoration && !isAcademyEndpoint && !isEmployerEndpoint) {
         // Check if this is a 404/403/500 error - these shouldn't trigger logout
         // Only logout on actual authentication failures (401 after refresh fails)
         const errorStatus = error.response?.status;
@@ -224,7 +242,7 @@ apiClient.interceptors.response.use(
           // Don't logout the user for these errors
           // console.log(`API error ${errorStatus} - not logging out user`);
         }
-      } else if (isAcademyProfileEndpoint) {
+      } else if (isAcademyProfileEndpoint || isEmployerEndpoint) {
         // For academy profile endpoints, just reject the error and let component handle it
         // Don't logout - the component knows how to handle 401/404 for academy profiles
         // console.log(

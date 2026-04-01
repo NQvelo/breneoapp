@@ -9,6 +9,7 @@ export const ka = {
     settings: "პარამეტრები",
     help: "დახმარების ცენტრი",
     notifications: "შეტყობინებები",
+    yourJobs: "თქვენი ვაკანსიები",
   },
   // Common
   common: {

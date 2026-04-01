@@ -14,6 +14,7 @@ import {
   normalizeAcademyProfileApiResponse,
   type AcademyProfileApiRaw,
 } from "@/api/academy";
+import { normalizeEmployerProfile } from "@/api/employer/profile";
 import { useImagePreloader } from "@/components/ui/OptimizedAvatar";
 import {
   getLocalizedPath,
@@ -49,7 +50,22 @@ interface AuthContextType {
     is_verified?: boolean;
     profile_image?: string | null;
   }) => void;
-  login: (email: string, password: string) => Promise<void>;
+  /** Company name, email, logo from /api/employer/profile/ */
+  employerDisplay: {
+    name: string;
+    email: string;
+    logo_url?: string | null;
+  } | null;
+  updateEmployerDisplay: (partial: {
+    name?: string;
+    email?: string;
+    logo_url?: string | null;
+  }) => void;
+  login: (
+    email: string,
+    password: string,
+    options?: { skipRedirect?: boolean },
+  ) => Promise<void>;
   logout: () => void;
   register: (email: string, password: string) => Promise<void>;
   updateUser: (userData: Partial<User>) => void;
@@ -73,8 +89,15 @@ const extractUserFromData = (data: unknown): User | null => {
       if (obj.user_role) return String(obj.user_role);
 
       // Check if roles is an array (might be from user_roles table)
-      if (Array.isArray(obj.roles) && obj.roles.length > 0) {
-        // Get the first role, or find "academy" role if present
+        if (Array.isArray(obj.roles) && obj.roles.length > 0) {
+        const priority = ["employer", "academy", "user", "admin"];
+        for (const p of priority) {
+          const found = obj.roles.find(
+            (r: unknown) =>
+              typeof r === "string" && r.toLowerCase() === p,
+          );
+          if (found) return String(found);
+        }
         const academyRole = obj.roles.find(
           (r: unknown) =>
             typeof r === "string" &&
@@ -113,7 +136,8 @@ const extractUserFromData = (data: unknown): User | null => {
       dataObj.id ||
       dataObj.user_type ||
       dataObj.role ||
-      dataObj.name
+      dataObj.name ||
+      (dataObj.employer && typeof dataObj.employer === "object")
     ) {
       // Create a clean user object by excluding non-user fields like tokens
       const userFields: User = {} as User;
@@ -138,6 +162,19 @@ const extractUserFromData = (data: unknown): User | null => {
       if (dataObj.profile_image !== undefined)
         userFields.profile_image = dataObj.profile_image as string | null;
 
+      if (dataObj.employer && typeof dataObj.employer === "object") {
+        const em = dataObj.employer as Record<string, unknown>;
+        if (em.email && !userFields.email) {
+          userFields.email = String(em.email);
+        }
+        if (em.company_name && !userFields.first_name) {
+          userFields.first_name = String(em.company_name);
+        }
+        if (em.phone_number && !userFields.phone_number) {
+          userFields.phone_number = String(em.phone_number);
+        }
+      }
+
       // ✅ FIX: Extract role from multiple possible field names
       const extractedRole = extractRole(dataObj);
       if (extractedRole) {
@@ -153,6 +190,8 @@ const extractUserFromData = (data: unknown): User | null => {
         //     roles: dataObj.roles,
         //   }
         // );
+      } else if (dataObj.employer && typeof dataObj.employer === "object") {
+        userFields.user_type = "employer";
       }
 
       return userFields;
@@ -188,6 +227,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     email: string;
     is_verified?: boolean;
     profile_image?: string | null;
+  } | null>(null);
+  const [employerDisplay, setEmployerDisplay] = useState<{
+    name: string;
+    email: string;
+    logo_url?: string | null;
   } | null>(null);
   const navigate = useNavigate();
   const { preloadImage } = useImagePreloader();
@@ -293,12 +337,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           jwtUserData = null;
         }
 
-        // Try to fetch profile from API (skip for academy users - /api/profile/ returns 403 for them)
+        // Try to fetch profile from API (skip for academy / employer — /api/profile/ may be forbidden)
         const isAcademyFromStorage = storedRole === "academy";
         const isAcademyFromJwt = jwtUserData?.user_type === "academy";
+        const isEmployerFromStorage = storedRole === "employer";
+        const isEmployerFromJwt = jwtUserData?.user_type === "employer";
         let userData: User | null = null;
 
-        if (isAcademyFromStorage || isAcademyFromJwt) {
+        if (
+          isAcademyFromStorage ||
+          isAcademyFromJwt ||
+          isEmployerFromStorage ||
+          isEmployerFromJwt
+        ) {
           userData = jwtUserData;
         } else {
           try {
@@ -380,9 +431,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // 3. JWT token payload user_type (if stored role not found)
         // 4. Default to "user" (only if nothing else available)
 
-        // ✅ FALLBACK: Check if user has an academy profile (if role not found)
-        // This handles cases where the role exists in the database but wasn't returned in the profile
+        // ✅ FALLBACK: Check if user has an academy / employer profile (if role not found)
         let hasAcademyProfile = false;
+        let hasEmployerProfile = false;
         if (!userData?.user_type && !storedRoleFromLogin) {
           try {
             const academyCheck = await apiClient.get(
@@ -390,18 +441,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             );
             if (academyCheck.data && academyCheck.status !== 404) {
               hasAcademyProfile = true;
-              // console.log(
-              //   "✅ User has academy profile but no role - treating as academy user"
-              // );
             }
-          } catch (academyError) {
-            // 404 means no academy profile, which is fine - user is not academy
-            // Other errors are also fine - we'll default to "user"
-            // console.log(
-            //   "ℹ️ No academy profile found (or error checking):",
-            //   (academyError as { response?: { status?: number } })?.response
-            //     ?.status
-            // );
+          } catch {
+            /* ignore */
+          }
+          try {
+            const employerCheck = await apiClient.get(
+              API_ENDPOINTS.EMPLOYER.PROFILE,
+            );
+            if (employerCheck.data && employerCheck.status !== 404) {
+              hasEmployerProfile = true;
+            }
+          } catch {
+            /* ignore */
           }
         }
 
@@ -433,12 +485,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           //   userData.user_type
           // );
         } else if (hasAcademyProfile) {
-          // Fallback: User has academy profile but no role in API response
           userData.user_type = "academy";
           localStorage.setItem("userRole", "academy");
-          // console.log(
-          //   "✅ User has academy profile but no role in API - setting to 'academy'"
-          // );
+        } else if (hasEmployerProfile) {
+          userData.user_type = "employer";
+          localStorage.setItem("userRole", "employer");
         } else if (jwtUserData?.user_type && jwtUserData.user_type !== "user") {
           // Fallback to JWT token if API didn't provide user_type and stored role missing
           userData.user_type = jwtUserData.user_type;
@@ -488,6 +539,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           setUser(userData);
           if (userData.user_type === "academy") {
+            setEmployerDisplay(null);
             apiClient
               .get(API_ENDPOINTS.ACADEMY.PROFILE)
               .then((res) => {
@@ -509,8 +561,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 }
               })
               .catch(() => setAcademyDisplay(null));
+          } else if (userData.user_type === "employer") {
+            setAcademyDisplay(null);
+            apiClient
+              .get(API_ENDPOINTS.EMPLOYER.PROFILE)
+              .then((res) => {
+                const n = normalizeEmployerProfile(
+                  res.data,
+                  typeof userData.email === "string" ? userData.email : undefined,
+                );
+                if (n) {
+                  setEmployerDisplay({
+                    name:
+                      n.company_name ||
+                      (typeof userData.first_name === "string"
+                        ? userData.first_name
+                        : "") ||
+                      String(userData.email ?? ""),
+                    email: n.email || String(userData.email ?? ""),
+                    logo_url: n.logo_url,
+                  });
+                } else {
+                  setEmployerDisplay(null);
+                }
+              })
+              .catch(() => setEmployerDisplay(null));
           } else {
             setAcademyDisplay(null);
+            setEmployerDisplay(null);
           }
         } else {
           // console.error(
@@ -521,6 +599,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Only clear tokens if we're absolutely sure the token is invalid
           setUser(null);
           setAcademyDisplay(null);
+          setEmployerDisplay(null);
         }
       } catch (error) {
         // console.error("❌ Failed to restore session:", error);
@@ -530,6 +609,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Token clearing is now handled by the axios interceptor only for non-session-restoration requests
         setUser(null);
         setAcademyDisplay(null);
+        setEmployerDisplay(null);
       } finally {
         // ✅ FIX: Always clear session restoration flag at the end of the entire process
         // This ensures the flag is cleared even if an error occurs
@@ -545,11 +625,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     for (const url of [
       academyDisplay?.profile_image,
+      employerDisplay?.logo_url,
       user?.profile_image,
     ] as (string | null | undefined)[]) {
       if (url) preloadImageRef.current(url).catch(console.error);
     }
-  }, [academyDisplay?.profile_image, user?.profile_image]);
+  }, [academyDisplay?.profile_image, employerDisplay?.logo_url, user?.profile_image]);
 
   // ✅ CRITICAL FIX: Redirect users ONLY when necessary
   // Preserves current route on refresh if user is on a valid route for their role
@@ -568,6 +649,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userRole =
         localStorage.getItem("userRole") || user.user_type || "user";
 
+      const pathWithoutLang = removeLanguagePrefix(currentPath);
+
       // List of public routes
       const publicRoutes = [
         "/auth/login",
@@ -580,18 +663,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // List of common routes (available to all authenticated users)
       const commonRoutes = ["/terms-of-use", "/help"];
-      const isCommonRoute = commonRoutes.includes(currentPath);
+      const isCommonRoute =
+        commonRoutes.includes(currentPath) ||
+        commonRoutes.includes(pathWithoutLang);
 
       // If we're on root or a public route, redirect to appropriate dashboard
       if (currentPath === "/" || isPublicRoute) {
         if (userRole === "academy") {
-          // console.log(
-          //   "🔄 Redirecting academy user from public route to /academy/dashboard"
-          // );
           const academyPath = getLocalizedPath("/academy/dashboard", language);
           navigate(academyPath, { replace: true });
+        } else if (userRole === "employer") {
+          const employerPath = getLocalizedPath("/employer/home", language);
+          navigate(employerPath, { replace: true });
         } else {
-          // console.log("🔄 Redirecting user from public route to /home");
           const homePath = getLocalizedPath("/home", language);
           navigate(homePath, { replace: true });
         }
@@ -603,9 +687,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Common routes are fine for any authenticated user
         return;
       }
-
-      // Remove language prefix for route detection
-      const pathWithoutLang = removeLanguagePrefix(currentPath);
 
       // Check if user is on a valid route for their role
       const isAcademyRoute = pathWithoutLang.startsWith("/academy/");
@@ -648,6 +729,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return; // Stay on current route - this is accessible to all authenticated users
       }
 
+      const isEmployerPrivateRoute =
+        pathWithoutLang.startsWith("/employer/") &&
+        pathWithoutLang !== "/employer/register";
+
+      if (userRole === "employer") {
+        if (isEmployerPrivateRoute) return;
+        if (pathWithoutLang === "/employer/register") {
+          const employerPath = getLocalizedPath("/employer/home", language);
+          navigate(employerPath, { replace: true });
+          return;
+        }
+        const employerPath = getLocalizedPath("/employer/home", language);
+        navigate(employerPath, { replace: true });
+        return;
+      }
+
+      if (
+        userRole !== "employer" &&
+        pathWithoutLang.startsWith("/employer/") &&
+        pathWithoutLang !== "/employer/register"
+      ) {
+        if (userRole === "academy") {
+          const academyPath = getLocalizedPath("/academy/dashboard", language);
+          navigate(academyPath, { replace: true });
+        } else {
+          const homePath = getLocalizedPath("/home", language);
+          navigate(homePath, { replace: true });
+        }
+        return;
+      }
+
       // ✅ CRITICAL FIX: Check academy routes FIRST before checking user routes
       // This prevents academy users on /academy/profile from being redirected
       if (userRole === "academy" && isAcademyRoute && !isAcademyPublicRoute) {
@@ -667,17 +779,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return; // Stay on current route - don't redirect
       }
 
-      // Additional check: if user is on dashboard/home route, don't redirect
-      if (
-        pathWithoutLang === "/dashboard" ||
-        pathWithoutLang === "/home" ||
-        currentPath.includes("/dashboard") ||
-        currentPath.includes("/home")
-      ) {
-        // console.log(
-        //   `✅ User is on dashboard/home route: ${currentPath}, not redirecting`
-        // );
-        return; // Stay on dashboard/home route
+      // Additional check: learner surfaces — don't redirect (employer handled above)
+      if (userRole === "user") {
+        if (pathWithoutLang === "/dashboard" || pathWithoutLang === "/home") {
+          return;
+        }
+        if (
+          currentPath.includes("/dashboard") &&
+          !pathWithoutLang.startsWith("/employer/")
+        ) {
+          return;
+        }
+        if (currentPath.includes("/home")) {
+          return;
+        }
       }
 
       // Only redirect if user is on the wrong route for their role
@@ -711,7 +826,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [user, loading, navigate]); // Re-run when user or loading state changes
 
   // --- Login function ---
-  const login = async (email: string, password: string) => {
+  const login = async (
+    email: string,
+    password: string,
+    options?: { skipRedirect?: boolean },
+  ) => {
     setLoading(true);
     try {
       const res = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, {
@@ -781,6 +900,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (!userData) {
+        try {
+          const employerRes = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
+          if (employerRes.data && typeof employerRes.data === "object") {
+            const ep = employerRes.data as Record<string, unknown>;
+            userData = {
+              id: extractUserIdFromToken(token) || String(ep.email ?? email),
+              email: (ep.email as string) || email,
+              first_name:
+                (ep.company_name as string) ||
+                (ep.name as string) ||
+                undefined,
+              user_type: "employer",
+              phone_number: ep.phone_number as string | undefined,
+            };
+          }
+        } catch {
+          /* not an employer account */
+        }
+      }
+
+      if (!userData) {
         throw new Error("Failed to fetch user profile.");
       }
 
@@ -826,10 +966,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           //   "✅ Setting user_type to 'academy' based on academy profile check"
           // );
         } else {
-          userData.user_type = "user";
-          // console.log(
-          //   "⚠️ user_type not found in profile and no academy profile - defaulting to 'user'"
-          // );
+          let hasEmployerProfile = false;
+          try {
+            const employerCheck = await apiClient.get(
+              API_ENDPOINTS.EMPLOYER.PROFILE,
+            );
+            if (employerCheck.data && employerCheck.status !== 404) {
+              hasEmployerProfile = true;
+            }
+          } catch {
+            /* ignore */
+          }
+          if (hasEmployerProfile) {
+            userData.user_type = "employer";
+          } else {
+            userData.user_type = "user";
+          }
         }
       } else {
         // console.log("✅ User type from profile:", userData.user_type);
@@ -844,6 +996,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(userData);
 
       if (userData.user_type === "academy") {
+        setEmployerDisplay(null);
         apiClient
           .get(API_ENDPOINTS.ACADEMY.PROFILE)
           .then((res) => {
@@ -865,8 +1018,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
           })
           .catch(() => setAcademyDisplay(null));
+      } else if (userData.user_type === "employer") {
+        setAcademyDisplay(null);
+        apiClient
+          .get(API_ENDPOINTS.EMPLOYER.PROFILE)
+          .then((res) => {
+            const n = normalizeEmployerProfile(
+              res.data,
+              typeof userData.email === "string" ? userData.email : undefined,
+            );
+            if (n) {
+              setEmployerDisplay({
+                name:
+                  n.company_name ||
+                  (typeof userData.first_name === "string"
+                    ? userData.first_name
+                    : "") ||
+                  String(userData.email ?? ""),
+                email: n.email || String(userData.email ?? ""),
+                logo_url: n.logo_url,
+              });
+            } else {
+              setEmployerDisplay(null);
+            }
+          })
+          .catch(() => setEmployerDisplay(null));
       } else {
         setAcademyDisplay(null);
+        setEmployerDisplay(null);
       }
 
       // Preload profile image for better performance
@@ -874,6 +1053,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         preloadImageRef.current(userData.profile_image).catch(console.error);
       }
       // ✅ END: FIX
+
+      if (options?.skipRedirect) {
+        return;
+      }
 
       // ✅ FIX: Redirect based on user type - academy users go to academy dashboard
       const language =
@@ -883,6 +1066,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (userData.user_type === "academy") {
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         navigate(academyPath);
+      } else if (userData.user_type === "employer") {
+        const employerPath = getLocalizedPath("/employer/home", language);
+        navigate(employerPath);
       } else {
         const homePath = getLocalizedPath("/home", language);
         navigate(homePath);
@@ -915,6 +1101,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     TokenManager.clearTokens();
     setUser(null);
     setAcademyDisplay(null);
+    setEmployerDisplay(null);
     navigate("/auth/login");
   };
 
@@ -964,6 +1151,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           /* ignore academy refresh errors */
         }
       }
+      const isEmployerUser =
+        userData?.user_type === "employer" ||
+        user?.user_type === "employer" ||
+        (typeof window !== "undefined" &&
+          localStorage.getItem("userRole") === "employer");
+      if (isEmployerUser) {
+        try {
+          const er = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
+          const n = normalizeEmployerProfile(
+            er.data,
+            userData?.email ?? user?.email,
+          );
+          if (n) {
+            setEmployerDisplay({
+              name:
+                n.company_name ||
+                (userData?.first_name as string) ||
+                user?.first_name ||
+                "",
+              email: n.email || userData?.email || user?.email || "",
+              logo_url: n.logo_url,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      }
     } catch (err) {
       console.error("Failed to refresh user:", err);
     }
@@ -989,6 +1203,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [],
   );
 
+  const updateEmployerDisplay = useCallback(
+    (partial: {
+      name?: string;
+      email?: string;
+      logo_url?: string | null;
+    }) => {
+      setEmployerDisplay((prev) => ({
+        name: partial.name ?? prev?.name ?? "",
+        email: partial.email ?? prev?.email ?? "",
+        logo_url:
+          partial.logo_url !== undefined
+            ? partial.logo_url
+            : (prev?.logo_url ?? null),
+      }));
+    },
+    [],
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -996,6 +1228,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loading,
         academyDisplay,
         updateAcademyDisplay,
+        employerDisplay,
+        updateEmployerDisplay,
         login,
         logout,
         register,

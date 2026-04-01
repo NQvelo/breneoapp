@@ -67,6 +67,9 @@ const LoginPage: React.FC = () => {
       if (userRole === "academy") {
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         navigate(academyPath, { replace: true });
+      } else if (userRole === "employer") {
+        const employerPath = getLocalizedPath("/employer/home", language);
+        navigate(employerPath, { replace: true });
       } else {
         const homePath = getLocalizedPath("/home", language);
         navigate(homePath, { replace: true });
@@ -99,12 +102,10 @@ const LoginPage: React.FC = () => {
     canonical.setAttribute("href", `${window.location.origin}/auth/login`);
   }, []);
 
-  // ✅ Handle login with dual endpoint support (academy and regular user)
+  // Academy → employer → unified learner login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // First, try academy login
-    let academyLoginFailed = false;
     try {
       const res = await apiClient.post(API_ENDPOINTS.AUTH.ACADEMY_LOGIN, {
         email: emailOrUsername,
@@ -120,30 +121,44 @@ const LoginPage: React.FC = () => {
         );
       }
 
-      // Store tokens using TokenManager
       if (refreshToken) {
         TokenManager.setTokens(token, refreshToken);
       } else {
         localStorage.setItem("authToken", token);
       }
 
-      // Set user role to academy
       localStorage.setItem("userRole", "academy");
-
-      // Successful academy login - reload page to trigger AuthContext session restoration
       window.location.href = "/academy/dashboard";
       return;
-    } catch (academyErr: unknown) {
-      console.log("Academy login failed, trying regular login...");
-      academyLoginFailed = true;
+    } catch {
+      /* try employer */
     }
 
-    // If academy login failed, try regular login
-    if (academyLoginFailed) {
-      try {
-        await login(emailOrUsername, password);
-        // Success logic (navigation, etc.) is handled by the AuthContext
-      } catch (err: unknown) {
+    try {
+      const res = await apiClient.post(API_ENDPOINTS.EMPLOYER.LOGIN, {
+        email: emailOrUsername,
+        password,
+      });
+      const token = res.data.access || res.data.token;
+      const refreshToken = res.data.refresh || res.data.refresh_token;
+      if (!token) {
+        throw new Error("Login succeeded but did not return the required token.");
+      }
+      TokenManager.setTokens(token, refreshToken || "");
+      localStorage.setItem("userRole", "employer");
+      const language =
+        getLanguageFromPath(window.location.pathname) ||
+        (localStorage.getItem("appLanguage") as "en" | "ka") ||
+        "en";
+      window.location.href = getLocalizedPath("/employer/home", language);
+      return;
+    } catch {
+      /* try unified login */
+    }
+
+    try {
+      await login(emailOrUsername, password);
+    } catch (err: unknown) {
         // ✅ START: Improved error handling
         let errorMessage = "Login failed. Please try again.";
         let needsVerification = false;
@@ -209,7 +224,6 @@ const LoginPage: React.FC = () => {
           }
         }
         // ✅ END: Improved error handling
-      }
     }
   };
 
@@ -352,6 +366,16 @@ const LoginPage: React.FC = () => {
                 onClick={() => navigate("/auth/signup")}
               >
                 Sign Up
+              </button>
+            </p>
+            <p className="text-center text-muted-foreground mt-3 text-sm">
+              Hiring company?{" "}
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => navigate("/employer/register")}
+              >
+                Register as employer
               </button>
             </p>
           </div>
