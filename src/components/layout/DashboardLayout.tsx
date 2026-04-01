@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { DashboardHeader } from "./DashboardHeader";
+import { useAuth } from "@/contexts/AuthContext";
+import { removeLanguagePrefix } from "@/utils/localeUtils";
+import { TokenManager } from "@/api/auth/tokenManager";
 import { AcademyVerifiedCongratsModal } from "@/components/common/AcademyVerifiedCongratsModal";
 import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
 import { cn } from "@/lib/utils";
@@ -30,6 +33,26 @@ export function DashboardLayout({
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const mainContentRef = useRef<HTMLElement>(null);
+  const location = useLocation();
+  const { user, employerDisplay } = useAuth();
+
+  useEffect(() => {
+    const path = removeLanguagePrefix(location.pathname);
+    if (!path.startsWith("/employer/") || path === "/employer/register") {
+      return;
+    }
+    console.log("[employer auth]", {
+      path,
+      userRole:
+        typeof window !== "undefined"
+          ? localStorage.getItem("userRole")
+          : null,
+      userType: user?.user_type,
+      email: user?.email,
+      employerDisplay,
+      hasAccessToken: !!TokenManager.getAccessToken(),
+    });
+  }, [location.pathname, user?.user_type, user?.email, employerDisplay]);
 
   useEffect(() => {
     if (searchParams.get("upgrade") === "true") {
