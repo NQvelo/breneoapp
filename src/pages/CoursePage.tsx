@@ -4,7 +4,6 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { createAcademySlug } from "@/utils/academyUtils";
@@ -54,6 +53,7 @@ type ApiCourse = {
   academy_name?: string | null;
   cover_image_url?: string | null;
   lecturer_photo_url?: string | null;
+  lecturer_name?: string | null;
   description?: string | null;
   level?: string | null;
   language?: string | null;
@@ -76,6 +76,8 @@ type CourseUi = {
   duration: string;
   image: string;
   description: string;
+  lecturer_name: string;
+  lecturer_photo_url: string | null;
   topics: string[];
   required_skills: string[];
   academy_id: string | null;
@@ -128,6 +130,9 @@ const normalizeApiCourseToUi = (api: ApiCourse): CourseUi => {
     duration: String(api.total_duration ?? ""),
     image: normalizeCourseImage(imageCandidate),
     description: String(api.description ?? ""),
+    lecturer_name: String(api.lecturer_name ?? ""),
+    lecturer_photo_url:
+      api.lecturer_photo_url != null ? String(api.lecturer_photo_url) : null,
     topics: [],
     required_skills: requiredSkills,
     academy_id: api.academy_id != null ? String(api.academy_id) : null,
@@ -490,7 +495,9 @@ const CoursePage = () => {
           {},
         );
       } catch (err: unknown) {
-        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        const status = axios.isAxiosError(err)
+          ? err.response?.status
+          : undefined;
         if (status === 404 || status === 405) {
           await patchEnrolledUsers();
         } else {
@@ -568,6 +575,8 @@ const CoursePage = () => {
 
   const academyUrl = getAcademyUrl();
   const academyName = academyProfile?.academy_name || course.provider;
+  const lecturerName = course.lecturer_name || "Lecturer";
+  const lecturerPhotoUrl = course.lecturer_photo_url || null;
 
   // Get the image URL (prefer profile_photo_url, fallback to logo_url)
   const academyImageUrl =
@@ -593,17 +602,13 @@ const CoursePage = () => {
     return "3 Hours Estimation";
   };
 
-  // Get first 3 topics/categories for tags
-  const displayTags =
-    course.topics?.slice(0, 3) || course.required_skills?.slice(0, 3) || [];
-
   return (
     <DashboardLayout>
-      <div className="px-4 py-4 sm:px-6 sm:py-6 pb-40 sm:pb-44 mb-16 sm:mb-20 ">
+      <div className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-44 mb-16 sm:mb-20 sm:px-4 md:px-6">
         {/* Main Content Wrapper */}
-        <div className="max-w-7xl mx-auto pb-20">
+        <div className="pb-20 p-1">
           {/* 1. Cover Image - Outside the main div */}
-          <div className="w-full h-40 sm:h-80 overflow-hidden rounded-3xl mb-6">
+          <div className="w-full h-48 sm:h-80 overflow-hidden rounded-3xl mb-6">
             <img
               src={course.image}
               alt={course.title}
@@ -611,40 +616,24 @@ const CoursePage = () => {
             />
           </div>
 
+          {/* 2. Course Title - Outside the main card */}
+          <h1 className="text-xl sm:text-2xl font-bold text-black dark:text-white mb-6">
+            {course.title}
+          </h1>
+
           {/* Main Content Card */}
           <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
             <CardContent className="p-6 sm:p-6 space-y-0 ">
-              {/* 2. Academy Name */}
-              <div className="flex items-center gap-3 pb-2 ">
-                <OptimizedAvatar
-                  src={academyImageUrl || undefined}
-                  alt={academyName}
-                  fallback={
-                    academyName ? academyName.charAt(0).toUpperCase() : "A"
-                  }
-                  size="sm"
-                  className="flex-shrink-0 !h-10 !w-10 !rounded-sm"
-                />
-                <span className="text-gray-600 text-base font-medium">
-                  {academyName}
-                </span>
-              </div>
-
-              {/* 3. Course Title (smaller font) */}
-              <h1 className="text-xl sm:text-2xl font-bold text-black dark:text-white pb-6">
-                {course.title}
-              </h1>
-
               {/* 5. Info Cards Section with Registration and Save Buttons */}
-              <div className="py-0 px-0 sm:py-5 sm:px-0 bg-white dark:bg-white rounded-3xl">
+              <div className="py-0 px-0 sm:py-2 sm:px-0 bg-white dark:bg-white rounded-3xl">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 sm:gap-6">
                   {/* Info Cards */}
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-12 flex-1 w-full sm:w-auto  rounded-2xl sm:rounded-none p-0 sm:p-0">
                     {/* Price Card */}
                     <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                          <DollarSign className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
+                          <DollarSign className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
                         </div>
                         <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           Free
@@ -666,8 +655,8 @@ const CoursePage = () => {
                     {/* Duration Card */}
                     <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                          <RotateCcw className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
+                          <RotateCcw className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
                         </div>
                         <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           {course.duration || "2 თვე"}
@@ -689,8 +678,8 @@ const CoursePage = () => {
                     {/* Lectures Card */}
                     <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                          <Video className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
+                          <Video className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
                         </div>
                         <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           {course.topics?.length || 16}
@@ -712,8 +701,8 @@ const CoursePage = () => {
                     {/* Level Card */}
                     <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-8 sm:h-8 rounded-xl sm:rounded-full bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/40 flex items-center justify-center flex-shrink-0">
-                          <Users className="h-5 w-5 sm:h-4 sm:w-4 text-breneo-blue dark:text-breneo-blue" />
+                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/15 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
+                          <Users className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
                         </div>
                         <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
                           {course.level || "All Levels"}
@@ -800,9 +789,7 @@ const CoursePage = () => {
                         type="button"
                         size="default"
                         disabled={
-                          !user ||
-                          isUserEnrolled ||
-                          enrollMutation.isPending
+                          !user || isUserEnrolled || enrollMutation.isPending
                         }
                         onClick={() => enrollMutation.mutate(course)}
                         className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
@@ -819,110 +806,118 @@ const CoursePage = () => {
                   </div>
                 </div>
               </div>
-
-              {/* 6. Description */}
-              <div className="py-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <img
-                    src="/lovable-uploads/3dicons-notebook-dynamic-color.png"
-                    alt="Notebook"
-                    className="h-12 w-12 object-contain flex-shrink-0"
-                  />
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    What will You learn
-                  </h2>
-                </div>
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
-                  {course.description || "No description available."}
-                </p>
-              </div>
-
-              {/* About Academy Section */}
-
-              {/* Chips - Moved to bottom */}
-              <div className="flex flex-wrap gap-2 py-6">
-                {displayTags.slice(0, 3).map((tag, index) => (
-                  <Badge
-                    key={index}
-                    className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100"
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
             </CardContent>
           </Card>
 
-          {/* About Academy Section - Separate Card */}
-          {academyProfile && (
-            <Card className="rounded-m border-0 shadow-none bg-white dark:bg-white mt-6">
+          {/* Course Description - Separate Card */}
+          <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white mt-6">
+            <CardContent className="p-6 sm:p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                What will You learn
+              </h2>
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                {course.description || "No description available."}
+              </p>
+            </CardContent>
+          </Card>
+
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-6 mt-6",
+              academyProfile && "lg:grid-cols-2",
+            )}
+          >
+            <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
               <CardContent className="p-6 sm:p-6">
                 <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
-                  About Academy
+                  Lecturer
                 </h2>
-                <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  {/* Academy Logo */}
-                  <div className="flex-shrink-0">
-                    <OptimizedAvatar
-                      src={academyImageUrl || undefined}
-                      alt={academyName}
-                      fallback={
-                        academyName ? academyName.charAt(0).toUpperCase() : "A"
-                      }
-                      size="lg"
-                      className="!h-16 !w-16 !rounded-sm"
-                    />
-                  </div>
-
-                  {/* Academy Info */}
-                  <div className="flex-1 w-full">
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                          {academyName}
-                        </h3>
-                        {academyProfile.description ? (
-                          <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                            {academyProfile.description}
-                          </p>
-                        ) : (
-                          <p className="text-gray-500 dark:text-gray-500 italic">
-                            No description available.
-                          </p>
-                        )}
-                      </div>
-
-                      <Link
-                        to={academyUrl}
-                        className="hidden sm:block flex-shrink-0"
-                      >
-                        <Button
-                          variant="outline"
-                          className="flex items-center gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View Academy
-                        </Button>
-                      </Link>
-                    </div>
-
-                    {/* Mobile View Academy Button */}
-                    <div className="block sm:hidden mt-4 w-full">
-                      <Link to={academyUrl}>
-                        <Button
-                          variant="outline"
-                          className="w-full flex items-center gap-2 justify-center"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View Academy
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
+                <div className="flex items-start gap-4">
+                  <OptimizedAvatar
+                    src={lecturerPhotoUrl || undefined}
+                    alt={lecturerName}
+                    fallback={lecturerName ? lecturerName.charAt(0).toUpperCase() : "L"}
+                    size="lg"
+                    className="!h-16 !w-16 !rounded-sm"
+                  />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {lecturerName}
+                  </h3>
                 </div>
               </CardContent>
             </Card>
-          )}
+
+            {/* About Academy Section - Separate Card */}
+            {academyProfile && (
+              <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
+                <CardContent className="p-6 sm:p-6">
+                  <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
+                    About Academy
+                  </h2>
+                  <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    {/* Academy Logo */}
+                    <div className="flex-shrink-0">
+                      <OptimizedAvatar
+                        src={academyImageUrl || undefined}
+                        alt={academyName}
+                        fallback={
+                          academyName ? academyName.charAt(0).toUpperCase() : "A"
+                        }
+                        size="lg"
+                        className="!h-16 !w-16 !rounded-sm"
+                      />
+                    </div>
+
+                    {/* Academy Info */}
+                    <div className="flex-1 w-full">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                            {academyName}
+                          </h3>
+                          {academyProfile.description ? (
+                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                              {academyProfile.description}
+                            </p>
+                          ) : (
+                            <p className="text-gray-500 dark:text-gray-500 italic">
+                              No description available.
+                            </p>
+                          )}
+                        </div>
+
+                        <Link
+                          to={academyUrl}
+                          className="hidden sm:block flex-shrink-0"
+                        >
+                          <Button
+                            variant="outline"
+                            className="flex items-center gap-2"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View Academy
+                          </Button>
+                        </Link>
+                      </div>
+
+                      {/* Mobile View Academy Button */}
+                      <div className="block sm:hidden mt-4 w-full">
+                        <Link to={academyUrl}>
+                          <Button
+                            variant="outline"
+                            className="w-full flex items-center gap-2 justify-center"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View Academy
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </DashboardLayout>
