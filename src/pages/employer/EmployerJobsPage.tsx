@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,32 +16,75 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchEmployerJobs, type EmployerJob } from "@/api/employer/jobsApi";
+import {
+  fetchEmployerJobsFiltered,
+  type EmployerJob,
+} from "@/api/employer/jobsApi";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 
 export default function EmployerJobsPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { employerDisplay } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const statusFilter =
-    searchParams.get("status") === "closed" ? "closed" : "active";
+  const statusFilter = (() => {
+    const s = searchParams.get("status");
+    if (s === "inactive") return "inactive";
+    if (s === "active") return "active";
+    return "all";
+  })();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await fetchEmployerJobs();
+      const prof = await apiClient
+        .get(API_ENDPOINTS.EMPLOYER.PROFILE)
+        .catch(() => null);
+      const profile =
+        prof?.data && typeof prof.data === "object"
+          ? (prof.data as Record<string, unknown>)
+          : null;
+      const companyId =
+        profile?.company_id != null
+          ? String(profile.company_id)
+          : profile?.company &&
+              typeof profile.company === "object" &&
+              (profile.company as Record<string, unknown>).id != null
+            ? String((profile.company as Record<string, unknown>).id)
+            : "";
+      const companyName =
+        (typeof profile?.company_name === "string" && profile.company_name) ||
+        employerDisplay?.name ||
+        "";
+      const list = await fetchEmployerJobsFiltered({
+        companyId,
+        companyName,
+      });
       setJobs(list);
+      setLoadError(null);
     } catch {
-      toast.error("Could not load jobs.");
+      setLoadError("Could not load jobs.");
+      toast.error("Could not load jobs.", {
+        action: {
+          label: "Retry",
+          onClick: () => {
+            load();
+          },
+        },
+      });
       setJobs([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [employerDisplay?.name]);
 
   useEffect(() => {
     load();
@@ -58,7 +100,12 @@ export default function EmployerJobsPage() {
   );
 
   const filteredJobs = useMemo(() => {
-    const byStatus = statusFilter === "active" ? activeJobs : closedJobs;
+    const byStatus =
+      statusFilter === "active"
+        ? activeJobs
+        : statusFilter === "inactive"
+          ? closedJobs
+          : jobs;
     const q = query.trim().toLowerCase();
     if (!q) return byStatus;
     return byStatus.filter((job) => {
@@ -66,7 +113,7 @@ export default function EmployerJobsPage() {
       const location = (job.location || "").toLowerCase();
       return title.includes(q) || location.includes(q);
     });
-  }, [statusFilter, activeJobs, closedJobs, query]);
+  }, [statusFilter, activeJobs, closedJobs, jobs, query]);
 
   const relativePosted = (value?: string) => {
     if (!value) return "Posted recently";
@@ -88,25 +135,7 @@ export default function EmployerJobsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">
-              Your jobs
-            </h1>
-            <p className="text-muted-foreground text-sm mt-1">
-              Manage job postings for your company
-            </p>
-          </div>
-          <Button
-            onClick={() =>
-              navigate(getLocalizedPath("/employer/jobs/add", language))
-            }
-            className="shrink-0"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Post a new job
-          </Button>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"></div>
 
         <Card>
           <CardHeader className="pb-2">
@@ -117,10 +146,8 @@ export default function EmployerJobsPage() {
                   setSearchParams(
                     (prev) => {
                       const next = new URLSearchParams(prev);
-                      next.set(
-                        "status",
-                        value === "closed" ? "closed" : "active",
-                      );
+                      if (value === "all") next.delete("status");
+                      else next.set("status", value);
                       return next;
                     },
                     { replace: true },
@@ -128,24 +155,30 @@ export default function EmployerJobsPage() {
                 }
               >
                 <TabsList>
+                  <TabsTrigger value="all">All ({jobs.length})</TabsTrigger>
                   <TabsTrigger value="active">
                     Active ({activeJobs.length})
                   </TabsTrigger>
-                  <TabsTrigger value="closed">
-                    Closed ({closedJobs.length})
+                  <TabsTrigger value="inactive">
+                    Inactive ({closedJobs.length})
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="relative w-full md:max-w-sm">
-                <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by title or location"
-                  className="pl-9"
-                />
+              <div className="relative w-full md:max-w-sm flex justify-end">
+                <Button
+                  onClick={() =>
+                    navigate(getLocalizedPath("/employer/jobs/add", language))
+                  }
+                  className="shrink-0"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Post a new job
+                </Button>
               </div>
             </div>
+            {loadError ? (
+              <p className="text-xs text-destructive pt-2">{loadError}</p>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3">
             {loading ? (
@@ -210,28 +243,24 @@ export default function EmployerJobsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge
-                          variant={job.is_active ? "default" : "secondary"}
-                          className="font-normal"
-                        >
-                          {job.is_active ? "Active" : "Closed"}
-                        </Badge>
                         {job.id ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              navigate(
-                                getLocalizedPath(
-                                  `/employer/jobs/edit/${job.id}?source=${job.source ?? "breneo"}`,
-                                  language,
-                                ),
-                              )
-                            }
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                navigate(
+                                  getLocalizedPath(
+                                    `/employer/jobs/edit/${job.id}?source=${job.source ?? "aggregator"}`,
+                                    language,
+                                  ),
+                                )
+                              }
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                          </>
                         ) : null}
                       </div>
                     </div>

@@ -1,5 +1,3 @@
-import apiClient from "@/api/auth/apiClient";
-import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
 
 export type EmployerJobSource = "breneo" | "aggregator";
@@ -16,9 +14,22 @@ export type EmployerJob = {
   is_active: boolean;
   created_at?: string;
   work_mode?: string;
+  company_id?: string;
+  company_name?: string;
   /** Jobs from job-aggregator (POST via dev proxy); omit or breneo = main API */
   source?: EmployerJobSource;
 };
+
+export type EmployerJobsFilter = {
+  companyId?: string;
+  companyName?: string;
+};
+
+const EMPLOYER_JOBS_API_BASE =
+  (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL as string | undefined) ||
+  (import.meta.env.DEV
+    ? window.location.origin
+    : "https://breneo-job-aggregator.up.railway.app");
 
 function toIsActive(value: unknown): boolean {
   if (value === false || value === 0 || value === "0") return false;
@@ -38,48 +49,56 @@ function workModeLabel(mode: string): string {
   return mode;
 }
 
-function parseJob(raw: Record<string, unknown>): EmployerJob {
-  const src = raw.source === "aggregator" ? "aggregator" : "breneo";
+function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
+  const src = "aggregator";
+  const wm = String(raw.work_mode ?? "");
+  const companyRaw = raw.company;
+  const companyObj =
+    companyRaw && typeof companyRaw === "object"
+      ? (companyRaw as Record<string, unknown>)
+      : null;
+  const companyId =
+    companyObj?.id != null
+      ? String(companyObj.id)
+      : (typeof companyRaw === "number" || typeof companyRaw === "string") &&
+          String(companyRaw).trim() !== "" &&
+          /^\d+$/.test(String(companyRaw).trim())
+        ? String(companyRaw).trim()
+      : raw.company_id != null
+        ? String(raw.company_id)
+        : undefined;
+  const companyName =
+    typeof companyRaw === "string"
+      ? companyRaw
+      : companyObj?.name != null
+        ? String(companyObj.name)
+        : raw.company_name != null
+          ? String(raw.company_name)
+          : undefined;
   return {
     id: raw.id != null ? String(raw.id) : "",
     title: String(raw.title ?? raw.job_title ?? ""),
-    description: String(raw.description ?? ""),
+    description: String(raw.full_description ?? raw.description ?? ""),
     location: String(raw.location ?? raw.job_location ?? ""),
     employment_type: String(
-      raw.employment_type ?? raw.job_type ?? raw.type ?? "",
+      raw.employment_type ?? raw.job_type ?? raw.type ?? workModeLabel(wm),
     ),
     apply_url: String(raw.apply_url ?? raw.application_url ?? ""),
     salary: String(raw.salary ?? raw.salary_range ?? ""),
-    remote: Boolean(raw.remote ?? raw.is_remote),
+    remote: wm.toLowerCase() === "remote" || Boolean(raw.remote ?? raw.is_remote),
     is_active: toIsActive(raw.is_active),
     created_at:
-      raw.created_at != null ? String(raw.created_at) : undefined,
-    work_mode: String(raw.work_mode ?? ""),
-    source: src,
-  };
-}
-
-/** v1 list/detail shape from breneo-job-aggregator */
-function parseAggregatorV1Job(raw: Record<string, unknown>): EmployerJob {
-  const wm = String(raw.work_mode ?? "unknown");
-  return {
-    id: raw.id != null ? String(raw.id) : "",
-    title: String(raw.title ?? ""),
-    description: String(raw.description ?? ""),
-    location: String(raw.location ?? ""),
-    employment_type: workModeLabel(wm),
-    apply_url: String(raw.apply_url ?? ""),
-    salary: raw.salary != null ? String(raw.salary) : "",
-    remote: wm === "remote",
-    is_active: toIsActive(raw.is_active),
-    created_at:
-      raw.posted_at != null
-        ? String(raw.posted_at)
-        : raw.fetched_at != null
-          ? String(raw.fetched_at)
-          : undefined,
+      raw.created_at != null
+        ? String(raw.created_at)
+        : raw.posted_at != null
+          ? String(raw.posted_at)
+          : raw.updated_at != null
+            ? String(raw.updated_at)
+            : undefined,
     work_mode: wm,
-    source: "aggregator",
+    company_id: companyId,
+    company_name: companyName,
+    source: src,
   };
 }
 
@@ -93,98 +112,69 @@ function unwrapList(data: unknown): unknown[] {
   return [];
 }
 
-async function fetchEmployerJobsBreneo(): Promise<EmployerJob[]> {
-  try {
-    const res = await apiClient.get(API_ENDPOINTS.EMPLOYER.JOBS);
-    return unwrapList(res.data)
-      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-      .map((x) => parseJob(x));
-  } catch (e: unknown) {
-    const status = (e as { response?: { status?: number } })?.response?.status;
-    if (status === 404) return [];
-    throw e;
-  }
+/**
+ * Employer dashboard list via server proxy GET /api/employer/jobs.
+ * Includes active + inactive jobs.
+ */
+export async function fetchEmployerJobs(): Promise<EmployerJob[]> {
+  return fetchEmployerJobsFiltered();
 }
 
-/**
- * Jobs posted to the job-aggregator (same-origin GET /api/employer/jobs in dev via Vite → Express proxy).
- * Returns [] if unauthenticated, offline, or no proxy (e.g. static production host).
- */
-async function fetchEmployerJobsAggregator(): Promise<EmployerJob[]> {
+function buildEmployerJobsUrl(
+  base: string,
+  filter?: EmployerJobsFilter,
+): string {
+  const url = new URL("/api/employer/jobs", base);
+  const companyId = filter?.companyId?.trim();
+  const companyName = filter?.companyName?.trim();
+  if (companyId) {
+    url.searchParams.set("company_id", companyId);
+  } else if (companyName) {
+    url.searchParams.set("company", companyName);
+  }
+  return url.toString();
+}
+
+export async function fetchEmployerJobsFiltered(
+  filter?: EmployerJobsFilter,
+): Promise<EmployerJob[]> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") return [];
-  try {
-    const res = await fetch(`${window.location.origin}/api/employer/jobs`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as { results?: unknown[] };
-    const rows = Array.isArray(data.results) ? data.results : [];
-    return rows
-      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-      .map((row) => parseAggregatorV1Job(row));
-  } catch {
-    return [];
+  const res = await fetch(buildEmployerJobsUrl(EMPLOYER_JOBS_API_BASE, filter), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const detail =
+      (typeof body.detail === "string" && body.detail) || "Could not load jobs.";
+    const err = new Error(detail) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
-}
-
-/** Merges main Breneo employer jobs with job-aggregator listings for the signed-in company. */
-export async function fetchEmployerJobs(): Promise<EmployerJob[]> {
-  const [breneoRes, aggRes] = await Promise.allSettled([
-    fetchEmployerJobsBreneo(),
-    fetchEmployerJobsAggregator(),
-  ]);
-
-  const agg =
-    aggRes.status === "fulfilled" ? aggRes.value : [];
-  let breneo: EmployerJob[] = [];
-  if (breneoRes.status === "fulfilled") {
-    breneo = breneoRes.value;
-  } else if (agg.length === 0) {
-    throw breneoRes.reason;
-  }
-
-  const seen = new Set<string>();
-  const merged: EmployerJob[] = [];
-  for (const j of [...agg, ...breneo]) {
-    const key = `${j.source ?? "breneo"}:${j.id}:${j.title}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(j);
-  }
-
-  merged.sort((a, b) => {
+  const data = (await res.json()) as Record<string, unknown>;
+  const rows = unwrapList(data);
+  const jobs = rows
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+    .map((row) => parseEmployerJob(row));
+  jobs.sort((a, b) => {
     const ta = a.created_at ? Date.parse(a.created_at) : 0;
     const tb = b.created_at ? Date.parse(b.created_at) : 0;
     return tb - ta;
   });
-
-  return merged;
+  return jobs;
 }
 
-export async function fetchEmployerJob(id: string): Promise<EmployerJob | null> {
-  try {
-    const url = `${API_ENDPOINTS.EMPLOYER.JOBS}${id}/`;
-    const res = await apiClient.get(url);
-    if (res.data && typeof res.data === "object") {
-      return parseJob(res.data as Record<string, unknown>);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-async function fetchEmployerJobFromAggregator(
+async function fetchEmployerJobFromProxyList(
   id: string,
+  filter?: EmployerJobsFilter,
 ): Promise<EmployerJob | null> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") return null;
   try {
-    const res = await fetch(`${window.location.origin}/api/employer/jobs`, {
+    const res = await fetch(buildEmployerJobsUrl(EMPLOYER_JOBS_API_BASE, filter), {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
@@ -198,7 +188,7 @@ async function fetchEmployerJobFromAggregator(
       return String((row as Record<string, unknown>).id ?? "") === String(id);
     });
     if (!found || typeof found !== "object") return null;
-    return parseAggregatorV1Job(found as Record<string, unknown>);
+    return parseEmployerJob(found as Record<string, unknown>);
   } catch {
     return null;
   }
@@ -207,44 +197,9 @@ async function fetchEmployerJobFromAggregator(
 export async function fetchEmployerJobForEdit(
   id: string,
   source?: EmployerJobSource,
+  filter?: EmployerJobsFilter,
 ): Promise<EmployerJob | null> {
-  if (source === "aggregator") {
-    const agg = await fetchEmployerJobFromAggregator(id);
-    if (agg) return agg;
-  }
-  return fetchEmployerJob(id);
-}
-
-export type EmployerJobPayload = {
-  title: string;
-  description: string;
-  location: string;
-  employment_type: string;
-  apply_url: string;
-  salary: string;
-  remote: boolean;
-  is_active: boolean;
-};
-
-export async function createEmployerJob(
-  payload: EmployerJobPayload,
-): Promise<EmployerJob> {
-  const res = await apiClient.post(API_ENDPOINTS.EMPLOYER.JOBS, payload);
-  if (res.data && typeof res.data === "object") {
-    return parseJob(res.data as Record<string, unknown>);
-  }
-  return { ...payload, id: "", is_active: true, remote: false };
-}
-
-export async function updateEmployerJob(
-  id: string,
-  payload: Partial<EmployerJobPayload>,
-): Promise<void> {
-  const url = `${API_ENDPOINTS.EMPLOYER.JOBS}${id}/`;
-  await apiClient.patch(url, payload);
-}
-
-export async function deleteEmployerJob(id: string): Promise<void> {
-  const url = `${API_ENDPOINTS.EMPLOYER.JOBS}${id}/`;
-  await apiClient.delete(url);
+  const row = await fetchEmployerJobFromProxyList(id, filter);
+  if (row) return row;
+  return null;
 }

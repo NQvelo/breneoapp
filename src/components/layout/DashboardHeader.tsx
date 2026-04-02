@@ -46,7 +46,7 @@ const isCourseAddEditPage = (pathname: string): boolean => {
 const getPageTitle = (
   pathname: string,
   username?: string,
-  t?: ReturnType<typeof useTranslation>
+  t?: ReturnType<typeof useTranslation>,
 ) => {
   if (!t) return "Home";
 
@@ -72,6 +72,9 @@ const getPageTitle = (
       </>
     );
   }
+  if (pathname.startsWith("/employer/jobs/add")) return "Add job";
+  if (pathname.startsWith("/employer/jobs/edit/")) return "Edit job";
+  if (pathname.startsWith("/employer/jobs")) return "Job Postings";
   if (pathname.startsWith("/jobs")) return t.jobs.title;
   if (pathname.startsWith("/courses")) return t.courses.title;
   if (
@@ -138,7 +141,7 @@ export function DashboardHeader({
         "transition-opacity duration-300 ease-in-out",
         sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
         "left-0",
-        isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
       )}
     >
       <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">

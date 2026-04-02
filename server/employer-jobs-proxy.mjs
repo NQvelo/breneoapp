@@ -1,6 +1,6 @@
 /**
- * Dev/local proxy for employer jobs (same path as Breneo for POST shape; list merges elsewhere).
- * - GET /api/employer/jobs — JWT + profile → GET aggregator /api/v1/jobs/?company=… (public list by company name)
+ * Dev/local proxy for employer jobs (BFF; secret never in browser).
+ * - GET /api/employer/jobs — JWT auth → GET aggregator /api/employer/jobs (active + inactive)
  * - POST /api/employer/jobs — JWT + profile → POST aggregator /api/employer/jobs with X-Employer-Key
  * - PATCH /api/employer/jobs/:jobId — same auth + key forwarding
  * - DELETE /api/employer/jobs/:jobId — same auth + key forwarding
@@ -11,7 +11,8 @@
  *   JOB_AGGREGATOR_EMPLOYER_KEY — required for POST; must match Django EMPLOYER_POST_SECRET
  *   MAIN_API_BASE_URL — Breneo API base (no trailing slash); must match JWT issuer (same as VITE_API_BASE_URL)
  *   VITE_API_BASE_URL — optional fallback from .env if MAIN_API_BASE_URL unset (dotenv loads it for Node too)
- *   JOB_AGGREGATOR_POST_URL — optional; full URL or origin only (path defaults to /api/employer/jobs)
+ *   JOB_AGGREGATOR_BASE_URL — aggregator origin (default: https://breneo-job-aggregator.up.railway.app)
+ *   JOB_AGGREGATOR_POST_URL — deprecated fallback; full URL or origin only
  *   EMPLOYER_PROXY_PORT — default 8787
  */
 import "dotenv/config";
@@ -20,26 +21,20 @@ import cors from "cors";
 
 const PORT = Number(process.env.EMPLOYER_PROXY_PORT || 8787);
 
-/** Django employer job create — all POST bodies go here (never from the browser). */
-const CANONICAL_AGGREGATOR_EMPLOYER_JOBS_POST =
-  "https://breneo-job-aggregator.up.railway.app/api/employer/jobs";
+const DEFAULT_AGGREGATOR_BASE_URL = "https://breneo-job-aggregator.up.railway.app";
 
-/**
- * @returns {string} Normalized POST URL (no trailing slash).
- */
-function resolveAggregatorPostUrl() {
-  const raw = process.env.JOB_AGGREGATOR_POST_URL?.trim();
+function resolveAggregatorBaseUrl() {
+  const raw =
+    process.env.JOB_AGGREGATOR_BASE_URL?.trim() ||
+    process.env.JOB_AGGREGATOR_POST_URL?.trim();
   if (!raw) {
-    return CANONICAL_AGGREGATOR_EMPLOYER_JOBS_POST.replace(/\/$/, "");
+    return DEFAULT_AGGREGATOR_BASE_URL.replace(/\/$/, "");
   }
   try {
     const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
-    if (!u.pathname || u.pathname === "/") {
-      u.pathname = "/api/employer/jobs";
-    }
-    return u.toString().replace(/\/$/, "");
+    return `${u.origin}`.replace(/\/$/, "");
   } catch {
-    return CANONICAL_AGGREGATOR_EMPLOYER_JOBS_POST.replace(/\/$/, "");
+    return DEFAULT_AGGREGATOR_BASE_URL.replace(/\/$/, "");
   }
 }
 
@@ -49,9 +44,8 @@ const MAIN_API_BASE = (
   process.env.VITE_API_BASE_URL ||
   "https://web-production-80ed8.up.railway.app"
 ).replace(/\/$/, "");
-const AGGREGATOR_URL = resolveAggregatorPostUrl();
-const AGGREGATOR_ORIGIN = new URL(AGGREGATOR_URL).origin;
-const AGGREGATOR_V1_JOBS = `${AGGREGATOR_ORIGIN}/api/v1/jobs`;
+const AGGREGATOR_BASE_URL = resolveAggregatorBaseUrl();
+const AGGREGATOR_EMPLOYER_JOBS_URL = `${AGGREGATOR_BASE_URL}/api/employer/jobs`;
 const AGGREGATOR_KEY = process.env.JOB_AGGREGATOR_EMPLOYER_KEY;
 
 if (!AGGREGATOR_KEY) {
@@ -147,14 +141,31 @@ async function handleEmployerJobsList(req, res) {
   try {
     const ctx = await requireEmployerCompany(req, res);
     if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        detail:
+          "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
+      });
+    }
 
-    const listUrl = new URL(AGGREGATOR_V1_JOBS);
-    listUrl.searchParams.set("company", ctx.company);
-    listUrl.searchParams.set("limit", "100");
-    listUrl.searchParams.set("sort", "-posted_at");
+    const listUrl = new URL(AGGREGATOR_EMPLOYER_JOBS_URL);
+    const requestedCompanyId = String(req.query.company_id || "").trim();
+    const requestedCompany = String(req.query.company || "").trim();
+    if (requestedCompanyId) {
+      listUrl.searchParams.set("company_id", requestedCompanyId);
+    } else if (requestedCompany) {
+      listUrl.searchParams.set("company", requestedCompany);
+    } else if (ctx.company) {
+      // Safe fallback if client did not provide explicit company filters.
+      listUrl.searchParams.set("company", ctx.company);
+    }
 
     const upstream = await fetch(listUrl.toString(), {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
     });
 
     const text = await upstream.text();
@@ -173,7 +184,13 @@ async function handleEmployerJobsList(req, res) {
       );
     }
 
-    const results = Array.isArray(data.results) ? data.results : [];
+    const results = Array.isArray(data)
+      ? data
+      : Array.isArray(data.results)
+        ? data.results
+        : Array.isArray(data.jobs)
+          ? data.jobs
+          : [];
     const mapped = results.map((row) => ({
       ...row,
       source: "aggregator",
@@ -199,7 +216,7 @@ function parseUpstreamJson(text) {
 
 function aggregatorJobDetailUrl(jobId) {
   const id = encodeURIComponent(String(jobId || "").trim());
-  return `${AGGREGATOR_URL}/${id}`;
+  return `${AGGREGATOR_EMPLOYER_JOBS_URL}/${id}`;
 }
 
 /**
@@ -287,7 +304,7 @@ app.post("/api/employer/jobs", async (req, res) => {
     if (!built.ok) return res.status(400).json({ detail: built.error });
     const payload = built.payload;
 
-    const upstream = await fetch(AGGREGATOR_URL, {
+    const upstream = await fetch(AGGREGATOR_EMPLOYER_JOBS_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -393,7 +410,7 @@ app.delete("/api/employer/jobs/:jobId", async (req, res) => {
 
 const server = app.listen(PORT, "127.0.0.1", () => {
   console.log(
-    `[employer-jobs-proxy] http://127.0.0.1:${PORT} (profile: ${MAIN_API_BASE}) GET ${AGGREGATOR_V1_JOBS} POST ${AGGREGATOR_URL}`,
+    `[employer-jobs-proxy] http://127.0.0.1:${PORT} (profile: ${MAIN_API_BASE}) CRUD ${AGGREGATOR_EMPLOYER_JOBS_URL}`,
   );
 });
 server.on("error", (err) => {

@@ -21,6 +21,15 @@ export type PublishEmployerJobBody = {
   employment_type_note?: string;
 };
 
+export type EmployerJobsApiError = Error & {
+  status?: number;
+  fieldErrors?: Record<string, string[]>;
+};
+
+const EMPLOYER_JOBS_API_BASE =
+  (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL as string | undefined) ||
+  (import.meta.env.DEV ? window.location.origin : "https://breneo-job-aggregator.up.railway.app");
+
 /**
  * POST /api/employer/jobs — same-origin proxy (dev: Vite → Express) with server-side X-Employer-Key.
  * The server forwards the JSON body to:
@@ -61,7 +70,8 @@ async function sendEmployerJobsRequest(
     throw new Error("Not authenticated");
   }
 
-  const res = await fetch(path, {
+  const url = new URL(path, EMPLOYER_JOBS_API_BASE).toString();
+  const res = await fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -70,24 +80,37 @@ async function sendEmployerJobsRequest(
     body: body == null ? undefined : JSON.stringify(body),
   });
 
-  const data = (await res.json().catch(() => ({}))) as Record<
-    string,
-    unknown
-  >;
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
   if (!res.ok) {
     const detail =
       (typeof data.detail === "string" && data.detail) ||
       (typeof data.message === "string" && data.message) ||
       res.statusText;
-    throw new Error(detail);
+    const err = new Error(detail) as EmployerJobsApiError;
+    err.status = res.status;
+    if (data && typeof data === "object") {
+      const fields: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (k === "detail" || k === "message") continue;
+        if (Array.isArray(v)) {
+          fields[k] = v.map((x) => String(x));
+        } else if (typeof v === "string") {
+          fields[k] = [v];
+        }
+      }
+      if (Object.keys(fields).length > 0) err.fieldErrors = fields;
+    }
+    throw err;
   }
 
   return data;
 }
 
 /** Client-side apply URL check (server validates again) */
-export function validateHttpUrl(raw: string): { ok: true; url: string } | { ok: false; error: string } {
+export function validateHttpUrl(
+  raw: string,
+): { ok: true; url: string } | { ok: false; error: string } {
   const t = raw.trim();
   if (!t) return { ok: true, url: "" };
   try {
@@ -95,7 +118,10 @@ export function validateHttpUrl(raw: string): { ok: true; url: string } | { ok: 
       t.startsWith("http://") || t.startsWith("https://") ? t : `https://${t}`,
     );
     if (u.protocol !== "http:" && u.protocol !== "https:") {
-      return { ok: false, error: "Application URL must start with http:// or https://" };
+      return {
+        ok: false,
+        error: "Application URL must start with http:// or https://",
+      };
     }
     return { ok: true, url: u.toString() };
   } catch {
