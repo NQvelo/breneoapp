@@ -41,6 +41,7 @@ export function DashboardLayout({
     if (!path.startsWith("/employer/") || path === "/employer/register") {
       return;
     }
+    const accessToken = TokenManager.getAccessToken();
     console.log("[employer auth]", {
       path,
       userRole:
@@ -50,7 +51,9 @@ export function DashboardLayout({
       userType: user?.user_type,
       email: user?.email,
       employerDisplay,
-      hasAccessToken: !!TokenManager.getAccessToken(),
+      /** localStorage key used for the JWT access token */
+      accessTokenStorageKey: "authToken",
+      accessToken,
     });
   }, [location.pathname, user?.user_type, user?.email, employerDisplay]);
 
