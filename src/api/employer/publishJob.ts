@@ -30,18 +30,44 @@ export type PublishEmployerJobBody = {
 export async function publishEmployerJob(
   body: PublishEmployerJobBody,
 ): Promise<Record<string, unknown>> {
+  return sendEmployerJobsRequest("POST", "/api/employer/jobs", body);
+}
+
+export async function updatePublishedEmployerJob(
+  jobId: string,
+  body: Partial<PublishEmployerJobBody>,
+): Promise<Record<string, unknown>> {
+  return sendEmployerJobsRequest(
+    "PATCH",
+    `/api/employer/jobs/${encodeURIComponent(jobId)}`,
+    body,
+  );
+}
+
+export async function deletePublishedEmployerJob(jobId: string): Promise<void> {
+  await sendEmployerJobsRequest(
+    "DELETE",
+    `/api/employer/jobs/${encodeURIComponent(jobId)}`,
+  );
+}
+
+async function sendEmployerJobsRequest(
+  method: "POST" | "PATCH" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<Record<string, unknown>> {
   const token = TokenManager.getAccessToken();
   if (!token) {
     throw new Error("Not authenticated");
   }
 
-  const res = await fetch("/api/employer/jobs", {
-    method: "POST",
+  const res = await fetch(path, {
+    method,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    body: body == null ? undefined : JSON.stringify(body),
   });
 
   const data = (await res.json().catch(() => ({}))) as Record<

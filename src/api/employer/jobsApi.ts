@@ -15,9 +15,19 @@ export type EmployerJob = {
   remote: boolean;
   is_active: boolean;
   created_at?: string;
+  work_mode?: string;
   /** Jobs from job-aggregator (POST via dev proxy); omit or breneo = main API */
   source?: EmployerJobSource;
 };
+
+function toIsActive(value: unknown): boolean {
+  if (value === false || value === 0 || value === "0") return false;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (v === "false" || v === "closed" || v === "inactive") return false;
+  }
+  return true;
+}
 
 function workModeLabel(mode: string): string {
   const m = (mode || "").toLowerCase();
@@ -41,9 +51,10 @@ function parseJob(raw: Record<string, unknown>): EmployerJob {
     apply_url: String(raw.apply_url ?? raw.application_url ?? ""),
     salary: String(raw.salary ?? raw.salary_range ?? ""),
     remote: Boolean(raw.remote ?? raw.is_remote),
-    is_active: raw.is_active !== false && raw.status !== "closed",
+    is_active: toIsActive(raw.is_active),
     created_at:
       raw.created_at != null ? String(raw.created_at) : undefined,
+    work_mode: String(raw.work_mode ?? ""),
     source: src,
   };
 }
@@ -60,13 +71,14 @@ function parseAggregatorV1Job(raw: Record<string, unknown>): EmployerJob {
     apply_url: String(raw.apply_url ?? ""),
     salary: raw.salary != null ? String(raw.salary) : "",
     remote: wm === "remote",
-    is_active: raw.is_active !== false,
+    is_active: toIsActive(raw.is_active),
     created_at:
       raw.posted_at != null
         ? String(raw.posted_at)
         : raw.fetched_at != null
           ? String(raw.fetched_at)
           : undefined,
+    work_mode: wm,
     source: "aggregator",
   };
 }
@@ -166,6 +178,43 @@ export async function fetchEmployerJob(id: string): Promise<EmployerJob | null> 
   }
 }
 
+async function fetchEmployerJobFromAggregator(
+  id: string,
+): Promise<EmployerJob | null> {
+  const token = TokenManager.getAccessToken();
+  if (!token || typeof window === "undefined") return null;
+  try {
+    const res = await fetch(`${window.location.origin}/api/employer/jobs`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { results?: unknown[] };
+    const rows = Array.isArray(data.results) ? data.results : [];
+    const found = rows.find((row) => {
+      if (!row || typeof row !== "object") return false;
+      return String((row as Record<string, unknown>).id ?? "") === String(id);
+    });
+    if (!found || typeof found !== "object") return null;
+    return parseAggregatorV1Job(found as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchEmployerJobForEdit(
+  id: string,
+  source?: EmployerJobSource,
+): Promise<EmployerJob | null> {
+  if (source === "aggregator") {
+    const agg = await fetchEmployerJobFromAggregator(id);
+    if (agg) return agg;
+  }
+  return fetchEmployerJob(id);
+}
+
 export type EmployerJobPayload = {
   title: string;
   description: string;
@@ -193,4 +242,9 @@ export async function updateEmployerJob(
 ): Promise<void> {
   const url = `${API_ENDPOINTS.EMPLOYER.JOBS}${id}/`;
   await apiClient.patch(url, payload);
+}
+
+export async function deleteEmployerJob(id: string): Promise<void> {
+  const url = `${API_ENDPOINTS.EMPLOYER.JOBS}${id}/`;
+  await apiClient.delete(url);
 }

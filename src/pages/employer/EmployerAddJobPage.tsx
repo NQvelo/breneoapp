@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
-import { Loader2, MapPin, Link2, Banknote, Briefcase } from "lucide-react";
+import { Loader2, MapPin, Link2, Banknote, Briefcase, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -26,11 +26,15 @@ import {
   type NormalizedEmployerProfile,
 } from "@/api/employer/profile";
 import {
-  fetchEmployerJob,
+  fetchEmployerJobForEdit,
+  deleteEmployerJob,
+  type EmployerJobSource,
   updateEmployerJob,
 } from "@/api/employer/jobsApi";
 import {
+  deletePublishedEmployerJob,
   publishEmployerJob,
+  updatePublishedEmployerJob,
   validateHttpUrl,
   type AggregatorWorkMode,
 } from "@/api/employer/publishJob";
@@ -59,16 +63,21 @@ const WORK_MODE_OPTIONS: { value: AggregatorWorkMode; label: string }[] = [
 
 export default function EmployerAddJobPage() {
   const { jobId } = useParams<{ jobId?: string }>();
+  const locationState = useLocation();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { user } = useAuth();
   const isEdit = Boolean(jobId);
+  const editSource = (new URLSearchParams(locationState.search).get(
+    "source",
+  ) || "breneo") as EmployerJobSource;
 
   const [profile, setProfile] = useState<NormalizedEmployerProfile | null>(
     null,
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -90,7 +99,7 @@ export default function EmployerAddJobPage() {
       setProfile(n);
 
       if (isEdit && jobId) {
-        const job = await fetchEmployerJob(jobId);
+        const job = await fetchEmployerJobForEdit(jobId, editSource);
         if (!job) {
           toast.error("Job not found.");
           navigate(getLocalizedPath("/employer/jobs", language));
@@ -109,6 +118,13 @@ export default function EmployerAddJobPage() {
         setApplyUrl(job.apply_url);
         setSalary(job.salary);
         if (
+          job.work_mode &&
+          ["remote", "hybrid", "onsite", "on-site", "unknown"].includes(
+            job.work_mode.toLowerCase(),
+          )
+        ) {
+          setWorkMode(job.work_mode.toLowerCase() as AggregatorWorkMode);
+        } else if (
           job.employment_type &&
           ["remote", "hybrid", "onsite", "on-site", "unknown"].includes(
             job.employment_type.toLowerCase(),
@@ -125,7 +141,7 @@ export default function EmployerAddJobPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, isEdit, jobId, navigate, language]);
+  }, [user, isEdit, jobId, navigate, language, editSource]);
 
   useEffect(() => {
     initPage();
@@ -150,17 +166,31 @@ export default function EmployerAddJobPage() {
     setSaving(true);
     try {
       if (isEdit && jobId) {
-        await updateEmployerJob(jobId, {
-          title: title.trim(),
-          description: description.trim(),
-          location: location.trim(),
-          employment_type: workMode,
-          apply_url: applyCheck.url,
-          salary: salary.trim(),
-          remote: workMode === "remote",
-          is_active: isActive,
-        });
-        toast.success("Job updated.");
+        if (editSource === "aggregator") {
+          await updatePublishedEmployerJob(jobId, {
+            title: title.trim(),
+            full_description: description.trim(),
+            work_mode: workMode,
+            location: location.trim(),
+            salary: salary.trim(),
+            apply_url: applyCheck.url || null,
+            is_active: isActive,
+            employment_type_note: employmentType,
+          });
+          toast.success("Job updated.");
+        } else {
+          await updateEmployerJob(jobId, {
+            title: title.trim(),
+            description: description.trim(),
+            location: location.trim(),
+            employment_type: workMode,
+            apply_url: applyCheck.url,
+            salary: salary.trim(),
+            remote: workMode === "remote",
+            is_active: isActive,
+          });
+          toast.success("Job updated.");
+        }
       } else {
         const data = await publishEmployerJob({
           title: title.trim(),
@@ -193,6 +223,34 @@ export default function EmployerAddJobPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!isEdit || !jobId) return;
+    const ok = window.confirm(
+      "Delete this job? This action cannot be undone.",
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      if (editSource === "aggregator") {
+        await deletePublishedEmployerJob(jobId);
+      } else {
+        await deleteEmployerJob(jobId);
+      }
+      toast.success("Job deleted.");
+      navigate(getLocalizedPath("/employer/jobs", language));
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : (e as { response?: { data?: { detail?: string } } })?.response
+              ?.data?.detail ?? "Could not delete job.";
+      toast.error(String(msg));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const companyName =
     profile?.company_name || user?.first_name || user?.email || "Company";
 
@@ -222,7 +280,7 @@ export default function EmployerAddJobPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving || deleting}>
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -234,6 +292,25 @@ export default function EmployerAddJobPage() {
                 "Publish job"
               )}
             </Button>
+            {isEdit ? (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete job
+                  </>
+                )}
+              </Button>
+            ) : null}
           </div>
         </div>
 
