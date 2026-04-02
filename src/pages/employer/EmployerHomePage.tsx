@@ -274,9 +274,8 @@ const EmployerHomePage = () => {
             <CardContent>
               {jobsError ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">
-                  Job listings could not be loaded. If this persists, your API
-                  may not expose{" "}
-                  <code className="text-xs">GET /api/employer/jobs/</code> yet.
+                  Job listings could not be loaded. Check your connection and
+                  try again.
                 </p>
               ) : jobs.length === 0 ? (
                 <div className="text-center py-8">
@@ -296,7 +295,7 @@ const EmployerHomePage = () => {
                 <ul className="max-h-[min(420px,50vh)] space-y-2 overflow-y-auto pr-1">
                   {jobs.slice(0, 8).map((job) => (
                     <li
-                      key={job.id || job.title}
+                      key={`${job.source ?? "breneo"}-${job.id || job.title}`}
                       className="rounded-lg border p-3 text-sm"
                     >
                       <div className="font-medium">{job.title}</div>

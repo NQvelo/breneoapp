@@ -19,6 +19,11 @@ export default defineConfig(({ mode }) => ({
     proxy:
       mode === "development"
         ? {
+            // Employer job post → local proxy (secret key never in browser). Run `npm run dev` (starts proxy on 8787).
+            "/api/employer/jobs": {
+              target: "http://127.0.0.1:8787",
+              changeOrigin: true,
+            },
             "/api/job-details": {
               target: "https://breneo-job-aggregator.up.railway.app/",
               changeOrigin: true,

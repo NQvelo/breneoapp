@@ -103,7 +103,9 @@ export default function EmployerJobsPage() {
                   </TableHeader>
                   <TableBody>
                     {jobs.map((job) => (
-                      <TableRow key={job.id || job.title}>
+                      <TableRow
+                        key={`${job.source ?? "breneo"}-${job.id || job.title}`}
+                      >
                         <TableCell className="font-medium max-w-[200px] truncate">
                           {job.title || "Untitled"}
                           <div className="md:hidden text-xs text-muted-foreground mt-1 flex items-center gap-1">
@@ -125,7 +127,7 @@ export default function EmployerJobsPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {job.id ? (
+                          {job.id && job.source !== "aggregator" ? (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -141,6 +143,10 @@ export default function EmployerJobsPage() {
                               <Edit className="h-4 w-4 mr-1" />
                               Edit
                             </Button>
+                          ) : job.source === "aggregator" ? (
+                            <span className="text-xs text-muted-foreground">
+                              Job board
+                            </span>
                           ) : null}
                         </TableCell>
                       </TableRow>

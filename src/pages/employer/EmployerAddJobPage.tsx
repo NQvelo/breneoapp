@@ -26,16 +26,21 @@ import {
   type NormalizedEmployerProfile,
 } from "@/api/employer/profile";
 import {
-  createEmployerJob,
   fetchEmployerJob,
   updateEmployerJob,
 } from "@/api/employer/jobsApi";
+import {
+  publishEmployerJob,
+  validateHttpUrl,
+  type AggregatorWorkMode,
+} from "@/api/employer/publishJob";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
 
+/** Shown in description as "Employment: …" on the aggregator */
 const EMPLOYMENT_TYPES = [
   "Full-time",
   "Part-time",
@@ -43,6 +48,14 @@ const EMPLOYMENT_TYPES = [
   "Internship",
   "Temporary",
 ] as const;
+
+const WORK_MODE_OPTIONS: { value: AggregatorWorkMode; label: string }[] = [
+  { value: "remote", label: "Remote" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "on-site", label: "On-site" },
+  { value: "onsite", label: "Onsite" },
+  { value: "unknown", label: "Not specified" },
+];
 
 export default function EmployerAddJobPage() {
   const { jobId } = useParams<{ jobId?: string }>();
@@ -65,7 +78,7 @@ export default function EmployerAddJobPage() {
   );
   const [applyUrl, setApplyUrl] = useState("");
   const [salary, setSalary] = useState("");
-  const [remote, setRemote] = useState(false);
+  const [workMode, setWorkMode] = useState<AggregatorWorkMode>("on-site");
   const [isActive, setIsActive] = useState(true);
 
   const initPage = useCallback(async () => {
@@ -95,7 +108,16 @@ export default function EmployerAddJobPage() {
         );
         setApplyUrl(job.apply_url);
         setSalary(job.salary);
-        setRemote(job.remote);
+        if (
+          job.employment_type &&
+          ["remote", "hybrid", "onsite", "on-site", "unknown"].includes(
+            job.employment_type.toLowerCase(),
+          )
+        ) {
+          setWorkMode(job.employment_type as AggregatorWorkMode);
+        } else if (job.remote) {
+          setWorkMode("remote");
+        }
         setIsActive(job.is_active !== false);
       }
     } catch {
@@ -119,31 +141,52 @@ export default function EmployerAddJobPage() {
       return;
     }
 
+    const applyCheck = validateHttpUrl(applyUrl);
+    if (!applyCheck.ok) {
+      toast.error(applyCheck.error);
+      return;
+    }
+
     setSaving(true);
     try {
-      const payload = {
-        title: title.trim(),
-        description: description.trim(),
-        location: location.trim(),
-        employment_type: employmentType,
-        apply_url: applyUrl.trim(),
-        salary: salary.trim(),
-        remote,
-        is_active: isActive,
-      };
-
       if (isEdit && jobId) {
-        await updateEmployerJob(jobId, payload);
+        await updateEmployerJob(jobId, {
+          title: title.trim(),
+          description: description.trim(),
+          location: location.trim(),
+          employment_type: workMode,
+          apply_url: applyCheck.url,
+          salary: salary.trim(),
+          remote: workMode === "remote",
+          is_active: isActive,
+        });
         toast.success("Job updated.");
       } else {
-        await createEmployerJob(payload);
-        toast.success("Job posted.");
+        const data = await publishEmployerJob({
+          title: title.trim(),
+          full_description: description.trim(),
+          work_mode: workMode,
+          location: location.trim() || undefined,
+          salary: salary.trim() || undefined,
+          apply_url: applyCheck.url || null,
+          is_active: isActive,
+          employment_type_note: employmentType,
+        });
+        const id = data.id ?? data.pk ?? data.job_id;
+        toast.success(
+          id != null
+            ? `Job posted successfully (id: ${String(id)})`
+            : "Job posted successfully",
+        );
+        console.log("[job aggregator] response", data);
       }
       navigate(getLocalizedPath("/employer/jobs", language));
     } catch (e: unknown) {
       const msg =
-        (e as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Could not save job. Check the API is available.";
+        e instanceof Error
+          ? e.message
+          : (e as { response?: { data?: { detail?: string } } })?.response
+              ?.data?.detail ?? "Could not save job.";
       toast.error(String(msg));
     } finally {
       setSaving(false);
@@ -244,6 +287,28 @@ export default function EmployerAddJobPage() {
               <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Briefcase className="h-4 w-4 text-breneo-blue" />
+                  Work mode
+                </div>
+                <Select
+                  value={workMode}
+                  onValueChange={(v) => setWorkMode(v as AggregatorWorkMode)}
+                >
+                  <SelectTrigger className="bg-white dark:bg-background">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WORK_MODE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Briefcase className="h-4 w-4 text-breneo-blue" />
                   Employment type
                 </div>
                 <Select
@@ -289,16 +354,6 @@ export default function EmployerAddJobPage() {
                 />
               </div>
 
-              <div className="flex items-center space-x-3 rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4">
-                <Checkbox
-                  id="remote"
-                  checked={remote}
-                  onCheckedChange={(c) => setRemote(c === true)}
-                />
-                <Label htmlFor="remote" className="cursor-pointer">
-                  Remote-friendly
-                </Label>
-              </div>
             </div>
 
             {isEdit ? (
