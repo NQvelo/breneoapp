@@ -1,5 +1,10 @@
 import { TokenManager } from "@/api/auth/tokenManager";
 
+import {
+  assertEmployerJobsProxyConfigured,
+  getEmployerJobsApiBaseUrl,
+} from "@/api/employer/employerJobsApiBase";
+
 /** Values accepted by the job-aggregator Django API */
 export type AggregatorWorkMode =
   | "remote"
@@ -26,14 +31,8 @@ export type EmployerJobsApiError = Error & {
   fieldErrors?: Record<string, string[]>;
 };
 
-const EMPLOYER_JOBS_API_BASE =
-  (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL as string | undefined) ||
-  (import.meta.env.DEV ? window.location.origin : "https://breneo-job-aggregator.up.railway.app");
-
 /**
- * POST /api/employer/jobs — same-origin proxy (dev: Vite → Express) with server-side X-Employer-Key.
- * The server forwards the JSON body to:
- *   https://breneo-job-aggregator.up.railway.app/api/employer/jobs
+ * Employer jobs CRUD base.
  * Never put the aggregator secret in VITE_* env.
  */
 export async function publishEmployerJob(
@@ -70,7 +69,10 @@ async function sendEmployerJobsRequest(
     throw new Error("Not authenticated");
   }
 
-  const url = new URL(path, EMPLOYER_JOBS_API_BASE).toString();
+  // Prevent accidental direct browser calls to Railway (requires X-Employer-Key server-side).
+  assertEmployerJobsProxyConfigured(method);
+
+  const url = new URL(path, getEmployerJobsApiBaseUrl()).toString();
   const res = await fetch(url, {
     method,
     headers: {
@@ -80,7 +82,7 @@ async function sendEmployerJobsRequest(
     body: body == null ? undefined : JSON.stringify(body),
   });
 
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const data = await parseJsonBody(res);
 
   if (!res.ok) {
     const detail =
@@ -105,6 +107,21 @@ async function sendEmployerJobsRequest(
   }
 
   return data;
+}
+
+async function parseJsonBody(res: Response): Promise<Record<string, unknown>> {
+  // Upstream delete returns 204 with an empty body.
+  if (res.status === 204 || res.status === 205) return {};
+  const text = await res.text();
+  if (!text.trim()) return {};
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 /** Client-side apply URL check (server validates again) */

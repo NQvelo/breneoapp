@@ -1,0 +1,8 @@
+[variables]
+NIXPACKS_NODE_PACKAGE_MANAGER = "npm"
+
+[phases.install]
+cmds = ["npm ci"]
+
+[start]
+cmd = "npm run start:bff"

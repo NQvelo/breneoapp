@@ -1,5 +1,10 @@
 import { TokenManager } from "@/api/auth/tokenManager";
 
+import {
+  assertEmployerJobsProxyConfigured,
+  getEmployerJobsApiBaseUrl,
+} from "@/api/employer/employerJobsApiBase";
+
 export type EmployerJobSource = "breneo" | "aggregator";
 
 export type EmployerJob = {
@@ -24,12 +29,6 @@ export type EmployerJobsFilter = {
   companyId?: string;
   companyName?: string;
 };
-
-const EMPLOYER_JOBS_API_BASE =
-  (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL as string | undefined) ||
-  (import.meta.env.DEV
-    ? window.location.origin
-    : "https://breneo-job-aggregator.up.railway.app");
 
 function toIsActive(value: unknown): boolean {
   if (value === false || value === 0 || value === "0") return false;
@@ -140,7 +139,12 @@ export async function fetchEmployerJobsFiltered(
 ): Promise<EmployerJob[]> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") return [];
-  const res = await fetch(buildEmployerJobsUrl(EMPLOYER_JOBS_API_BASE, filter), {
+
+  // Prevent accidental direct browser calls to Railway (requires X-Employer-Key server-side).
+  assertEmployerJobsProxyConfigured("GET");
+
+  const base = getEmployerJobsApiBaseUrl();
+  const res = await fetch(buildEmployerJobsUrl(base, filter), {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
@@ -174,15 +178,18 @@ async function fetchEmployerJobFromProxyList(
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") return null;
   try {
-    const res = await fetch(buildEmployerJobsUrl(EMPLOYER_JOBS_API_BASE, filter), {
+    assertEmployerJobsProxyConfigured("GET");
+
+    const base = getEmployerJobsApiBaseUrl();
+    const res = await fetch(buildEmployerJobsUrl(base, filter), {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { results?: unknown[] };
-    const rows = Array.isArray(data.results) ? data.results : [];
+    const data = (await res.json()) as Record<string, unknown>;
+    const rows = unwrapList(data);
     const found = rows.find((row) => {
       if (!row || typeof row !== "object") return false;
       return String((row as Record<string, unknown>).id ?? "") === String(id);

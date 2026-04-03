@@ -13,13 +13,24 @@
  *   VITE_API_BASE_URL — optional fallback from .env if MAIN_API_BASE_URL unset (dotenv loads it for Node too)
  *   JOB_AGGREGATOR_BASE_URL — aggregator origin (default: https://breneo-job-aggregator.up.railway.app)
  *   JOB_AGGREGATOR_POST_URL — deprecated fallback; full URL or origin only
- *   EMPLOYER_PROXY_PORT — default 8787
+ *   EMPLOYER_PROXY_PORT — default 8787 (local dev; ignored when PORT is set)
+ *   PORT — set by Railway/Render/Fly; when set, server binds 0.0.0.0 for public access
  */
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
 
-const PORT = Number(process.env.EMPLOYER_PROXY_PORT || 8787);
+const hasPlatformPort = Boolean(
+  process.env.PORT && String(process.env.PORT).trim() !== "",
+);
+const PORT = Number(
+  hasPlatformPort
+    ? process.env.PORT
+    : process.env.EMPLOYER_PROXY_PORT || 8787,
+);
+const LISTEN_HOST = hasPlatformPort
+  ? "0.0.0.0"
+  : process.env.BIND_HOST || "127.0.0.1";
 
 const DEFAULT_AGGREGATOR_BASE_URL = "https://breneo-job-aggregator.up.railway.app";
 
@@ -408,9 +419,9 @@ app.delete("/api/employer/jobs/:jobId", async (req, res) => {
   }
 });
 
-const server = app.listen(PORT, "127.0.0.1", () => {
+const server = app.listen(PORT, LISTEN_HOST, () => {
   console.log(
-    `[employer-jobs-proxy] http://127.0.0.1:${PORT} (profile: ${MAIN_API_BASE}) CRUD ${AGGREGATOR_EMPLOYER_JOBS_URL}`,
+    `[employer-jobs-proxy] http://${LISTEN_HOST}:${PORT} (profile: ${MAIN_API_BASE}) CRUD ${AGGREGATOR_EMPLOYER_JOBS_URL}`,
   );
 });
 server.on("error", (err) => {
