@@ -71,3 +71,17 @@ export function assertEmployerJobsProxyConfigured(
   }
 }
 
+if (import.meta.env.PROD && typeof window !== "undefined") {
+  const bff = trimBase(import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL);
+  if (!bff) {
+    const h = window.location.hostname;
+    if (h === "dashboard.breneo.app" || h.endsWith(".github.io")) {
+      console.warn(
+        "[breneo employer jobs] VITE_EMPLOYER_JOBS_API_BASE_URL is missing from this build. " +
+          "Calls fall back to same-origin (/api/employer/jobs), which static hosts usually do not serve. " +
+          "Rebuild the SPA with VITE_EMPLOYER_JOBS_API_BASE_URL=https://<your-bff>.up.railway.app",
+      );
+    }
+  }
+}
+

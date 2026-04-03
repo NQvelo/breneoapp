@@ -2,7 +2,8 @@
 NIXPACKS_NODE_PACKAGE_MANAGER = "npm"
 
 [phases.install]
-cmds = ["npm ci"]
+# Explicit --omit=dev avoids deprecated "production" npm config warnings on Railway.
+cmds = ["npm ci --omit=dev"]
 
 [start]
 cmd = "npm run start:bff"

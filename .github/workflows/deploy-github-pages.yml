@@ -1,0 +1,62 @@
+# Build and deploy static site to GitHub Pages.
+# Enable: Repo → Settings → Pages → Build and deployment → Source: GitHub Actions
+#
+# Required repository secret:
+#   VITE_EMPLOYER_JOBS_API_BASE_URL = https://<your-bff>.up.railway.app  (no trailing path)
+#
+# Recommended (match your production API):
+#   VITE_API_BASE_URL = https://web-production-80ed8.up.railway.app
+#
+# Add other VITE_* the same way if your build needs them (PostHog, Supabase, etc.).
+
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          VITE_EMPLOYER_JOBS_API_BASE_URL: ${{ secrets.VITE_EMPLOYER_JOBS_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
