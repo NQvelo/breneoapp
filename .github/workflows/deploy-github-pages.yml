@@ -42,7 +42,7 @@ jobs:
       # npm ci can skip Rollup's optional native binary on Linux (npm/cli#4828).
       - name: Ensure Rollup Linux native binary
         run: |
-          ROLLUP_VER=$(node -p "require('rollup/package.json').version")
+          ROLLUP_VER=$(node -p "JSON.parse(require('fs').readFileSync('node_modules/rollup/package.json','utf8')).version")
           npm install "@rollup/rollup-linux-x64-gnu@${ROLLUP_VER}" --no-save --no-audit --no-fund
 
       - name: Build
