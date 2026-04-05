@@ -8,15 +8,13 @@
 
 import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
 import { countries } from "@/data/countries";
-import { JOB_API_BASE_URL } from "@/api/auth/config";
-
-const API_BASE = JOB_API_BASE_URL;
+import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
 // Primary: multi-value filters (comma-separated), recommended for full filtering
-const JOB_SEARCH_API = `${API_BASE}/api/search`;
+const JOB_SEARCH_API = `${JOB_AGGREGATOR_BASE_URL}/api/search`;
 
 // Fallback: single-value filters only
-const JOB_API_BASE = `${API_BASE}/api/v1/jobs/`;
+const JOB_API_BASE = `${JOB_AGGREGATOR_BASE_URL}/api/v1/jobs/`;
 
 /**
  * Map country code (e.g. "DE", "US") to lowercase for /api/search country param.
@@ -654,7 +652,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   const isDevelopment = import.meta.env.DEV;
   const JOB_DETAIL_API_BASE = isDevelopment
     ? "/api/job-details" // Relative path goes through Vite proxy
-    : `${JOB_API_BASE_URL}/api/job-details`;
+    : `${JOB_AGGREGATOR_BASE_URL}/api/job-details`;
 
   const queryParams = new URLSearchParams();
   queryParams.set("job_id", jobId); // Use the "id" field from the job

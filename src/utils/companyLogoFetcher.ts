@@ -5,9 +5,7 @@
  * Falls back to existing logo fields if API doesn't have the logo
  */
 
-import { JOB_API_BASE_URL } from "@/api/auth/config";
-
-const COMPANY_API_BASE = `${JOB_API_BASE_URL}/api/companies`;
+import { getJobAggregatorClient } from "@/api/httpClients";
 
 /**
  * Cache for company logos to avoid repeated API calls
@@ -36,15 +34,16 @@ export const fetchCompanyLogo = async (
 
   try {
     const encodedCompanyName = encodeURIComponent(normalizedName);
-    const companyApiUrl = `${COMPANY_API_BASE}/${encodedCompanyName}`;
-    
-    const response = await fetch(companyApiUrl, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
+    const response = await getJobAggregatorClient().fetch(
+      `/api/companies/${encodedCompanyName}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
       },
-    });
+    );
 
     if (response.ok) {
       const data = await response.json();

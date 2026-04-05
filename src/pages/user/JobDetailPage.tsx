@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
+import { getJobAggregatorClient } from "@/api/httpClients";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
   Heart,
@@ -743,13 +744,16 @@ const JobDetailPage = () => {
 
       setIsLoadingCompanyDetails(true);
       try {
-        // Fetch from the company API endpoint
         const encodedCompanyName = encodeURIComponent(companyName.trim());
-        const companyApiUrl = `https://breneo-job-aggregator.up.railway.app/api/companies/${encodedCompanyName}`;
+        const jobAgg = getJobAggregatorClient();
+        const companyApiUrl = new URL(
+          `/api/companies/${encodedCompanyName}`,
+          `${jobAgg.baseURL}/`,
+        ).toString();
 
         console.log("🔍 Fetching company details from:", companyApiUrl);
 
-        const response = await fetch(companyApiUrl, {
+        const response = await jobAgg.fetch(`/api/companies/${encodedCompanyName}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

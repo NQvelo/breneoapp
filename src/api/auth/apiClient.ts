@@ -11,18 +11,10 @@ import axios, {
   AxiosResponse,
 } from "axios";
 import { TokenManager } from "./tokenManager";
-import { API_ENDPOINTS } from "./endpoints";
-import { API_BASE_URL } from "./config";
+import { createBreneoApiClient } from "@/api/httpClients";
 
-// Create axios instance with base configuration
-const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000, // 10 second timeout
-  headers: {
-    "Content-Type": "application/json",
-    Accept: "application/json",
-  },
-});
+// Single Breneo API origin — see `createBreneoApiClient()` / `BRENEO_API_BASE_URL`
+const apiClient: AxiosInstance = createBreneoApiClient();
 
 // Request interceptor to add Bearer token to authorized requests
 apiClient.interceptors.request.use(

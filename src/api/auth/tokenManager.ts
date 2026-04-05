@@ -6,7 +6,7 @@
  */
 
 import axios from "axios";
-import { API_BASE_URL } from "./config";
+import { BRENEO_API_BASE_URL } from "./config";
 
 // ✅ Session restoration flag to prevent token clearing during session restoration
 let isSessionRestoration = false;
@@ -132,7 +132,7 @@ export const TokenManager = {
     }
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/refresh/`, {
+      const response = await axios.post(`${BRENEO_API_BASE_URL}/api/refresh/`, {
         refresh: refreshToken,
       });
 

@@ -13,11 +13,9 @@ import {
   getEmployerJobsApiBaseUrl,
 } from "@/api/employer/employerJobsApiBase";
 import { extractBreneoUserIdFromEmployerProfileRaw } from "@/api/employer/profile";
+import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
 export type AggregatorIndustry = { id: number; name: string };
-
-const DEFAULT_AGGREGATOR_PUBLIC_ORIGIN =
-  "https://breneo-job-aggregator.up.railway.app";
 
 /**
  * Collection URL (no trailing slash). BFF forwards to the same path on the job aggregator with
@@ -150,11 +148,11 @@ export async function fetchAggregatorIndustries(): Promise<AggregatorIndustry[]>
   bases.push(primary);
   try {
     const o = new URL(primary).origin;
-    if (o !== new URL(DEFAULT_AGGREGATOR_PUBLIC_ORIGIN).origin) {
-      bases.push(DEFAULT_AGGREGATOR_PUBLIC_ORIGIN.replace(/\/$/, ""));
+    if (o !== new URL(JOB_AGGREGATOR_BASE_URL).origin) {
+      bases.push(JOB_AGGREGATOR_BASE_URL.replace(/\/$/, ""));
     }
   } catch {
-    bases.push(DEFAULT_AGGREGATOR_PUBLIC_ORIGIN.replace(/\/$/, ""));
+    bases.push(JOB_AGGREGATOR_BASE_URL.replace(/\/$/, ""));
   }
 
   let lastMessage = "Could not load industries.";

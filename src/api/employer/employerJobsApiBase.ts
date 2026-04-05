@@ -10,7 +10,7 @@
  * (`JOB_AGGREGATOR_BASE_URL` in `server/employer-jobs-proxy.mjs`).
  */
 
-import { JOB_API_BASE_URL } from "@/api/auth/config";
+import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
 function trimBase(raw: string | undefined): string | undefined {
   const t = raw?.trim();
@@ -18,14 +18,20 @@ function trimBase(raw: string | undefined): string | undefined {
   return t.replace(/\/$/, "");
 }
 
+/** Read at build time: `VITE_EMPLOYER_JOBS_API_BASE_URL` or `VITE_EMPLOYER_BFF_URL` (same meaning). */
+function employerBffBaseFromEnv(): string | undefined {
+  return trimBase(
+    (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL ||
+      import.meta.env.VITE_EMPLOYER_BFF_URL) as string | undefined,
+  );
+}
+
 function getRailwayOrigin(): string {
-  return JOB_API_BASE_URL;
+  return JOB_AGGREGATOR_BASE_URL;
 }
 
 function resolveBaseFromEnvOrBrowser(): string {
-  const fromEnv = trimBase(
-    import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL as string | undefined,
-  );
+  const fromEnv = employerBffBaseFromEnv();
 
   if (fromEnv) {
     // Local dev: common mistake is VITE_EMPLOYER_JOBS_API_BASE_URL=https://breneoapp-production…
@@ -43,7 +49,7 @@ function resolveBaseFromEnvOrBrowser(): string {
           if (u.hostname === "breneoapp-production.up.railway.app") {
             if (import.meta.env.DEV && typeof console !== "undefined") {
               console.warn(
-                "[Breneo] Ignoring VITE_EMPLOYER_JOBS_API_BASE_URL for local dev; using same-origin so /api/employer/* proxies to the job-aggregator BFF.",
+                "[Breneo] Ignoring VITE_EMPLOYER_JOBS_API_BASE_URL / VITE_EMPLOYER_BFF_URL for local dev; using same-origin so /api/employer/* proxies to the job-aggregator BFF.",
               );
             }
             return window.location.origin;

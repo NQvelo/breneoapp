@@ -5,7 +5,7 @@
  * Uses Breneo Job Aggregator API for job statistics and generates AI-powered insights
  */
 
-import { JOB_API_BASE_URL } from "@/api/auth/config";
+import { getJobAggregatorClient } from "@/api/httpClients";
 
 interface BreneoJob {
   id: number;
@@ -37,8 +37,6 @@ interface AIMarketInsight {
   chartData: Array<{ year: string; popularity: number }>;
 }
 
-const JOB_API_BASE = `${JOB_API_BASE_URL}/api/`;
-
 /**
  * Fetch job market statistics for a skill/job title
  * @param skillName - The skill or job title to search for
@@ -50,8 +48,7 @@ export const fetchJobMarketStats = async (
   country: string = "Georgia"
 ): Promise<MarketTrendsData | null> => {
   try {
-    // Fetch all jobs from Breneo API
-    const response = await fetch(JOB_API_BASE, {
+    const response = await getJobAggregatorClient().fetch("/api/", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
