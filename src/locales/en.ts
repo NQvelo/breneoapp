@@ -260,6 +260,20 @@ export const en = {
     comingsoondescription:
       "We’re adding a brand new page to Breneo very soon! Stay tuned for fresh features and updates that will make your experience even better.",
   },
+  employerJobForm: {
+    extractingDescriptionTitle: "Extracting job description…",
+    extractingDescriptionHint:
+      "We’re analyzing your text with AI. This usually takes a few seconds. English and Georgian descriptions are both supported.",
+    buttonExtractingSaving: "Extracting & saving…",
+    buttonSaving: "Saving…",
+    fullDescriptionLabel: "Full job description",
+    responsibilitiesLabel: "Responsibilities",
+    responsibilitiesHint:
+      "What the hire will do — one bullet per line (max 6). Pre-filled from AI; you can edit.",
+    qualificationsLabel: "Qualifications",
+    qualificationsHint:
+      "Requirements and skills — one bullet per line (max 6). Pre-filled from AI; you can edit.",
+  },
   // Beta Version
   beta: {
     title: "You’re using the beta version",

@@ -1,6 +1,10 @@
 /**
  * Job Section Extractor Utility
  * Extracts and summarizes Responsibilities and Qualifications from job descriptions
+ *
+ * Persisted employer job fields use Gemini on the BFF only; the intelligent fallbacks here are
+ * for client-side display helpers. See `server/staticJobSectionExtractor.mjs` for a Node port of
+ * the same heuristics (not used for DB writes).
  */
 
 export interface ExtractionResult {

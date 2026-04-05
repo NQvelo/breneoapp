@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ import {
 } from "@/api/employer/publishJob";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -67,11 +68,27 @@ const WORK_MODE_OPTIONS: { value: AggregatorWorkMode; label: string }[] = [
   { value: "unknown", label: "Not specified" },
 ];
 
+function normalizeBulletLinesKey(text: string): string {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function linesToBulletArray(text: string, max = 6): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
 export default function EmployerAddJobPage() {
   const { jobId } = useParams<{ jobId?: string }>();
   const locationState = useLocation();
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { user } = useAuth();
   const isEdit = Boolean(jobId);
   const editSource = (new URLSearchParams(locationState.search).get("source") ||
@@ -87,6 +104,8 @@ export default function EmployerAddJobPage() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [responsibilitiesText, setResponsibilitiesText] = useState("");
+  const [qualificationsText, setQualificationsText] = useState("");
   const [location, setLocation] = useState("");
   const [employmentType, setEmploymentType] = useState<string>(
     EMPLOYMENT_TYPES[0],
@@ -98,6 +117,8 @@ export default function EmployerAddJobPage() {
   const [initialSnapshot, setInitialSnapshot] = useState<{
     title: string;
     full_description: string;
+    responsibilities_key: string;
+    qualifications_key: string;
     work_mode: AggregatorWorkMode;
     location: string;
     salary: string;
@@ -117,14 +138,38 @@ export default function EmployerAddJobPage() {
           ? (res.data as Record<string, unknown>)
           : null;
       const companyId =
-        profileObj?.company_id != null ? String(profileObj.company_id) : "";
+        profileObj?.company_id != null
+          ? String(profileObj.company_id)
+          : profileObj?.company &&
+              typeof profileObj.company === "object" &&
+              (profileObj.company as Record<string, unknown>).id != null
+            ? String((profileObj.company as Record<string, unknown>).id)
+            : "";
       const companyName = n?.company_name || "";
-
-      if (isEdit && jobId) {
-        const job = await fetchEmployerJobForEdit(jobId, editSource, {
-          companyId,
-          companyName,
+      const { companyId: resolvedCompanyId, companyName: resolvedCompanyName } =
+        await resolveEmployerJobsCompanyFilter({
+          breneoUserId: user?.id,
+          employerProfileRaw: res.data,
+          profileCompanyId: companyId,
+          profileCompanyName: companyName,
         });
+      if (isEdit && jobId) {
+        let job;
+        try {
+          job = await fetchEmployerJobForEdit(jobId, editSource, {
+            companyId: resolvedCompanyId,
+            companyName: resolvedCompanyName,
+          });
+        } catch (e: unknown) {
+          const err = e as Error & { status?: number };
+          if (err.status === 403) {
+            toast.error("You are not authorized to view this job.");
+          } else {
+            toast.error(err.message || "Could not load job.");
+          }
+          navigate(getLocalizedPath("/employer/jobs", language));
+          return;
+        }
         if (!job) {
           toast.error("Job not found.");
           navigate(getLocalizedPath("/employer/jobs", language));
@@ -132,6 +177,8 @@ export default function EmployerAddJobPage() {
         }
         setTitle(job.title);
         setDescription(job.description);
+        setResponsibilitiesText((job.responsibilities ?? []).join("\n"));
+        setQualificationsText((job.qualifications ?? []).join("\n"));
         setLocation(job.location);
         setEmploymentType(
           EMPLOYMENT_TYPES.includes(
@@ -142,29 +189,38 @@ export default function EmployerAddJobPage() {
         );
         setApplyUrl(job.apply_url);
         setSalary(job.salary);
+        let resolvedWorkMode: AggregatorWorkMode = "unknown";
         if (
           job.work_mode &&
           ["remote", "hybrid", "onsite", "on-site", "unknown"].includes(
             job.work_mode.toLowerCase(),
           )
         ) {
-          setWorkMode(job.work_mode.toLowerCase() as AggregatorWorkMode);
+          resolvedWorkMode = job.work_mode.toLowerCase() as AggregatorWorkMode;
+          setWorkMode(resolvedWorkMode);
         } else if (
           job.employment_type &&
           ["remote", "hybrid", "onsite", "on-site", "unknown"].includes(
             job.employment_type.toLowerCase(),
           )
         ) {
-          setWorkMode(job.employment_type as AggregatorWorkMode);
+          resolvedWorkMode = job.employment_type.toLowerCase() as AggregatorWorkMode;
+          setWorkMode(resolvedWorkMode);
         } else if (job.remote) {
+          resolvedWorkMode = "remote";
           setWorkMode("remote");
+        } else {
+          setWorkMode("unknown");
         }
         setIsActive(job.is_active !== false);
+        const respJoined = (job.responsibilities ?? []).join("\n");
+        const qualJoined = (job.qualifications ?? []).join("\n");
         setInitialSnapshot({
           title: String(job.title ?? "").trim(),
           full_description: String(job.description ?? "").trim(),
-          work_mode:
-            (job.work_mode?.toLowerCase() as AggregatorWorkMode) || "unknown",
+          responsibilities_key: normalizeBulletLinesKey(respJoined),
+          qualifications_key: normalizeBulletLinesKey(qualJoined),
+          work_mode: resolvedWorkMode,
           location: String(job.location ?? "").trim(),
           salary: String(job.salary ?? "").trim(),
           apply_url: String(job.apply_url ?? "").trim(),
@@ -182,6 +238,9 @@ export default function EmployerAddJobPage() {
     initPage();
   }, [initPage]);
 
+  /** Gemini runs on the server only when publishing a new job (not on edit — structured fields are manual). */
+  const willExtractDescriptionOnSave = useMemo(() => !isEdit, [isEdit]);
+
   const handleSubmit = async () => {
     if (!title.trim()) {
       setFieldErrors({ title: ["Job title is required."] });
@@ -195,7 +254,7 @@ export default function EmployerAddJobPage() {
     }
 
     const applyCheck = validateHttpUrl(applyUrl);
-    if (!applyCheck.ok) {
+    if (applyCheck.ok === false) {
       setFieldErrors({ apply_url: [applyCheck.error] });
       toast.error(applyCheck.error);
       return;
@@ -223,6 +282,8 @@ export default function EmployerAddJobPage() {
           apply_url: string | null;
           is_active: boolean;
           employment_type_note: string;
+          responsibilities: string[];
+          qualifications: string[];
         }> = {};
 
         const snap = initialSnapshot;
@@ -248,6 +309,17 @@ export default function EmployerAddJobPage() {
         }
         if (patch.full_description != null) {
           patch.employment_type_note = employmentType;
+          patch.responsibilities = linesToBulletArray(responsibilitiesText);
+          patch.qualifications = linesToBulletArray(qualificationsText);
+        } else {
+          const nextRespKey = normalizeBulletLinesKey(responsibilitiesText);
+          const nextQualKey = normalizeBulletLinesKey(qualificationsText);
+          if (!snap || nextRespKey !== snap.responsibilities_key) {
+            patch.responsibilities = linesToBulletArray(responsibilitiesText);
+          }
+          if (!snap || nextQualKey !== snap.qualifications_key) {
+            patch.qualifications = linesToBulletArray(qualificationsText);
+          }
         }
         if (Object.keys(patch).length === 0) {
           toast.info("No changes to save.");
@@ -318,7 +390,7 @@ export default function EmployerAddJobPage() {
   };
 
   const companyName =
-    profile?.company_name || user?.first_name || user?.email || "Company";
+    profile?.company_name?.trim() || user?.email || "Company";
 
   if (loading) {
     return (
@@ -333,7 +405,22 @@ export default function EmployerAddJobPage() {
   return (
     <DashboardLayout containMainScroll={false}>
       <div className="max-w-4xl mx-auto pb-24 space-y-6">
-        <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-card">
+        <Card className="relative rounded-3xl border-0 shadow-none bg-white dark:bg-card overflow-hidden">
+          {saving && willExtractDescriptionOnSave ? (
+            <div
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-3xl bg-background/85 px-6 text-center backdrop-blur-sm dark:bg-background/90"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
+              <p className="text-base font-semibold text-foreground">
+                {t.employerJobForm.extractingDescriptionTitle}
+              </p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                {t.employerJobForm.extractingDescriptionHint}
+              </p>
+            </div>
+          ) : null}
           <CardContent className="p-6 sm:p-8 space-y-6">
             <div className="flex items-center gap-3 pb-2 border-b border-border/60">
               <OptimizedAvatar
@@ -360,18 +447,78 @@ export default function EmployerAddJobPage() {
               <p className="text-sm text-destructive">{fieldErrors.title[0]}</p>
             ) : null}
 
-            <div className={cn(dashedShell)}>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="min-h-[200px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                placeholder="Describe the role, requirements, and benefits…"
-              />
+            <div className="space-y-2">
+              {isEdit ? (
+                <Label
+                  htmlFor="employer-job-full-description"
+                  className="text-sm font-medium text-foreground"
+                >
+                  {t.employerJobForm.fullDescriptionLabel}
+                </Label>
+              ) : null}
+              <div className={cn(dashedShell)}>
+                <Textarea
+                  id="employer-job-full-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="min-h-[200px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
+                  placeholder="Describe the role, requirements, and benefits…"
+                />
+              </div>
+              {fieldErrors.full_description?.[0] ? (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.full_description[0]}
+                </p>
+              ) : null}
             </div>
-            {fieldErrors.full_description?.[0] ? (
-              <p className="text-sm text-destructive">
-                {fieldErrors.full_description[0]}
-              </p>
+
+            {isEdit ? (
+              <div className="space-y-6 pt-2 border-t border-border/50">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="employer-job-responsibilities"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {t.employerJobForm.responsibilitiesLabel}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t.employerJobForm.responsibilitiesHint}
+                  </p>
+                  <div className={cn(dashedShell)}>
+                    <Textarea
+                      id="employer-job-responsibilities"
+                      value={responsibilitiesText}
+                      onChange={(e) =>
+                        setResponsibilitiesText(e.target.value)
+                      }
+                      className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
+                      placeholder="One bullet per line"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="employer-job-qualifications"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    {t.employerJobForm.qualificationsLabel}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t.employerJobForm.qualificationsHint}
+                  </p>
+                  <div className={cn(dashedShell)}>
+                    <Textarea
+                      id="employer-job-qualifications"
+                      value={qualificationsText}
+                      onChange={(e) =>
+                        setQualificationsText(e.target.value)
+                      }
+                      className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
+                      placeholder="One bullet per line"
+                    />
+                  </div>
+                </div>
+              </div>
             ) : null}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -510,7 +657,9 @@ export default function EmployerAddJobPage() {
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving…
+                      {willExtractDescriptionOnSave
+                        ? t.employerJobForm.buttonExtractingSaving
+                        : t.employerJobForm.buttonSaving}
                     </>
                   ) : isEdit ? (
                     "Save changes"

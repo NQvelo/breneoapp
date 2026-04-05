@@ -19,7 +19,20 @@ export default defineConfig(({ mode }) => ({
     proxy:
       mode === "development"
         ? {
-            // Employer job post → local proxy (secret key never in browser). Run `npm run dev` (starts proxy on 8787).
+            // Public industries list — proxy straight to Railway so it works even if employer-jobs-proxy (8787) is not running.
+            "/api/industries": {
+              target: "https://breneo-job-aggregator.up.railway.app",
+              changeOrigin: true,
+              secure: true,
+            },
+            "/api/employer/companies": {
+              target: "http://127.0.0.1:8787",
+              changeOrigin: true,
+            },
+            "/api/employer/staff-memberships": {
+              target: "http://127.0.0.1:8787",
+              changeOrigin: true,
+            },
             "/api/employer/jobs": {
               target: "http://127.0.0.1:8787",
               changeOrigin: true,
@@ -117,6 +130,15 @@ export default defineConfig(({ mode }) => ({
         // Don't precache routes - handle them at runtime
         dontCacheBustURLsMatching: /\.\w{8}\./,
         runtimeCaching: [
+          // Never cache API traffic — avoids Cache.put failures on PATCH/POST and stale auth data.
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            handler: "NetworkOnly",
+          },
+          {
+            urlPattern: /^https:\/\/breneo\.onrender\.com\/api\//i,
+            handler: "NetworkOnly",
+          },
           {
             // Handle navigation requests (SPA routes)
             urlPattern: ({ request }) => request.mode === "navigate",
@@ -126,6 +148,7 @@ export default defineConfig(({ mode }) => ({
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24, // 24 hours
+                purgeOnQuotaError: true,
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -156,13 +179,17 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            urlPattern: /^https:\/\/breneo\.onrender\.com\/.*/i,
+            // Non-API assets on Breneo origin (rare); keep network-first without mixing with /api/.
+            urlPattern: ({ url }) =>
+              url.hostname === "breneo.onrender.com" &&
+              !url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
-              cacheName: "api-cache",
+              cacheName: "breneo-origin-cache",
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24,
+                purgeOnQuotaError: true,
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -177,6 +204,7 @@ export default defineConfig(({ mode }) => ({
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24, // 24 hours
+                purgeOnQuotaError: true,
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -185,8 +213,9 @@ export default defineConfig(({ mode }) => ({
           },
         ],
       },
+      // Avoid Workbox Cache API errors during local dev (PATCH /api, HMR, low disk space).
       devOptions: {
-        enabled: true,
+        enabled: false,
         type: "module",
       },
       // Additional options to handle missing routes gracefully

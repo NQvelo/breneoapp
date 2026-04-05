@@ -24,6 +24,9 @@ export type PublishEmployerJobBody = {
   is_active?: boolean;
   /** Appended to full_description on the server */
   employment_type_note?: string;
+  /** Sent on PATCH from employer edit form; max 6 items each. BFF maps to API keys Responsibilities + qualifications. */
+  responsibilities?: string[];
+  qualifications?: string[];
 };
 
 export type EmployerJobsApiError = Error & {
@@ -41,6 +44,11 @@ export async function publishEmployerJob(
   return sendEmployerJobsRequest("POST", "/api/employer/jobs", body);
 }
 
+/**
+ * PATCH/DELETE: same-origin `/api/employer/jobs/{jobId}` only (no query string).
+ * BFF forwards to the aggregator, e.g. `https://breneo-job-aggregator.up.railway.app/api/employer/jobs/{id}/`
+ * (`JOB_AGGREGATOR_BASE_URL`), with `X-Employer-Key` and Breneo JWT validation server-side.
+ */
 export async function updatePublishedEmployerJob(
   jobId: string,
   body: Partial<PublishEmployerJobBody>,
@@ -52,7 +60,9 @@ export async function updatePublishedEmployerJob(
   );
 }
 
-export async function deletePublishedEmployerJob(jobId: string): Promise<void> {
+export async function deletePublishedEmployerJob(
+  jobId: string,
+): Promise<void> {
   await sendEmployerJobsRequest(
     "DELETE",
     `/api/employer/jobs/${encodeURIComponent(jobId)}`,
@@ -86,9 +96,13 @@ async function sendEmployerJobsRequest(
 
   if (!res.ok) {
     const detail =
-      (typeof data.detail === "string" && data.detail) ||
+      formatEmployerJobsErrorDetail(data) ||
       (typeof data.message === "string" && data.message) ||
-      res.statusText;
+      (res.status === 403
+        ? "You are not allowed to perform this action on this job."
+        : res.status === 404
+          ? "Job not found"
+          : res.statusText);
     const err = new Error(detail) as EmployerJobsApiError;
     err.status = res.status;
     if (data && typeof data === "object") {
@@ -107,6 +121,37 @@ async function sendEmployerJobsRequest(
   }
 
   return data;
+}
+
+/** Django REST: detail string | string[] | { field: string[] } */
+function formatEmployerJobsErrorDetail(data: Record<string, unknown>): string {
+  const d = data.detail;
+  if (typeof d === "string" && d.trim()) return d.trim();
+  if (Array.isArray(d)) {
+    const parts = d.map((x) => {
+      if (typeof x === "string") return x;
+      if (x && typeof x === "object") {
+        const o = x as Record<string, unknown>;
+        if (typeof o.string === "string") return o.string;
+        if (typeof o.message === "string") return o.message;
+      }
+      return JSON.stringify(x);
+    });
+    return parts.filter(Boolean).join(" ");
+  }
+  if (d && typeof d === "object") {
+    const o = d as Record<string, unknown>;
+    const lines: string[] = [];
+    for (const [k, v] of Object.entries(o)) {
+      if (Array.isArray(v)) {
+        lines.push(`${k}: ${v.map(String).join(", ")}`);
+      } else if (v != null) {
+        lines.push(`${k}: ${String(v)}`);
+      }
+    }
+    if (lines.length) return lines.join("; ");
+  }
+  return "";
 }
 
 async function parseJsonBody(res: Response): Promise<Record<string, unknown>> {

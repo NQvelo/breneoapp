@@ -8,8 +8,9 @@
 
 import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
 import { countries } from "@/data/countries";
+import { JOB_API_BASE_URL } from "@/api/auth/config";
 
-const API_BASE = "https://breneo-job-aggregator.up.railway.app";
+const API_BASE = JOB_API_BASE_URL;
 
 // Primary: multi-value filters (comma-separated), recommended for full filtering
 const JOB_SEARCH_API = `${API_BASE}/api/search`;
@@ -652,8 +653,8 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
   // In production, use the full URL
   const isDevelopment = import.meta.env.DEV;
   const JOB_DETAIL_API_BASE = isDevelopment
-    ? "/api/job-details" // Relative path goes through Vite proxy to http://127.0.0.1:8000
-    : "https://breneo-job-aggregator.up.railway.app/api/job-details"; // Direct URL in production
+    ? "/api/job-details" // Relative path goes through Vite proxy
+    : `${JOB_API_BASE_URL}/api/job-details`;
 
   const queryParams = new URLSearchParams();
   queryParams.set("job_id", jobId); // Use the "id" field from the job

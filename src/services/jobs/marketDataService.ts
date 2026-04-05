@@ -5,6 +5,8 @@
  * Uses Breneo Job Aggregator API for job statistics and generates AI-powered insights
  */
 
+import { JOB_API_BASE_URL } from "@/api/auth/config";
+
 interface BreneoJob {
   id: number;
   title: string;
@@ -35,7 +37,7 @@ interface AIMarketInsight {
   chartData: Array<{ year: string; popularity: number }>;
 }
 
-const JOB_API_BASE = "https://breneo-job-aggregator.up.railway.app/api/";
+const JOB_API_BASE = `${JOB_API_BASE_URL}/api/`;
 
 /**
  * Fetch job market statistics for a skill/job title

@@ -260,6 +260,20 @@ export const ka = {
     comingsoondescription:
       "Breneo-ს მალე ახალი გვერდი დაემატება! დაელოდე ახალ ფუნქციებს და განახლებებს, რომლებიც შენს გამოცდილებას კიდევ უფრო საინტერესოს გახდის.",
   },
+  employerJobForm: {
+    extractingDescriptionTitle: "ვაკანსიის აღწერის ანალიზი…",
+    extractingDescriptionHint:
+      "AI ამუშავებს ტექსტს — ეს რამდენიმე წამს სჭირს. შეგიძლიათ ინგლისური ან ქართული აღწერა.",
+    buttonExtractingSaving: "ანალიზი და შენახვა…",
+    buttonSaving: "ინახება…",
+    fullDescriptionLabel: "სრული აღწერა",
+    responsibilitiesLabel: "პასუხისმგებლობები",
+    responsibilitiesHint:
+      "რას აკეთებს თანამშრომელი — თითო ხაზზე ერთი პუნქტი (მაქს. 6). შევსებულია AI-ით; შეგიძლიათ შეცვალოთ.",
+    qualificationsLabel: "მოთხოვნები",
+    qualificationsHint:
+      "გამოცდილება და უნარები — თითო ხაზზე ერთი პუნქტი (მაქს. 6). შევსებულია AI-ით; შეგიძლიათ შეცვალოთ.",
+  },
   // Beta Version
   beta: {
     title: "შენ იყენებ საცდელ ვერსიას",

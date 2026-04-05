@@ -23,9 +23,10 @@ import {
   type NormalizedEmployerProfile,
 } from "@/api/employer/profile";
 import {
-  fetchEmployerJobs,
+  fetchEmployerJobsFiltered,
   type EmployerJob,
 } from "@/api/employer/jobsApi";
+import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -51,7 +52,7 @@ const EmployerHomePage = () => {
       if (normalized) {
         setProfile(normalized);
         updateEmployerDisplay({
-          name: normalized.company_name || user.first_name || user.email,
+          name: normalized.company_name?.trim() || user.email,
           email: normalized.email || user.email,
           logo_url: normalized.logo_url,
         });
@@ -67,13 +68,41 @@ const EmployerHomePage = () => {
   const loadJobs = useCallback(async () => {
     setJobsError(false);
     try {
-      const list = await fetchEmployerJobs();
+      const prof = await apiClient
+        .get(API_ENDPOINTS.EMPLOYER.PROFILE)
+        .catch(() => null);
+      const profile =
+        prof?.data && typeof prof.data === "object"
+          ? (prof.data as Record<string, unknown>)
+          : null;
+      const companyId =
+        profile?.company_id != null
+          ? String(profile.company_id)
+          : profile?.company &&
+              typeof profile.company === "object" &&
+              (profile.company as Record<string, unknown>).id != null
+            ? String((profile.company as Record<string, unknown>).id)
+            : "";
+      const companyName =
+        (typeof profile?.company_name === "string" && profile.company_name) ||
+        "";
+      const { companyId: resolvedId, companyName: resolvedName } =
+        await resolveEmployerJobsCompanyFilter({
+          breneoUserId: user?.id,
+          employerProfileRaw: prof?.data,
+          profileCompanyId: companyId,
+          profileCompanyName: companyName,
+        });
+      const list = await fetchEmployerJobsFiltered({
+        companyId: resolvedId,
+        companyName: resolvedName,
+      });
       setJobs(list);
     } catch {
       setJobsError(true);
       setJobs([]);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadProfile();
@@ -126,7 +155,7 @@ const EmployerHomePage = () => {
   }
 
   const companyName =
-    profile.company_name || user?.first_name || user?.email || "Your company";
+    profile.company_name?.trim() || user?.email || "Your company";
 
   return (
     <DashboardLayout>

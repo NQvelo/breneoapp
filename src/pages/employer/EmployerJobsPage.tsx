@@ -13,27 +13,30 @@ import {
   Globe,
   GraduationCap,
   Clock3,
-  Search,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchEmployerJobsFiltered,
   type EmployerJob,
 } from "@/api/employer/jobsApi";
+import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import { normalizeEmployerProfile } from "@/api/employer/profile";
 
 export default function EmployerJobsPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { employerDisplay } = useAuth();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [linkedCompanyName, setLinkedCompanyName] = useState("");
   const [query, setQuery] = useState("");
   const statusFilter = (() => {
     const s = searchParams.get("status");
@@ -48,31 +51,52 @@ export default function EmployerJobsPage() {
       const prof = await apiClient
         .get(API_ENDPOINTS.EMPLOYER.PROFILE)
         .catch(() => null);
-      const profile =
+      const profileObj =
         prof?.data && typeof prof.data === "object"
           ? (prof.data as Record<string, unknown>)
           : null;
+      const n = profileObj
+        ? normalizeEmployerProfile(prof.data, user?.email)
+        : null;
       const companyId =
-        profile?.company_id != null
-          ? String(profile.company_id)
-          : profile?.company &&
-              typeof profile.company === "object" &&
-              (profile.company as Record<string, unknown>).id != null
-            ? String((profile.company as Record<string, unknown>).id)
+        profileObj?.company_id != null
+          ? String(profileObj.company_id)
+          : profileObj?.company &&
+              typeof profileObj.company === "object" &&
+              (profileObj.company as Record<string, unknown>).id != null
+            ? String((profileObj.company as Record<string, unknown>).id)
             : "";
-      const companyName =
-        (typeof profile?.company_name === "string" && profile.company_name) ||
-        employerDisplay?.name ||
-        "";
+      const companyName = (n?.company_name || "").trim();
+      const {
+        companyId: resolvedId,
+        companyName: resolvedName,
+        linkedDirectoryCompanyName,
+      } = await resolveEmployerJobsCompanyFilter({
+        breneoUserId: user?.id,
+        employerProfileRaw: prof?.data,
+        profileCompanyId: companyId,
+        profileCompanyName: companyName,
+      });
+      setLinkedCompanyName(linkedDirectoryCompanyName);
       const list = await fetchEmployerJobsFiltered({
-        companyId,
-        companyName,
+        companyId: resolvedId,
+        companyName: resolvedName,
       });
       setJobs(list);
       setLoadError(null);
-    } catch {
-      setLoadError("Could not load jobs.");
-      toast.error("Could not load jobs.", {
+    } catch (e: unknown) {
+      const err = e as Error & { status?: number };
+      let msg = "Could not load jobs.";
+      if (err.status === 403) {
+        msg =
+          "You are not allowed to view jobs for this company. Contact support if this is unexpected.";
+      } else if (err.status === 404) {
+        msg = "Jobs not found.";
+      } else if (err.message?.trim()) {
+        msg = err.message.trim();
+      }
+      setLoadError(msg);
+      toast.error(msg, {
         action: {
           label: "Retry",
           onClick: () => {
@@ -84,7 +108,7 @@ export default function EmployerJobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [employerDisplay?.name]);
+  }, [user?.email, user?.id]);
 
   useEffect(() => {
     load();
@@ -111,7 +135,8 @@ export default function EmployerJobsPage() {
     return byStatus.filter((job) => {
       const title = (job.title || "").toLowerCase();
       const location = (job.location || "").toLowerCase();
-      return title.includes(q) || location.includes(q);
+      const company = (job.company_name || "").toLowerCase();
+      return title.includes(q) || location.includes(q) || company.includes(q);
     });
   }, [statusFilter, activeJobs, closedJobs, jobs, query]);
 
@@ -135,7 +160,19 @@ export default function EmployerJobsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"></div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          {linkedCompanyName ? (
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <Building2 className="h-4 w-4 shrink-0" />
+              <span>
+                Showing jobs for{" "}
+                <span className="text-foreground font-medium">
+                  {linkedCompanyName}
+                </span>
+              </span>
+            </p>
+          ) : null}
+        </div>
 
         <Card>
           <CardHeader className="pb-2">
@@ -204,68 +241,79 @@ export default function EmployerJobsPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredJobs.map((job) => (
-                  <div
-                    key={`${job.source ?? "breneo"}-${job.id || job.title}`}
-                    className="rounded-xl border bg-card p-4 md:p-5"
-                  >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-lg leading-none">
-                            {job.title || "Untitled"}
-                          </h3>
-                          <span className="text-xs text-muted-foreground">
-                            {relativePosted(job.created_at)}
-                          </span>
+                {filteredJobs.map((job) => {
+                  const rowCompany =
+                    (job.company_name && job.company_name.trim()) ||
+                    linkedCompanyName;
+                  return (
+                    <div
+                      key={`${job.source ?? "breneo"}-${job.id || job.title}`}
+                      className="rounded-xl border bg-card p-4 md:p-5"
+                    >
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-lg leading-none">
+                              {job.title || "Untitled"}
+                            </h3>
+                            <span className="text-xs text-muted-foreground">
+                              {relativePosted(job.created_at)}
+                            </span>
+                          </div>
+                          {rowCompany ? (
+                            <p className="mt-1.5 text-sm text-muted-foreground inline-flex items-center gap-1.5">
+                              <Building2 className="h-3.5 w-3.5 shrink-0" />
+                              {rowCompany}
+                            </p>
+                          ) : null}
+                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                              {job.location || "N/A"}
+                            </span>
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Briefcase className="h-4 w-4" />
+                              {modeLabel(job)}
+                            </span>
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Globe className="h-4 w-4" />
+                              {job.salary || "N/A"}
+                            </span>
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <Clock3 className="h-4 w-4" />
+                              {job.remote ? "Remote" : "Onsite"}
+                            </span>
+                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <GraduationCap className="h-4 w-4" />
+                              {job.employment_type || "N/A"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                          <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <MapPin className="h-4 w-4" />
-                            {job.location || "N/A"}
-                          </span>
-                          <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <Briefcase className="h-4 w-4" />
-                            {modeLabel(job)}
-                          </span>
-                          <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <Globe className="h-4 w-4" />
-                            {job.salary || "N/A"}
-                          </span>
-                          <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <Clock3 className="h-4 w-4" />
-                            {job.remote ? "Remote" : "Onsite"}
-                          </span>
-                          <span className="inline-flex items-center gap-2 text-muted-foreground">
-                            <GraduationCap className="h-4 w-4" />
-                            {job.employment_type || "N/A"}
-                          </span>
+                        <div className="flex items-center gap-2">
+                          {job.id ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  navigate(
+                                    getLocalizedPath(
+                                      `/employer/jobs/edit/${job.id}?source=${job.source ?? "aggregator"}`,
+                                      language,
+                                    ),
+                                  )
+                                }
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            </>
+                          ) : null}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {job.id ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                navigate(
-                                  getLocalizedPath(
-                                    `/employer/jobs/edit/${job.id}?source=${job.source ?? "aggregator"}`,
-                                    language,
-                                  ),
-                                )
-                              }
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
-                            </Button>
-                          </>
-                        ) : null}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

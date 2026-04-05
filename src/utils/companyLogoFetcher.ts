@@ -1,11 +1,13 @@
 /**
  * Company Logo Fetcher Utility
- * 
+ *
  * Fetches company logos from the Breneo Job Aggregator API
  * Falls back to existing logo fields if API doesn't have the logo
  */
 
-const COMPANY_API_BASE = "https://breneo-job-aggregator.up.railway.app/api/companies";
+import { JOB_API_BASE_URL } from "@/api/auth/config";
+
+const COMPANY_API_BASE = `${JOB_API_BASE_URL}/api/companies`;
 
 /**
  * Cache for company logos to avoid repeated API calls
