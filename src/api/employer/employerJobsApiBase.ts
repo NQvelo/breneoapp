@@ -20,10 +20,32 @@ function trimBase(raw: string | undefined): string | undefined {
 
 /** Read at build time: `VITE_EMPLOYER_JOBS_API_BASE_URL` or `VITE_EMPLOYER_BFF_URL` (same meaning). */
 function employerBffBaseFromEnv(): string | undefined {
-  return trimBase(
+  const buildTime = trimBase(
     (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL ||
       import.meta.env.VITE_EMPLOYER_BFF_URL) as string | undefined,
   );
+  if (buildTime) return buildTime;
+
+  if (typeof window !== "undefined") {
+    // Emergency runtime override for static deployments when build-time env was missed.
+    // Can be set from browser console:
+    // localStorage.setItem("EMPLOYER_BFF_URL_OVERRIDE", "https://your-bff.up.railway.app")
+    const runtimeLocal = trimBase(
+      window.localStorage?.getItem("EMPLOYER_BFF_URL_OVERRIDE") || undefined,
+    );
+    if (runtimeLocal) return runtimeLocal;
+
+    const runtimeGlobal = trimBase(
+      (
+        window as Window & {
+          __BRENEO_EMPLOYER_BFF_URL__?: string;
+        }
+      ).__BRENEO_EMPLOYER_BFF_URL__,
+    );
+    if (runtimeGlobal) return runtimeGlobal;
+  }
+
+  return undefined;
 }
 
 function getRailwayOrigin(): string {
@@ -102,6 +124,25 @@ function resolveBaseFromEnvOrBrowser(): string {
 
 export function getEmployerJobsApiBaseUrl(): string {
   return resolveBaseFromEnvOrBrowser();
+}
+
+export function getEmployerJobsApiDebugInfo(): {
+  baseUrl: string;
+  mode: "same-origin-bff" | "custom-bff" | "unknown";
+} {
+  if (typeof window === "undefined") {
+    return { baseUrl: getEmployerJobsApiBaseUrl(), mode: "unknown" };
+  }
+  const baseUrl = getEmployerJobsApiBaseUrl();
+  let baseOrigin = "";
+  try {
+    baseOrigin = new URL(baseUrl, window.location.href).origin;
+  } catch {
+    return { baseUrl, mode: "unknown" };
+  }
+  const mode =
+    baseOrigin === window.location.origin ? "same-origin-bff" : "custom-bff";
+  return { baseUrl, mode };
 }
 
 export function assertEmployerJobsProxyConfigured(
