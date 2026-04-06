@@ -15,6 +15,11 @@ interface ImportMetaEnv {
   readonly VITE_EMPLOYER_JOBS_API_BASE_URL?: string;
   /** Alias of `VITE_EMPLOYER_JOBS_API_BASE_URL` (deployed Node `employer-jobs-proxy`, not the raw aggregator URL). */
   readonly VITE_EMPLOYER_BFF_URL?: string;
+  /**
+   * Comma-separated hostnames (no scheme) that serve a static SPA without `/api/employer/*`.
+   * Those hosts use `JOB_AGGREGATOR_BASE_URL` for employer APIs. `dashboard.breneo.app` is built in.
+   */
+  readonly VITE_STATIC_EMPLOYER_DASHBOARD_HOSTS?: string;
 }
 
 interface ImportMeta {

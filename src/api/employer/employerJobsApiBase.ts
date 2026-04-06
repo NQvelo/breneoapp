@@ -1,13 +1,13 @@
 /**
  * Shared employer-jobs base URL resolution.
  *
- * The browser calls **your BFF** (same-origin dev proxy, `production.mjs`, or a deployed Node
- * proxy) at `/api/employer/jobs` and `/api/employer/jobs/{jobId}` — never the raw aggregator with
- * `X-Employer-Key` in the client.
- *
- * The BFF forwards to the job aggregator, by default:
- *   `https://breneo-job-aggregator.up.railway.app/api/employer/jobs` and `…/api/employer/jobs/{jobId}/`
- * (`JOB_AGGREGATOR_BASE_URL` in `server/employer-jobs-proxy.mjs`).
+ * - **Local dev / same-origin BFF:** `window.location.origin` so `/api/employer/*` hits Vite proxy or
+ *   `production.mjs` (adds `X-Employer-Key` upstream to `JOB_AGGREGATOR_BASE_URL`).
+ * - **Static dashboard** (`dashboard.breneo.app`, optional `VITE_STATIC_EMPLOYER_DASHBOARD_HOSTS`):
+ *   no `/api/employer/*` on that host — base URL is `JOB_AGGREGATOR_BASE_URL` (e.g.
+ *   `https://breneo-job-aggregator.up.railway.app`) so requests target
+ *   `…/api/employer/jobs/{id}`, `…/api/employer/companies?search=`, etc. on the aggregator.
+ * - **Override:** `VITE_EMPLOYER_JOBS_API_BASE_URL` / `VITE_EMPLOYER_BFF_URL` (e.g. dedicated BFF on Railway).
  */
 
 import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
@@ -28,6 +28,23 @@ function employerBffBaseFromEnv(): string | undefined {
 
 function getRailwayOrigin(): string {
   return JOB_AGGREGATOR_BASE_URL;
+}
+
+/**
+ * Hostnames where the SPA is static (no Node `/api/employer/*` proxy). Employer calls must use
+ * `JOB_AGGREGATOR_BASE_URL` (see `.env.example` — optional `VITE_EMPLOYER_JOBS_API_BASE_URL` overrides).
+ */
+function isStaticEmployerDashboardHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "dashboard.breneo.app") return true;
+  const extra = (
+    import.meta.env.VITE_STATIC_EMPLOYER_DASHBOARD_HOSTS as string | undefined
+  )
+    ?.split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (extra?.length) return extra.includes(h);
+  return false;
 }
 
 function resolveBaseFromEnvOrBrowser(): string {
@@ -62,14 +79,23 @@ function resolveBaseFromEnvOrBrowser(): string {
     return fromEnv;
   }
 
-  // Default to same-origin so browser hits your proxy route:
-  //   /api/employer/jobs -> server adds X-Employer-Key
   if (typeof window !== "undefined" && window.location?.origin) {
+    const host = window.location.hostname;
+    // Static dashboard (e.g. gh-pages / CDN): same-origin has no BFF — call job aggregator directly
+    // (`…/api/employer/jobs`, `…/api/employer/companies?search=`, …) per `JOB_AGGREGATOR_BASE_URL`.
+    if (isStaticEmployerDashboardHost(host)) {
+      return getRailwayOrigin();
+    }
+    const local =
+      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    if (local) {
+      // Dev: Vite proxy → employer-jobs-proxy → aggregator with X-Employer-Key
+      return window.location.origin;
+    }
+    // Default: same-origin when your host runs `production.mjs` or a reverse proxy for /api/employer/*
     return window.location.origin;
   }
 
-  // Non-browser fallback (tests / SSR): use Railway origin, but calling it
-  // from a real browser would be rejected by the guard below.
   return getRailwayOrigin();
 }
 
@@ -77,35 +103,10 @@ export function getEmployerJobsApiBaseUrl(): string {
   return resolveBaseFromEnvOrBrowser();
 }
 
+/** Reserved for future runtime checks; employer base is resolved in `getEmployerJobsApiBaseUrl()`. */
 export function assertEmployerJobsProxyConfigured(
-  action: "GET" | "POST" | "PATCH" | "DELETE",
+  _action: "GET" | "POST" | "PATCH" | "DELETE",
 ): void {
   if (typeof window === "undefined") return;
-
-  const baseUrl = getEmployerJobsApiBaseUrl();
-  let baseOrigin: string;
-  try {
-    baseOrigin = new URL(baseUrl, window.location.href).origin;
-  } catch {
-    return;
-  }
-  const pageOrigin = window.location.origin;
-  let aggregatorOrigin: string;
-  try {
-    aggregatorOrigin = new URL(getRailwayOrigin()).origin;
-  } catch {
-    return;
-  }
-
-  // Only block cross-origin calls straight to the public aggregator host (no BFF in between).
-  // Same-origin requests to that host are OK when the SPA and Node BFF are served together (e.g. Railway).
-  if (baseOrigin === aggregatorOrigin && pageOrigin !== aggregatorOrigin) {
-    throw new Error(
-      `Employer jobs ${action} cannot target the job-aggregator origin (${aggregatorOrigin}) from ` +
-        `${pageOrigin} without a BFF. Set VITE_EMPLOYER_JOBS_API_BASE_URL to your BFF origin, ` +
-        `or use same-origin (e.g. localhost with Vite proxy to employer-jobs-proxy). ` +
-        `The BFF forwards to ${aggregatorOrigin}/api/employer/jobs/{jobId} with X-Employer-Key.`,
-    );
-  }
 }
 
