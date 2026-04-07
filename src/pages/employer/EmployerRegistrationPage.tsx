@@ -649,6 +649,7 @@ const EmployerRegistrationPage = () => {
             breneoUserId,
             mode: "existing",
             existingCompanyId: String(selectedDirectoryCompany.id),
+            existingCompanyName: String(selectedDirectoryCompany.name ?? ""),
           });
         } else {
           const aggregatorPayload = buildAggregatorCompanyCreatePayload({

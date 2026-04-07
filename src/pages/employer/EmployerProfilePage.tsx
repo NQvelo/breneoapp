@@ -325,6 +325,7 @@ export default function EmployerProfilePage() {
           breneoUserId,
           mode: "existing",
           existingCompanyId: String(pickerSelected.id),
+          existingCompanyName: String(pickerSelected.name ?? ""),
         });
       } else {
         const payload = buildAggregatorCompanyCreatePayload({

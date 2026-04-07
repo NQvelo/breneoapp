@@ -187,22 +187,26 @@ export async function fetchAggregatorIndustries(): Promise<AggregatorIndustry[]>
  * @param _staffUserId retained for callers; BFF resolves the user from JWT.
  */
 export async function fetchEmployerAggregatorCompanies(
-  _staffUserId: string,
+  externalUserId: string,
 ): Promise<AggregatorCompany[]> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") return [];
 
   assertEmployerJobsProxyConfigured("GET");
 
-  const res = await fetch(
-    new URL(`${EMPLOYER_COMPANIES_COLLECTION}/for-user`, `${employerBffOrigin()}/`).toString(),
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    },
+  const staffUserId = externalUserId.trim();
+  if (!staffUserId) return [];
+  const url = new URL(
+    `${EMPLOYER_COMPANIES_COLLECTION}/for-user`,
+    `${employerBffOrigin()}/`,
   );
+  url.searchParams.set("external_user_id", staffUserId);
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
@@ -250,18 +254,25 @@ export async function searchAggregatorCompanies(
 }
 
 export async function fetchAggregatorCompanyDetail(
-  companyId: string,
+  companyName: string,
+  externalUserId?: string,
 ): Promise<AggregatorCompany> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
   }
   assertEmployerJobsProxyConfigured("GET");
+  const encodedName = encodeURIComponent(companyName.trim());
+  const url = new URL(
+    `${EMPLOYER_COMPANIES_COLLECTION}/${encodedName}`,
+    `${employerBffOrigin()}/`,
+  );
+  const staffUserId = externalUserId?.trim();
+  if (staffUserId) {
+    url.searchParams.set("external_user_id", staffUserId);
+  }
   const res = await fetch(
-    new URL(
-      `${EMPLOYER_COMPANIES_COLLECTION}/${encodeURIComponent(companyId)}/`,
-      `${employerBffOrigin()}/`,
-    ).toString(),
+    url.toString(),
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -409,7 +420,12 @@ export async function createEmployerDirectoryCompanyQuick(args: {
 }
 
 export type CreateEmployerAggregatorCompanyOptions = {
+  /** Preferred latest key for company detail/update path. */
+  aggregatorCompanyName?: string;
+  /** @deprecated Company detail path now uses name; only kept for backward compatibility. */
   aggregatorCompanyId?: string;
+  /** Optional scoped access query for company detail/update endpoints. */
+  externalUserId?: string;
   detailMethod?: "PATCH" | "POST" | "PUT";
 };
 
@@ -422,20 +438,25 @@ export async function createEmployerAggregatorCompany(
     throw new Error("Not authenticated");
   }
 
-  const id = options?.aggregatorCompanyId?.trim();
+  const companyName = options?.aggregatorCompanyName?.trim();
   const detailMethod = options?.detailMethod ?? "PATCH";
-  const method = id ? detailMethod : "POST";
+  const method = companyName ? detailMethod : "POST";
   assertEmployerJobsProxyConfigured(method === "PUT" ? "PATCH" : method);
 
   const origin = employerBffOrigin();
-  const url = id
-    ? new URL(
-        `${EMPLOYER_COMPANIES_COLLECTION}/${encodeURIComponent(id)}/`,
-        `${origin}/`,
-      ).toString()
-    : new URL(EMPLOYER_COMPANIES_COLLECTION, `${origin}/`).toString();
+  let url = new URL(EMPLOYER_COMPANIES_COLLECTION, `${origin}/`);
+  if (companyName) {
+    url = new URL(
+      `${EMPLOYER_COMPANIES_COLLECTION}/${encodeURIComponent(companyName)}`,
+      `${origin}/`,
+    );
+    const externalUserId = options?.externalUserId?.trim();
+    if (externalUserId) {
+      url.searchParams.set("external_user_id", externalUserId);
+    }
+  }
 
-  const res = await fetch(url, {
+  const res = await fetch(url.toString(), {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -449,7 +470,7 @@ export async function createEmployerAggregatorCompany(
     const err = new Error(
       extractErrorMessage(
         body,
-        id
+        companyName
           ? "Could not save company on job aggregator."
           : "Could not create company on job aggregator.",
       ),
@@ -466,10 +487,15 @@ export async function createEmployerAggregatorCompany(
  */
 export async function linkEmployerToAggregatorCompany(
   companyId: string,
+  externalUserId: string,
 ): Promise<void> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
+  }
+  const userId = externalUserId.trim();
+  if (!userId) {
+    throw new Error("external_user_id is required for membership create.");
   }
   const n = Number(companyId);
   if (!Number.isFinite(n)) {
@@ -485,7 +511,7 @@ export async function linkEmployerToAggregatorCompany(
         Accept: "application/json",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ company_id: n }),
+      body: JSON.stringify({ company_id: n, external_user_id: userId }),
     },
   );
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -508,18 +534,19 @@ export async function createOrUpdateEmployerAggregatorCompany(
     detailMethod?: CreateEmployerAggregatorCompanyOptions["detailMethod"];
   },
 ): Promise<AggregatorCompany> {
-  let aggregatorCompanyId: string | undefined;
+  let aggregatorCompanyName: string | undefined;
   try {
     const list = await fetchEmployerAggregatorCompanies(params.breneoUserId);
     const first = list[0];
-    if (first?.id != null && String(first.id).trim() !== "") {
-      aggregatorCompanyId = String(first.id).trim();
+    if (first?.name != null && String(first.name).trim() !== "") {
+      aggregatorCompanyName = String(first.name).trim();
     }
   } catch {
     /* POST new company */
   }
   return createEmployerAggregatorCompany(payload, {
-    aggregatorCompanyId,
+    aggregatorCompanyName,
+    externalUserId: params.breneoUserId,
     detailMethod: params.detailMethod,
   });
 }
@@ -531,14 +558,19 @@ export async function joinOrCreateEmployerAggregatorCompany(args: {
   breneoUserId: string;
   mode: "existing" | "new";
   existingCompanyId?: string;
+  existingCompanyName?: string;
   createPayload?: CreateAggregatorCompanyBody;
 }): Promise<AggregatorCompany | void> {
   if (args.mode === "existing") {
     const id = args.existingCompanyId?.trim();
     if (!id) throw new Error("Company id is required.");
-    await linkEmployerToAggregatorCompany(id);
+    await linkEmployerToAggregatorCompany(id, args.breneoUserId);
     try {
-      return await fetchAggregatorCompanyDetail(id);
+      const name = args.existingCompanyName?.trim();
+      if (name) {
+        return await fetchAggregatorCompanyDetail(name, args.breneoUserId);
+      }
+      return;
     } catch {
       return;
     }
