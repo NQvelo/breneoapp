@@ -15,7 +15,11 @@ import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 function trimBase(raw: string | undefined): string | undefined {
   const t = raw?.trim();
   if (!t) return undefined;
-  return t.replace(/\/$/, "");
+  // Railway/UI copy-paste sometimes includes wrapping quotes.
+  // Accept `"https://.../"` or `'https://.../'` safely.
+  const unquoted = t.replace(/^['"]+|['"]+$/g, "").trim();
+  if (!unquoted) return undefined;
+  return unquoted.replace(/\/+$/, "");
 }
 
 /** Read at build time: `VITE_EMPLOYER_JOBS_API_BASE_URL` or `VITE_EMPLOYER_BFF_URL` (same meaning). */
