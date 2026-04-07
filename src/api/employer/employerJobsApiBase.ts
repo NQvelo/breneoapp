@@ -30,6 +30,13 @@ function employerBffBaseFromEnv(): string | undefined {
   );
   if (buildTime) return buildTime;
 
+  // Backward-compatible fallback for deployments that only define the generic API base.
+  // This commonly points at production.mjs (same BFF surface for /api/employer/*).
+  const genericApiBase = trimBase(
+    import.meta.env.VITE_API_BASE_URL as string | undefined,
+  );
+  if (genericApiBase) return genericApiBase;
+
   if (typeof window !== "undefined") {
     // Emergency runtime override for static deployments when build-time env was missed.
     // Can be set from browser console:
@@ -113,8 +120,7 @@ function resolveBaseFromEnvOrBrowser(): string {
           "(or VITE_EMPLOYER_BFF_URL) to your deployed employer-jobs-proxy URL.",
       );
     }
-    const local =
-      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
     if (local) {
       // Dev: Vite proxy → employer-jobs-proxy → aggregator with X-Employer-Key
       return window.location.origin;
@@ -182,4 +188,3 @@ export function assertEmployerJobsProxyConfigured(
     );
   }
 }
-
