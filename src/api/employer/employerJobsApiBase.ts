@@ -10,7 +10,7 @@
  * - **Override:** `VITE_EMPLOYER_JOBS_API_BASE_URL` / `VITE_EMPLOYER_BFF_URL`.
  */
 
-import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
+import { BRENEO_API_BASE_URL, JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
 function trimBase(raw: string | undefined): string | undefined {
   const t = raw?.trim();
@@ -61,6 +61,10 @@ function employerBffBaseFromEnv(): string | undefined {
 
 function getRailwayOrigin(): string {
   return JOB_AGGREGATOR_BASE_URL;
+}
+
+function getBreneoApiOrigin(): string {
+  return BRENEO_API_BASE_URL;
 }
 
 /**
@@ -115,15 +119,20 @@ function resolveBaseFromEnvOrBrowser(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     const host = window.location.hostname;
     if (isStaticEmployerDashboardHost(host)) {
+      const breNeoApiBase = trimBase(
+        import.meta.env.VITE_API_BASE_URL as string | undefined,
+      );
+      const staticFallback = breNeoApiBase || getBreneoApiOrigin();
       if (typeof console !== "undefined") {
         console.error(
           "Employer API requires a BFF on static hosts. Set VITE_EMPLOYER_JOBS_API_BASE_URL " +
-            "(or VITE_EMPLOYER_BFF_URL) to your deployed employer-jobs-proxy URL.",
+            "(or VITE_EMPLOYER_BFF_URL) to your deployed employer-jobs-proxy URL. " +
+            `Using fallback base: ${staticFallback}`,
         );
       }
-      // Avoid hard-crashing the route on static hosts.
-      // Requests will still fail unless a BFF is configured, but UI can show a recoverable error state.
-      return window.location.origin;
+      // Static dashboards cannot serve `/api/employer/*` themselves.
+      // Prefer the configured Breneo API host as a safer fallback than dashboard origin.
+      return staticFallback;
     }
     const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
     if (local) {
