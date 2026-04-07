@@ -115,10 +115,15 @@ function resolveBaseFromEnvOrBrowser(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
     const host = window.location.hostname;
     if (isStaticEmployerDashboardHost(host)) {
-      throw new Error(
-        "Employer API requires a BFF on static hosts. Set VITE_EMPLOYER_JOBS_API_BASE_URL " +
-          "(or VITE_EMPLOYER_BFF_URL) to your deployed employer-jobs-proxy URL.",
-      );
+      if (typeof console !== "undefined") {
+        console.error(
+          "Employer API requires a BFF on static hosts. Set VITE_EMPLOYER_JOBS_API_BASE_URL " +
+            "(or VITE_EMPLOYER_BFF_URL) to your deployed employer-jobs-proxy URL.",
+        );
+      }
+      // Avoid hard-crashing the route on static hosts.
+      // Requests will still fail unless a BFF is configured, but UI can show a recoverable error state.
+      return window.location.origin;
     }
     const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
     if (local) {
