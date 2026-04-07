@@ -1,0 +1,75 @@
+# Build and deploy static site to GitHub Pages.
+# Enable: Repo → Settings → Pages → Build and deployment → Source: GitHub Actions
+#
+# Employer BFF + API bases: use Repository variables (Settings → Actions → Variables), e.g.:
+#   VITE_EMPLOYER_JOBS_API_BASE_URL = https://breneoapp-production.up.railway.app
+#   VITE_EMPLOYER_BFF_URL            = same (optional alias)
+#   VITE_API_BASE_URL                = https://web-production-80ed8.up.railway.app
+#   VITE_BRENEO_API_BASE_URL         = same as VITE_API_BASE_URL (optional)
+#   VITE_JOB_AGGREGATOR_BASE_URL     = https://breneo-job-aggregator.up.railway.app
+#
+# If you previously added these as Secrets instead of Variables, they still work:
+# each line below falls back from vars → secrets.
+#
+# Add any other VITE_* your app needs (Supabase, PostHog, etc.) the same way on the Build step.
+
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # npm ci can skip Rollup's optional native binary on Linux (npm/cli#4828).
+      - name: Ensure Rollup Linux native binary
+        run: |
+          ROLLUP_VER=$(node -p "JSON.parse(require('fs').readFileSync('node_modules/rollup/package.json','utf8')).version")
+          npm install "@rollup/rollup-linux-x64-gnu@${ROLLUP_VER}" --no-save --no-audit --no-fund
+
+      - name: Build
+        env:
+          VITE_EMPLOYER_JOBS_API_BASE_URL: ${{ vars.VITE_EMPLOYER_JOBS_API_BASE_URL || secrets.VITE_EMPLOYER_JOBS_API_BASE_URL }}
+          VITE_EMPLOYER_BFF_URL: ${{ vars.VITE_EMPLOYER_BFF_URL || secrets.VITE_EMPLOYER_BFF_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || secrets.VITE_API_BASE_URL }}
+          VITE_BRENEO_API_BASE_URL: ${{ vars.VITE_BRENEO_API_BASE_URL || secrets.VITE_BRENEO_API_BASE_URL }}
+          VITE_JOB_AGGREGATOR_BASE_URL: ${{ vars.VITE_JOB_AGGREGATOR_BASE_URL || secrets.VITE_JOB_AGGREGATOR_BASE_URL }}
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
