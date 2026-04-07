@@ -63,12 +63,14 @@ jobs:
         with:
           path: dist
 
+  # No `environment: github-pages` here — that env's branch rules can block deploys from `main`
+  # even when `main` appears allowed. `deploy-pages@v4` works with workflow `permissions` only.
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
