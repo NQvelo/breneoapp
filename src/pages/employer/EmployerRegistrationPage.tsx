@@ -184,6 +184,7 @@ const EmployerRegistrationPage = () => {
   const [selectedIndustryIds, setSelectedIndustryIds] = useState<number[]>([]);
   const [selectedDirectoryCompany, setSelectedDirectoryCompany] =
     useState<AggregatorCompany | null>(null);
+  const [showNewCompanyDetails, setShowNewCompanyDetails] = useState(false);
   const [companyDomain, setCompanyDomain] = useState("");
   const [companyLogoUrl, setCompanyLogoUrl] = useState("");
 
@@ -541,6 +542,7 @@ const EmployerRegistrationPage = () => {
             companyDomain.trim() || workEmailDomain(emailStored),
           industriesCatalog: industries,
         });
+        setShowNewCompanyDetails(true);
         toast.success("Company created on the job directory.");
         return company;
       } catch (e) {
@@ -557,12 +559,14 @@ const EmployerRegistrationPage = () => {
     const breneoCompanyName = selectedDirectoryCompany
       ? String(selectedDirectoryCompany.name ?? "").trim() || companyName.trim()
       : companyName.trim();
-    if (!breneoCompanyName.trim() || !description.trim()) {
+    if (!breneoCompanyName.trim()) {
       toast.error(
-        selectedDirectoryCompany
-          ? "Description is required."
-          : "Company name and description are required.",
+        "Company name is required.",
       );
+      return;
+    }
+    if (showNewCompanyDetails && !description.trim()) {
+      toast.error("Description is required for a new company.");
       return;
     }
     if (selectedDirectoryCompany) {
@@ -628,19 +632,28 @@ const EmployerRegistrationPage = () => {
       const last = lastName.trim();
       const fullPersonName = `${first} ${last}`.trim();
 
-      const patchRes = await apiClient.patch(API_ENDPOINTS.EMPLOYER.PROFILE, {
+      const baseProfilePatch: Record<string, unknown> = {
         company_name: breneoCompanyName.trim(),
         name: fullPersonName,
         first_name: first,
         last_name: last,
-        description: description.trim(),
-        phone_number: phoneNumber,
-        website: website.trim(),
-        locations,
-        number_of_employees: numberOfEmployees,
-        industries: selectedIndustryIds,
-        industry_names: industryNamesBySelectionOrder,
-      });
+      };
+      const profilePatch = showNewCompanyDetails
+        ? {
+            ...baseProfilePatch,
+            description: description.trim(),
+            phone_number: phoneNumber,
+            website: website.trim(),
+            locations,
+            number_of_employees: numberOfEmployees,
+            industries: selectedIndustryIds,
+            industry_names: industryNamesBySelectionOrder,
+          }
+        : baseProfilePatch;
+      const patchRes = await apiClient.patch(
+        API_ENDPOINTS.EMPLOYER.PROFILE,
+        profilePatch,
+      );
 
       let aggregatorCompanyOk = false;
       try {
@@ -688,7 +701,7 @@ const EmployerRegistrationPage = () => {
       if (aggregatorCompanyOk) {
         toast.success("Profile saved. Welcome!");
       }
-      window.location.href = getLocalizedPath("/employer/home", language);
+      window.location.href = getLocalizedPath("/employer/jobs", language);
     } catch (err: unknown) {
       const ax = err as {
         response?: { data?: unknown; status?: number };
@@ -927,6 +940,7 @@ const EmployerRegistrationPage = () => {
                   selected={selectedDirectoryCompany}
                   onSelectExisting={(c) => {
                     setSelectedDirectoryCompany(c);
+                    setShowNewCompanyDetails(false);
                     if (c?.name) setCompanyName(String(c.name));
                     else setCompanyName("");
                   }}
@@ -934,7 +948,7 @@ const EmployerRegistrationPage = () => {
                   onCompanyNameChange={setCompanyName}
                   onQuickCreateCompany={handleQuickCreateFromSearch}
                 />
-                {!selectedDirectoryCompany ? (
+                {showNewCompanyDetails && !selectedDirectoryCompany ? (
                   <>
                     <div>
                       <Label htmlFor="co-domain">Domain</Label>
@@ -962,95 +976,95 @@ const EmployerRegistrationPage = () => {
                     </div>
                   </>
                 ) : null}
-                <div>
-                  <Label htmlFor="co-desc">Description</Label>
-                  <Textarea
-                    id="co-desc"
-                    className="mt-1 min-h-[100px]"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    placeholder="Short description of your company"
-                  />
-                </div>
-                <div>
-                  <Label>Phone number</Label>
-                  <div className="flex gap-2 mt-1">
-                    <CountrySelector
-                      value={selectedCountry}
-                      onChange={setSelectedCountry}
-                    />
-                    <Input
-                      className="h-[3rem] flex-1"
-                      value={phoneLocal}
-                      onChange={(e) => setPhoneLocal(e.target.value)}
-                      disabled={isLoading}
-                      placeholder="Phone"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="co-web">Website</Label>
-                  <Input
-                    id="co-web"
-                    type="url"
-                    className="mt-1 h-[3rem]"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    disabled={isLoading}
-                    placeholder="https://"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="co-loc">Locations</Label>
-                  <Textarea
-                    id="co-loc"
-                    className="mt-1 min-h-[72px]"
-                    value={locationsRaw}
-                    onChange={(e) => setLocationsRaw(e.target.value)}
-                    disabled={isLoading}
-                    placeholder="One per line or comma-separated (e.g. Tbilisi, Remote)"
-                  />
-                </div>
-                <div>
-                  <Label>Number of employees</Label>
-                  <Select
-                    value={numberOfEmployees}
-                    onValueChange={setNumberOfEmployees}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger className="mt-1 h-[3rem]">
-                      <SelectValue placeholder="Select range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Industries</Label>
-                  <p className="text-xs text-muted-foreground mt-1 mb-2">
-                    Search and add one or more industries. Selected tags appear
-                    above the search field.
-                  </p>
-                  {industries.length === 0 ? (
-                    <p className="text-sm text-muted-foreground border rounded-md p-3">
-                      No industries loaded yet.
-                    </p>
-                  ) : (
-                    <IndustryMultiSelect
-                      industries={industries}
-                      value={selectedIndustryIds}
-                      onChange={setSelectedIndustryIds}
-                      disabled={isLoading}
-                    />
-                  )}
-                </div>
+                {showNewCompanyDetails ? (
+                  <>
+                    <div>
+                      <Label htmlFor="co-desc">Description</Label>
+                      <Textarea
+                        id="co-desc"
+                        className="mt-1 min-h-[100px]"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        placeholder="Short description of your company"
+                      />
+                    </div>
+                    <div>
+                      <Label>Phone number</Label>
+                      <div className="flex gap-2 mt-1">
+                        <CountrySelector
+                          value={selectedCountry}
+                          onChange={setSelectedCountry}
+                        />
+                        <Input
+                          className="h-[3rem] flex-1"
+                          value={phoneLocal}
+                          onChange={(e) => setPhoneLocal(e.target.value)}
+                          disabled={isLoading}
+                          placeholder="Phone"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="co-web">Website</Label>
+                      <Input
+                        id="co-web"
+                        type="url"
+                        className="mt-1 h-[3rem]"
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        disabled={isLoading}
+                        placeholder="https://"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="co-loc">Locations</Label>
+                      <Textarea
+                        id="co-loc"
+                        className="mt-1 min-h-[72px]"
+                        value={locationsRaw}
+                        onChange={(e) => setLocationsRaw(e.target.value)}
+                        disabled={isLoading}
+                        placeholder="One per line or comma-separated (e.g. Tbilisi, Remote)"
+                      />
+                    </div>
+                    <div>
+                      <Label>Number of employees</Label>
+                      <Select
+                        value={numberOfEmployees}
+                        onValueChange={setNumberOfEmployees}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger className="mt-1 h-[3rem]">
+                          <SelectValue placeholder="Select range" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
+                            <SelectItem key={opt} value={opt}>
+                              {opt}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Industries</Label>
+                      {industries.length === 0 ? (
+                        <p className="text-sm text-muted-foreground border rounded-md p-3">
+                          No industries loaded yet.
+                        </p>
+                      ) : (
+                        <IndustryMultiSelect
+                          industries={industries}
+                          value={selectedIndustryIds}
+                          onChange={setSelectedIndustryIds}
+                          disabled={isLoading}
+                        />
+                      )}
+                    </div>
+                  </>
+                ) : null}
                 <Button
                   type="submit"
                   className="w-full h-12 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"

@@ -9,9 +9,6 @@ import {
   BookOpen,
   Users,
   Award,
-  Globe,
-  Mail,
-  ExternalLink,
   Building2,
   CheckCircle2,
   Clock,
@@ -302,140 +299,144 @@ const AcademyHomePage = () => {
           </div>
         </div> */}
 
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-4 gap-2 md:gap-6">
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Total Courses
-              </CardTitle>
-              <BookOpen className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
-                {totalCourses}
+        <Card className="border-0 shadow-none bg-white dark:bg-card rounded-3xl">
+          <CardContent className="p-4 md:p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-foreground">
+                Your academy overview
+              </h3>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible">
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0">
+                <p className="text-xs text-muted-foreground truncate">
+                  Total Courses
+                </p>
+                <p className="text-2xl leading-none font-bold text-foreground">
+                  {totalCourses}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Active courses in your academy
+                </p>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Active courses in your academy
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Categories
-              </CardTitle>
-              <Award className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">{categories}</div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Different course categories
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Total Students
-              </CardTitle>
-              <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
-                {studentAggregates.uniqueCount}
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0">
+                <p className="text-xs text-muted-foreground truncate">
+                  Categories
+                </p>
+                <p className="text-2xl leading-none font-bold text-foreground">
+                  {categories}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Different course categories
+                </p>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Unique enrollments across your courses
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Status
-              </CardTitle>
-              <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
-                {academyProfile.is_verified ? (
-                  <Badge className="bg-green-500 text-[10px] md:text-xs">
-                    Verified
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-[10px] md:text-xs">
-                    Pending
-                  </Badge>
-                )}
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0">
+                <p className="text-xs text-muted-foreground truncate">
+                  Total Students
+                </p>
+                <p className="text-2xl leading-none font-bold text-foreground">
+                  {studentAggregates.uniqueCount}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Unique enrollments across your courses
+                </p>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Academy verification status
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0">
+                <p className="text-xs text-muted-foreground truncate">Status</p>
+                <div className="pt-1">
+                  {academyProfile.is_verified ? (
+                    <Badge className="bg-green-500 text-xs">Verified</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      Pending
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  Academy verification status
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Academy Information */}
+          {/* Visitor statistics (UI placeholder for future real analytics) */}
           <Card>
-            <CardHeader>
+            <CardHeader className="border-b-0">
               <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Academy Information
+
+                Visitor statistics
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">
-                  Academy Name
-                </p>
-                <p className="font-semibold">{academyProfile.academy_name}</p>
-              </div>
-              {academyProfile.description && (
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    Description
-                  </p>
-                  <p className="text-sm">{academyProfile.description}</p>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="inline-flex items-center rounded-2xl border border-border bg-muted/40 p-1">
+                  <button
+                    type="button"
+                    className="rounded-xl px-3 py-1.5 text-xs text-muted-foreground"
+                    disabled
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl px-3 py-1.5 text-xs text-muted-foreground"
+                    disabled
+                  >
+                    Yesterday
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm"
+                    disabled
+                  >
+                    Last 7 days
+                  </button>
                 </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {academyProfile.website_url && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      window.open(academyProfile.website_url, "_blank")
-                    }
-                  >
-                    <Globe className="h-4 w-4 mr-2" />
-                    Website
-                    <ExternalLink className="h-3 w-3 ml-2" />
-                  </Button>
-                )}
-                {academyProfile.contact_email && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      (window.location.href = `mailto:${academyProfile.contact_email}`)
-                    }
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Contact
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-xl"
+                  disabled
+                  aria-label="Visitors details"
+                >
+                  ↗
+                </Button>
+              </div>
+
+              <div className="rounded-2xl bg-muted/40 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-3xl font-bold text-foreground">0</p>
+                  <p className="text-sm text-muted-foreground">
+                    visitors in the selected period
+                  </p>
+                </div>
+
+                <div className="mt-5 grid h-28 grid-cols-7 items-end gap-2">
+                  {[24, 36, 18, 44, 29, 52, 34].map((h, idx) => (
+                    <div
+                      key={idx}
+                      className="w-full rounded-md bg-sky-500/85"
+                      style={{ height: `${h}px` }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 grid grid-cols-7 text-[10px] text-muted-foreground">
+                  {["04/02", "04/03", "04/04", "04/05", "04/06", "04/07", "04/08"].map(
+                    (d) => (
+                      <span key={d} className="text-center">
+                        {d}
+                      </span>
+                    ),
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Enrolled students across all courses */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between border-b-0">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 Enrolled students
@@ -511,7 +512,7 @@ const AcademyHomePage = () => {
 
         {/* Quick Actions */}
         <Card>
-          <CardHeader>
+          <CardHeader className="border-b-0">
             <CardTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5" />
               Quick Actions

@@ -50,7 +50,6 @@ import AcademyRegistrationPage from "@/pages/academy/AcademyRegistrationPage";
 import AddCoursePage from "@/pages/academy/AddCoursePage";
 import EmployerRegistrationPage from "@/pages/employer/EmployerRegistrationPage";
 import EmployerDashboardPage from "@/pages/employer/EmployerDashboardPage";
-import EmployerHomePage from "@/pages/employer/EmployerHomePage";
 import EmployerJobsPage from "@/pages/employer/EmployerJobsPage";
 import EmployerAddJobPage from "@/pages/employer/EmployerAddJobPage";
 import EmployerProfilePage from "@/pages/employer/EmployerProfilePage";
@@ -222,7 +221,7 @@ export const AppRoutes = () => {
       {createLocalizedRoute(
         "/employer/home",
         <ProtectedRoute requiredRole="employer">
-          <EmployerHomePage />
+          <EmployerDashboardPage />
         </ProtectedRoute>
       )}
       {createLocalizedRoute(

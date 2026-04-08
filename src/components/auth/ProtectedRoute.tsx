@@ -111,7 +111,7 @@ export function ProtectedRoute({
     // ✅ FIX: Direct comparison instead of isRole() to avoid double-calling getRole()
     if (userRole !== requiredRole) {
       if (userRole === "employer") {
-        const employerPath = getLocalizedPath("/employer/home", language);
+        const employerPath = getLocalizedPath("/employer/jobs", language);
         return <Navigate to={employerPath} replace />;
       }
       if (requiredRole === "employer") {

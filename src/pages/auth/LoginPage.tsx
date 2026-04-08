@@ -68,7 +68,7 @@ const LoginPage: React.FC = () => {
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         navigate(academyPath, { replace: true });
       } else if (userRole === "employer") {
-        const employerPath = getLocalizedPath("/employer/home", language);
+        const employerPath = getLocalizedPath("/employer/jobs", language);
         navigate(employerPath, { replace: true });
       } else {
         const homePath = getLocalizedPath("/home", language);
@@ -150,7 +150,7 @@ const LoginPage: React.FC = () => {
         getLanguageFromPath(window.location.pathname) ||
         (localStorage.getItem("appLanguage") as "en" | "ka") ||
         "en";
-      window.location.href = getLocalizedPath("/employer/home", language);
+      window.location.href = getLocalizedPath("/employer/jobs", language);
       return;
     } catch {
       /* try unified login */

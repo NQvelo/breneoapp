@@ -461,7 +461,7 @@ export function EmployerDirectoryCompanyEditSection({
   }
 
   return (
-    <div className="rounded-2xl border border-border/60 p-4 bg-muted/20 space-y-4">
+    <div className="space-y-4">
       {companies.length > 1 ? (
         <div className="space-y-2">
           <Label>Directory company</Label>

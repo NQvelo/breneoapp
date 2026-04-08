@@ -66,8 +66,7 @@ export function AppSidebar({
         email?: unknown;
       };
       return {
-        memberName:
-          typeof o.memberName === "string" ? o.memberName.trim() : "",
+        memberName: typeof o.memberName === "string" ? o.memberName.trim() : "",
         logo: typeof o.logo === "string" ? o.logo.trim() : "",
         email: typeof o.email === "string" ? o.email.trim() : "",
       };
@@ -144,7 +143,9 @@ export function AppSidebar({
           extractBreneoUserIdFromEmployerProfileRaw(res.data) ||
           (user?.id != null ? String(user.id) : "");
         if (extId.trim()) {
-          const companies = await fetchEmployerAggregatorCompanies(extId.trim());
+          const companies = await fetchEmployerAggregatorCompanies(
+            extId.trim(),
+          );
           if (cancelled) return;
           const first = companies[0] as { logo?: unknown } | undefined;
           const logoFromCompany =
@@ -177,7 +178,14 @@ export function AppSidebar({
     return () => {
       cancelled = true;
     };
-  }, [isEmployer, user?.id, user?.email, readEmployerCache, employerMemberName, employerProfileEmail]);
+  }, [
+    isEmployer,
+    user?.id,
+    user?.email,
+    readEmployerCache,
+    employerMemberName,
+    employerProfileEmail,
+  ]);
 
   // ⛔ Removed old useState and useEffect for localStorage
 
@@ -213,12 +221,11 @@ export function AppSidebar({
    * Academy: after `academyDisplay` is loaded from `/api/academy/profile/`, use that photo only (JWT `user.profile_image` does not update on upload).
    * Before load completes, fall back to `user.profile_image`.
    */
-  const sidebarAvatarUrl =
-    isEmployer
-      ? employerProfileLogo || employerDisplay?.logo_url || undefined
-      : isAcademy && academyDisplay != null
-        ? academyDisplay.profile_image || undefined
-        : user?.profile_image;
+  const sidebarAvatarUrl = isEmployer
+    ? employerProfileLogo || employerDisplay?.logo_url || undefined
+    : isAcademy && academyDisplay != null
+      ? academyDisplay.profile_image || undefined
+      : user?.profile_image;
 
   // Helper: Get avatar initials (academy name or user name/email)
   const getInitials = () => {
@@ -262,7 +269,6 @@ export function AppSidebar({
       ]
     : isEmployer
       ? [
-          { icon: Home, label: t.nav.home, href: "/employer/home" },
           { icon: Briefcase, label: t.nav.yourJobs, href: "/employer/jobs" },
           { icon: Users, label: t.nav.members, href: "/employer/members" },
         ]
@@ -282,7 +288,7 @@ export function AppSidebar({
   const homePath = isAcademy
     ? "/academy/home"
     : isEmployer
-      ? "/employer/home"
+      ? "/employer/jobs"
       : "/home";
 
   // Mobile navigation (includes profile for all roles, including employer)
@@ -349,12 +355,6 @@ export function AppSidebar({
                 currentPath === "/academy/dashboard" ||
                 rawPathname.includes("/academy/home") ||
                 rawPathname.includes("/academy/dashboard");
-            } else if (item.href === "/employer/home") {
-              isActive =
-                currentPath === "/employer/home" ||
-                currentPath === "/employer/dashboard" ||
-                rawPathname.includes("/employer/home") ||
-                rawPathname.includes("/employer/dashboard");
             } else if (item.href === "/employer/jobs") {
               isActive =
                 currentPath.startsWith("/employer/jobs") ||
@@ -400,7 +400,6 @@ export function AppSidebar({
               </LocalizedLink>
             );
           })}
-          
         </nav>
       </div>
 
@@ -447,12 +446,6 @@ export function AppSidebar({
                     currentPath === "/academy/dashboard" ||
                     rawPathname.includes("/academy/home") ||
                     rawPathname.includes("/academy/dashboard");
-                } else if (item.href === "/employer/home") {
-                  isActive =
-                    currentPath === "/employer/home" ||
-                    currentPath === "/employer/dashboard" ||
-                    rawPathname.includes("/employer/home") ||
-                    rawPathname.includes("/employer/dashboard");
                 } else if (item.href === "/employer/jobs") {
                   isActive =
                     currentPath.startsWith("/employer/jobs") ||
@@ -516,87 +509,87 @@ export function AppSidebar({
 
             {/* Settings, Help Center, Theme Toggle grouped together */}
             {!isEmployer && (
-            <div className="space-y-1 mb-4">
-              <LocalizedLink
-                to={settingsPath}
-                className={cn(
-                  "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                  currentPath === settingsPath
-                    ? "bg-breneo-blue/10 text-breneo-blue"
-                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
-                )}
-              >
-                <Settings
-                  size={22}
+              <div className="space-y-1 mb-4">
+                <LocalizedLink
+                  to={settingsPath}
                   className={cn(
-                    "flex-shrink-0 transition-colors duration-200",
+                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                     currentPath === settingsPath
-                      ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
-                  )}
-                />
-                {!collapsed && (
-                  <span className="font-medium text-base">
-                    {t.nav.settings}
-                  </span>
-                )}
-              </LocalizedLink>
-
-              <LocalizedLink
-                to="/help"
-                className={cn(
-                  "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                  currentPath === "/help"
-                    ? "bg-breneo-blue/10 text-breneo-blue"
-                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
-                )}
-              >
-                <HelpCircle
-                  size={22}
-                  className={cn(
-                    "flex-shrink-0 transition-colors duration-200",
-                    currentPath === "/help"
-                      ? "text-breneo-blue"
-                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
-                  )}
-                />
-                {!collapsed && (
-                  <span className="font-medium text-base">{t.nav.help}</span>
-                )}
-              </LocalizedLink>
-
-              {/* Breneo Pro Plan Widget - Desktop Only */}
-              {!isAcademy && (
-                <button
-                  onClick={onUpgradeClick}
-                  className={cn(
-                    "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                    "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
-                    "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50 text-left",
-                    collapsed && "justify-center px-4",
+                      ? "bg-breneo-blue/10 text-breneo-blue"
+                      : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
                   )}
                 >
-                  {subscriptionInfo?.is_active ? (
-                    <Sparkles
-                      size={22}
-                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
-                    />
-                  ) : (
-                    <ArrowRight
-                      size={22}
-                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
-                    />
-                  )}
+                  <Settings
+                    size={22}
+                    className={cn(
+                      "flex-shrink-0 transition-colors duration-200",
+                      currentPath === settingsPath
+                        ? "text-breneo-blue"
+                        : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
+                    )}
+                  />
                   {!collapsed && (
-                    <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
-                      {subscriptionInfo?.is_active
-                        ? subscriptionInfo.plan_name || "Pro Plan"
-                        : t.subscription.upgrade}
+                    <span className="font-medium text-base">
+                      {t.nav.settings}
                     </span>
                   )}
-                </button>
-              )}
-            </div>
+                </LocalizedLink>
+
+                <LocalizedLink
+                  to="/help"
+                  className={cn(
+                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                    currentPath === "/help"
+                      ? "bg-breneo-blue/10 text-breneo-blue"
+                      : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
+                  )}
+                >
+                  <HelpCircle
+                    size={22}
+                    className={cn(
+                      "flex-shrink-0 transition-colors duration-200",
+                      currentPath === "/help"
+                        ? "text-breneo-blue"
+                        : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
+                    )}
+                  />
+                  {!collapsed && (
+                    <span className="font-medium text-base">{t.nav.help}</span>
+                  )}
+                </LocalizedLink>
+
+                {/* Breneo Pro Plan Widget - Desktop Only */}
+                {!isAcademy && (
+                  <button
+                    onClick={onUpgradeClick}
+                    className={cn(
+                      "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                      "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
+                      "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50 text-left",
+                      collapsed && "justify-center px-4",
+                    )}
+                  >
+                    {subscriptionInfo?.is_active ? (
+                      <Sparkles
+                        size={22}
+                        className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
+                      />
+                    ) : (
+                      <ArrowRight
+                        size={22}
+                        className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                      />
+                    )}
+                    {!collapsed && (
+                      <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
+                        {subscriptionInfo?.is_active
+                          ? subscriptionInfo.plan_name || "Pro Plan"
+                          : t.subscription.upgrade}
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Profile / employer company */}
@@ -608,7 +601,7 @@ export function AppSidebar({
                 {/* Avatar box */}
                 <div
                   className={cn(
-                    "flex items-center justify-center w-8 h-8 rounded-[50px] text-sm font-semibold shrink-0",
+                    "flex items-center justify-center w-8 h-8 rounded-[8px] text-sm font-semibold shrink-0",
                     // ✅ Changed userData to user
                     sidebarAvatarUrl
                       ? "overflow-hidden"
@@ -619,7 +612,7 @@ export function AppSidebar({
                     <img
                       src={sidebarAvatarUrl}
                       alt="Profile"
-                      className="w-full h-full object-cover rounded-[12px]"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
                     getInitials()

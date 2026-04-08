@@ -2,18 +2,20 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Plus,
-  Edit,
+  MoreVertical,
   Briefcase,
   MapPin,
-  Globe,
-  GraduationCap,
-  Clock3,
-  Building2,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -28,6 +30,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeEmployerProfile } from "@/api/employer/profile";
+import {
+  deletePublishedEmployerJob,
+  updatePublishedEmployerJob,
+} from "@/api/employer/publishJob";
 
 export default function EmployerJobsPage() {
   const navigate = useNavigate();
@@ -38,7 +44,6 @@ export default function EmployerJobsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedCompanyName, setLinkedCompanyName] = useState("");
-  const [query, setQuery] = useState("");
   const statusFilter = (() => {
     const s = searchParams.get("status");
     if (s === "inactive") return "inactive";
@@ -146,15 +151,8 @@ export default function EmployerJobsPage() {
         : statusFilter === "inactive"
           ? closedJobs
           : jobs;
-    const q = query.trim().toLowerCase();
-    if (!q) return byStatus;
-    return byStatus.filter((job) => {
-      const title = (job.title || "").toLowerCase();
-      const location = (job.location || "").toLowerCase();
-      const company = (job.company_name || "").toLowerCase();
-      return title.includes(q) || location.includes(q) || company.includes(q);
-    });
-  }, [statusFilter, activeJobs, closedJobs, jobs, query]);
+    return byStatus;
+  }, [statusFilter, activeJobs, closedJobs, jobs]);
 
   const relativePosted = (value?: string) => {
     if (!value) return "Posted recently";
@@ -173,26 +171,59 @@ export default function EmployerJobsPage() {
     return job.employment_type;
   };
 
+  const handleOpenJobEdit = (job: EmployerJob) => {
+    if (!job.id) return;
+    navigate(
+      getLocalizedPath(
+        `/employer/jobs/edit/${job.id}?source=${job.source ?? "aggregator"}`,
+        language,
+      ),
+    );
+  };
+
+  const handleSetJobActiveState = async (job: EmployerJob, isActive: boolean) => {
+    if (!job.id) return;
+    const alreadyActive = job.is_active !== false;
+    if (alreadyActive === isActive) {
+      toast.info(
+        isActive ? "This job is already active." : "This job is already inactive.",
+      );
+      return;
+    }
+    try {
+      await updatePublishedEmployerJob(String(job.id), { is_active: isActive });
+      setJobs((prev) =>
+        prev.map((row) =>
+          String(row.id) === String(job.id)
+            ? { ...row, is_active: isActive }
+            : row,
+        ),
+      );
+      toast.success(isActive ? "Job marked as active." : "Job marked as inactive.");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to update job.";
+      toast.error(message);
+    }
+  };
+
+  const handleDeleteJob = async (job: EmployerJob) => {
+    if (!job.id) return;
+    try {
+      await deletePublishedEmployerJob(String(job.id));
+      setJobs((prev) => prev.filter((row) => String(row.id) !== String(job.id)));
+      toast.success("Job deleted.");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to delete job.";
+      toast.error(message);
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          {linkedCompanyName ? (
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <Building2 className="h-4 w-4 shrink-0" />
-              <span>
-                Showing jobs for{" "}
-                <span className="text-foreground font-medium">
-                  {linkedCompanyName}
-                </span>
-              </span>
-            </p>
-          ) : null}
-        </div>
-
+      <div className="space-y-6 md:px-6 lg:px-8">
         <Card>
-          <CardHeader className="pb-2">
-            <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3 justify-between">
               <Tabs
                 value={statusFilter}
                 onValueChange={(value) =>
@@ -207,33 +238,48 @@ export default function EmployerJobsPage() {
                   )
                 }
               >
-                <TabsList>
-                  <TabsTrigger value="all">All ({jobs.length})</TabsTrigger>
-                  <TabsTrigger value="active">
+                <TabsList className="bg-transparent border border-border p-1">
+                  <TabsTrigger
+                    value="all"
+                    className="data-[state=active]:bg-muted"
+                  >
+                    All ({jobs.length})
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="active"
+                    className="data-[state=active]:bg-muted"
+                  >
                     Active ({activeJobs.length})
                   </TabsTrigger>
-                  <TabsTrigger value="inactive">
+                  <TabsTrigger
+                    value="inactive"
+                    className="data-[state=active]:bg-muted"
+                  >
                     Inactive ({closedJobs.length})
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="relative w-full md:max-w-sm flex justify-end">
+              <div className="relative flex justify-end shrink-0">
                 <Button
                   onClick={() =>
                     navigate(getLocalizedPath("/employer/jobs/add", language))
                   }
-                  className="shrink-0"
+                  className="h-10 w-10 p-0 md:h-auto md:w-auto md:px-4 md:py-2 shrink-0"
+                  aria-label="Add new job"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Post a new job
+                  <Plus className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Add New</span>
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="space-y-0 p-0">
             {loadError ? (
-              <p className="text-xs text-destructive pt-2">{loadError}</p>
+              <p className="text-xs text-destructive pb-3">{loadError}</p>
             ) : null}
-          </CardHeader>
-          <CardContent className="space-y-3">
             {loading ? (
               <div className="p-12 text-center text-muted-foreground">
                 Loading…
@@ -242,9 +288,7 @@ export default function EmployerJobsPage() {
               <div className="p-12 text-center">
                 <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground mb-4">
-                  {query.trim()
-                    ? "No matching jobs found"
-                    : "No jobs posted yet"}
+                  No jobs posted yet
                 </p>
                 <Button
                   onClick={() =>
@@ -256,7 +300,7 @@ export default function EmployerJobsPage() {
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-border">
                 {filteredJobs.map((job) => {
                   const rowCompany =
                     (job.company_name && job.company_name.trim()) ||
@@ -264,66 +308,67 @@ export default function EmployerJobsPage() {
                   return (
                     <div
                       key={`${job.source ?? "breneo"}-${job.id || job.title}`}
-                      className="rounded-xl border bg-card p-4 md:p-5"
+                      className="group cursor-pointer transition-colors hover:bg-muted/30"
+                      onClick={() => handleOpenJobEdit(job)}
                     >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-lg leading-none">
+                      <div className="flex gap-4 py-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-normal text-sm text-muted-foreground mb-1 line-clamp-1">
+                            {rowCompany || "Company"}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <h4 className="font-bold text-base md:text-lg line-clamp-2">
                               {job.title || "Untitled"}
-                            </h3>
-                            <span className="text-xs text-muted-foreground">
-                              {relativePosted(job.created_at)}
-                            </span>
-                          </div>
-                          {rowCompany ? (
-                            <p className="mt-1.5 text-sm text-muted-foreground inline-flex items-center gap-1.5">
-                              <Building2 className="h-3.5 w-3.5 shrink-0" />
-                              {rowCompany}
-                            </p>
-                          ) : null}
-                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                            </h4>
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                               <MapPin className="h-4 w-4" />
-                              {job.location || "N/A"}
-                            </span>
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
+                              <span>{job.location || "N/A"}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Clock className="h-4 w-4" />
+                              <span>{modeLabel(job)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                               <Briefcase className="h-4 w-4" />
-                              {modeLabel(job)}
-                            </span>
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <Globe className="h-4 w-4" />
-                              {job.salary || "N/A"}
-                            </span>
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <Clock3 className="h-4 w-4" />
-                              {job.remote ? "Remote" : "Onsite"}
-                            </span>
-                            <span className="inline-flex items-center gap-2 text-muted-foreground">
-                              <GraduationCap className="h-4 w-4" />
-                              {job.employment_type || "N/A"}
-                            </span>
+                              <span>{relativePosted(job.created_at)}</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex-shrink-0 flex items-center">
                           {job.id ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  navigate(
-                                    getLocalizedPath(
-                                      `/employer/jobs/edit/${job.id}?source=${job.source ?? "aggregator"}`,
-                                      language,
-                                    ),
-                                  )
-                                }
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-8 w-8 bg-[#EDEDEE] hover:bg-[#EDEDEE]/90 dark:bg-[#2D2D30] dark:hover:bg-[#3A3A3E] text-foreground"
+                                  aria-label="Job actions"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                              </Button>
-                            </>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleSetJobActiveState(job, job.is_active === false)
+                                  }
+                                >
+                                  {job.is_active === false
+                                    ? "Make job active"
+                                    : "Make job inactive"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteJob(job)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  Delete job
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           ) : null}
                         </div>
                       </div>

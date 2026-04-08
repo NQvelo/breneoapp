@@ -673,7 +673,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const academyPath = getLocalizedPath("/academy/dashboard", language);
           navigate(academyPath, { replace: true });
         } else if (userRole === "employer") {
-          const employerPath = getLocalizedPath("/employer/home", language);
+          const employerPath = getLocalizedPath("/employer/jobs", language);
           navigate(employerPath, { replace: true });
         } else {
           const homePath = getLocalizedPath("/home", language);
@@ -736,11 +736,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (userRole === "employer") {
         if (isEmployerPrivateRoute) return;
         if (pathWithoutLang === "/employer/register") {
-          const employerPath = getLocalizedPath("/employer/home", language);
+          const employerPath = getLocalizedPath("/employer/jobs", language);
           navigate(employerPath, { replace: true });
           return;
         }
-        const employerPath = getLocalizedPath("/employer/home", language);
+        const employerPath = getLocalizedPath("/employer/jobs", language);
         navigate(employerPath, { replace: true });
         return;
       }
@@ -1067,7 +1067,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const academyPath = getLocalizedPath("/academy/dashboard", language);
         navigate(academyPath);
       } else if (userData.user_type === "employer") {
-        const employerPath = getLocalizedPath("/employer/home", language);
+        const employerPath = getLocalizedPath("/employer/jobs", language);
         navigate(employerPath);
       } else {
         const homePath = getLocalizedPath("/home", language);

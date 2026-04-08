@@ -101,13 +101,17 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, academyDisplay } = useAuth();
   const { theme, setTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
-  const username = user?.first_name || user?.email?.split("@")[0] || "User";
   const currentPath = removeLanguagePrefix(location.pathname);
+  const username =
+    (currentPath.startsWith("/academy/") ? academyDisplay?.name : undefined) ||
+    user?.first_name ||
+    user?.email?.split("@")[0] ||
+    "User";
   const pageTitle = getPageTitle(currentPath, username, t);
   const isJobDetail = isJobDetailPage(currentPath);
   const isCourseDetail = isCourseDetailPage(currentPath);

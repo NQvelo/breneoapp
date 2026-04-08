@@ -45,10 +45,7 @@ const EmployerHomePage = () => {
     if (!user) return;
     try {
       const response = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
-      const normalized = normalizeEmployerProfile(
-        response.data,
-        user.email,
-      );
+      const normalized = normalizeEmployerProfile(response.data, user.email);
       if (normalized) {
         setProfile(normalized);
         updateEmployerDisplay({
@@ -160,75 +157,64 @@ const EmployerHomePage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-6">
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Total jobs
-              </CardTitle>
-              <Briefcase className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">{jobs.length}</div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Jobs you have posted
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Active
-              </CardTitle>
-              <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
-                {activeJobs.length}
+        <Card className="border-0 shadow-none bg-white dark:bg-card rounded-3xl">
+          <CardContent className="p-4 md:p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-foreground">
+                Your Company overview
+              </h3>
+              {/* <button
+                type="button"
+                aria-label="Overview details"
+                className="h-12 w-12 rounded-2xl bg-muted text-foreground inline-flex items-center justify-center"
+              >
+                <ExternalLink className="h-5 w-5" />
+              </button> */}
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible">
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0 min-h-[132px]">
+                <p className="text-xs text-muted-foreground truncate">
+                  Total jobs
+                </p>
+                <p className="text-2xl leading-none font-bold text-foreground">
+                  {jobs.length}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Jobs you have posted
+                </p>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Open listings
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Locations
-              </CardTitle>
-              <MapPin className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
-                {locationsCount}
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0 min-h-[132px]">
+                <p className="text-xs text-muted-foreground truncate">Active</p>
+                <p className="text-2xl leading-none font-bold text-foreground">
+                  {activeJobs.length}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  Open listings
+                </p>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                From company profile
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="min-w-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
-              <CardTitle className="text-xs md:text-sm font-medium truncate">
-                Status
-              </CardTitle>
-              <Building2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground shrink-0" />
-            </CardHeader>
-            <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
-                <Badge className="bg-green-500 text-[10px] md:text-xs">
-                  Active
-                </Badge>
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0 min-h-[132px]">
+                <p className="text-xs text-muted-foreground truncate">
+                  Locations
+                </p>
+                <p className="text-2xl leading-none font-bold text-foreground">
+                  {locationsCount}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  From company profile
+                </p>
               </div>
-              <p className="text-[10px] md:text-xs text-muted-foreground hidden md:block">
-                Employer account
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="rounded-2xl bg-[#F2F2F3] dark:bg-[#171717] p-4 space-y-1 min-w-[220px] sm:min-w-0 min-h-[132px]">
+                <p className="text-xs text-muted-foreground truncate">Status</p>
+                <div className="pt-1">
+                  <Badge className="bg-green-500 text-xs">Active</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  Employer account
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>

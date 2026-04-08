@@ -38,6 +38,7 @@ import {
   Building2,
   User,
   Settings,
+  LogOut,
 } from "lucide-react";
 import {
   extractBreneoEmailFromJwt,
@@ -70,6 +71,7 @@ export default function EmployerProfilePage() {
   const {
     user,
     loading: authLoading,
+    logout,
     updateUser,
     updateEmployerDisplay,
   } = useAuth();
@@ -503,6 +505,15 @@ export default function EmployerProfilePage() {
                 aria-label="Account settings"
               >
                 <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={logout}
+                aria-label="Log out"
+              >
+                <LogOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
               </Button>
             </div>
           </CardHeader>
