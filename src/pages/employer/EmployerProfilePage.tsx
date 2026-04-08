@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { IndustryMultiSelect } from "@/components/employer/IndustryMultiSelect";
 import { EmployerCompanySearchField } from "@/components/employer/EmployerCompanySearchField";
+import { EmployerDirectoryCompanyEditSection } from "@/components/employer/EmployerDirectoryCompanyEditSection";
 import {
   Edit,
   LogOut,
@@ -39,7 +40,6 @@ import {
   Camera,
   Building2,
   User,
-  Briefcase,
 } from "lucide-react";
 import {
   extractBreneoEmailFromJwt,
@@ -112,6 +112,7 @@ export default function EmployerProfilePage() {
   const [industryCatalog, setIndustryCatalog] = useState<AggregatorIndustry[]>(
     [],
   );
+  const [breneoStaffUserId, setBreneoStaffUserId] = useState("");
 
   useEffect(() => {
     fetchAggregatorIndustries()
@@ -150,21 +151,25 @@ export default function EmployerProfilePage() {
     fetchProfile();
   }, [fetchProfile]);
 
-  const loadAggregatorCompanies = useCallback(async () => {
-    if (!user) return;
-    setAggregatorLoading(true);
-    try {
-      const prof = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
-      const staffId =
-        extractBreneoUserIdFromEmployerProfileRaw(prof.data) || String(user.id);
-      const list = await fetchEmployerAggregatorCompanies(staffId);
-      setAggregatorCompanies(list);
-    } catch {
-      setAggregatorCompanies([]);
-    } finally {
-      setAggregatorLoading(false);
-    }
-  }, [user]);
+  const loadAggregatorCompanies = useCallback(
+    async (opts?: { quiet?: boolean }) => {
+      if (!user) return;
+      if (!opts?.quiet) setAggregatorLoading(true);
+      try {
+        const prof = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
+        const staffId =
+          extractBreneoUserIdFromEmployerProfileRaw(prof.data) || String(user.id);
+        setBreneoStaffUserId(staffId);
+        const list = await fetchEmployerAggregatorCompanies(staffId);
+        setAggregatorCompanies(list);
+      } catch {
+        setAggregatorCompanies([]);
+      } finally {
+        if (!opts?.quiet) setAggregatorLoading(false);
+      }
+    },
+    [user],
+  );
 
   useEffect(() => {
     loadAggregatorCompanies();
@@ -449,8 +454,12 @@ export default function EmployerProfilePage() {
     user?.profile_image ||
     undefined;
 
+  const accountFirstName =
+    profile?.first_name?.trim() || user?.first_name?.trim() || "";
+  const accountLastName =
+    profile?.last_name?.trim() || user?.last_name?.trim() || "";
   const personDisplayName =
-    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+    [accountFirstName, accountLastName].filter(Boolean).join(" ").trim() ||
     user?.email ||
     "Employer";
   const displayName =
@@ -461,8 +470,6 @@ export default function EmployerProfilePage() {
   const avatarFallback = displayName.charAt(0).toUpperCase() || "C";
   const personAvatarFallback =
     personDisplayName.charAt(0).toUpperCase() || "U";
-  const primaryAggregatorCompany: AggregatorCompany | undefined =
-    aggregatorCompanies[0];
   const websiteRaw = profile?.website?.trim() ?? "";
   const websiteHref =
     websiteRaw && !/^https?:\/\//i.test(websiteRaw)
@@ -536,6 +543,24 @@ export default function EmployerProfilePage() {
                 <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
                   {personDisplayName}
                 </h1>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      First name
+                    </p>
+                    <p className="text-sm text-foreground mt-0.5">
+                      {accountFirstName || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Last name
+                    </p>
+                    <p className="text-sm text-foreground mt-0.5">
+                      {accountLastName || "—"}
+                    </p>
+                  </div>
+                </div>
                 {user?.email ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm">
                     <Mail className="h-4 w-4 text-gray-500" />
@@ -566,76 +591,14 @@ export default function EmployerProfilePage() {
           <CardContent className="px-6 pb-6 space-y-4">
             {aggregatorLoading ? (
               <p className="text-sm text-muted-foreground">Loading company…</p>
-            ) : primaryAggregatorCompany ? (
-              <div className="rounded-2xl border border-border/60 p-4 bg-muted/20 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                  {typeof primaryAggregatorCompany.logo === "string" &&
-                  primaryAggregatorCompany.logo.trim() ? (
-                    <img
-                      src={primaryAggregatorCompany.logo}
-                      alt=""
-                      className="h-16 w-16 rounded-xl object-cover border border-border/60 shrink-0"
-                    />
-                  ) : null}
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-lg font-semibold text-foreground">
-                      {primaryAggregatorCompany.name ?? "Company"}
-                    </p>
-                    {primaryAggregatorCompany.domain ? (
-                      <p className="text-sm text-muted-foreground">
-                        {String(primaryAggregatorCompany.domain)}
-                      </p>
-                    ) : null}
-                    {primaryAggregatorCompany.company_email ? (
-                      <p className="text-sm inline-flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                        {primaryAggregatorCompany.company_email}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                {primaryAggregatorCompany.description ? (
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                    {String(primaryAggregatorCompany.description)}
-                  </p>
-                ) : null}
-                {primaryAggregatorCompany.website ? (
-                  <a
-                    href={
-                      /^https?:\/\//i.test(String(primaryAggregatorCompany.website))
-                        ? String(primaryAggregatorCompany.website)
-                        : `https://${String(primaryAggregatorCompany.website).replace(/^\/\//, "")}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                  >
-                    <Globe className="h-4 w-4" />
-                    {String(primaryAggregatorCompany.website)}
-                  </a>
-                ) : null}
-                {Array.isArray(primaryAggregatorCompany.industries) &&
-                primaryAggregatorCompany.industries.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {primaryAggregatorCompany.industries.map((ind) => (
-                      <span
-                        key={`${ind.id}-${ind.name}`}
-                        className="rounded-full bg-muted px-2.5 py-0.5 text-xs"
-                      >
-                        {ind.name}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {primaryAggregatorCompany.job_count != null ? (
-                  <p className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
-                    <Briefcase className="h-4 w-4" />
-                    {String(primaryAggregatorCompany.job_count)} job
-                    {Number(primaryAggregatorCompany.job_count) === 1 ? "" : "s"}{" "}
-                    on the directory
-                  </p>
-                ) : null}
-              </div>
+            ) : aggregatorCompanies.length > 0 ? (
+              <EmployerDirectoryCompanyEditSection
+                companies={aggregatorCompanies}
+                companiesLoading={aggregatorLoading}
+                industryCatalog={industryCatalog}
+                breneoUserId={breneoStaffUserId}
+                onDirectoryUpdated={() => loadAggregatorCompanies({ quiet: true })}
+              />
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">

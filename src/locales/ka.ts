@@ -10,6 +10,7 @@ export const ka = {
     help: "დახმარების ცენტრი",
     notifications: "შეტყობინებები",
     yourJobs: "თქვენი ვაკანსიები",
+    members: "წევრები",
   },
   // Common
   common: {

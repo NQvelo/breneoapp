@@ -6,6 +6,9 @@ export type NormalizedEmployerProfile = {
   id: string;
   company_name: string;
   email: string;
+  /** Account holder / contact person (from profile or nested `user`). */
+  first_name: string;
+  last_name: string;
   phone_number: string;
   website: string;
   description: string;
@@ -21,8 +24,8 @@ function readString(v: unknown): string {
 }
 
 /**
- * Main Breneo employer profile company id — job aggregator expects
- * `PATCH|POST …/api/employer/companies/{id}/` for company registration/update.
+ * Main Breneo employer profile company id — job aggregator employer API uses
+ * numeric primary key: `PATCH|POST …/api/employer/companies/{company_id}/` (not public `/api/companies/{name}`).
  */
 export function extractBreneoCompanyIdFromEmployerProfileRaw(
   data: unknown,
@@ -113,6 +116,35 @@ export function extractEmailFromEmployerProfileRaw(data: unknown): string {
   return "";
 }
 
+/** Person name fields on employer profile or nested `user` (Breneo API shapes vary). */
+function extractPersonNamesFromEmployerProfileRaw(data: Record<string, unknown>): {
+  first_name: string;
+  last_name: string;
+} {
+  const fromObj = (o: Record<string, unknown>) => ({
+    first_name:
+      readString(o.first_name) ||
+      readString(o.firstName) ||
+      readString(o.given_name) ||
+      readString(o.givenName),
+    last_name:
+      readString(o.last_name) ||
+      readString(o.lastName) ||
+      readString(o.family_name) ||
+      readString(o.familyName),
+  });
+  let { first_name, last_name } = fromObj(data);
+  if (!first_name && !last_name) {
+    const u = data.user;
+    if (u != null && typeof u === "object" && !Array.isArray(u)) {
+      const inner = fromObj(u as Record<string, unknown>);
+      first_name = inner.first_name;
+      last_name = inner.last_name;
+    }
+  }
+  return { first_name, last_name };
+}
+
 export function extractEmployerLogoUrl(data: Record<string, unknown>): string | null {
   const direct =
     data.logo_url ??
@@ -159,10 +191,13 @@ export function normalizeEmployerProfile(
       }
     }
   }
+  const { first_name, last_name } = extractPersonNamesFromEmployerProfileRaw(o);
   return {
     id: o.id != null ? String(o.id) : "",
     company_name: companyName,
     email,
+    first_name,
+    last_name,
     phone_number: readString(o.phone_number),
     website: readString(o.website),
     description: readString(o.description),

@@ -46,7 +46,7 @@ export async function publishEmployerJob(
 
 /**
  * PATCH/DELETE: same-origin `/api/employer/jobs/{jobId}` only (no query string).
- * BFF forwards to the aggregator, e.g. `https://breneo-job-aggregator.up.railway.app/api/employer/jobs/{id}/`
+ * BFF forwards to the aggregator, e.g. `https://breneo-job-aggregator.up.railway.app/api/employer/jobs/{id}?company_id=…`
  * (`JOB_AGGREGATOR_BASE_URL`), with `X-Employer-Key` and Breneo JWT validation server-side.
  */
 export async function updatePublishedEmployerJob(

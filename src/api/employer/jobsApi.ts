@@ -297,8 +297,8 @@ export async function fetchEmployerJobsFiltered(
 }
 
 /**
- * GET `/api/employer/jobs/{id}` via your BFF (no query params). Upstream default:
- * `https://breneo-job-aggregator.up.railway.app/api/employer/jobs/{id}/` with `X-Employer-Key`.
+ * GET `/api/employer/jobs/{id}` via your BFF (no query params in the browser). Upstream (when
+ * `AGGREGATOR_JOB_DETAIL_COMPANY_QUERY=1` on the BFF): `…/api/employer/jobs/{id}?company_id=…` with `X-Employer-Key`.
  */
 export async function fetchEmployerJobById(id: string): Promise<EmployerJob> {
   const token = TokenManager.getAccessToken();

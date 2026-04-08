@@ -3,11 +3,11 @@
  * - GET /api/industries/ — public → GET aggregator industries (proxied)
  * - GET /api/employer/companies/for-user — JWT → GET aggregator “my companies” (for-user or legacy ?staff_user_id=)
  * - GET /api/employer/companies?search=|name= — JWT → company picker search (new API only)
- * - GET /api/employer/companies/:companyId — JWT → company detail (scoped with external_user_id when new API)
+ * - GET /api/employer/companies/:companyId — JWT → company detail (`companyId` = numeric PK; not public name-based /api/companies/…)
  * - POST /api/employer/staff-memberships — JWT → POST aggregator /api/employer/staff-memberships { company_id, external_user_id }
- * - POST /api/employer/companies/:companyId/members — JWT → same as staff-memberships (compat alias)
+ * - POST /api/employer/companies/:companyId/members — JWT → same as staff-memberships (`companyId` = numeric PK)
  * - POST /api/employer/companies — JWT → create company; new API: no staff_user_ids in body; BFF POSTs membership after create
- * - PATCH|POST|PUT /api/employer/companies/:companyId — JWT → partial/full update (new API strips staff_user_ids from body)
+ * - PATCH|POST|PUT /api/employer/companies/:companyId — JWT → partial/full update (`companyId` = numeric PK; new API strips staff_user_ids from body)
  *   Upstream path: JOB_AGGREGATOR_COMPANIES_PATH (default /api/employer/companies). Staff link: POST staff-memberships unless JOB_AGGREGATOR_EMBED_STAFF_USER_IDS_IN_COMPANY_BODY=1.
  * - GET /api/employer/jobs — JWT auth → GET aggregator list (?company_id preferred, ?company fallback)
  * - GET /api/employer/jobs/:jobId — JWT → GET aggregator detail (forwards ?company_id; adds from profile if missing)
@@ -25,6 +25,7 @@
  *   MAIN_API_BASE_URL — main Breneo API (no trailing slash); JWT/profile checks hit …/api/employer/profile/ here (same as VITE_API_BASE_URL)
  *   VITE_API_BASE_URL — optional fallback if MAIN_API_BASE_URL unset (dotenv loads VITE_* for Node in dev)
  *   JOB_AGGREGATOR_BASE_URL — job aggregator origin (employer CRUD, industries, companies search); default breneo-job-aggregator Railway
+ *   VITE_JOB_AGGREGATOR_BASE_URL — optional alias (same as frontend config; dotenv loads for Node)
  *   VITE_JOB_API_BASE_URL — optional alias for JOB_AGGREGATOR_BASE_URL (same value; dotenv loads for Node)
  *   JOB_AGGREGATOR_COMPANIES_PATH — upstream companies prefix (default /api/employer/companies on JOB_AGGREGATOR_BASE_URL).
  *   JOB_AGGREGATOR_STAFF_MEMBERSHIPS_PATH — default /api/employer/staff-memberships (no trailing slash on upstream POST URL).
@@ -57,20 +58,35 @@ const LISTEN_HOST = hasPlatformPort
 
 const DEFAULT_AGGREGATOR_BASE_URL = "https://breneo-job-aggregator.up.railway.app";
 
-function resolveAggregatorBaseUrl() {
-  const raw =
-    process.env.JOB_AGGREGATOR_BASE_URL?.trim() ||
-    process.env.VITE_JOB_API_BASE_URL?.trim() ||
-    process.env.JOB_AGGREGATOR_POST_URL?.trim();
-  if (!raw) {
-    return DEFAULT_AGGREGATOR_BASE_URL.replace(/\/$/, "");
+/**
+ * All employer job/company/industry upstream calls use this origin + `/api/employer/…`.
+ * Priority matches typical .env: server name first, then Vite-prefixed aliases dotenv loads.
+ * @returns {{ origin: string, source: string }}
+ */
+function readAggregatorOriginFromEnv() {
+  const entries = [
+    ["JOB_AGGREGATOR_BASE_URL", process.env.JOB_AGGREGATOR_BASE_URL],
+    ["VITE_JOB_AGGREGATOR_BASE_URL", process.env.VITE_JOB_AGGREGATOR_BASE_URL],
+    ["VITE_JOB_API_BASE_URL", process.env.VITE_JOB_API_BASE_URL],
+    ["JOB_AGGREGATOR_POST_URL", process.env.JOB_AGGREGATOR_POST_URL],
+  ];
+  for (const [key, val] of entries) {
+    const raw = val?.trim();
+    if (!raw) continue;
+    try {
+      const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+      return {
+        origin: `${u.origin}`.replace(/\/$/, ""),
+        source: key,
+      };
+    } catch {
+      /* try next */
+    }
   }
-  try {
-    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
-    return `${u.origin}`.replace(/\/$/, "");
-  } catch {
-    return DEFAULT_AGGREGATOR_BASE_URL.replace(/\/$/, "");
-  }
+  return {
+    origin: DEFAULT_AGGREGATOR_BASE_URL.replace(/\/$/, ""),
+    source: "(default breneo-job-aggregator)",
+  };
 }
 
 // Must match src/api/auth/config.ts API_BASE_URL or JWT validation returns 401 (not the job aggregator).
@@ -79,7 +95,10 @@ const MAIN_API_BASE = (
   process.env.VITE_API_BASE_URL ||
   "https://web-production-80ed8.up.railway.app"
 ).replace(/\/$/, "");
-const AGGREGATOR_BASE_URL = resolveAggregatorBaseUrl();
+const {
+  origin: AGGREGATOR_BASE_URL,
+  source: AGGREGATOR_BASE_SOURCE,
+} = readAggregatorOriginFromEnv();
 
 function employerAuthFailureHint(status) {
   if (status !== 401 && status !== 403) return "";
@@ -123,12 +142,13 @@ const AGGREGATOR_STAFF_MEMBERSHIPS_ROOT = `${AGGREGATOR_BASE_URL.replace(/\/$/, 
 );
 
 /**
- * Django REST detail routes often expect a trailing slash before the query string.
+ * Job detail path (no trailing slash). With `AGGREGATOR_JOB_DETAIL_COMPANY_QUERY=1`, the BFF appends
+ * `?company_id=` so upstream matches e.g. `…/api/employer/jobs/5854?company_id=31` (slash before `?` breaks some Railway builds).
  * @param {string} encodedJobId result of encodeURIComponent(jobId)
  */
 function aggregatorJobDetailUrl(encodedJobId) {
   const root = AGGREGATOR_EMPLOYER_JOBS_URL.replace(/\/$/, "");
-  return `${root}/${encodedJobId}/`;
+  return `${root}/${encodedJobId}`;
 }
 const AGGREGATOR_KEY = process.env.JOB_AGGREGATOR_EMPLOYER_KEY;
 
@@ -504,10 +524,9 @@ async function requireEmployerAuth(req, res) {
 }
 
 /**
- * Upstream URL for one job (GET/PATCH/DELETE detail).
- * Matches Postman / public API: path only — auth is `X-Employer-Key`; `?company_id=` can make
- * some aggregator builds return 404 for valid job ids.
- * Set AGGREGATOR_JOB_DETAIL_COMPANY_QUERY=1 to append `company_id` from JWT (legacy).
+ * Upstream URL for one job (GET/PATCH/DELETE detail). Auth: `X-Employer-Key`.
+ * Set AGGREGATOR_JOB_DETAIL_COMPANY_QUERY=1 to append `?company_id=` (required on breneo-job-aggregator
+ * employer job detail). Path has no trailing slash so the final URL is `…/jobs/{id}?company_id=…`.
  * @param {string} jobId
  * @param {import("express").Request} req
  * @param {{ companyId?: string }} ctx
@@ -750,6 +769,52 @@ async function handleStaffMembershipsCreate(req, res) {
   }
 }
 
+async function handleStaffMembershipsList(req, res) {
+  try {
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        detail:
+          "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
+      });
+    }
+    const url = new URL(AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, ""));
+    for (const [k, v] of Object.entries(req.query || {})) {
+      if (v === undefined || v === "") continue;
+      const val = Array.isArray(v) ? v[0] : v;
+      url.searchParams.set(k, String(val));
+    }
+    const ext = String(
+      req.query.external_user_id || req.query.staff_user_id || "",
+    ).trim();
+    if (ext && ext !== ctx.userId) {
+      return res.status(403).json({
+        detail: "external_user_id does not match authenticated user",
+      });
+    }
+    const upstream = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    const text = await upstream.text();
+    const data = parseUpstreamJson(text);
+    if (!upstream.ok) {
+      return res.status(upstream.status >= 400 ? upstream.status : 502).json(
+        typeof data === "object" && data !== null
+          ? data
+          : { detail: text || "Staff memberships list error" },
+      );
+    }
+    return res.status(200).json(data);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ detail: "Internal server error" });
+  }
+}
+
 async function handleEmployerCompaniesForUser(req, res) {
   try {
     const ctx = await requireEmployerAuth(req, res);
@@ -806,12 +871,18 @@ async function handleEmployerCompanyDetailRead(req, res) {
           "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
       });
     }
-    const companyId = String(req.params.companyId || "").trim();
-    if (!companyId || companyId === "for-user") {
+    const raw = String(req.params.companyId || "").trim();
+    if (!raw || raw === "for-user") {
       return res.status(400).json({ detail: "company id is required in the URL path" });
     }
+    const pk = Number(raw);
+    if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
+      return res.status(400).json({
+        detail: "Employer company routes use numeric primary key in the path, not company name.",
+      });
+    }
     const root = AGGREGATOR_COMPANIES_ROOT.replace(/\/$/, "");
-    const u = new URL(`${root}/${encodeURIComponent(companyId)}/`);
+    const u = new URL(`${root}/${pk}`);
     if (!COMPANIES_API_LEGACY) {
       u.searchParams.set("external_user_id", ctx.userId);
     }
@@ -858,11 +929,17 @@ async function handleEmployerCompanyMembers(req, res) {
           "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
       });
     }
-    const companyId = String(req.params.companyId || "").trim();
-    if (!companyId) {
+    const raw = String(req.params.companyId || "").trim();
+    if (!raw) {
       return res.status(400).json({ detail: "company id is required in the URL path" });
     }
-    const link = await postStaffMembership(companyId, ctx);
+    const pk = Number(raw);
+    if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
+      return res.status(400).json({
+        detail: "Employer company routes use numeric primary key in the path, not company name.",
+      });
+    }
+    const link = await postStaffMembership(pk, ctx);
     if (!link.ok) {
       return res.status(link.status >= 400 ? link.status : 502).json(
         typeof link.data === "object" && link.data !== null
@@ -1079,20 +1156,54 @@ async function handleEmployerCompanyDetailWrite(req, res) {
           "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
       });
     }
-    const companyId = String(req.params.companyId || "").trim();
-    if (!companyId) {
+    const raw = String(req.params.companyId || "").trim();
+    if (!raw) {
       return res.status(400).json({ detail: "company id is required in the URL path" });
+    }
+    const pk = Number(raw);
+    if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
+      return res.status(400).json({
+        detail: "Employer company routes use numeric primary key in the path, not company name.",
+      });
     }
     const method = String(req.method || "PATCH").toUpperCase();
     if (!["PATCH", "POST", "PUT"].includes(method)) {
       return res.status(405).json({ detail: "Method not allowed" });
     }
+    const root = AGGREGATOR_COMPANIES_ROOT.replace(/\/$/, "");
+    const u = new URL(`${root}/${pk}`);
+    if (!COMPANIES_API_LEGACY) {
+      u.searchParams.set("external_user_id", ctx.userId);
+    }
+    const contentType = String(req.headers["content-type"] || "").toLowerCase();
+    const isMultipart = contentType.includes("multipart/form-data");
+    if (isMultipart) {
+      const upstream = await fetch(u.toString(), {
+        method,
+        headers: {
+          "Content-Type": String(req.headers["content-type"] || ""),
+          "X-Employer-Key": AGGREGATOR_KEY,
+          Accept: "application/json",
+        },
+        // Stream multipart body as-is to aggregator (logo uploads).
+        body: req,
+        duplex: "half",
+      });
+      const text = await upstream.text();
+      const data = parseUpstreamJson(text);
+      if (!upstream.ok) {
+        return res.status(upstream.status).json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator company detail error" },
+        );
+      }
+      return res.status(upstream.status).json(data);
+    }
     const rawBody = EMBED_STAFF_USER_IDS_IN_COMPANY_BODY
       ? prepareEmployerCompanyPayloadLegacy(req, ctx)
       : prepareEmployerCompanyPayloadNew(req);
-    const root = AGGREGATOR_COMPANIES_ROOT.replace(/\/$/, "");
-    const detailUrl = `${root}/${encodeURIComponent(companyId)}/`;
-    const upstream = await fetch(detailUrl, {
+    const upstream = await fetch(u.toString(), {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -1203,6 +1314,8 @@ async function handleEmployerJobsList(req, res) {
 
 app.get("/api/industries", handleIndustriesList);
 app.get("/api/industries/", handleIndustriesList);
+app.get("/api/employer/staff-memberships", handleStaffMembershipsList);
+app.get("/api/employer/staff-memberships/", handleStaffMembershipsList);
 app.post("/api/employer/staff-memberships", handleStaffMembershipsCreate);
 app.post("/api/employer/staff-memberships/", handleStaffMembershipsCreate);
 app.get("/api/employer/companies/for-user", handleEmployerCompaniesForUser);
@@ -1268,6 +1381,13 @@ async function handleEmployerJobDetail(req, res) {
     }
     const data = parsed.data;
     if (!upstream.ok) {
+      if (String(process.env.EMPLOYER_PROXY_DEBUG || "").trim() === "1") {
+        console.warn(
+          "[employer-jobs-proxy] upstream GET job:",
+          upstream.status,
+          url,
+        );
+      }
       return res.status(upstream.status).json(
         typeof data === "object" && data !== null
           ? data
@@ -1550,6 +1670,13 @@ async function handleEmployerJobUpdate(req, res) {
     const text = await upstream.text();
     const data = parseUpstreamJson(text);
     if (!upstream.ok) {
+      if (String(process.env.EMPLOYER_PROXY_DEBUG || "").trim() === "1") {
+        console.warn(
+          "[employer-jobs-proxy] upstream PATCH job:",
+          upstream.status,
+          upstreamUrl,
+        );
+      }
       return res.status(upstream.status).json(
         typeof data === "object" && data !== null
           ? data
@@ -1609,6 +1736,9 @@ if (isMainModule) {
   const server = app.listen(PORT, LISTEN_HOST, () => {
     console.log(
       `[employer-jobs-proxy] http://${LISTEN_HOST}:${PORT} profile=${MAIN_API_BASE}`,
+    );
+    console.log(
+      `[employer-jobs-proxy] aggregator origin=${AGGREGATOR_BASE_URL} (${AGGREGATOR_BASE_SOURCE})`,
     );
     console.log(
       `[employer-jobs-proxy] upstream companies=${AGGREGATOR_COMPANIES_ROOT} staff=${AGGREGATOR_STAFF_MEMBERSHIPS_ROOT} jobs=${AGGREGATOR_EMPLOYER_JOBS_URL}`,

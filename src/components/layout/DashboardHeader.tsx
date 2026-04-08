@@ -75,6 +75,7 @@ const getPageTitle = (
   if (pathname.startsWith("/employer/jobs/add")) return "Add job";
   if (pathname.startsWith("/employer/jobs/edit/")) return "Edit job";
   if (pathname.startsWith("/employer/jobs")) return "Job Postings";
+  if (pathname.startsWith("/employer/members")) return "Members";
   if (pathname.startsWith("/jobs")) return t.jobs.title;
   if (pathname.startsWith("/courses")) return t.courses.title;
   if (

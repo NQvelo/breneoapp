@@ -10,6 +10,7 @@ export const en = {
     help: "Help Center",
     notifications: "Notifications",
     yourJobs: "Your jobs",
+    members: "Members",
   },
   // Common
   common: {

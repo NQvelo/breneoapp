@@ -54,6 +54,7 @@ import EmployerHomePage from "@/pages/employer/EmployerHomePage";
 import EmployerJobsPage from "@/pages/employer/EmployerJobsPage";
 import EmployerAddJobPage from "@/pages/employer/EmployerAddJobPage";
 import EmployerProfilePage from "@/pages/employer/EmployerProfilePage";
+import EmployerMembersPage from "@/pages/employer/EmployerMembersPage";
 
 // Common pages (Available to all authenticated users)
 import TermsOfUse from "@/pages/TermsOfUse";
@@ -246,6 +247,12 @@ export const AppRoutes = () => {
         "/employer/profile",
         <ProtectedRoute requiredRole="employer">
           <EmployerProfilePage />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
+        "/employer/members",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerMembersPage />
         </ProtectedRoute>
       )}
       {createLocalizedRoute(

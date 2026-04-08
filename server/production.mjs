@@ -8,7 +8,7 @@
  *
  * Railway: Build = `npm run build`, Start = `npm start`.
  * Env: JOB_AGGREGATOR_EMPLOYER_KEY; MAIN_API_BASE_URL (main Breneo API, same as VITE_API_BASE_URL);
- *   JOB_AGGREGATOR_BASE_URL or VITE_JOB_API_BASE_URL (job aggregator); GEMINI_* optional.
+ *   JOB_AGGREGATOR_BASE_URL (or VITE_JOB_AGGREGATOR_BASE_URL / VITE_JOB_API_BASE_URL) for job aggregator; GEMINI_* optional.
  */
 import path from "path";
 import { fileURLToPath } from "url";

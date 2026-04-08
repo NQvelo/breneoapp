@@ -16,12 +16,20 @@ import {
   ArrowRight,
   Globe,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import {
+  extractBreneoUserIdFromEmployerProfileRaw,
+  normalizeEmployerProfile,
+} from "@/api/employer/profile";
+import { fetchEmployerAggregatorCompanies } from "@/api/employer/aggregatorBffApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
@@ -45,6 +53,11 @@ export function AppSidebar({
   const { language, setLanguage } = useLanguage();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
+  const [employerMemberName, setEmployerMemberName] = React.useState("");
+  const [employerProfileLogo, setEmployerProfileLogo] = React.useState<
+    string | null
+  >(null);
+  const [employerProfileEmail, setEmployerProfileEmail] = React.useState("");
 
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
@@ -67,12 +80,65 @@ export function AppSidebar({
     setMounted(true);
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadEmployerProfile = async () => {
+      if (!isEmployer) {
+        setEmployerMemberName("");
+        setEmployerProfileLogo(null);
+        setEmployerProfileEmail("");
+        return;
+      }
+      try {
+        const res = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
+        if (cancelled) return;
+        const n = normalizeEmployerProfile(res.data, user?.email);
+        if (n) {
+          const first = (n.first_name || "").trim();
+          const last = (n.last_name || "").trim();
+          const full = [first, last].filter(Boolean).join(" ").trim();
+          setEmployerMemberName(full);
+          setEmployerProfileLogo(n.logo_url || null);
+          setEmployerProfileEmail((n.email || "").trim());
+        }
+        const extId =
+          extractBreneoUserIdFromEmployerProfileRaw(res.data) ||
+          (user?.id != null ? String(user.id) : "");
+        if (extId.trim()) {
+          const companies = await fetchEmployerAggregatorCompanies(extId.trim());
+          if (cancelled) return;
+          const first = companies[0] as { logo?: unknown } | undefined;
+          const logoFromCompany =
+            typeof first?.logo === "string" && first.logo.trim()
+              ? first.logo.trim()
+              : "";
+          if (logoFromCompany) {
+            setEmployerProfileLogo(logoFromCompany);
+          }
+        }
+      } catch {
+        if (cancelled) return;
+        setEmployerMemberName("");
+        setEmployerProfileLogo(null);
+        setEmployerProfileEmail("");
+      }
+    };
+    void loadEmployerProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEmployer, user?.id, user?.email]);
+
   // ⛔ Removed old useState and useEffect for localStorage
 
   if (loading) return null;
 
   // Helper: Get display name (academy name from context for academy users, else user name – no refetch on nav)
   const getDisplayName = () => {
+    if (isEmployer && employerMemberName) return employerMemberName;
+    if (isEmployer && user?.first_name && user?.last_name) {
+      return `${user.first_name} ${user.last_name}`.trim();
+    }
     if (isEmployer && employerDisplay?.name) return employerDisplay.name;
     if (isAcademy && academyDisplay?.name) return academyDisplay.name;
     if (!user) return "Member";
@@ -87,6 +153,7 @@ export function AppSidebar({
 
   // Helper: Get display email (academy email from context for academy users, else user email)
   const getDisplayEmail = () => {
+    if (isEmployer && employerProfileEmail) return employerProfileEmail;
     if (isEmployer && employerDisplay?.email) return employerDisplay.email;
     if (isAcademy && academyDisplay?.email) return academyDisplay.email;
     return user?.email ?? "";
@@ -97,14 +164,21 @@ export function AppSidebar({
    * Before load completes, fall back to `user.profile_image`.
    */
   const sidebarAvatarUrl =
-    isEmployer && employerDisplay != null
-      ? employerDisplay.logo_url || undefined
+    isEmployer
+      ? employerProfileLogo || employerDisplay?.logo_url || undefined
       : isAcademy && academyDisplay != null
         ? academyDisplay.profile_image || undefined
         : user?.profile_image;
 
   // Helper: Get avatar initials (academy name or user name/email)
   const getInitials = () => {
+    if (isEmployer && employerMemberName) {
+      const parts = employerMemberName.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+      }
+      return employerMemberName.slice(0, 2).toUpperCase();
+    }
     if (isEmployer && employerDisplay?.name) {
       return employerDisplay.name.slice(0, 2).toUpperCase();
     }
@@ -140,6 +214,7 @@ export function AppSidebar({
       ? [
           { icon: Home, label: t.nav.home, href: "/employer/home" },
           { icon: Briefcase, label: t.nav.yourJobs, href: "/employer/jobs" },
+          { icon: Users, label: t.nav.members, href: "/employer/members" },
         ]
       : [
           { icon: Home, label: t.nav.home, href: "/home" },
@@ -230,6 +305,14 @@ export function AppSidebar({
                 currentPath === "/employer/dashboard" ||
                 rawPathname.includes("/employer/home") ||
                 rawPathname.includes("/employer/dashboard");
+            } else if (item.href === "/employer/jobs") {
+              isActive =
+                currentPath.startsWith("/employer/jobs") ||
+                rawPathname.includes("/employer/jobs");
+            } else if (item.href === "/employer/members") {
+              isActive =
+                currentPath.startsWith("/employer/members") ||
+                rawPathname.includes("/employer/members");
             } else {
               isActive =
                 currentPath === item.href || rawPathname.endsWith(item.href);
@@ -324,6 +407,10 @@ export function AppSidebar({
                   isActive =
                     currentPath.startsWith("/employer/jobs") ||
                     rawPathname.includes("/employer/jobs");
+                } else if (item.href === "/employer/members") {
+                  isActive =
+                    currentPath.startsWith("/employer/members") ||
+                    rawPathname.includes("/employer/members");
                 } else {
                   // For other items, check if pathname ends with the href (handles language prefixes)
                   isActive =

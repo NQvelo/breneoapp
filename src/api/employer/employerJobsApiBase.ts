@@ -8,6 +8,11 @@
  * - **Static dashboards (e.g. dashboard.breneo.app):** must set `VITE_EMPLOYER_JOBS_API_BASE_URL`
  *   or `VITE_EMPLOYER_BFF_URL` to a deployed BFF URL (do NOT call raw aggregator directly).
  * - **Override:** `VITE_EMPLOYER_JOBS_API_BASE_URL` / `VITE_EMPLOYER_BFF_URL`.
+ *
+ * `VITE_API_BASE_URL` is the **Breneo main API** (auth, profile). It is not the employer BFF.
+ * A legacy fallback maps it to employer routes only for hosts that serve `/api/employer/*` (e.g. `production.mjs`).
+ * In **Vite dev on localhost**, employer calls always use same-origin so `/api/employer/*` hits the proxy →
+ * `employer-jobs-proxy` → job aggregator — even when `VITE_API_BASE_URL` points at Railway.
  */
 
 import { BRENEO_API_BASE_URL, JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
@@ -85,6 +90,27 @@ function isStaticEmployerDashboardHost(hostname: string): boolean {
 }
 
 function resolveBaseFromEnvOrBrowser(): string {
+  const explicitEmployerBff = trimBase(
+    (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL ||
+      import.meta.env.VITE_EMPLOYER_BFF_URL) as string | undefined,
+  );
+
+  // Dev + localhost: employer routes must go through Vite’s `/api/employer/*` proxy → employer-jobs-proxy
+  // → job aggregator. Do not send them to `VITE_API_BASE_URL` (main Breneo API); that host has no aggregator
+  // employer surface → 404 on e.g. `/api/employer/companies/for-user`.
+  if (
+    typeof window !== "undefined" &&
+    window.location?.origin &&
+    import.meta.env.DEV
+  ) {
+    const host = window.location.hostname;
+    const local =
+      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    if (local && !explicitEmployerBff) {
+      return window.location.origin;
+    }
+  }
+
   const fromEnv = employerBffBaseFromEnv();
 
   if (fromEnv) {
