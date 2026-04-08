@@ -252,6 +252,7 @@ export function AppSidebar({
     }
     return "U";
   };
+  const isRegularUser = !isEmployer && !isAcademy;
 
   // Navigation items - completely separated by role
   const navItems = isAcademy
@@ -601,7 +602,8 @@ export function AppSidebar({
                 {/* Avatar box */}
                 <div
                   className={cn(
-                    "flex items-center justify-center w-8 h-8 rounded-[8px] text-sm font-semibold shrink-0",
+                    "flex items-center justify-center w-8 h-8 text-sm font-semibold shrink-0",
+                    isRegularUser ? "rounded-full" : "rounded-[8px]",
                     // ✅ Changed userData to user
                     sidebarAvatarUrl
                       ? "overflow-hidden"
