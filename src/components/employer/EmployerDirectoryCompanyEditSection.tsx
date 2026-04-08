@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +29,7 @@ import {
   uploadEmployerAggregatorCompanyLogo,
   type PatchAggregatorCompanyBody,
 } from "@/api/employer/aggregatorBffApi";
+import { UploadCloud, X } from "lucide-react";
 
 const EMPLOYEE_BANDS = [
   "1-10",
@@ -157,7 +165,10 @@ function buildPatch(
     }
     patch.social_links = merged;
   }
-  if (current.additional_details_text.trim() !== initial.additional_details_text.trim()) {
+  if (
+    current.additional_details_text.trim() !==
+    initial.additional_details_text.trim()
+  ) {
     try {
       patch.additional_details = normalizeAdditionalJson(
         current.additional_details_text,
@@ -197,8 +208,6 @@ export function EmployerDirectoryCompanyEditSection({
   const bandsListId = useId();
   /** Aggregator primary key for `/api/employer/companies/{id}` — not public name-based routes. */
   const [currentCompanyId, setCurrentCompanyId] = useState<number | null>(null);
-  const [companyNumericId, setCompanyNumericId] = useState<number | null>(null);
-  const [jobCount, setJobCount] = useState<number | null>(null);
 
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
@@ -215,6 +224,7 @@ export function EmployerDirectoryCompanyEditSection({
   const [logoFileName, setLogoFileName] = useState("");
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
 
   const initialRef = useRef<FormSnapshot | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -223,7 +233,8 @@ export function EmployerDirectoryCompanyEditSection({
 
   useEffect(() => {
     return () => {
-      if (logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl);
+      if (logoPreviewUrl?.startsWith("blob:"))
+        URL.revokeObjectURL(logoPreviewUrl);
     };
   }, [logoPreviewUrl]);
 
@@ -242,9 +253,6 @@ export function EmployerDirectoryCompanyEditSection({
     const nm = readStr(c.name);
     const pk = parseAggregatorCompanyPk(c.id);
     if (pk != null) setCurrentCompanyId(pk);
-    setCompanyNumericId(pk);
-    const jc = c.job_count;
-    setJobCount(typeof jc === "number" ? jc : jc != null ? Number(jc) : null);
 
     setName(nm);
     setDomain(readStr(c.domain));
@@ -261,7 +269,8 @@ export function EmployerDirectoryCompanyEditSection({
     setIndustryIds(iids);
     setLogoFileName("");
     setLogoFile(null);
-    if (logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl);
+    if (logoPreviewUrl?.startsWith("blob:"))
+      URL.revokeObjectURL(logoPreviewUrl);
     setLogoPreviewUrl(null);
 
     const rawSl =
@@ -302,7 +311,9 @@ export function EmployerDirectoryCompanyEditSection({
       } catch (e: unknown) {
         const err = e as { message?: string; status?: number };
         if (err.status === 403) {
-          toast.error("You are not allowed to view this company on the directory.");
+          toast.error(
+            "You are not allowed to view this company on the directory.",
+          );
         } else if (err.status === 404) {
           toast.error("Company not found or not available for this account.");
         } else {
@@ -359,6 +370,15 @@ export function EmployerDirectoryCompanyEditSection({
 
   const fieldMessage = (key: string) => fieldErrors[key];
 
+  const clearSelectedLogo = useCallback(() => {
+    setLogoFile(null);
+    setLogoFileName("");
+    if (logoPreviewUrl?.startsWith("blob:"))
+      URL.revokeObjectURL(logoPreviewUrl);
+    setLogoPreviewUrl(null);
+    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+  }, [logoPreviewUrl]);
+
   const handleSave = async () => {
     const initial = initialRef.current;
     if (!initial) {
@@ -397,10 +417,7 @@ export function EmployerDirectoryCompanyEditSection({
       if (updated) {
         applyCompanyDetail(updated);
       }
-      setLogoFile(null);
-      setLogoFileName("");
-      if (logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl);
-      setLogoPreviewUrl(null);
+      clearSelectedLogo();
       await onDirectoryUpdated();
       toast.success("Job directory company updated.");
     } catch (e: unknown) {
@@ -416,9 +433,13 @@ export function EmployerDirectoryCompanyEditSection({
       if (err.status === 403) {
         toast.error("You are not allowed to update this company.");
       } else if (err.status === 404) {
-        toast.error("Company not found. If you renamed it elsewhere, refresh the list.");
+        toast.error(
+          "Company not found. If you renamed it elsewhere, refresh the list.",
+        );
       } else if (err.status === 400) {
-        toast.error(err.message || "Validation failed. Check the fields below.");
+        toast.error(
+          err.message || "Validation failed. Check the fields below.",
+        );
       } else {
         toast.error(err.message || "Could not save.");
       }
@@ -429,7 +450,9 @@ export function EmployerDirectoryCompanyEditSection({
 
   if (companiesLoading) {
     return (
-      <p className="text-sm text-muted-foreground">Loading directory company…</p>
+      <p className="text-sm text-muted-foreground">
+        Loading directory company…
+      </p>
     );
   }
 
@@ -439,11 +462,6 @@ export function EmployerDirectoryCompanyEditSection({
 
   return (
     <div className="rounded-2xl border border-border/60 p-4 bg-muted/20 space-y-4">
-      <p className="text-xs text-muted-foreground">
-        Edits apply to the job directory only (not your Breneo account). Staff membership
-        is managed separately.
-      </p>
-
       {companies.length > 1 ? (
         <div className="space-y-2">
           <Label>Directory company</Label>
@@ -476,19 +494,6 @@ export function EmployerDirectoryCompanyEditSection({
         <p className="text-sm text-muted-foreground">Loading company…</p>
       ) : (
         <>
-          {companyNumericId != null ? (
-            <p className="text-xs text-muted-foreground">
-              Directory id:{" "}
-              <span className="font-mono text-foreground">{companyNumericId}</span>
-              {jobCount != null && Number.isFinite(jobCount) ? (
-                <>
-                  {" "}
-                  · {jobCount} job{jobCount === 1 ? "" : "s"} listed
-                </>
-              ) : null}
-            </p>
-          ) : null}
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="agg-name">Company name</Label>
@@ -496,15 +501,90 @@ export function EmployerDirectoryCompanyEditSection({
                 id="agg-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                disabled={saving}
-                aria-invalid={Boolean(fieldMessage.name)}
+                disabled
               />
-              {fieldMessage.name ? (
-                <p className="text-xs text-destructive">{fieldMessage.name}</p>
+              <p className="text-xs text-muted-foreground">
+                Company name is read-only here. API routes use the numeric
+                company id above.
+              </p>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="agg-logo-upload">Profile picture</Label>
+              <input
+                ref={logoFileInputRef}
+                id="agg-logo-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={saving}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 10 * 1024 * 1024) {
+                    toast.error("Image size must be less than 10MB.");
+                    if (logoFileInputRef.current)
+                      logoFileInputRef.current.value = "";
+                    return;
+                  }
+                  const objUrl = URL.createObjectURL(file);
+                  if (logoPreviewUrl?.startsWith("blob:"))
+                    URL.revokeObjectURL(logoPreviewUrl);
+                  setLogoPreviewUrl(objUrl);
+                  setLogoFile(file);
+                  setLogoFileName(file.name);
+                }}
+              />
+              {logoPreviewUrl || logo ? (
+                <div className="space-y-2">
+                  <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-muted">
+                    <img
+                      src={logoPreviewUrl || logo}
+                      alt="Company logo preview"
+                      className="h-full w-full object-cover"
+                    />
+                    {logoPreviewUrl ? (
+                      <button
+                        type="button"
+                        onClick={clearSelectedLogo}
+                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70"
+                        aria-label="Remove selected logo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    disabled={saving}
+                  >
+                    {logoPreviewUrl ? "Change photo" : "Upload photo"}
+                  </Button>
+                  {logoFileName ? (
+                    <p className="text-xs text-muted-foreground">
+                      Selected file: {logoFileName}. It will be uploaded and
+                      saved with the other changes.
+                    </p>
+                  ) : null}
+                </div>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  API routes use the numeric company id above; the name is the display label on the directory.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => logoFileInputRef.current?.click()}
+                  disabled={saving}
+                  className="flex h-32 w-32 shrink-0 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-transparent px-2 text-gray-500 transition hover:border-breneo-blue disabled:opacity-60 disabled:cursor-not-allowed dark:border-[#444444]"
+                >
+                  <UploadCloud className="h-8 w-8 text-gray-400" />
+                  <span className="text-sm font-medium text-breneo-blue">
+                    Upload photo
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    PNG, JPG up to 10MB
+                  </span>
+                </button>
               )}
             </div>
             <div className="space-y-2">
@@ -517,51 +597,8 @@ export function EmployerDirectoryCompanyEditSection({
                 aria-invalid={Boolean(fieldMessage.domain)}
               />
               {fieldMessage.domain ? (
-                <p className="text-xs text-destructive">{fieldMessage.domain}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agg-platform">Platform (e.g. ATS)</Label>
-              <Input
-                id="agg-platform"
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                disabled={saving}
-                aria-invalid={Boolean(fieldMessage.platform)}
-              />
-              {fieldMessage.platform ? (
-                <p className="text-xs text-destructive">{fieldMessage.platform}</p>
-              ) : null}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="agg-logo-upload">Profile picture</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="agg-logo-upload"
-                  type="file"
-                  accept="image/*"
-                  disabled={saving}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const objUrl = URL.createObjectURL(file);
-                    if (logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl);
-                    setLogoPreviewUrl(objUrl);
-                    setLogoFile(file);
-                    setLogoFileName(file.name);
-                  }}
-                />
-              </div>
-              {logoPreviewUrl || logo ? (
-                <img
-                  src={logoPreviewUrl || logo}
-                  alt="Company logo preview"
-                  className="h-14 w-14 rounded-lg object-cover border border-border/60"
-                />
-              ) : null}
-              {logoFileName ? (
-                <p className="text-xs text-muted-foreground">
-                  Selected file: {logoFileName}. It will be uploaded and saved with the other changes.
+                <p className="text-xs text-destructive">
+                  {fieldMessage.domain}
                 </p>
               ) : null}
             </div>
@@ -576,7 +613,9 @@ export function EmployerDirectoryCompanyEditSection({
                 aria-invalid={Boolean(fieldMessage.description)}
               />
               {fieldMessage.description ? (
-                <p className="text-xs text-destructive">{fieldMessage.description}</p>
+                <p className="text-xs text-destructive">
+                  {fieldMessage.description}
+                </p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -590,7 +629,9 @@ export function EmployerDirectoryCompanyEditSection({
                 aria-invalid={Boolean(fieldMessage.website)}
               />
               {fieldMessage.website ? (
-                <p className="text-xs text-destructive">{fieldMessage.website}</p>
+                <p className="text-xs text-destructive">
+                  {fieldMessage.website}
+                </p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -604,7 +645,9 @@ export function EmployerDirectoryCompanyEditSection({
                 aria-invalid={Boolean(fieldMessage.company_email)}
               />
               {fieldMessage.company_email ? (
-                <p className="text-xs text-destructive">{fieldMessage.company_email}</p>
+                <p className="text-xs text-destructive">
+                  {fieldMessage.company_email}
+                </p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -618,7 +661,9 @@ export function EmployerDirectoryCompanyEditSection({
                 aria-invalid={Boolean(fieldMessage.founded_date)}
               />
               {fieldMessage.founded_date ? (
-                <p className="text-xs text-destructive">{fieldMessage.founded_date}</p>
+                <p className="text-xs text-destructive">
+                  {fieldMessage.founded_date}
+                </p>
               ) : null}
             </div>
             <div className="space-y-2">
@@ -638,7 +683,9 @@ export function EmployerDirectoryCompanyEditSection({
                 ))}
               </datalist>
               {fieldMessage.employees_count ? (
-                <p className="text-xs text-destructive">{fieldMessage.employees_count}</p>
+                <p className="text-xs text-destructive">
+                  {fieldMessage.employees_count}
+                </p>
               ) : null}
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -654,33 +701,11 @@ export function EmployerDirectoryCompanyEditSection({
                   fieldMessage.social_links || fieldMessage.linkedin,
                 )}
               />
-              {(fieldMessage.social_links || fieldMessage.linkedin) ? (
+              {fieldMessage.social_links || fieldMessage.linkedin ? (
                 <p className="text-xs text-destructive">
                   {fieldMessage.social_links || fieldMessage.linkedin}
                 </p>
               ) : null}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="agg-extra">Additional details (JSON object)</Label>
-              <Textarea
-                id="agg-extra"
-                value={additionalDetailsText}
-                onChange={(e) => setAdditionalDetailsText(e.target.value)}
-                disabled={saving}
-                rows={4}
-                className="font-mono text-sm"
-                placeholder="{}"
-                aria-invalid={Boolean(fieldMessage.additional_details)}
-              />
-              {fieldMessage.additional_details ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.additional_details}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Optional structured data; leave empty or use valid JSON.
-                </p>
-              )}
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label>Industries</Label>
@@ -694,9 +719,11 @@ export function EmployerDirectoryCompanyEditSection({
                   value={industryIds}
                   onChange={setIndustryIds}
                   disabled={saving}
+                  searchInputClassName="md:max-w-[260px]"
+                  chipClassName="min-h-10 px-3 text-sm"
                 />
               )}
-              {(fieldMessage.industry_ids || fieldMessage.industry_names) ? (
+              {fieldMessage.industry_ids || fieldMessage.industry_names ? (
                 <p className="text-xs text-destructive">
                   {fieldMessage.industry_ids || fieldMessage.industry_names}
                 </p>
@@ -705,7 +732,9 @@ export function EmployerDirectoryCompanyEditSection({
           </div>
 
           {fieldMessage.non_field_errors ? (
-            <p className="text-sm text-destructive">{fieldMessage.non_field_errors}</p>
+            <p className="text-sm text-destructive">
+              {fieldMessage.non_field_errors}
+            </p>
           ) : null}
 
           <Button onClick={handleSave} disabled={saving || detailLoading}>

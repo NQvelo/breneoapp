@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
@@ -32,14 +31,13 @@ import { IndustryMultiSelect } from "@/components/employer/IndustryMultiSelect";
 import { EmployerCompanySearchField } from "@/components/employer/EmployerCompanySearchField";
 import { EmployerDirectoryCompanyEditSection } from "@/components/employer/EmployerDirectoryCompanyEditSection";
 import {
-  Edit,
-  LogOut,
   Mail,
   Globe,
   Phone,
   Camera,
   Building2,
   User,
+  Settings,
 } from "lucide-react";
 import {
   extractBreneoEmailFromJwt,
@@ -71,12 +69,10 @@ const EMP_AGG_EMPLOYEE_OPTIONS = [
 export default function EmployerProfilePage() {
   const {
     user,
-    logout,
     loading: authLoading,
     updateUser,
     updateEmployerDisplay,
   } = useAuth();
-  const navigate = useNavigate();
   const [profile, setProfile] = useState<NormalizedEmployerProfile | null>(
     null,
   );
@@ -100,9 +96,8 @@ export default function EmployerProfilePage() {
   const [aggregatorLoading, setAggregatorLoading] = useState(false);
   const [companyPickerOpen, setCompanyPickerOpen] = useState(false);
   const [pickerSaving, setPickerSaving] = useState(false);
-  const [pickerSelected, setPickerSelected] = useState<AggregatorCompany | null>(
-    null,
-  );
+  const [pickerSelected, setPickerSelected] =
+    useState<AggregatorCompany | null>(null);
   const [pickerName, setPickerName] = useState("");
   const [pickerDomain, setPickerDomain] = useState("");
   const [pickerLogoUrl, setPickerLogoUrl] = useState("");
@@ -158,7 +153,8 @@ export default function EmployerProfilePage() {
       try {
         const prof = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
         const staffId =
-          extractBreneoUserIdFromEmployerProfileRaw(prof.data) || String(user.id);
+          extractBreneoUserIdFromEmployerProfileRaw(prof.data) ||
+          String(user.id);
         setBreneoStaffUserId(staffId);
         const list = await fetchEmployerAggregatorCompanies(staffId);
         setAggregatorCompanies(list);
@@ -304,7 +300,10 @@ export default function EmployerProfilePage() {
 
     const emailNorm = email.trim().toLowerCase();
     const domainFromEmail = emailNorm.includes("@")
-      ? emailNorm.slice(emailNorm.indexOf("@") + 1).trim().toLowerCase()
+      ? emailNorm
+          .slice(emailNorm.indexOf("@") + 1)
+          .trim()
+          .toLowerCase()
       : "";
 
     const industryNamesBySelectionOrder = pickerIndustryIds.map(
@@ -449,10 +448,7 @@ export default function EmployerProfilePage() {
   };
 
   const avatarDisplaySrc =
-    logoPreview ||
-    profile?.logo_url ||
-    user?.profile_image ||
-    undefined;
+    logoPreview || profile?.logo_url || user?.profile_image || undefined;
 
   const accountFirstName =
     profile?.first_name?.trim() || user?.first_name?.trim() || "";
@@ -468,18 +464,12 @@ export default function EmployerProfilePage() {
     user?.email ||
     "Company";
   const avatarFallback = displayName.charAt(0).toUpperCase() || "C";
-  const personAvatarFallback =
-    personDisplayName.charAt(0).toUpperCase() || "U";
+  const personAvatarFallback = personDisplayName.charAt(0).toUpperCase() || "U";
   const websiteRaw = profile?.website?.trim() ?? "";
   const websiteHref =
     websiteRaw && !/^https?:\/\//i.test(websiteRaw)
       ? `https://${websiteRaw}`
       : websiteRaw;
-
-  const handleSignOut = () => {
-    logout();
-    navigate("/");
-  };
 
   if (authLoading || loading) {
     return (
@@ -498,84 +488,24 @@ export default function EmployerProfilePage() {
     <DashboardLayout>
       <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
         <Card className="border-0 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              Your account
-            </h3>
-            <div className="flex items-center gap-1">
+          <CardHeader className="p-4 pb-3 border-b-0">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground min-w-0">
+              <User className="h-4 w-4 shrink-0" />
+              <span className="truncate flex-1">
+                Signed in as{" "}
+                <span className="text-foreground">{personDisplayName}</span>
+              </span>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={handleSignOut}
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
+                className="h-9 w-9 rounded-full ml-auto"
                 onClick={() => setIsEditing(true)}
-                aria-label="Edit company profile"
+                aria-label="Account settings"
               >
-                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="px-6 pb-6">
-            <div className="flex flex-row items-start gap-4">
-              <div className="flex-shrink-0">
-                <OptimizedAvatar
-                  src={user?.profile_image ?? undefined}
-                  alt="Profile"
-                  fallback={personAvatarFallback}
-                  size="lg"
-                  loading="eager"
-                  className="rounded-full"
-                />
-              </div>
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  Signed in as
-                </div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                  {personDisplayName}
-                </h1>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      First name
-                    </p>
-                    <p className="text-sm text-foreground mt-0.5">
-                      {accountFirstName || "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Last name
-                    </p>
-                    <p className="text-sm text-foreground mt-0.5">
-                      {accountLastName || "—"}
-                    </p>
-                  </div>
-                </div>
-                {user?.email ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm">
-                    <Mail className="h-4 w-4 text-gray-500" />
-                    {user.email}
-                  </span>
-                ) : null}
-                {(profile?.phone_number || user?.phone_number) ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm">
-                    <Phone className="h-4 w-4 text-gray-500" />
-                    {profile?.phone_number || user?.phone_number}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </CardContent>
         </Card>
 
         <Card className="border-0 rounded-3xl">
@@ -583,10 +513,6 @@ export default function EmployerProfilePage() {
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               Company
             </h3>
-            <p className="text-sm text-muted-foreground font-normal">
-              Job directory profile (Breneo job aggregator). This links your user to
-              your organization for public job listings.
-            </p>
           </CardHeader>
           <CardContent className="px-6 pb-6 space-y-4">
             {aggregatorLoading ? (
@@ -597,7 +523,9 @@ export default function EmployerProfilePage() {
                 companiesLoading={aggregatorLoading}
                 industryCatalog={industryCatalog}
                 breneoUserId={breneoStaffUserId}
-                onDirectoryUpdated={() => loadAggregatorCompanies({ quiet: true })}
+                onDirectoryUpdated={() =>
+                  loadAggregatorCompanies({ quiet: true })
+                }
               />
             ) : (
               <div className="space-y-3">
@@ -615,62 +543,6 @@ export default function EmployerProfilePage() {
                 </Button>
               </div>
             )}
-
-            <div className="rounded-2xl border border-dashed border-border/60 p-4 bg-muted/10">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                <Building2 className="h-4 w-4" />
-                Breneo profile (edit logo & details)
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Company name, description, and logo for your main Breneo profile. Use
-                Edit above or here to update.
-              </p>
-              <div className="flex flex-row items-center gap-4">
-                <button
-                  type="button"
-                  className="relative group cursor-pointer rounded-full overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <OptimizedAvatar
-                    key={`emp-avatar-${imageTimestamp}`}
-                    src={avatarDisplaySrc}
-                    alt="Company logo"
-                    fallback={avatarFallback}
-                    size="lg"
-                    loading="eager"
-                    className="rounded-full"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                  </div>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                />
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{displayName}</p>
-                  {websiteHref ? (
-                    <a
-                      href={websiteHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline truncate block"
-                    >
-                      {websiteRaw}
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-              {profile?.description ? (
-                <p className="text-sm mt-3 text-muted-foreground line-clamp-3">
-                  {profile.description}
-                </p>
-              ) : null}
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -845,7 +717,10 @@ export default function EmployerProfilePage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCompanyDirectorySubmit} disabled={pickerSaving}>
+            <Button
+              onClick={handleCompanyDirectorySubmit}
+              disabled={pickerSaving}
+            >
               {pickerSaving ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>

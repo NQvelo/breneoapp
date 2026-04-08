@@ -29,6 +29,7 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
+  extractBreneoUserIdFromEmployerProfileRaw,
   normalizeEmployerProfile,
   type NormalizedEmployerProfile,
 } from "@/api/employer/profile";
@@ -47,7 +48,10 @@ import {
 import { getEmployerJobsApiDebugInfo } from "@/api/employer/employerJobsApiBase";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
+import {
+  fetchEmployerAggregatorCompanies,
+  resolveEmployerJobsCompanyFilter,
+} from "@/api/employer/aggregatorBffApi";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -102,6 +106,8 @@ export default function EmployerAddJobPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [headerCompanyName, setHeaderCompanyName] = useState("");
+  const [headerCompanyLogo, setHeaderCompanyLogo] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -147,13 +153,46 @@ export default function EmployerAddJobPage() {
             ? String((profileObj.company as Record<string, unknown>).id)
             : "";
       const companyName = n?.company_name || "";
-      const { companyId: resolvedCompanyId, companyName: resolvedCompanyName } =
+      const {
+        companyId: resolvedCompanyId,
+        companyName: resolvedCompanyName,
+        linkedDirectoryCompanyName,
+      } =
         await resolveEmployerJobsCompanyFilter({
           breneoUserId: user?.id,
           employerProfileRaw: res.data,
           profileCompanyId: companyId,
           profileCompanyName: companyName,
         });
+      setHeaderCompanyName(
+        linkedDirectoryCompanyName?.trim() ||
+          resolvedCompanyName?.trim() ||
+          companyName.trim(),
+      );
+      const staffUserId =
+        extractBreneoUserIdFromEmployerProfileRaw(res.data) ||
+        String(user?.id ?? "").trim();
+      if (staffUserId) {
+        try {
+          const companies = await fetchEmployerAggregatorCompanies(staffUserId);
+          const matched =
+            companies.find(
+              (c) =>
+                c?.id != null &&
+                String(c.id).trim() === String(resolvedCompanyId).trim(),
+            ) || companies[0];
+          const logo =
+            matched?.logo != null ? String(matched.logo).trim() : "";
+          setHeaderCompanyLogo(logo || null);
+          if (!linkedDirectoryCompanyName?.trim()) {
+            const name =
+              matched?.name != null ? String(matched.name).trim() : "";
+            if (name) setHeaderCompanyName(name);
+          }
+        } catch {
+          setHeaderCompanyLogo(null);
+        }
+      }
       if (isEdit && jobId) {
         let job;
         try {
@@ -406,7 +445,10 @@ export default function EmployerAddJobPage() {
   };
 
   const companyName =
-    profile?.company_name?.trim() || user?.email || "Company";
+    headerCompanyName.trim() ||
+    profile?.company_name?.trim() ||
+    user?.email ||
+    "Company";
 
   if (loading) {
     return (
@@ -440,7 +482,7 @@ export default function EmployerAddJobPage() {
           <CardContent className="p-6 sm:p-8 space-y-6">
             <div className="flex items-center gap-3 pb-2 border-b border-border/60">
               <OptimizedAvatar
-                src={profile?.logo_url || undefined}
+                src={headerCompanyLogo || profile?.logo_url || undefined}
                 alt={companyName}
                 fallback={companyName.charAt(0).toUpperCase()}
                 size="sm"

@@ -34,6 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 
+const EMPLOYER_SIDEBAR_CACHE_KEY = "employerSidebarIdentity";
+
 interface AppSidebarProps {
   collapsed: boolean;
   toggleSidebar: () => void;
@@ -53,11 +55,38 @@ export function AppSidebar({
   const { language, setLanguage } = useLanguage();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
-  const [employerMemberName, setEmployerMemberName] = React.useState("");
+  const readEmployerCache = React.useCallback(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.sessionStorage.getItem(EMPLOYER_SIDEBAR_CACHE_KEY);
+      if (!raw) return null;
+      const o = JSON.parse(raw) as {
+        memberName?: unknown;
+        logo?: unknown;
+        email?: unknown;
+      };
+      return {
+        memberName:
+          typeof o.memberName === "string" ? o.memberName.trim() : "",
+        logo: typeof o.logo === "string" ? o.logo.trim() : "",
+        email: typeof o.email === "string" ? o.email.trim() : "",
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+  const [employerMemberName, setEmployerMemberName] = React.useState(() => {
+    return readEmployerCache()?.memberName ?? "";
+  });
   const [employerProfileLogo, setEmployerProfileLogo] = React.useState<
     string | null
-  >(null);
-  const [employerProfileEmail, setEmployerProfileEmail] = React.useState("");
+  >(() => {
+    const logo = readEmployerCache()?.logo ?? "";
+    return logo || null;
+  });
+  const [employerProfileEmail, setEmployerProfileEmail] = React.useState(() => {
+    return readEmployerCache()?.email ?? "";
+  });
 
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
@@ -100,6 +129,16 @@ export function AppSidebar({
           setEmployerMemberName(full);
           setEmployerProfileLogo(n.logo_url || null);
           setEmployerProfileEmail((n.email || "").trim());
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem(
+              EMPLOYER_SIDEBAR_CACHE_KEY,
+              JSON.stringify({
+                memberName: full,
+                logo: n.logo_url || "",
+                email: (n.email || "").trim(),
+              }),
+            );
+          }
         }
         const extId =
           extractBreneoUserIdFromEmployerProfileRaw(res.data) ||
@@ -114,6 +153,17 @@ export function AppSidebar({
               : "";
           if (logoFromCompany) {
             setEmployerProfileLogo(logoFromCompany);
+            if (typeof window !== "undefined") {
+              const current = readEmployerCache();
+              window.sessionStorage.setItem(
+                EMPLOYER_SIDEBAR_CACHE_KEY,
+                JSON.stringify({
+                  memberName: current?.memberName || employerMemberName || "",
+                  logo: logoFromCompany,
+                  email: current?.email || employerProfileEmail || "",
+                }),
+              );
+            }
           }
         }
       } catch {
@@ -127,7 +177,7 @@ export function AppSidebar({
     return () => {
       cancelled = true;
     };
-  }, [isEmployer, user?.id, user?.email]);
+  }, [isEmployer, user?.id, user?.email, readEmployerCache, employerMemberName, employerProfileEmail]);
 
   // ⛔ Removed old useState and useEffect for localStorage
 
