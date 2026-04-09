@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ChevronsUpDown } from "lucide-react";
 import { CountrySelectorModal } from "./CountrySelectorModal";
 import { Country, countries } from "@/data/countries";
@@ -29,7 +30,7 @@ export const CountrySelector: React.FC<CountrySelectorProps> = ({
         variant="outline"
         role="combobox"
         aria-expanded={isOpen}
-        className={`justify-between shrink-0 ${className}`}
+        className={cn("justify-between sm:shrink-0", className)}
         onClick={() => setIsOpen(true)}
       >
         {selectedCountry ? (

@@ -45,9 +45,16 @@ export default function EmployerMembersPage() {
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [companies, setCompanies] = useState<AggregatorCompany[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
-  const [memberships, setMemberships] = useState<AggregatorStaffMembership[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
+    null,
+  );
+  const [memberships, setMemberships] = useState<AggregatorStaffMembership[]>(
+    [],
+  );
   const [breneoUserId, setBreneoUserId] = useState("");
+  const [memberNamesByUserId, setMemberNamesByUserId] = useState<
+    Record<string, string>
+  >({});
 
   const resolveBreneoUserId = useCallback(async (): Promise<string> => {
     const token = TokenManager.getAccessToken();
@@ -62,7 +69,8 @@ export default function EmployerMembersPage() {
       const fromJwt = extractBreneoUserIdFromJwt(token);
       if (fromJwt?.trim()) return fromJwt.trim();
     }
-    if (user?.id != null && String(user.id).trim() !== "") return String(user.id).trim();
+    if (user?.id != null && String(user.id).trim() !== "")
+      return String(user.id).trim();
     return "";
   }, [user?.id]);
 
@@ -83,7 +91,10 @@ export default function EmployerMembersPage() {
         const list = await fetchEmployerAggregatorCompanies(uid);
         if (cancelled) return;
         setCompanies(list);
-        const firstPk = list.map((c) => parseAggregatorCompanyPk(c.id)).find((x) => x != null) ?? null;
+        const firstPk =
+          list
+            .map((c) => parseAggregatorCompanyPk(c.id))
+            .find((x) => x != null) ?? null;
         setSelectedCompanyId(firstPk);
       } catch (e) {
         if (!cancelled) {
@@ -132,9 +143,76 @@ export default function EmployerMembersPage() {
     };
   }, [selectedCompanyId]);
 
+  const resolveMemberNameByUserId = useCallback(
+    async (externalUserId: string): Promise<string> => {
+      const id = externalUserId.trim();
+      if (!id) return "";
+      const candidateEndpoints = [
+        `/api/users/${encodeURIComponent(id)}/`,
+        `/api/profile/${encodeURIComponent(id)}/`,
+        `/api/profile/?user_id=${encodeURIComponent(id)}`,
+      ];
+      for (const endpoint of candidateEndpoints) {
+        try {
+          const res = await apiClient.get(endpoint);
+          const raw =
+            res?.data && typeof res.data === "object"
+              ? (res.data as Record<string, unknown>)
+              : null;
+          if (!raw) continue;
+          const first = readStr(raw.first_name);
+          const last = readStr(raw.last_name);
+          const full = [first, last].filter(Boolean).join(" ").trim();
+          if (full) return full;
+        } catch {
+          // Try next candidate endpoint.
+        }
+      }
+      return "";
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (memberships.length === 0) return;
+    const uniqueIds = Array.from(
+      new Set(
+        memberships
+          .map((m) => readStr(m.external_user_id))
+          .filter((id) => id.length > 0),
+      ),
+    );
+    const unresolved = uniqueIds.filter(
+      (id) => memberNamesByUserId[id] == null,
+    );
+    if (unresolved.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const resolvedEntries = await Promise.all(
+        unresolved.map(async (id) => {
+          const name = await resolveMemberNameByUserId(id);
+          return [id, name] as const;
+        }),
+      );
+      if (cancelled) return;
+      setMemberNamesByUserId((prev) => {
+        const next = { ...prev };
+        for (const [id, name] of resolvedEntries) {
+          next[id] = name;
+        }
+        return next;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [memberships, memberNamesByUserId, resolveMemberNameByUserId]);
+
   const selectedCompanyName = useMemo(() => {
     if (selectedCompanyId == null) return "";
-    const row = companies.find((c) => parseAggregatorCompanyPk(c.id) === selectedCompanyId);
+    const row = companies.find(
+      (c) => parseAggregatorCompanyPk(c.id) === selectedCompanyId,
+    );
     return readStr(row?.name) || `Company ${selectedCompanyId}`;
   }, [companies, selectedCompanyId]);
 
@@ -150,14 +228,17 @@ export default function EmployerMembersPage() {
                   Company members
                 </h1>
                 <p className="text-sm text-muted-foreground font-normal mt-1">
-                  Members are read from staff memberships for the selected company.
+                  Members are read from staff memberships for the selected
+                  company.
                 </p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="px-6 pb-6 space-y-4">
             {loadingCompanies ? (
-              <p className="text-sm text-muted-foreground">Loading companies…</p>
+              <p className="text-sm text-muted-foreground">
+                Loading companies…
+              </p>
             ) : companies.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No linked company found for this account.
@@ -166,7 +247,9 @@ export default function EmployerMembersPage() {
               <div className="space-y-2">
                 <Label>Company</Label>
                 <Select
-                  value={selectedCompanyId != null ? String(selectedCompanyId) : ""}
+                  value={
+                    selectedCompanyId != null ? String(selectedCompanyId) : ""
+                  }
                   onValueChange={(v) => {
                     const n = Number(v);
                     if (Number.isInteger(n) && n > 0) setSelectedCompanyId(n);
@@ -195,11 +278,17 @@ export default function EmployerMembersPage() {
 
             {selectedCompanyId != null ? (
               <p className="text-xs text-muted-foreground">
-                Showing memberships for <span className="font-medium text-foreground">{selectedCompanyName}</span>{" "}
-                (company_id <span className="font-mono">{selectedCompanyId}</span>)
+                Showing memberships for{" "}
+                <span className="font-medium text-foreground">
+                  {selectedCompanyName}
+                </span>{" "}
+                (company_id{" "}
+                <span className="font-mono">{selectedCompanyId}</span>)
                 {breneoUserId ? (
                   <>
-                    {" "}· current user_id <span className="font-mono">{breneoUserId}</span>
+                    {" "}
+                    · current user_id{" "}
+                    <span className="font-mono">{breneoUserId}</span>
                   </>
                 ) : null}
               </p>
@@ -219,12 +308,17 @@ export default function EmployerMembersPage() {
                     className="rounded-xl border border-border/60 p-3 bg-muted/20"
                   >
                     <p className="text-sm">
-                      <span className="text-muted-foreground">User id:</span>{" "}
-                      <span className="font-mono">{m.external_user_id}</span>
+                      <span className="text-muted-foreground">Member:</span>{" "}
+                      <span className="font-medium">
+                        {memberNamesByUserId[readStr(m.external_user_id)] ||
+                          "Unknown member"}
+                      </span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      membership_id {m.id} · created {formatDate(m.created_at)} · updated{" "}
-                      {formatDate(m.updated_at)}
+                      user_id{" "}
+                      <span className="font-mono">{m.external_user_id}</span> ·{" "}
+                      membership_id {m.id} · created {formatDate(m.created_at)}{" "}
+                      · updated {formatDate(m.updated_at)}
                     </p>
                   </div>
                 ))}
@@ -236,4 +330,3 @@ export default function EmployerMembersPage() {
     </DashboardLayout>
   );
 }
-

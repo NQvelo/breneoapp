@@ -90,7 +90,9 @@ export function IndustryMultiSelect({
               chipClassName,
             )}
           >
-            <span className="max-w-[200px] truncate">{ind.name}</span>
+            <span className="max-w-full truncate sm:max-w-[200px]">
+              {ind.name}
+            </span>
             <button
               type="button"
               disabled={disabled}
@@ -118,7 +120,7 @@ export function IndustryMultiSelect({
             Add
           </button>
         ) : (
-          <div className="relative w-full md:max-w-[320px]">
+          <div className="relative w-full min-w-0 max-w-full sm:max-w-[320px]">
             <Input
               ref={inputRef}
               value={query}

@@ -92,7 +92,6 @@ import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import { getMatchQualityLabel, extractJobSkills } from "@/utils/jobMatchUtils";
-import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 
 // Updated Job interface for the new API
 interface Job {
@@ -2461,70 +2460,6 @@ const JobsPage = () => {
     return transformedRemoteJobs; // Return all remote jobs
   }, [transformedRemoteJobs]);
 
-  // State to store fetched logos for all job types
-  const [jobLogos, setJobLogos] = useState<Record<string, string>>({});
-
-  // Fetch missing company logos from API for all job types
-  useEffect(() => {
-    const fetchMissingLogos = async () => {
-      // Combine all jobs that need logos (including top matched)
-      const allJobs = [
-        ...transformedJobs,
-        ...topMatchedJobs,
-        ...transformedInternshipJobs,
-        ...transformedRemoteJobs,
-      ];
-
-      const jobsNeedingLogos = allJobs.filter(
-        (job) => !job.company_logo && job.company_name,
-      );
-
-      if (jobsNeedingLogos.length === 0) return;
-
-      // Fetch logos for jobs without them
-      const logoPromises = jobsNeedingLogos.map(async (job) => {
-        const logo = await getCompanyLogo(job.company_name || "", undefined);
-        return { jobId: job.id, logo };
-      });
-
-      const logoResults = await Promise.all(logoPromises);
-      const newLogos: Record<string, string> = {};
-
-      logoResults.forEach(({ jobId, logo }) => {
-        if (logo) {
-          newLogos[jobId] = logo;
-        }
-      });
-
-      if (Object.keys(newLogos).length > 0) {
-        setJobLogos((prev) => ({ ...prev, ...newLogos }));
-      }
-    };
-
-    fetchMissingLogos();
-  }, [transformedJobs, topMatchedJobs, transformedInternshipJobs, transformedRemoteJobs]);
-
-  // Merge fetched logos into jobs
-  const regularJobsWithLogos = regularJobs.map((job) => ({
-    ...job,
-    company_logo: job.company_logo || jobLogos[job.id] || undefined,
-  }));
-
-  const topMatchedJobsWithLogos = topMatchedJobs.map((job) => ({
-    ...job,
-    company_logo: job.company_logo || jobLogos[job.id] || undefined,
-  }));
-
-  const internJobsWithLogos = internJobs.map((job) => ({
-    ...job,
-    company_logo: job.company_logo || jobLogos[job.id] || undefined,
-  }));
-
-  const remoteJobsWithLogos = remoteJobs.map((job) => ({
-    ...job,
-    company_logo: job.company_logo || jobLogos[job.id] || undefined,
-  }));
-
   // Debug logging
   useEffect(() => {
     console.log(
@@ -3045,7 +2980,7 @@ const JobsPage = () => {
               <h2 className="text-lg font-bold">Top Matched Jobs</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {topMatchedJobsWithLogos.map((job) => (
+              {topMatchedJobs.map((job) => (
                 <Card
                   key={job.id}
                   className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
@@ -3057,8 +2992,8 @@ const JobsPage = () => {
                 >
                   <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-shrink-0 relative w-10 h-10">
-                        {job.company_logo ? (
+                      {job.company_logo ? (
+                        <div className="flex-shrink-0 relative w-10 h-10">
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
@@ -3066,21 +3001,12 @@ const JobsPage = () => {
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = "none";
-                              const fallback = target.nextElementSibling as HTMLElement;
-                              if (fallback) fallback.style.display = "flex";
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
                             }}
                           />
-                        ) : null}
-                        <div
-                          className={`w-10 h-10 rounded-md bg-breneo-accent flex items-center justify-center ${
-                            job.company_logo ? "hidden absolute inset-0" : ""
-                          }`}
-                        >
-                          <Briefcase className="h-5 w-5 text-white" />
                         </div>
-                      </div>
+                      ) : null}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">
                           {job.company_name || job.company}
@@ -3160,7 +3086,7 @@ const JobsPage = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {regularJobsWithLogos.map((job) => (
+              {regularJobs.map((job) => (
                 <Card
                   key={job.id}
                   className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
@@ -3173,8 +3099,8 @@ const JobsPage = () => {
                   <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
                     {/* Company Logo and Info */}
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-shrink-0 relative w-10 h-10">
-                        {job.company_logo ? (
+                      {job.company_logo ? (
+                        <div className="flex-shrink-0 relative w-10 h-10">
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
@@ -3182,38 +3108,12 @@ const JobsPage = () => {
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              console.warn(
-                                "❌ Logo failed to load:",
-                                job.company_logo,
-                                target.src,
-                              );
-                              target.style.display = "none";
-                              const fallback =
-                                target.nextElementSibling as HTMLElement;
-                              if (fallback) {
-                                fallback.style.display = "flex";
-                              }
-                            }}
-                            onLoad={() => {
-                              // Logo loaded successfully
-                              if (process.env.NODE_ENV === "development") {
-                                console.log(
-                                  "✅ Logo loaded successfully:",
-                                  job.company_logo,
-                                );
-                              }
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
                             }}
                           />
-                        ) : null}
-                        <div
-                          className={`w-10 h-10 rounded-md bg-breneo-accent flex items-center justify-center ${
-                            job.company_logo ? "hidden absolute inset-0" : ""
-                          }`}
-                        >
-                          <Briefcase className="h-5 w-5 text-white" />
                         </div>
-                      </div>
+                      ) : null}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">
                           {job.company_name || job.company}
@@ -3322,7 +3222,7 @@ const JobsPage = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {remoteJobsWithLogos.map((job) => (
+              {remoteJobs.map((job) => (
                 <Card
                   key={job.id}
                   className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
@@ -3335,8 +3235,8 @@ const JobsPage = () => {
                   <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
                     {/* Company Logo and Info */}
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-shrink-0 relative w-10 h-10">
-                        {job.company_logo ? (
+                      {job.company_logo ? (
+                        <div className="flex-shrink-0 relative w-10 h-10">
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
@@ -3344,38 +3244,12 @@ const JobsPage = () => {
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              console.warn(
-                                "❌ Logo failed to load:",
-                                job.company_logo,
-                                target.src,
-                              );
-                              target.style.display = "none";
-                              const fallback =
-                                target.nextElementSibling as HTMLElement;
-                              if (fallback) {
-                                fallback.style.display = "flex";
-                              }
-                            }}
-                            onLoad={() => {
-                              // Logo loaded successfully
-                              if (process.env.NODE_ENV === "development") {
-                                console.log(
-                                  "✅ Logo loaded successfully:",
-                                  job.company_logo,
-                                );
-                              }
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
                             }}
                           />
-                        ) : null}
-                        <div
-                          className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center ${
-                            job.company_logo ? "hidden absolute inset-0" : ""
-                          }`}
-                        >
-                          <Briefcase className="h-5 w-5 text-white" />
                         </div>
-                      </div>
+                      ) : null}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-sm truncate">
                           {job.company_name || job.company}

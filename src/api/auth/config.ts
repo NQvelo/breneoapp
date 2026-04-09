@@ -5,12 +5,24 @@ function trimApiBase(raw: string): string {
 /**
  * Breneo product API (auth, users, sessions, employer profile on Breneo, academy, …).
  * Prefer `VITE_BRENEO_API_BASE_URL`; `VITE_API_BASE_URL` remains supported.
+ *
+ * In Vite dev, if `VITE_API_BASE_URL` points at a hostname that does not resolve
+ * (`net::ERR_NAME_NOT_RESOLVED`), set `VITE_DEV_SAME_ORIGIN_BRENEO_API=1` and
+ * restart — requests use same-origin `/api/...` so `vite.config` proxies to the
+ * configured backend (see `/api` → `breneo.onrender.com`).
  */
-export const BRENEO_API_BASE_URL = trimApiBase(
-  import.meta.env.VITE_BRENEO_API_BASE_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    "https://web-production-80ed8.up.railway.app",
-);
+function resolveBreneoApiBaseUrl(): string {
+  if (import.meta.env.DEV && import.meta.env.VITE_DEV_SAME_ORIGIN_BRENEO_API === "1") {
+    return "";
+  }
+  return trimApiBase(
+    import.meta.env.VITE_BRENEO_API_BASE_URL ||
+      import.meta.env.VITE_API_BASE_URL ||
+      "https://web-production-80ed8.up.railway.app",
+  );
+}
+
+export const BRENEO_API_BASE_URL = resolveBreneoApiBaseUrl();
 
 /**
  * Job aggregator (public jobs, search, v1, companies, industries, health/docs).

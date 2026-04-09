@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, EyeOff, ImageIcon } from "lucide-react";
+import { Eye, EyeOff, ImageIcon, X } from "lucide-react";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
@@ -19,8 +19,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { IndustryMultiSelect } from "@/components/employer/IndustryMultiSelect";
 import { EmployerCompanySearchField } from "@/components/employer/EmployerCompanySearchField";
 import {
+  aggregatorCompanyLogoUrl,
   buildAggregatorCompanyCreatePayload,
-  createEmployerDirectoryCompanyQuick,
   joinOrCreateEmployerAggregatorCompany,
   fetchAggregatorIndustries,
   type AggregatorCompany,
@@ -30,6 +30,10 @@ import {
   extractBreneoUserIdFromEmployerProfileRaw,
   extractBreneoUserIdFromJwt,
 } from "@/api/employer/profile";
+import {
+  fetchEmployerCompanyFromAggregator,
+  uploadEmployerCompanyLogoToAggregator,
+} from "@/api/employer/employerProfileApi";
 import {
   Select,
   SelectContent,
@@ -83,13 +87,13 @@ function buildEmployerRegisterBody(
 function workEmailDomain(email: string): string {
   const at = email.indexOf("@");
   if (at === -1) return "";
-  return email.slice(at + 1).trim().toLowerCase();
+  return email
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
 }
 
-function formatApiErrors(
-  data: unknown,
-  opts?: { status?: number },
-): string {
+function formatApiErrors(data: unknown, opts?: { status?: number }): string {
   if (data == null || typeof data === "string") {
     if (typeof data === "string" && data.trim()) return data.trim();
     return opts?.status
@@ -142,7 +146,8 @@ function formatApiErrors(
         else parts.push(`${key}: ${String(item)}`);
       }
     } else if (typeof v === "string") parts.push(`${key}: ${v}`);
-    else if (v && typeof v === "object") parts.push(`${key}: ${JSON.stringify(v)}`);
+    else if (v && typeof v === "object")
+      parts.push(`${key}: ${JSON.stringify(v)}`);
   }
   if (parts.length) return parts.join(" ");
 
@@ -184,12 +189,20 @@ const EmployerRegistrationPage = () => {
   const [selectedIndustryIds, setSelectedIndustryIds] = useState<number[]>([]);
   const [selectedDirectoryCompany, setSelectedDirectoryCompany] =
     useState<AggregatorCompany | null>(null);
+  const [selectedCreateNewCompanyName, setSelectedCreateNewCompanyName] =
+    useState("");
   const [showNewCompanyDetails, setShowNewCompanyDetails] = useState(false);
   const [companyDomain, setCompanyDomain] = useState("");
   const [companyLogoUrl, setCompanyLogoUrl] = useState("");
+  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(
+    null,
+  );
+  const companyLogoInputRef = useRef<HTMLInputElement>(null);
 
   const [industries, setIndustries] = useState<AggregatorIndustry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLogoUploading, setIsLogoUploading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
 
@@ -244,6 +257,14 @@ const EmployerRegistrationPage = () => {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (companyLogoPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(companyLogoPreview);
+      }
+    };
+  }, [companyLogoPreview]);
+
+  useEffect(() => {
     if (resendCooldown <= 0) return;
     const t = window.setInterval(() => {
       setResendCooldown((s) => (s <= 1 ? 0 : s - 1));
@@ -269,8 +290,7 @@ const EmployerRegistrationPage = () => {
           },
           { timeout: EMPLOYER_REGISTER_TIMEOUT_MS },
         );
-        const access =
-          loginRes.data?.access || loginRes.data?.token;
+        const access = loginRes.data?.access || loginRes.data?.token;
         const refreshTok =
           loginRes.data?.refresh || loginRes.data?.refresh_token;
         if (!cancelled && access) {
@@ -370,7 +390,10 @@ const EmployerRegistrationPage = () => {
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").trim();
+    const pastedData = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .trim();
     if (/^\d{6}$/.test(pastedData)) {
       setCode(pastedData.split(""));
       inputRefs.current[5]?.focus();
@@ -395,7 +418,12 @@ const EmployerRegistrationPage = () => {
 
     setIsResending(true);
     try {
-      const payload = buildEmployerRegisterBody(fn, ln, emailStored, passwordStored);
+      const payload = buildEmployerRegisterBody(
+        fn,
+        ln,
+        emailStored,
+        passwordStored,
+      );
       const res = await apiClient.post(
         API_ENDPOINTS.EMPLOYER.REGISTER,
         payload,
@@ -429,7 +457,9 @@ const EmployerRegistrationPage = () => {
     e.preventDefault();
     const emailStored = (
       sessionStorage.getItem("tempEmployerEmail") || email.trim()
-    ).trim().toLowerCase();
+    )
+      .trim()
+      .toLowerCase();
     const codeString = code.join("").replace(/\D/g, "");
     if (codeString.length !== 6) {
       toast.error("Enter the 6-digit code.");
@@ -466,8 +496,7 @@ const EmployerRegistrationPage = () => {
             },
             { timeout: EMPLOYER_REGISTER_TIMEOUT_MS },
           );
-          const access =
-            loginRes.data?.access || loginRes.data?.token;
+          const access = loginRes.data?.access || loginRes.data?.token;
           const refreshTok =
             loginRes.data?.refresh || loginRes.data?.refresh_token;
           if (access) {
@@ -492,67 +521,44 @@ const EmployerRegistrationPage = () => {
     }
   };
 
-  const handleQuickCreateFromSearch = useCallback(
-    async (name: string): Promise<AggregatorCompany> => {
-      const trim = name.trim();
-      if (!trim) {
-        throw new Error("Company name is required.");
-      }
-      const emailStored = sessionStorage.getItem("tempEmployerEmail");
-      const passwordStored = sessionStorage.getItem("tempEmployerPassword");
-      if (!emailStored || !passwordStored) {
-        toast.error("Session expired. Start registration again.");
-        navigate("/employer/register");
-        throw new Error("Session expired");
-      }
-      if (!industries.length) {
-        toast.error("Industries are still loading. Try again in a moment.");
-        throw new Error("Industries not loaded");
-      }
-      let token = TokenManager.getAccessToken();
-      if (!token) {
-        const loginRes = await apiClient.post(API_ENDPOINTS.EMPLOYER.LOGIN, {
-          email: emailStored,
-          password: passwordStored,
-        });
-        token = loginRes.data?.access || loginRes.data?.token;
-        const refresh =
-          loginRes.data?.refresh || loginRes.data?.refresh_token || "";
-        if (!token) {
-          toast.error("Could not sign you in. Try the login page.");
-          throw new Error("No token");
-        }
-        TokenManager.setTokens(token, refresh || "");
-        localStorage.setItem("userRole", "employer");
-      }
-      const profileRes = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
-      const breneoUserId =
-        extractBreneoUserIdFromEmployerProfileRaw(profileRes.data) ||
-        extractBreneoUserIdFromJwt(token);
-      if (!breneoUserId) {
-        toast.error("Could not resolve your user id.");
-        throw new Error("No user id");
-      }
-      try {
-        const company = await createEmployerDirectoryCompanyQuick({
-          name: trim,
-          companyEmail: emailStored.trim().toLowerCase(),
-          breneoUserId,
-          domain:
-            companyDomain.trim() || workEmailDomain(emailStored),
-          industriesCatalog: industries,
-        });
-        setShowNewCompanyDetails(true);
-        toast.success("Company created on the job directory.");
-        return company;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Could not create company.";
-        toast.error(msg);
-        throw e;
-      }
-    },
-    [industries, companyDomain, navigate],
-  );
+  const resetUploadedCompanyLogo = useCallback(() => {
+    if (companyLogoPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(companyLogoPreview);
+    }
+    setCompanyLogoFile(null);
+    setCompanyLogoPreview(null);
+    if (companyLogoInputRef.current) companyLogoInputRef.current.value = "";
+  }, [companyLogoPreview]);
+
+  const handleCompanyLogoFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (PNG, JPG, SVG, etc.).");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo image must be 5MB or smaller.");
+      e.target.value = "";
+      return;
+    }
+    if (companyLogoPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(companyLogoPreview);
+    }
+    setCompanyLogoFile(file);
+    setCompanyLogoPreview(URL.createObjectURL(file));
+    setCompanyLogoUrl("");
+  };
+
+  const handleCompanyLogoUrlInput = (value: string) => {
+    if (value.trim() && companyLogoFile) {
+      resetUploadedCompanyLogo();
+    }
+    setCompanyLogoUrl(value);
+  };
 
   const handleStep3Company = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,8 +566,12 @@ const EmployerRegistrationPage = () => {
       ? String(selectedDirectoryCompany.name ?? "").trim() || companyName.trim()
       : companyName.trim();
     if (!breneoCompanyName.trim()) {
+      toast.error("Company name is required.");
+      return;
+    }
+    if (!selectedDirectoryCompany && !showNewCompanyDetails) {
       toast.error(
-        "Company name is required.",
+        "Choose an existing company from the list or click Create new company.",
       );
       return;
     }
@@ -587,7 +597,8 @@ const EmployerRegistrationPage = () => {
       return;
     }
 
-    const phoneNumber = `${selectedCountry?.dial_code ?? ""}${phoneLocal}`.trim();
+    const phoneNumber =
+      `${selectedCountry?.dial_code ?? ""}${phoneLocal}`.trim();
 
     setIsLoading(true);
     try {
@@ -598,10 +609,8 @@ const EmployerRegistrationPage = () => {
           email: emailStored,
           password: passwordStored,
         });
-        token =
-          loginRes.data?.access || loginRes.data?.token;
-        refresh =
-          loginRes.data?.refresh || loginRes.data?.refresh_token || "";
+        token = loginRes.data?.access || loginRes.data?.token;
+        refresh = loginRes.data?.refresh || loginRes.data?.refresh_token || "";
         if (!token) {
           toast.error(
             "Could not sign you in. Please try logging in from the login page.",
@@ -650,14 +659,15 @@ const EmployerRegistrationPage = () => {
             industry_names: industryNamesBySelectionOrder,
           }
         : baseProfilePatch;
-      const patchRes = await apiClient.patch(
-        API_ENDPOINTS.EMPLOYER.PROFILE,
-        profilePatch,
-      );
+      await apiClient.patch(API_ENDPOINTS.EMPLOYER.PROFILE, profilePatch);
+
+      let directoryLogoUrl = companyLogoUrl.trim() || undefined;
 
       let aggregatorCompanyOk = false;
+      let aggregatorCompanyId: number | string | undefined;
       try {
         if (selectedDirectoryCompany?.id != null) {
+          aggregatorCompanyId = selectedDirectoryCompany.id;
           await joinOrCreateEmployerAggregatorCompany({
             breneoUserId,
             mode: "existing",
@@ -668,21 +678,81 @@ const EmployerRegistrationPage = () => {
           const aggregatorPayload = buildAggregatorCompanyCreatePayload({
             name: companyName.trim(),
             companyEmail: emailStored.trim().toLowerCase(),
-            domain:
-              companyDomain.trim() || workEmailDomain(emailStored),
+            domain: companyDomain.trim() || workEmailDomain(emailStored),
             description: description.trim(),
             website: website.trim(),
-            logoUrl: companyLogoUrl.trim() || undefined,
             employeesCount: numberOfEmployees,
             selectedIndustryIds,
             industriesCatalog: industries,
             industryNamesBySelectionOrder,
           });
-          await joinOrCreateEmployerAggregatorCompany({
+          const created = await joinOrCreateEmployerAggregatorCompany({
             breneoUserId,
             mode: "new",
             createPayload: aggregatorPayload,
           });
+          if (created && typeof created === "object" && "id" in created) {
+            aggregatorCompanyId = created.id as number | string | undefined;
+          }
+        }
+
+        if (showNewCompanyDetails && companyLogoFile) {
+          if (
+            aggregatorCompanyId == null ||
+            String(aggregatorCompanyId).trim() === ""
+          ) {
+            throw new Error(
+              "Company created, but no company id was returned for logo upload.",
+            );
+          }
+          setIsLogoUploading(true);
+          try {
+            const logoRes = await uploadEmployerCompanyLogoToAggregator({
+              companyId: aggregatorCompanyId,
+              externalUserId: breneoUserId,
+              file: companyLogoFile,
+            });
+            let logo = aggregatorCompanyLogoUrl(logoRes);
+            if (!logo) {
+              const refreshed = await fetchEmployerCompanyFromAggregator({
+                companyId: aggregatorCompanyId,
+                externalUserId: breneoUserId,
+              });
+              logo = aggregatorCompanyLogoUrl(refreshed);
+            }
+            if (logo) {
+              directoryLogoUrl = logo;
+            } else {
+              throw new Error(
+                "Logo upload completed, but logo_upload (and logo) were empty in the response.",
+              );
+            }
+          } catch (logoErr: unknown) {
+            const err = logoErr as Error & { status?: number };
+            const status = err.status;
+            if (status === 400 || status === 422) {
+              toast.error(`Logo validation failed: ${err.message}`);
+            } else if (status === 403) {
+              toast.error(
+                "Logo upload denied (invalid or missing employer key).",
+              );
+            } else if (status === 404) {
+              toast.error(
+                "Logo upload target company was not found or not accessible for this user.",
+              );
+            } else if (status === 503) {
+              toast.error(
+                "Temporary upload failure (503). Please retry logo upload.",
+              );
+            } else {
+              toast.error(
+                `Logo upload failed${status != null ? ` (${status})` : ""}: ${err.message || "Upload failed."}`,
+              );
+            }
+            throw err;
+          } finally {
+            setIsLogoUploading(false);
+          }
         }
         aggregatorCompanyOk = true;
       } catch (aggErr: unknown) {
@@ -724,7 +794,7 @@ const EmployerRegistrationPage = () => {
   const progressPct = step === 1 ? "33%" : step === 2 ? "66%" : "100%";
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col overflow-x-hidden bg-background">
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
           {!logoLoaded && !imageError && (
@@ -746,10 +816,10 @@ const EmployerRegistrationPage = () => {
         <ThemeToggle />
       </div>
 
-      <div className="flex flex-1">
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-          <div className="w-full max-w-md">
-            <div className="mb-4 hidden lg:flex items-center justify-between">
+      <div className="flex min-w-0 flex-1">
+        <div className="flex w-full items-center justify-center bg-background p-8 lg:w-1/2">
+          <div className="w-full min-w-0 max-w-md">
+            <div className="mb-8 hidden lg:flex items-center justify-between">
               <BreneoLogo
                 className={`h-8 transition-opacity duration-300 ${
                   logoLoaded ? "opacity-100" : "opacity-0"
@@ -770,10 +840,10 @@ const EmployerRegistrationPage = () => {
               />
             </div>
 
-            <h1 className="text-2xl font-semibold text-foreground mb-1">
+            <h1 className="mb-2 text-3xl font-semibold text-foreground">
               Employer registration
             </h1>
-            <p className="text-muted-foreground mb-6 text-sm">
+            <p className="mb-8 text-muted-foreground">
               Step {step} of 3 —{" "}
               {step === 1
                 ? "Your details & sign up"
@@ -783,15 +853,15 @@ const EmployerRegistrationPage = () => {
             </p>
 
             {step === 1 && (
-              <form onSubmit={handleStep1} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <form onSubmit={handleStep1} className="space-y-6">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="emp-first-name">First name</Label>
                     <Input
                       id="emp-first-name"
                       type="text"
                       autoComplete="given-name"
-                      className="mt-1 h-[3rem]"
+                      className="mt-1 h-[3.2rem]"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                       required
@@ -805,7 +875,7 @@ const EmployerRegistrationPage = () => {
                       id="emp-last-name"
                       type="text"
                       autoComplete="family-name"
-                      className="mt-1 h-[3rem]"
+                      className="mt-1 h-[3.2rem]"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                       required
@@ -820,7 +890,7 @@ const EmployerRegistrationPage = () => {
                     id="emp-email"
                     type="email"
                     autoComplete="email"
-                    className="mt-1 h-[3rem]"
+                    className="mt-1 h-[3.2rem]"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -832,14 +902,14 @@ const EmployerRegistrationPage = () => {
                     accepted.
                   </p>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <Label htmlFor="emp-password">Password</Label>
-                  <div className="relative mt-1">
+                  <div className="relative mt-1 min-w-0">
                     <Input
                       id="emp-password"
                       type={showPassword ? "text" : "password"}
                       autoComplete="new-password"
-                      className="h-[3rem] pr-10"
+                      className="h-[3.2rem] pr-10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -857,7 +927,7 @@ const EmployerRegistrationPage = () => {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-12 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                  className="h-14 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
                   disabled={isLoading}
                 >
                   {isLoading ? "Sending code…" : "Continue"}
@@ -867,50 +937,52 @@ const EmployerRegistrationPage = () => {
 
             {step === 2 && (
               <form onSubmit={handleStep2} className="space-y-6">
-                <p className="text-sm text-muted-foreground">
+                <p className="break-words text-sm text-muted-foreground">
                   Enter the 6-digit code we sent to{" "}
-                  <strong>
+                  <strong className="break-all">
                     {sessionStorage.getItem("tempEmployerEmail") || email}
                   </strong>
                   . It may take a minute; check spam or promotions folders.
                 </p>
-                <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-                  {code.map((digit, index) => (
-                    <Input
-                      key={index}
-                      ref={(el) => {
-                        inputRefs.current[index] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      className="h-12 w-12 text-center text-xl font-semibold"
-                      value={digit}
-                      onChange={(e) =>
-                        handleCodeChange(index, e.target.value)
-                      }
-                      onKeyDown={(e) => handleKeyDown(index, e)}
-                      onPaste={index === 0 ? handlePaste : undefined}
-                      maxLength={1}
-                      disabled={isLoading}
-                      autoFocus={index === 0}
-                    />
-                  ))}
+                <div className="w-full sm:w-[23.5rem]">
+                  <div className="flex gap-2 sm:gap-2">
+                    {code.map((digit, index) => (
+                      <Input
+                        key={index}
+                        ref={(el) => {
+                          inputRefs.current[index] = el;
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        className="h-12 w-0 flex-1 text-center text-xl font-semibold sm:h-14 sm:w-14 sm:flex-none sm:text-2xl"
+                        value={digit}
+                        onChange={(e) =>
+                          handleCodeChange(index, e.target.value)
+                        }
+                        onKeyDown={(e) => handleKeyDown(index, e)}
+                        onPaste={index === 0 ? handlePaste : undefined}
+                        maxLength={1}
+                        disabled={isLoading}
+                        autoFocus={index === 0}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-12 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                  className="h-12 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 sm:h-14 sm:w-[23.5rem]"
                   disabled={isLoading}
                 >
                   {isLoading ? "Verifying…" : "Verify & continue"}
                 </Button>
                 <button
                   type="button"
-                  className="text-sm text-primary hover:underline w-full text-center"
+                  className="w-full text-center text-sm text-primary hover:underline sm:w-[23.5rem]"
                   onClick={() => setStep(1)}
                 >
                   Back
                 </button>
-                <div className="pt-2 border-t border-border/60 text-center space-y-2">
+                <div className="space-y-2 border-t border-border/60 pt-2 text-center sm:w-[23.5rem]">
                   <p className="text-sm text-muted-foreground">
                     Didn&apos;t get the code?
                   </p>
@@ -918,9 +990,7 @@ const EmployerRegistrationPage = () => {
                     type="button"
                     variant="outline"
                     className="w-full"
-                    disabled={
-                      resendCooldown > 0 || isResending || isLoading
-                    }
+                    disabled={resendCooldown > 0 || isResending || isLoading}
                     onClick={handleResendVerification}
                   >
                     {isResending
@@ -934,19 +1004,41 @@ const EmployerRegistrationPage = () => {
             )}
 
             {step === 3 && (
-              <form onSubmit={handleStep3Company} className="space-y-4">
+              <form onSubmit={handleStep3Company} className="space-y-6">
                 <EmployerCompanySearchField
                   disabled={isLoading}
                   selected={selectedDirectoryCompany}
+                  selectedCreateNewName={selectedCreateNewCompanyName}
                   onSelectExisting={(c) => {
                     setSelectedDirectoryCompany(c);
+                    setSelectedCreateNewCompanyName("");
                     setShowNewCompanyDetails(false);
+                    resetUploadedCompanyLogo();
+                    setCompanyLogoUrl("");
                     if (c?.name) setCompanyName(String(c.name));
                     else setCompanyName("");
                   }}
                   companyName={companyName}
-                  onCompanyNameChange={setCompanyName}
-                  onQuickCreateCompany={handleQuickCreateFromSearch}
+                  onCompanyNameChange={(value) => {
+                    setCompanyName(value);
+                    if (selectedDirectoryCompany) {
+                      setSelectedDirectoryCompany(null);
+                    }
+                    if (selectedCreateNewCompanyName) {
+                      setSelectedCreateNewCompanyName("");
+                    }
+                    setShowNewCompanyDetails(false);
+                  }}
+                  onSelectCreateNew={(value) => {
+                    setSelectedDirectoryCompany(null);
+                    setCompanyName(value);
+                    setSelectedCreateNewCompanyName(value);
+                    setShowNewCompanyDetails(true);
+                  }}
+                  onClearCreateNewSelection={() => {
+                    setSelectedCreateNewCompanyName("");
+                    setShowNewCompanyDetails(false);
+                  }}
                 />
                 {showNewCompanyDetails && !selectedDirectoryCompany ? (
                   <>
@@ -954,7 +1046,7 @@ const EmployerRegistrationPage = () => {
                       <Label htmlFor="co-domain">Domain</Label>
                       <Input
                         id="co-domain"
-                        className="mt-1 h-[3rem]"
+                        className="mt-1 h-[3.2rem]"
                         value={companyDomain}
                         onChange={(e) => setCompanyDomain(e.target.value)}
                         disabled={isLoading}
@@ -962,22 +1054,103 @@ const EmployerRegistrationPage = () => {
                         autoComplete="off"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="co-logo">Logo URL (optional)</Label>
-                      <Input
-                        id="co-logo"
-                        type="url"
-                        className="mt-1 h-[3rem]"
-                        value={companyLogoUrl}
-                        onChange={(e) => setCompanyLogoUrl(e.target.value)}
-                        disabled={isLoading}
-                        placeholder="https://…"
-                      />
-                    </div>
                   </>
                 ) : null}
                 {showNewCompanyDetails ? (
                   <>
+                    <div className="space-y-2">
+                      <Label htmlFor="co-logo-file">
+                        Company logo (optional)
+                      </Label>
+                      <input
+                        ref={companyLogoInputRef}
+                        id="co-logo-file"
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        disabled={isLoading}
+                        onChange={handleCompanyLogoFileChange}
+                      />
+                      <div className="relative inline-block">
+                        <label
+                          htmlFor="co-logo-file"
+                          className={
+                            "group relative flex h-32 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted transition-colors hover:border-muted-foreground/40 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 " +
+                            (isLoading ? "pointer-events-none opacity-50" : "")
+                          }
+                        >
+                          {companyLogoPreview ? (
+                            <>
+                              <img
+                                src={companyLogoPreview}
+                                alt=""
+                                className="h-full w-full object-contain p-1"
+                              />
+                              <div
+                                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                                aria-hidden
+                              >
+                                <span className="text-sm font-medium text-background">
+                                  Replace
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex h-full w-full items-center justify-center">
+                                <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                              <div
+                                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                                aria-hidden
+                              >
+                                <span className="text-sm font-medium text-background">
+                                  Upload
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </label>
+                        {companyLogoFile ? (
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+                            disabled={isLoading}
+                            aria-label="Remove logo"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              resetUploadedCompanyLogo();
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        PNG or JPG recommended. You can also paste a public URL
+                        below.
+                      </p>
+                      <div>
+                        <Label
+                          htmlFor="co-logo-url"
+                          className="text-muted-foreground"
+                        >
+                          Or logo URL
+                        </Label>
+                        <Input
+                          id="co-logo-url"
+                          type="url"
+                          className="mt-1 h-[3.2rem]"
+                          value={companyLogoUrl}
+                          onChange={(e) =>
+                            handleCompanyLogoUrlInput(e.target.value)
+                          }
+                          disabled={isLoading || !!companyLogoFile}
+                          placeholder="https://…"
+                        />
+                      </div>
+                    </div>
                     <div>
                       <Label htmlFor="co-desc">Description</Label>
                       <Textarea
@@ -992,13 +1165,14 @@ const EmployerRegistrationPage = () => {
                     </div>
                     <div>
                       <Label>Phone number</Label>
-                      <div className="flex gap-2 mt-1">
+                      <div className="mt-1 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
                         <CountrySelector
                           value={selectedCountry}
                           onChange={setSelectedCountry}
+                          className="h-[3.2rem] w-full shrink-0 sm:w-auto"
                         />
                         <Input
-                          className="h-[3rem] flex-1"
+                          className="h-[3.2rem] min-w-0 w-full flex-1 sm:min-w-[8rem]"
                           value={phoneLocal}
                           onChange={(e) => setPhoneLocal(e.target.value)}
                           disabled={isLoading}
@@ -1011,7 +1185,7 @@ const EmployerRegistrationPage = () => {
                       <Input
                         id="co-web"
                         type="url"
-                        className="mt-1 h-[3rem]"
+                        className="mt-1 h-[3.2rem]"
                         value={website}
                         onChange={(e) => setWebsite(e.target.value)}
                         disabled={isLoading}
@@ -1036,7 +1210,7 @@ const EmployerRegistrationPage = () => {
                         onValueChange={setNumberOfEmployees}
                         disabled={isLoading}
                       >
-                        <SelectTrigger className="mt-1 h-[3rem]">
+                        <SelectTrigger className="mt-1 h-[3.2rem] w-full">
                           <SelectValue placeholder="Select range" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1067,10 +1241,14 @@ const EmployerRegistrationPage = () => {
                 ) : null}
                 <Button
                   type="submit"
-                  className="w-full h-12 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-                  disabled={isLoading}
+                  className="h-14 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                  disabled={isLoading || isLogoUploading}
                 >
-                  {isLoading ? "Saving…" : "Finish & go to dashboard"}
+                  {isLoading || isLogoUploading
+                    ? isLogoUploading
+                      ? "Uploading logo…"
+                      : "Saving…"
+                    : "Finish & go to dashboard"}
                 </Button>
                 <button
                   type="button"
@@ -1083,7 +1261,7 @@ const EmployerRegistrationPage = () => {
               </form>
             )}
 
-            <p className="text-center text-muted-foreground mt-8 text-sm">
+            <p className="mt-8 text-center text-muted-foreground">
               Already have an account?{" "}
               <button
                 type="button"
@@ -1097,7 +1275,7 @@ const EmployerRegistrationPage = () => {
         </div>
 
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-          <div className="relative w-full h-full rounded-3xl overflow-hidden min-h-[480px]">
+          <div className="relative h-full w-full overflow-hidden rounded-3xl">
             {!backgroundLoaded && !imageError && (
               <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-[#242424] dark:to-[#2a2a2a] animate-pulse flex items-center justify-center">
                 <ImageIcon className="h-16 w-16 text-gray-400 dark:text-gray-600" />

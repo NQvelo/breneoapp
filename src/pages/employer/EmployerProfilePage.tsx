@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
+import { patchEmployerProfileFormData } from "@/api/employer/employerProfileApi";
 import { TokenManager } from "@/api/auth/tokenManager";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { toast } from "sonner";
@@ -340,7 +341,6 @@ export default function EmployerProfilePage() {
           domain: pickerDomain.trim() || domainFromEmail,
           description: pickerDescription.trim(),
           website: effectiveProfile.website?.trim() || "",
-          logoUrl: pickerLogoUrl.trim() || undefined,
           employeesCount: pickerEmployees,
           selectedIndustryIds: pickerIndustryIds,
           industriesCatalog: industryCatalog,
@@ -384,9 +384,7 @@ export default function EmployerProfilePage() {
         fd.append("website", formState.website.trim());
         fd.append("phone_number", formState.phone_number.trim());
         fd.append("logo", logoFile);
-        await apiClient.patch(API_ENDPOINTS.EMPLOYER.PROFILE, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await patchEmployerProfileFormData(fd);
       } else {
         await apiClient.patch(API_ENDPOINTS.EMPLOYER.PROFILE, {
           company_name: formState.company_name.trim(),
@@ -568,6 +566,43 @@ export default function EmployerProfilePage() {
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
+              <span className="text-sm font-medium leading-none">Company logo</span>
+              <div className="flex items-center gap-4">
+                <div className="h-20 w-20 shrink-0 rounded-full ring-2 ring-border overflow-hidden">
+                  <OptimizedAvatar
+                    src={avatarDisplaySrc}
+                    alt={displayName}
+                    fallback={avatarFallback}
+                    size="lg"
+                    className="h-20 w-20"
+                    loading="eager"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 min-w-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera className="h-4 w-4 mr-2 shrink-0" />
+                    Change logo
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    PNG or JPG, up to 10MB. Saves with the button below.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="company_name">Company name</Label>
               <Input
                 id="company_name"
@@ -609,11 +644,6 @@ export default function EmployerProfilePage() {
                 }
               />
             </div>
-            {logoFile ? (
-              <p className="text-xs text-muted-foreground">
-                New logo selected — it will upload when you save.
-              </p>
-            ) : null}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditing(false)}>

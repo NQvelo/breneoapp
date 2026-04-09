@@ -89,12 +89,43 @@ function readAggregatorOriginFromEnv() {
   };
 }
 
-// Must match src/api/auth/config.ts API_BASE_URL or JWT validation returns 401 (not the job aggregator).
-const MAIN_API_BASE = (
-  process.env.MAIN_API_BASE_URL ||
-  process.env.VITE_API_BASE_URL ||
-  "https://web-production-80ed8.up.railway.app"
-).replace(/\/$/, "");
+/**
+ * Breneo API host used only to validate JWT + load `/api/employer/profile/` before forwarding to the job aggregator.
+ * Must be the same issuer/login host the SPA uses (`src/api/auth/config.ts`), not JOB_AGGREGATOR_BASE_URL.
+ */
+function resolveMainApiBaseForBff() {
+  const mainOnly = process.env.MAIN_API_BASE_URL?.trim();
+  if (mainOnly) {
+    try {
+      const u = new URL(
+        /^https?:\/\//i.test(mainOnly) ? mainOnly : `https://${mainOnly}`,
+      );
+      return u.origin.replace(/\/$/, "");
+    } catch {
+      /* fall through */
+    }
+  }
+  // Same-origin Breneo via Vite `/api` → breneo.onrender.com; must run before generic VITE_* so a stale Railway URL in .env does not break JWT checks.
+  if (String(process.env.VITE_DEV_SAME_ORIGIN_BRENEO_API || "").trim() === "1") {
+    return "https://breneo.onrender.com";
+  }
+  const fromVite =
+    process.env.VITE_BRENEO_API_BASE_URL?.trim() ||
+    process.env.VITE_API_BASE_URL?.trim();
+  if (fromVite) {
+    try {
+      const u = new URL(
+        /^https?:\/\//i.test(fromVite) ? fromVite : `https://${fromVite}`,
+      );
+      return u.origin.replace(/\/$/, "");
+    } catch {
+      /* fall through */
+    }
+  }
+  return "https://web-production-80ed8.up.railway.app".replace(/\/$/, "");
+}
+
+const MAIN_API_BASE = resolveMainApiBaseForBff();
 const {
   origin: AGGREGATOR_BASE_URL,
   source: AGGREGATOR_BASE_SOURCE,
@@ -103,8 +134,9 @@ const {
 function employerAuthFailureHint(status) {
   if (status !== 401 && status !== 403) return "";
   return (
-    ` The BFF validates your token against the main Breneo API (${MAIN_API_BASE}); set MAIN_API_BASE_URL or VITE_API_BASE_URL to that host, not the job API. ` +
-    `Job routes are forwarded to ${AGGREGATOR_BASE_URL} (JOB_AGGREGATOR_BASE_URL or VITE_JOB_API_BASE_URL).`
+    ` The BFF validates your token against the main Breneo API (${MAIN_API_BASE}); set MAIN_API_BASE_URL (or VITE_BRENEO_API_BASE_URL / VITE_API_BASE_URL) to match your login host — not the job aggregator. ` +
+    `With VITE_DEV_SAME_ORIGIN_BRENEO_API=1, the proxy defaults to https://breneo.onrender.com (same as Vite’s /api proxy). ` +
+    `Employer routes are then forwarded to ${AGGREGATOR_BASE_URL}.`
   );
 }
 const AGGREGATOR_EMPLOYER_JOBS_URL = `${AGGREGATOR_BASE_URL}/api/employer/jobs`;
@@ -225,6 +257,30 @@ function getBodyQualifications(body) {
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
+
+/** Multipart: buffer before `fetch` to upstream — streaming `IncomingMessage` as `fetch` body + `duplex` often drops the connection in Node. */
+const MULTIPART_BODY_MAX_BYTES = 12 * 1024 * 1024;
+
+/**
+ * @param {import("http").IncomingMessage} req
+ * @param {number} maxBytes
+ * @returns {Promise<Buffer>}
+ */
+async function readRequestBodyIntoBuffer(req, maxBytes = MULTIPART_BODY_MAX_BYTES) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buf.length;
+    if (total > maxBytes) {
+      const err = new Error("Request body too large");
+      /** @type {Error & { code?: string }} */ (err).code = "PAYLOAD_TOO_LARGE";
+      throw err;
+    }
+    chunks.push(buf);
+  }
+  return chunks.length ? Buffer.concat(chunks) : Buffer.alloc(0);
+}
 
 function normalizeWorkMode(raw) {
   if (raw == null || raw === "") return "unknown";
@@ -1178,6 +1234,21 @@ async function handleEmployerCompanyDetailWrite(req, res) {
     const contentType = String(req.headers["content-type"] || "").toLowerCase();
     const isMultipart = contentType.includes("multipart/form-data");
     if (isMultipart) {
+      let buffer;
+      try {
+        buffer = await readRequestBodyIntoBuffer(req);
+      } catch (e) {
+        const code = /** @type {Error & { code?: string }} */ (e).code;
+        const detail =
+          code === "PAYLOAD_TOO_LARGE"
+            ? `Upload exceeds ${MULTIPART_BODY_MAX_BYTES / (1024 * 1024)}MB limit.`
+            : "Could not read multipart upload.";
+        console.error("[employer-jobs-proxy] multipart read failed:", e);
+        return res.status(400).json({ detail });
+      }
+      if (!buffer.length) {
+        return res.status(400).json({ detail: "Empty multipart body" });
+      }
       const upstream = await fetch(u.toString(), {
         method,
         headers: {
@@ -1185,9 +1256,7 @@ async function handleEmployerCompanyDetailWrite(req, res) {
           "X-Employer-Key": AGGREGATOR_KEY,
           Accept: "application/json",
         },
-        // Stream multipart body as-is to aggregator (logo uploads).
-        body: req,
-        duplex: "half",
+        body: buffer,
       });
       const text = await upstream.text();
       const data = parseUpstreamJson(text);

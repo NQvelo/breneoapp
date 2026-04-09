@@ -722,23 +722,18 @@ const JobDetailPage = () => {
     null,
   );
   const [isLoadingCompanyDetails, setIsLoadingCompanyDetails] = useState(false);
-  const [companyLogoFromAPI, setCompanyLogoFromAPI] = useState<
-    string | undefined
-  >(undefined);
 
   // Fetch company details when company name is available
   useEffect(() => {
     const fetchCompanyDetails = async () => {
       if (!jobDetail) {
         setCompanyDetails(null);
-        setCompanyLogoFromAPI(undefined);
         return;
       }
 
       const companyName = getCompanyName();
       if (!companyName || !companyName.trim()) {
         setCompanyDetails(null);
-        setCompanyLogoFromAPI(undefined);
         return;
       }
 
@@ -769,9 +764,21 @@ const JobDetailPage = () => {
           const companyInfo: CompanyInfo = {
             name: data.name || data.company_name || companyName,
             company_name: data.company_name || data.name || companyName,
-            logo: data.logo || data.company_logo || data.logo_url,
-            company_logo: data.company_logo || data.logo || data.logo_url,
-            logo_url: data.logo_url || data.logo || data.company_logo,
+            logo:
+              data.logo_upload ||
+              data.logo ||
+              data.company_logo ||
+              data.logo_url,
+            company_logo:
+              data.company_logo ||
+              data.logo_upload ||
+              data.logo ||
+              data.logo_url,
+            logo_url:
+              data.logo_url ||
+              data.logo_upload ||
+              data.logo ||
+              data.company_logo,
             website: data.website || data.company_url || data.website_url,
             company_url: data.company_url || data.website || data.website_url,
             description: data.description || data.company_description,
@@ -789,34 +796,16 @@ const JobDetailPage = () => {
           };
 
           setCompanyDetails(companyInfo);
-
-          // Set logo from API if available
-          const logoUrl =
-            companyInfo.logo ||
-            companyInfo.company_logo ||
-            companyInfo.logo_url;
-          if (logoUrl && typeof logoUrl === "string") {
-            try {
-              const url = new URL(logoUrl);
-              if (url.protocol.startsWith("http")) {
-                setCompanyLogoFromAPI(logoUrl);
-              }
-            } catch {
-              // Invalid URL, don't set
-            }
-          }
         } else {
           console.log(
             "⚠️ Company details not found or API error:",
             response.status,
           );
           setCompanyDetails(null);
-          setCompanyLogoFromAPI(undefined);
         }
       } catch (error) {
         console.error("❌ Error fetching company details:", error);
         setCompanyDetails(null);
-        setCompanyLogoFromAPI(undefined);
       } finally {
         setIsLoadingCompanyDetails(false);
       }
@@ -826,15 +815,25 @@ const JobDetailPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobDetail]);
 
-  // Get company logo - check API first, then fallback to job detail fields
+  // Company logo: only from job detail payload (not enriched from company lookup)
   const getCompanyLogo = () => {
-    // First, check if we have logo from company API
-    if (companyLogoFromAPI) {
-      return companyLogoFromAPI;
-    }
-
     if (!jobDetail) return undefined;
     const jobDetailAny = jobDetail as Record<string, unknown>;
+
+    if (
+      jobDetailAny.logo_upload &&
+      typeof jobDetailAny.logo_upload === "string"
+    ) {
+      const logoUrl = String(jobDetailAny.logo_upload);
+      try {
+        const url = new URL(logoUrl);
+        if (url.protocol.startsWith("http")) {
+          return logoUrl;
+        }
+      } catch {
+        // Invalid URL, continue
+      }
+    }
 
     // Check JSearch-specific employer_logo field first
     if (
@@ -895,6 +894,7 @@ const JobDetailPage = () => {
     if (jobDetail.company_info) {
       const companyInfo = jobDetail.company_info as CompanyInfo;
       const logoFields = [
+        companyInfo.logo_upload,
         companyInfo.logo,
         companyInfo.company_logo,
         companyInfo.employer_logo,
@@ -919,6 +919,7 @@ const JobDetailPage = () => {
     if (jobDetail.company && typeof jobDetail.company === "object") {
       const companyObj = jobDetail.company as CompanyInfo;
       const logoFields = [
+        companyObj.logo_upload,
         companyObj.logo,
         companyObj.company_logo,
         companyObj.employer_logo,
@@ -943,6 +944,7 @@ const JobDetailPage = () => {
     if (jobDetail.employer && typeof jobDetail.employer === "object") {
       const employerObj = jobDetail.employer as CompanyInfo;
       const logoFields = [
+        employerObj.logo_upload,
         employerObj.logo,
         employerObj.company_logo,
         employerObj.employer_logo,
@@ -1601,11 +1603,7 @@ const JobDetailPage = () => {
                           alt={getCompanyName() || "Company logo"}
                           className="h-12 w-12 rounded-md object-cover flex-shrink-0"
                         />
-                      ) : (
-                        <div className="h-12 w-12 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 flex-shrink-0">
-                          <Building2 className="h-6 w-6" />
-                        </div>
-                      )}
+                      ) : null}
 
                       <div className="flex flex-col min-w-0">
                         {getCompanyName() && (
@@ -2052,8 +2050,8 @@ const JobDetailPage = () => {
                   <div className="space-y-6">
                     {/* Header: Name and Logo */}
                     <div className="flex items-center gap-4">
-                      <div className="flex-shrink-0">
-                        {getCompanyLogo() ? (
+                      {getCompanyLogo() ? (
+                        <div className="flex-shrink-0">
                           <img
                             src={getCompanyLogo()}
                             alt={getCompanyName() || "Company logo"}
@@ -2061,21 +2059,10 @@ const JobDetailPage = () => {
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display =
                                 "none";
-                              (
-                                (e.target as HTMLImageElement)
-                                  .nextElementSibling as HTMLElement
-                              ).style.display = "flex";
                             }}
                           />
-                        ) : null}
-                        <div
-                          className={`h-16 w-16 md:h-20 md:w-20 rounded-2xl bg-gradient-to-br from-breneo-accent to-breneo-blue flex items-center justify-center text-white shadow-sm ${
-                            getCompanyLogo() ? "hidden" : "flex"
-                          }`}
-                        >
-                          <Building2 className="h-8 w-8" />
                         </div>
-                      </div>
+                      ) : null}
 
                       <h3 className="text-xl md:text-xl font-bold text-gray-900 dark:text-white break-words">
                         {getCompanyName() || "Company Name"}

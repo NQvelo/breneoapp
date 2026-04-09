@@ -49,9 +49,10 @@ export const fetchCompanyLogo = async (
       const data = await response.json();
       
       // Extract logo from response
-      const logoUrl = 
-        data.logo || 
-        data.company_logo || 
+      const logoUrl =
+        data.logo_upload ||
+        data.logo ||
+        data.company_logo ||
         data.logo_url ||
         data.employer_logo;
       

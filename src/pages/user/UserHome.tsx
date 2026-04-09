@@ -37,7 +37,6 @@ import {
   ClipboardCheck,
   Target,
   DollarSign,
-  Briefcase,
   Tag,
   MapPin,
 } from "lucide-react";
@@ -61,7 +60,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
-import { getCompanyLogo } from "@/utils/companyLogoFetcher";
 import { OnboardingModal } from "@/components/common/OnboardingModal";
 
 // extractJobSkills is now imported from @/utils/jobMatchUtils
@@ -839,11 +837,13 @@ const UserHome = () => {
 
         // Extract logo - check all possible fields
         const logo =
+          job.logo_upload ||
           job.employer_logo ||
           job.company_logo ||
           job.logo_url ||
           (typeof job.company === "object" && job.company
-            ? (job.company as { logo?: string; company_logo?: string }).logo ||
+            ? (job.company as { logo_upload?: string; logo?: string }).logo_upload ||
+              (job.company as { logo?: string; company_logo?: string }).logo ||
               (job.company as { company_logo?: string }).company_logo
             : undefined);
 
@@ -964,48 +964,6 @@ const UserHome = () => {
       })
       .filter((job): job is Job => job !== null); // Filter out null jobs (already limited to 9 above)
   }, [jobs, savedJobs, user, userSkillsForMatch]);
-
-  // State to store fetched logos
-  const [jobLogos, setJobLogos] = useState<Record<string, string>>({});
-
-  // Fetch missing company logos from API
-  useEffect(() => {
-    const fetchMissingLogos = async () => {
-      const jobsNeedingLogos = transformedJobs.filter(
-        (job) => !job.company_logo && job.company_name,
-      );
-
-      if (jobsNeedingLogos.length === 0) return;
-
-      // Fetch logos for jobs without them
-      const logoPromises = jobsNeedingLogos.map(async (job) => {
-        const logo = await getCompanyLogo(job.company_name || "", undefined);
-        return { jobId: job.id, logo };
-      });
-
-      const logoResults = await Promise.all(logoPromises);
-      const newLogos: Record<string, string> = {};
-
-      logoResults.forEach(({ jobId, logo }) => {
-        if (logo) {
-          newLogos[jobId] = logo;
-        }
-      });
-
-      if (Object.keys(newLogos).length > 0) {
-        setJobLogos((prev) => ({ ...prev, ...newLogos }));
-      }
-    };
-
-    fetchMissingLogos();
-  }, [transformedJobs]);
-
-  // Display up to 9 jobs (already sorted by match percentage)
-  // Merge fetched logos into jobs
-  const displayJobs = transformedJobs.map((job) => ({
-    ...job,
-    company_logo: job.company_logo || jobLogos[job.id] || undefined,
-  }));
 
   // Scroll functions for jobs
   const scrollJobs = (direction: "left" | "right") => {
@@ -1198,7 +1156,7 @@ const UserHome = () => {
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
                   Top job picks for you
                 </h2>
-                {!jobsLoading && !jobsError && displayJobs.length > 0 && (
+                {!jobsLoading && !jobsError && transformedJobs.length > 0 && (
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
@@ -1248,7 +1206,7 @@ const UserHome = () => {
                     </p>
                   </CardContent>
                 </Card>
-              ) : displayJobs.length === 0 ? (
+              ) : transformedJobs.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center">
                     <p className="text-gray-500">
@@ -1261,7 +1219,7 @@ const UserHome = () => {
                   ref={jobsScrollRef}
                   className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
                 >
-                  {displayJobs.map((job) => (
+                  {transformedJobs.map((job) => (
                     <Card
                       key={job.id}
                       className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px] hover:shadow-soft"
@@ -1274,8 +1232,8 @@ const UserHome = () => {
                       <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
                         {/* Company Logo and Info – copied from JobsPage */}
                         <div className="flex items-start gap-3 mb-3">
-                          <div className="flex-shrink-0 relative w-10 h-10">
-                            {job.company_logo ? (
+                          {job.company_logo ? (
+                            <div className="flex-shrink-0 relative w-10 h-10">
                               <img
                                 src={job.company_logo}
                                 alt={`${
@@ -1286,13 +1244,13 @@ const UserHome = () => {
                                 } logo`}
                                 className="w-10 h-10 rounded-md object-cover"
                                 loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display =
+                                    "none";
+                                }}
                               />
-                            ) : (
-                              <div className="w-10 h-10 rounded-md bg-breneo-accent flex items-center justify-center">
-                                <Briefcase className="h-5 w-5 text-white" />
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          ) : null}
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm truncate">
                               {job.company_name ||

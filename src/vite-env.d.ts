@@ -4,6 +4,11 @@ interface ImportMetaEnv {
   /** Breneo product API — same role as `VITE_API_BASE_URL`. */
   readonly VITE_BRENEO_API_BASE_URL?: string;
   readonly VITE_API_BASE_URL?: string;
+  /**
+   * Dev only: use same-origin `/api/*` (Vite proxy) for the main Breneo API instead of
+   * `VITE_API_BASE_URL` / Railway. Helps when that remote host does not resolve locally.
+   */
+  readonly VITE_DEV_SAME_ORIGIN_BRENEO_API?: string;
   /** Job aggregator — same role as `VITE_JOB_API_BASE_URL` and server `JOB_AGGREGATOR_BASE_URL`. */
   readonly VITE_JOB_AGGREGATOR_BASE_URL?: string;
   /** Public job aggregator (search, v1 jobs, logos). Same role as server `JOB_AGGREGATOR_BASE_URL`. */

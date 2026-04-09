@@ -13,6 +13,11 @@ import {
   getEmployerJobsApiBaseUrl,
 } from "@/api/employer/employerJobsApiBase";
 import { extractBreneoUserIdFromEmployerProfileRaw } from "@/api/employer/profile";
+import { uploadEmployerCompanyLogoToAggregator } from "@/api/employer/employerProfileApi";
+import {
+  extractAggregatorErrorMessage,
+  parseAggregatorFieldErrors,
+} from "@/api/employer/aggregatorHttpErrors";
 import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
 export type AggregatorIndustry = { id: number; name: string };
@@ -39,7 +44,9 @@ export function parseAggregatorCompanyPk(raw: unknown): number | null {
 function requireAggregatorCompanyPk(raw: unknown, label: string): number {
   const id = parseAggregatorCompanyPk(raw);
   if (id == null) {
-    throw new Error(`${label} must be a positive integer company id from the aggregator.`);
+    throw new Error(
+      `${label} must be a positive integer company id from the aggregator.`,
+    );
   }
   return id;
 }
@@ -86,10 +93,25 @@ export type AggregatorCompany = {
   domain?: string;
   description?: string;
   website?: string;
+  /** Canonical logo URL from job aggregator (multipart field `logo_upload`). */
+  logo_upload?: string;
+  /** Legacy/alternate logo URL; prefer {@link aggregatorCompanyLogoUrl}. */
   logo?: string;
   employees_count?: string | number;
   [key: string]: unknown;
 };
+
+/** Resolved display URL: `logo_upload` first, then `logo`. */
+export function aggregatorCompanyLogoUrl(
+  c: { logo?: unknown; logo_upload?: unknown } | null | undefined,
+): string {
+  if (!c || typeof c !== "object") return "";
+  const fromUpload =
+    typeof c.logo_upload === "string" ? c.logo_upload.trim() : "";
+  if (fromUpload) return fromUpload;
+  const fromLogo = typeof c.logo === "string" ? c.logo.trim() : "";
+  return fromLogo;
+}
 
 export type AggregatorStaffMembership = {
   id: number;
@@ -117,44 +139,17 @@ function isDuplicateStaffMembershipError(
   return false;
 }
 
-function extractErrorMessage(body: Record<string, unknown>, fallback: string): string {
-  const d = body.detail;
-  if (typeof d === "string" && d.trim()) return d.trim();
-  if (Array.isArray(d) && d.length) {
-    return d
-      .map((x) => (typeof x === "string" ? x : JSON.stringify(x)))
-      .join(" ");
-  }
-  if (d && typeof d === "object") {
-    try {
-      return JSON.stringify(d);
-    } catch {
-      /* fall through */
-    }
-  }
-  const nfe = body.non_field_errors;
-  if (Array.isArray(nfe) && nfe.length) {
-    return nfe.map((x) => String(x)).join(" ");
-  }
-  const m = body.message;
-  if (typeof m === "string" && m.trim()) return m.trim();
-  const parts: string[] = [];
-  for (const [key, v] of Object.entries(body)) {
-    if (key === "detail" || key === "non_field_errors") continue;
-    if (Array.isArray(v)) {
-      parts.push(`${key}: ${v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(", ")}`);
-    } else if (typeof v === "string") parts.push(`${key}: ${v}`);
-    else if (v && typeof v === "object") parts.push(`${key}: ${JSON.stringify(v)}`);
-  }
-  if (parts.length) return parts.join(" ");
-  return fallback;
-}
-
 function unwrapCompanies(data: unknown): AggregatorCompany[] {
   if (Array.isArray(data)) return data as AggregatorCompany[];
   if (!data || typeof data !== "object") return [];
   const o = data as Record<string, unknown>;
-  for (const key of ["results", "companies", "data", "items", "value"] as const) {
+  for (const key of [
+    "results",
+    "companies",
+    "data",
+    "items",
+    "value",
+  ] as const) {
     const v = o[key];
     if (Array.isArray(v)) return v as AggregatorCompany[];
   }
@@ -171,14 +166,20 @@ function unwrapStaffMemberships(data: unknown): AggregatorStaffMembership[] {
   if (Array.isArray(data)) return data as AggregatorStaffMembership[];
   if (!data || typeof data !== "object") return [];
   const o = data as Record<string, unknown>;
-  for (const key of ["results", "staff_memberships", "data", "items"] as const) {
+  for (const key of [
+    "results",
+    "staff_memberships",
+    "data",
+    "items",
+  ] as const) {
     const v = o[key];
     if (Array.isArray(v)) return v as AggregatorStaffMembership[];
   }
   const inner = o.data;
   if (inner && typeof inner === "object") {
     const d = inner as Record<string, unknown>;
-    if (Array.isArray(d.results)) return d.results as AggregatorStaffMembership[];
+    if (Array.isArray(d.results))
+      return d.results as AggregatorStaffMembership[];
     if (Array.isArray(d.data)) return d.data as AggregatorStaffMembership[];
   }
   return [];
@@ -188,7 +189,9 @@ function unwrapStaffMemberships(data: unknown): AggregatorStaffMembership[] {
  * Public list — no Authorization header.
  * Tries the configured app/BFF base first, then the public Railway aggregator (read-only, no key).
  */
-export async function fetchAggregatorIndustries(): Promise<AggregatorIndustry[]> {
+export async function fetchAggregatorIndustries(): Promise<
+  AggregatorIndustry[]
+> {
   const bases: string[] = [];
   const primary = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   bases.push(primary);
@@ -213,7 +216,7 @@ export async function fetchAggregatorIndustries(): Promise<AggregatorIndustry[]>
           raw && typeof raw === "object" && !Array.isArray(raw)
             ? (raw as Record<string, unknown>)
             : {};
-        lastMessage = extractErrorMessage(body, lastMessage);
+        lastMessage = extractAggregatorErrorMessage(body, lastMessage);
         continue;
       }
       const list = normalizeIndustryList(raw);
@@ -256,7 +259,7 @@ export async function fetchEmployerAggregatorCompanies(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
-      extractErrorMessage(body, "Could not load companies."),
+      extractAggregatorErrorMessage(body, "Could not load companies."),
     ) as Error & { status?: number };
     err.status = res.status;
     throw err;
@@ -290,7 +293,7 @@ export async function fetchEmployerStaffMemberships(params: {
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
-      extractErrorMessage(body, "Could not load staff memberships."),
+      extractAggregatorErrorMessage(body, "Could not load staff memberships."),
     ) as Error & { status?: number };
     err.status = res.status;
     throw err;
@@ -325,7 +328,7 @@ export async function searchAggregatorCompanies(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
-      extractErrorMessage(body, "Could not search companies."),
+      extractAggregatorErrorMessage(body, "Could not search companies."),
     ) as Error & { status?: number };
     err.status = res.status;
     throw err;
@@ -351,19 +354,16 @@ export async function fetchAggregatorCompanyDetail(
   if (staffUserId) {
     url.searchParams.set("external_user_id", staffUserId);
   }
-  const res = await fetch(
-    url.toString(),
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
     },
-  );
+  });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
-      extractErrorMessage(body, "Could not load company."),
+      extractAggregatorErrorMessage(body, "Could not load company."),
     ) as Error & { status?: number };
     err.status = res.status;
     throw err;
@@ -375,7 +375,8 @@ export async function fetchAggregatorCompanyDetail(
 export type PatchAggregatorCompanyBody = Partial<{
   name: string;
   domain: string;
-  logo: string;
+  /** URL or null — do not use legacy `logo` on JSON updates. */
+  logo_upload: string | null;
   platform: string | null;
   description: string;
   website: string;
@@ -392,25 +393,6 @@ export type AggregatorApiError = Error & {
   status?: number;
   fieldErrors?: Record<string, string[]>;
 };
-
-function parseAggregatorFieldErrors(
-  body: Record<string, unknown>,
-): Record<string, string[]> {
-  const fields: Record<string, string[]> = {};
-  for (const [k, v] of Object.entries(body)) {
-    if (k === "detail" || k === "message") continue;
-    if (k === "non_field_errors" && Array.isArray(v)) {
-      fields.non_field_errors = v.map((x) => String(x));
-      continue;
-    }
-    if (Array.isArray(v)) {
-      fields[k] = v.map((x) => String(x));
-    } else if (typeof v === "string") {
-      fields[k] = [v];
-    }
-  }
-  return fields;
-}
 
 /**
  * Partial update on the job aggregator via BFF (`X-Employer-Key` server-side; scoped user from JWT).
@@ -445,7 +427,10 @@ export async function patchEmployerAggregatorCompany(
   >;
   if (!res.ok) {
     const err = new Error(
-      extractErrorMessage(parsed, "Could not update company on the job directory."),
+      extractAggregatorErrorMessage(
+        parsed,
+        "Could not update company on the job directory.",
+      ),
     ) as AggregatorApiError;
     err.status = res.status;
     const fe = parseAggregatorFieldErrors(parsed);
@@ -455,7 +440,10 @@ export async function patchEmployerAggregatorCompany(
   return parsed as AggregatorCompany;
 }
 
-/** Multipart logo upload to employer company detail (`logo` file field). */
+/**
+ * Multipart logo upload (`logo_upload` field) on Job Aggregator.
+ * Uses aggregator origin directly — same-origin BFF proxy can reset connections on large multipart bodies.
+ */
 export async function uploadEmployerAggregatorCompanyLogo(
   companyId: number | string,
   file: File,
@@ -465,38 +453,26 @@ export async function uploadEmployerAggregatorCompanyLogo(
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
   }
-  const id = requireAggregatorCompanyPk(companyId, "companyId");
-  assertEmployerJobsProxyConfigured("PATCH");
-  const url = new URL(
-    `${EMPLOYER_COMPANIES_COLLECTION}/${id}`,
-    `${employerBffOrigin()}/`,
-  );
+  requireAggregatorCompanyPk(companyId, "companyId");
   const ext = externalUserId?.trim();
-  if (ext) url.searchParams.set("external_user_id", ext);
-  const fd = new FormData();
-  fd.append("logo", file);
-  const res = await fetch(url.toString(), {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-    body: fd,
-  });
-  const parsed = (await res.json().catch(() => ({}))) as Record<
-    string,
-    unknown
-  >;
-  if (!res.ok) {
+  if (!ext) {
+    throw new Error("external_user_id is required for company logo upload.");
+  }
+  try {
+    const data = await uploadEmployerCompanyLogoToAggregator({
+      companyId,
+      externalUserId: ext,
+      file,
+    });
+    return data as AggregatorCompany;
+  } catch (e: unknown) {
+    const src = e as Error & { status?: number };
     const err = new Error(
-      extractErrorMessage(parsed, "Could not upload company logo."),
+      src.message || "Could not upload company logo.",
     ) as AggregatorApiError;
-    err.status = res.status;
-    const fe = parseAggregatorFieldErrors(parsed);
-    if (Object.keys(fe).length > 0) err.fieldErrors = fe;
+    err.status = src.status;
     throw err;
   }
-  return parsed as AggregatorCompany;
 }
 
 /**
@@ -509,7 +485,8 @@ export type CreateAggregatorCompanyBody = {
   domain?: string;
   description?: string;
   website?: string;
-  logo?: string;
+  /** Explicit null on create; file uploads use multipart field `logo_upload` separately. */
+  logo_upload: null;
   platform?: string | null;
   founded_date?: string | null;
   employees_count?: string | number | null;
@@ -525,7 +502,6 @@ export function buildAggregatorCompanyCreatePayload(args: {
   domain: string;
   description: string;
   website: string;
-  logoUrl?: string;
   employeesCount?: string | number | null;
   selectedIndustryIds: number[];
   industriesCatalog: AggregatorIndustry[];
@@ -548,14 +524,12 @@ export function buildAggregatorCompanyCreatePayload(args: {
     domain: args.domain.trim(),
     description: args.description.trim(),
     website: args.website.trim(),
+    logo_upload: null,
     industry_ids,
     industry_names,
     social_links: {},
     additional_details: {},
   };
-
-  const logo = args.logoUrl?.trim();
-  if (logo) body.logo = logo;
 
   const ec = args.employeesCount;
   if (ec != null && ec !== "") {
@@ -583,7 +557,10 @@ export function buildQuickCreateAggregatorCompanyPayload(args: {
   const domain =
     (args.domain && args.domain.trim()) ||
     (email.includes("@")
-      ? email.slice(email.indexOf("@") + 1).trim().toLowerCase()
+      ? email
+          .slice(email.indexOf("@") + 1)
+          .trim()
+          .toLowerCase()
       : "");
   const cat = args.industriesCatalog;
   if (!cat.length) {
@@ -599,6 +576,7 @@ export function buildQuickCreateAggregatorCompanyPayload(args: {
     domain: domain || "pending.local",
     description: desc,
     website: "",
+    logo_upload: null,
     industry_ids,
     industry_names,
     social_links: {},
@@ -663,10 +641,7 @@ export async function createEmployerAggregatorCompany(
   const origin = employerBffOrigin();
   let url = new URL(EMPLOYER_COMPANIES_COLLECTION, `${origin}/`);
   if (updateId != null) {
-    url = new URL(
-      `${EMPLOYER_COMPANIES_COLLECTION}/${updateId}`,
-      `${origin}/`,
-    );
+    url = new URL(`${EMPLOYER_COMPANIES_COLLECTION}/${updateId}`, `${origin}/`);
     const externalUserId = options?.externalUserId?.trim();
     if (externalUserId) {
       url.searchParams.set("external_user_id", externalUserId);
@@ -685,7 +660,7 @@ export async function createEmployerAggregatorCompany(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
-      extractErrorMessage(
+      extractAggregatorErrorMessage(
         body,
         updateId != null
           ? "Could not save company on job aggregator."
@@ -720,7 +695,10 @@ export async function linkEmployerToAggregatorCompany(
   }
   assertEmployerJobsProxyConfigured("POST");
   const res = await fetch(
-    new URL("/api/employer/staff-memberships", `${employerBffOrigin()}/`).toString(),
+    new URL(
+      "/api/employer/staff-memberships",
+      `${employerBffOrigin()}/`,
+    ).toString(),
     {
       method: "POST",
       headers: {
@@ -734,7 +712,10 @@ export async function linkEmployerToAggregatorCompany(
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok && !isDuplicateStaffMembershipError(res.status, body)) {
     const err = new Error(
-      extractErrorMessage(body, "Could not link your account to this company."),
+      extractAggregatorErrorMessage(
+        body,
+        "Could not link your account to this company.",
+      ),
     ) as Error & { status?: number };
     err.status = res.status;
     throw err;
@@ -837,9 +818,7 @@ export async function resolveEmployerJobsCompanyFilter(params: {
     const list = await fetchEmployerAggregatorCompanies(staffUserId);
     const first = list[0];
     const fromDirectory =
-      first != null &&
-      first.name != null &&
-      String(first.name).trim() !== ""
+      first != null && first.name != null && String(first.name).trim() !== ""
         ? String(first.name).trim()
         : "";
     if (first?.id != null && String(first.id).trim() !== "") {

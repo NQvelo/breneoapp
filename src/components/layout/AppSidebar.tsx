@@ -29,7 +29,10 @@ import {
   extractBreneoUserIdFromEmployerProfileRaw,
   normalizeEmployerProfile,
 } from "@/api/employer/profile";
-import { fetchEmployerAggregatorCompanies } from "@/api/employer/aggregatorBffApi";
+import {
+  aggregatorCompanyLogoUrl,
+  fetchEmployerAggregatorCompanies,
+} from "@/api/employer/aggregatorBffApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
@@ -147,11 +150,8 @@ export function AppSidebar({
             extId.trim(),
           );
           if (cancelled) return;
-          const first = companies[0] as { logo?: unknown } | undefined;
-          const logoFromCompany =
-            typeof first?.logo === "string" && first.logo.trim()
-              ? first.logo.trim()
-              : "";
+          const first = companies[0];
+          const logoFromCompany = aggregatorCompanyLogoUrl(first);
           if (logoFromCompany) {
             setEmployerProfileLogo(logoFromCompany);
             if (typeof window !== "undefined") {

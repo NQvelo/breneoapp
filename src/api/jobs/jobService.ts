@@ -133,7 +133,10 @@ const mapSearchJobToApiJob = (job: Record<string, unknown>): ApiJob => {
     (job.company_name as string) ||
     "Unknown Company";
   const companyLogo =
-    (company?.logo as string) || (job.company_logo as string) || undefined;
+    (company?.logo_upload as string) ||
+    (company?.logo as string) ||
+    (job.company_logo as string) ||
+    undefined;
 
   return {
     id: String(job.id ?? ""),

@@ -8,6 +8,8 @@ export interface CompanyInfo {
   name?: string;
   company_name?: string;
   employer_name?: string;
+  /** Job-aggregator canonical logo URL (response field). */
+  logo_upload?: string;
   logo?: string;
   company_logo?: string;
   employer_logo?: string;
@@ -63,6 +65,7 @@ export interface JobDetail {
   link?: string;
   company_logo?: string;
   employer_logo?: string;
+  logo_upload?: string;
   logo_url?: string;
   posted_date?: string;
   date_posted?: string;
@@ -129,6 +132,7 @@ export interface ApiJob {
   url?: string;
   apply_url?: string;
   logo?: string;
+  logo_upload?: string;
   company_logo?: string;
   logo_url?: string;
   min_salary?: number;

@@ -21,14 +21,15 @@ import {
 import { IndustryMultiSelect } from "@/components/employer/IndustryMultiSelect";
 import {
   type AggregatorApiError,
+  aggregatorCompanyLogoUrl,
   type AggregatorCompany,
   type AggregatorIndustry,
   fetchAggregatorCompanyDetail,
   parseAggregatorCompanyPk,
   patchEmployerAggregatorCompany,
-  uploadEmployerAggregatorCompanyLogo,
   type PatchAggregatorCompanyBody,
 } from "@/api/employer/aggregatorBffApi";
+import { uploadEmployerCompanyLogoToAggregator } from "@/api/employer/employerProfileApi";
 import { UploadCloud, X } from "lucide-react";
 
 const EMPLOYEE_BANDS = [
@@ -132,9 +133,6 @@ function buildPatch(
   if (current.name !== initial.name) patch.name = current.name.trim();
   if (current.domain !== initial.domain) {
     patch.domain = current.domain.trim() || "";
-  }
-  if (current.logo !== initial.logo) {
-    patch.logo = current.logo.trim() || "";
   }
   if (current.platform !== initial.platform) {
     patch.platform = current.platform.trim() || null;
@@ -256,7 +254,7 @@ export function EmployerDirectoryCompanyEditSection({
 
     setName(nm);
     setDomain(readStr(c.domain));
-    setLogo(readStr(c.logo));
+    setLogo(aggregatorCompanyLogoUrl(c));
     setPlatform(readStr(c.platform));
     setDescription(readStr(c.description));
     setWebsite(readStr(c.website));
@@ -283,7 +281,7 @@ export function EmployerDirectoryCompanyEditSection({
     initialRef.current = {
       name: nm,
       domain: readStr(c.domain),
-      logo: readStr(c.logo),
+      logo: aggregatorCompanyLogoUrl(c),
       platform: readStr(c.platform),
       description: readStr(c.description),
       website: readStr(c.website),
@@ -385,39 +383,52 @@ export function EmployerDirectoryCompanyEditSection({
       toast.error("Nothing loaded yet.");
       return;
     }
-    setFieldErrors({});
-    let patch: PatchAggregatorCompanyBody;
-    try {
-      patch = buildPatch(initial, snapshot, industryCatalog);
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Invalid form data.");
-      return;
-    }
-    if (Object.keys(patch).length === 0 && !logoFile) {
-      toast.message("No changes to save.");
-      return;
-    }
     if (currentCompanyId == null) {
       toast.error("Company id is missing.");
       return;
     }
+    setFieldErrors({});
     setSaving(true);
     try {
+      let patch: PatchAggregatorCompanyBody;
+      try {
+        patch = buildPatch(initial, snapshot, industryCatalog);
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : "Invalid form data.");
+        return;
+      }
+
       let updated: AggregatorCompany | null = null;
-      if (Object.keys(patch).length > 0) {
+
+      if (logoFile) {
+        const ext = breneoUserId.trim();
+        if (!ext) {
+          toast.error("User id is missing. Refresh and try again.");
+          return;
+        }
+        if (Object.keys(patch).length > 0) {
+          await patchEmployerAggregatorCompany(currentCompanyId, patch);
+        }
+        const data = await uploadEmployerCompanyLogoToAggregator({
+          companyId: currentCompanyId,
+          externalUserId: ext,
+          file: logoFile,
+        });
+        updated = data as AggregatorCompany;
+      } else {
+        if (Object.keys(patch).length === 0) {
+          toast.message("No changes to save.");
+          return;
+        }
         updated = await patchEmployerAggregatorCompany(currentCompanyId, patch);
       }
-      if (logoFile) {
-        updated = await uploadEmployerAggregatorCompanyLogo(
-          currentCompanyId,
-          logoFile,
-          breneoUserId || undefined,
-        );
-      }
+
       if (updated) {
         applyCompanyDetail(updated);
       }
-      clearSelectedLogo();
+      if (logoFile) {
+        clearSelectedLogo();
+      }
       await onDirectoryUpdated();
       toast.success("Job directory company updated.");
     } catch (e: unknown) {
@@ -436,7 +447,7 @@ export function EmployerDirectoryCompanyEditSection({
         toast.error(
           "Company not found. If you renamed it elsewhere, refresh the list.",
         );
-      } else if (err.status === 400) {
+      } else if (err.status === 400 || err.status === 422) {
         toast.error(
           err.message || "Validation failed. Check the fields below.",
         );
@@ -470,7 +481,7 @@ export function EmployerDirectoryCompanyEditSection({
             onValueChange={onSelectCompany}
             disabled={detailLoading || saving}
           >
-            <SelectTrigger className="h-[3rem]">
+            <SelectTrigger className="h-[3.2rem]">
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
             <SelectContent>
@@ -534,58 +545,72 @@ export function EmployerDirectoryCompanyEditSection({
                   setLogoFileName(file.name);
                 }}
               />
-              {logoPreviewUrl || logo ? (
-                <div className="space-y-2">
-                  <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-muted">
-                    <img
-                      src={logoPreviewUrl || logo}
-                      alt="Company logo preview"
-                      className="h-full w-full object-cover"
-                    />
-                    {logoPreviewUrl ? (
-                      <button
-                        type="button"
-                        onClick={clearSelectedLogo}
-                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70"
-                        aria-label="Remove selected logo"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    ) : null}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={() => logoFileInputRef.current?.click()}
-                    disabled={saving}
+              <div className="space-y-2">
+                <div className="relative inline-block">
+                  <label
+                    htmlFor="agg-logo-upload"
+                    className={
+                      "group relative flex h-32 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted transition-colors hover:border-muted-foreground/40 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 dark:border-[#444444] " +
+                      (saving ? "pointer-events-none opacity-60" : "")
+                    }
                   >
-                    {logoPreviewUrl ? "Change photo" : "Upload photo"}
-                  </Button>
-                  {logoFileName ? (
-                    <p className="text-xs text-muted-foreground">
-                      Selected file: {logoFileName}. It will be uploaded and
-                      saved with the other changes.
-                    </p>
+                    {logoPreviewUrl || logo ? (
+                      <>
+                        <img
+                          src={logoPreviewUrl || logo}
+                          alt="Company logo preview"
+                          className="h-full w-full object-cover"
+                        />
+                        <div
+                          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                          aria-hidden
+                        >
+                          <span className="text-sm font-medium text-background">
+                            Replace
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center">
+                          <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            PNG, JPG up to 10MB
+                          </span>
+                        </div>
+                        <div
+                          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                          aria-hidden
+                        >
+                          <span className="text-sm font-medium text-background">
+                            Upload
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </label>
+                  {logoPreviewUrl ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        clearSelectedLogo();
+                      }}
+                      className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+                      aria-label="Remove selected logo"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   ) : null}
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => logoFileInputRef.current?.click()}
-                  disabled={saving}
-                  className="flex h-32 w-32 shrink-0 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-gray-300 bg-transparent px-2 text-gray-500 transition hover:border-breneo-blue disabled:opacity-60 disabled:cursor-not-allowed dark:border-[#444444]"
-                >
-                  <UploadCloud className="h-8 w-8 text-gray-400" />
-                  <span className="text-sm font-medium text-breneo-blue">
-                    Upload photo
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    PNG, JPG up to 10MB
-                  </span>
-                </button>
-              )}
+                {logoFileName ? (
+                  <p className="text-xs text-muted-foreground">
+                    Selected file: {logoFileName}. It will be uploaded and saved
+                    with the other changes.
+                  </p>
+                ) : null}
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="agg-domain">Domain</Label>

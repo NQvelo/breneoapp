@@ -385,10 +385,14 @@ const CompanyJobsPage = () => {
         if (job.companyLogo) companyLogo = job.companyLogo;
         if (!companyLogo && job.employer_logo) companyLogo = job.employer_logo;
         if (!companyLogo && job.company_logo) companyLogo = job.company_logo;
+        if (!companyLogo && job.logo_upload) companyLogo = job.logo_upload;
         if (!companyLogo && job.logo) companyLogo = job.logo;
         if (!companyLogo && job.logo_url) companyLogo = job.logo_url;
         if (!companyLogo && companyObj) {
-          if (companyObj.logo) companyLogo = companyObj.logo as string;
+          if (companyObj.logo_upload)
+            companyLogo = companyObj.logo_upload as string;
+          if (!companyLogo && companyObj.logo)
+            companyLogo = companyObj.logo as string;
           if (!companyLogo && companyObj.logo_url)
             companyLogo = companyObj.logo_url as string;
           if (!companyLogo && companyObj.company_logo)
@@ -523,11 +527,7 @@ const CompanyJobsPage = () => {
                   target.style.display = "none";
                 }}
               />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-breneo-accent flex items-center justify-center">
-                <Building2 className="h-8 w-8 text-white" />
-              </div>
-            )}
+            ) : null}
             <div>
               <h1 className="text-2xl font-bold">{displayCompanyName}</h1>
               <p className="text-gray-500">
@@ -584,72 +584,20 @@ const CompanyJobsPage = () => {
                   <CardContent className="p-5 flex flex-col flex-grow relative">
                     {/* Company Logo and Info */}
                     <div className="flex items-start gap-3 mb-4">
-                      <div className="flex-shrink-0 relative w-12 h-12">
-                        {job.company_logo ? (
+                      {job.company_logo ? (
+                        <div className="flex-shrink-0 relative w-12 h-12">
                           <img
                             src={job.company_logo}
                             alt={`${job.company_name || job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover absolute inset-0 z-10"
+                            className="w-12 h-12 rounded-full object-cover"
                             loading="lazy"
                             onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.style.display = "none";
-                              const iconFallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback",
-                                ) as HTMLElement;
-                              if (iconFallback) {
-                                iconFallback.style.display = "flex";
-                                iconFallback.style.zIndex = "10";
-                              }
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
                             }}
                           />
-                        ) : null}
-
-                        {job.company && !job.company_logo ? (
-                          <img
-                            src={`https://logo.clearbit.com/${encodeURIComponent(
-                              job.company,
-                            )}`}
-                            alt={`${job.company_name || job.company} logo`}
-                            className="w-12 h-12 rounded-full object-cover absolute inset-0 clearbit-logo"
-                            style={{ zIndex: 10 }}
-                            loading="lazy"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.style.display = "none";
-                              const iconFallback =
-                                target.parentElement?.querySelector(
-                                  ".logo-fallback",
-                                ) as HTMLElement;
-                              if (iconFallback) {
-                                iconFallback.style.display = "flex";
-                                iconFallback.style.zIndex = "10";
-                              }
-                            }}
-                          />
-                        ) : null}
-
-                        <div
-                          className={`w-12 h-12 rounded-full bg-breneo-accent flex items-center justify-center logo-fallback absolute inset-0 ${
-                            job.company_logo ||
-                            (job.company && !job.company_logo)
-                              ? "hidden"
-                              : "flex"
-                          }`}
-                          style={{
-                            zIndex:
-                              job.company_logo ||
-                              (job.company && !job.company_logo)
-                                ? 0
-                                : 10,
-                          }}
-                        >
-                          <Briefcase className="h-6 w-6 text-white" />
                         </div>
-                      </div>
+                      ) : null}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-base truncate">
                           {job.company_name || job.company}

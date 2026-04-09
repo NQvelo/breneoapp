@@ -13,10 +13,14 @@ const DEBOUNCE_MS = 280;
 type Props = {
   disabled?: boolean;
   selected: AggregatorCompany | null;
+  selectedCreateNewName?: string;
   onSelectExisting: (company: AggregatorCompany | null) => void;
   /** Single field: search query and, for new companies, the name to save */
   companyName: string;
   onCompanyNameChange: (value: string) => void;
+  /** Called when user chooses the soft "Create new company" option. */
+  onSelectCreateNew?: (name: string) => void;
+  onClearCreateNewSelection?: () => void;
   /**
    * When true, the list is only API search results — no “type a new name” row unless
    * `onQuickCreateCompany` is set (then “Create new” POSTs when search returns nothing).
@@ -35,9 +39,12 @@ type Props = {
 export function EmployerCompanySearchField({
   disabled,
   selected,
+  selectedCreateNewName,
   onSelectExisting,
   companyName,
   onCompanyNameChange,
+  onSelectCreateNew,
+  onClearCreateNewSelection,
   existingCompaniesOnly = false,
   onQuickCreateCompany,
 }: Props) {
@@ -99,18 +106,27 @@ export function EmployerCompanySearchField({
     return () => document.removeEventListener("mousedown", onDocDown);
   }, []);
 
-  if (selected) {
+  if (selected || selectedCreateNewName) {
+    const selectedLabel = selected
+      ? selected.name ?? "Company"
+      : selectedCreateNewName ?? "Company";
     return (
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         <Label>Company</Label>
-        <div className="flex items-center gap-2 flex-wrap rounded-xl border border-border/60 px-3 py-2 bg-muted/20">
-          <span className="font-medium">{selected.name ?? "Company"}</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+          <span className="min-w-0 max-w-full break-words font-medium">
+            {selectedLabel}
+          </span>
+          {!selected && selectedCreateNewName ? (
+            <span className="text-xs text-muted-foreground">(new)</span>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => {
-              onSelectExisting(null);
+              if (selected) onSelectExisting(null);
+              if (!selected && selectedCreateNewName) onClearCreateNewSelection?.();
               onCompanyNameChange("");
               setOpen(false);
             }}
@@ -179,7 +195,7 @@ export function EmployerCompanySearchField({
           : `Type at least ${MIN_SEARCH_CHARS} characters to search existing companies, or choose "Create new company" and edit the name in this field.`;
 
   return (
-    <div ref={containerRef} className="relative space-y-2">
+    <div ref={containerRef} className="relative min-w-0 space-y-2">
       <Label htmlFor="co-combobox">Company name</Label>
       <p className="text-xs text-muted-foreground">{helpText}</p>
       <Input
@@ -197,7 +213,7 @@ export function EmployerCompanySearchField({
             ? "Search companies…"
             : "Search companies or type a new name…"
         }
-        className="h-[3rem]"
+        className="h-[3.2rem]"
         autoComplete="off"
         role="combobox"
         aria-expanded={showPanel}
@@ -294,6 +310,7 @@ export function EmployerCompanySearchField({
                 className="w-full px-3 py-2.5 text-left text-sm hover:bg-muted/80 transition-colors"
                 onClick={() => {
                   setOpen(false);
+                  onSelectCreateNew?.(trimmed);
                   inputRef.current?.focus();
                 }}
                 disabled={disabled}

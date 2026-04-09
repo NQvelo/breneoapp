@@ -49,6 +49,7 @@ import { getEmployerJobsApiDebugInfo } from "@/api/employer/employerJobsApiBase"
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
+  aggregatorCompanyLogoUrl,
   fetchEmployerAggregatorCompanies,
   resolveEmployerJobsCompanyFilter,
 } from "@/api/employer/aggregatorBffApi";
@@ -181,8 +182,7 @@ export default function EmployerAddJobPage() {
                 c?.id != null &&
                 String(c.id).trim() === String(resolvedCompanyId).trim(),
             ) || companies[0];
-          const logo =
-            matched?.logo != null ? String(matched.logo).trim() : "";
+          const logo = aggregatorCompanyLogoUrl(matched);
           setHeaderCompanyLogo(logo || null);
           if (!linkedDirectoryCompanyName?.trim()) {
             const name =
