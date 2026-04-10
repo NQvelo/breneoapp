@@ -115,7 +115,8 @@ export default defineConfig(({ mode }) => ({
           "**/lovable-uploads/way.png",
           "**/lovable-uploads/full-shot-student-library.jpg",
         ],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        // Keep large hashed JS bundle in precache; CI currently produces ~10.4 MB main chunk.
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024, // 12 MB
         // Handle SPA routing - fallback to index.html for navigation requests
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [
