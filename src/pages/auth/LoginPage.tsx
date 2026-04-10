@@ -142,7 +142,9 @@ const LoginPage: React.FC = () => {
       const token = res.data.access || res.data.token;
       const refreshToken = res.data.refresh || res.data.refresh_token;
       if (!token) {
-        throw new Error("Login succeeded but did not return the required token.");
+        throw new Error(
+          "Login succeeded but did not return the required token.",
+        );
       }
       TokenManager.setTokens(token, refreshToken || "");
       localStorage.setItem("userRole", "employer");
@@ -159,71 +161,70 @@ const LoginPage: React.FC = () => {
     try {
       await login(emailOrUsername, password);
     } catch (err: unknown) {
-        // ✅ START: Improved error handling
-        let errorMessage = "Login failed. Please try again.";
-        let needsVerification = false;
+      // ✅ START: Improved error handling
+      let errorMessage = "Login failed. Please try again.";
+      let needsVerification = false;
 
-        if (axios.isAxiosError(err) && err.response && err.response.data) {
-          const errorData = err.response.data;
-          let detail = "";
+      if (axios.isAxiosError(err) && err.response && err.response.data) {
+        const errorData = err.response.data;
+        let detail = "";
 
-          // Try to find the error message in common response fields
-          if (typeof errorData.detail === "string") detail = errorData.detail;
-          else if (typeof errorData.message === "string")
-            detail = errorData.message;
-          else if (typeof errorData.error === "string")
-            detail = errorData.error;
-          // Check for Django REST Framework's default non-field errors
-          else if (
-            Array.isArray(errorData.non_field_errors) &&
-            errorData.non_field_errors.length > 0 &&
-            typeof errorData.non_field_errors[0] === "string"
+        // Try to find the error message in common response fields
+        if (typeof errorData.detail === "string") detail = errorData.detail;
+        else if (typeof errorData.message === "string")
+          detail = errorData.message;
+        else if (typeof errorData.error === "string") detail = errorData.error;
+        // Check for Django REST Framework's default non-field errors
+        else if (
+          Array.isArray(errorData.non_field_errors) &&
+          errorData.non_field_errors.length > 0 &&
+          typeof errorData.non_field_errors[0] === "string"
+        ) {
+          detail = errorData.non_field_errors[0];
+        }
+
+        if (detail) {
+          errorMessage = detail;
+          const lowerCaseDetail = detail.toLowerCase();
+
+          // Check for various "not verified" messages (case-insensitive)
+          if (
+            lowerCaseDetail.includes("email not verified") ||
+            lowerCaseDetail.includes("account not active") ||
+            lowerCaseDetail.includes("please verify your email") ||
+            lowerCaseDetail.includes("e-mail address not verified") ||
+            lowerCaseDetail.includes("user is inactive")
           ) {
-            detail = errorData.non_field_errors[0];
+            needsVerification = true;
           }
-
-          if (detail) {
-            errorMessage = detail;
-            const lowerCaseDetail = detail.toLowerCase();
-
-            // Check for various "not verified" messages (case-insensitive)
-            if (
-              lowerCaseDetail.includes("email not verified") ||
-              lowerCaseDetail.includes("account not active") ||
-              lowerCaseDetail.includes("please verify your email") ||
-              lowerCaseDetail.includes("e-mail address not verified") ||
-              lowerCaseDetail.includes("user is inactive")
-            ) {
-              needsVerification = true;
-            }
-          } else {
-            // If we can't parse the error, log it for debugging
-            console.error("Unknown error format from server:", errorData);
-          }
-        }
-
-        if (needsVerification) {
-          // This is the flow you requested
-          toast.info(
-            "Your account is not verified. Redirecting to verification...",
-          );
-          sessionStorage.setItem("tempEmail", emailOrUsername);
-          sessionStorage.setItem("tempPassword", password);
-          navigate("/auth/email-verification");
         } else {
-          // This is a standard login fail (e.g., wrong password)
-          toast.error(errorMessage);
-
-          // ✅ NEW: Log the server's response data for debugging
-          console.error(
-            "Login page caught error (see details below):",
-            err instanceof Error ? err.message : String(err),
-          );
-          if (axios.isAxiosError(err) && err.response) {
-            console.error("Server response data:", err.response.data);
-          }
+          // If we can't parse the error, log it for debugging
+          console.error("Unknown error format from server:", errorData);
         }
-        // ✅ END: Improved error handling
+      }
+
+      if (needsVerification) {
+        // This is the flow you requested
+        toast.info(
+          "Your account is not verified. Redirecting to verification...",
+        );
+        sessionStorage.setItem("tempEmail", emailOrUsername);
+        sessionStorage.setItem("tempPassword", password);
+        navigate("/auth/email-verification");
+      } else {
+        // This is a standard login fail (e.g., wrong password)
+        toast.error(errorMessage);
+
+        // ✅ NEW: Log the server's response data for debugging
+        console.error(
+          "Login page caught error (see details below):",
+          err instanceof Error ? err.message : String(err),
+        );
+        if (axios.isAxiosError(err) && err.response) {
+          console.error("Server response data:", err.response.data);
+        }
+      }
+      // ✅ END: Improved error handling
     }
   };
 
@@ -368,7 +369,7 @@ const LoginPage: React.FC = () => {
                 Sign Up
               </button>
             </p>
-            <p className="text-center text-muted-foreground mt-3 text-sm">
+            {/* <p className="text-center text-muted-foreground mt-3 text-sm">
               Hiring company?{" "}
               <button
                 type="button"
@@ -377,7 +378,7 @@ const LoginPage: React.FC = () => {
               >
                 Register as employer
               </button>
-            </p>
+            </p> */}
           </div>
         </div>
 

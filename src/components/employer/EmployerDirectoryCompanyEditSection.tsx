@@ -29,7 +29,7 @@ import {
   type PatchAggregatorCompanyBody,
 } from "@/api/employer/aggregatorBffApi";
 import { uploadEmployerCompanyLogoToAggregator } from "@/api/employer/employerProfileApi";
-import { UploadCloud, X } from "lucide-react";
+import { PencilLine, UploadCloud, X } from "lucide-react";
 
 const EMPLOYEE_BANDS = [
   "1-10",
@@ -207,6 +207,16 @@ export function EmployerDirectoryCompanyEditSection({
   breneoUserId,
   onDirectoryUpdated,
 }: EmployerDirectoryCompanyEditSectionProps) {
+  const editButtonClass =
+    "h-8 rounded-[14px] bg-gray-100 px-2.5 text-xs font-medium text-foreground hover:bg-gray-200 dark:bg-[#2d2d2d] dark:text-gray-200 dark:hover:bg-[#3a3a3a] md:h-10 md:px-4 md:text-sm";
+  type EditableBlockKey =
+    | "logo"
+    | "domain"
+    | "websiteEmail"
+    | "linkedin"
+    | "description"
+    | "foundedEmployees"
+    | "industries";
   /** Aggregator primary key for `/api/employer/companies/{id}` — not public name-based routes. */
   const [currentCompanyId, setCurrentCompanyId] = useState<number | null>(null);
 
@@ -231,6 +241,9 @@ export function EmployerDirectoryCompanyEditSection({
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [editingBlock, setEditingBlock] = useState<EditableBlockKey | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -250,53 +263,56 @@ export function EmployerDirectoryCompanyEditSection({
     });
   }, [companiesLoading, companies]);
 
-  const applyCompanyDetail = useCallback((c: AggregatorCompany) => {
-    const nm = readStr(c.name);
-    const pk = parseAggregatorCompanyPk(c.id);
-    if (pk != null) setCurrentCompanyId(pk);
+  const applyCompanyDetail = useCallback(
+    (c: AggregatorCompany) => {
+      const nm = readStr(c.name);
+      const pk = parseAggregatorCompanyPk(c.id);
+      if (pk != null) setCurrentCompanyId(pk);
 
-    setName(nm);
-    setDomain(readStr(c.domain));
-    setLogo(aggregatorCompanyLogoUrl(c));
-    setPlatform(readStr(c.platform));
-    setDescription(readStr(c.description));
-    setWebsite(readStr(c.website));
-    setFoundedDate(foundedDateForInput(c.founded_date));
-    setEmployeesCount(normalizeEmployeeBand(readStr(c.employees_count)));
-    setCompanyEmail(readStr(c.company_email));
-    setLinkedin(linkedinFromSocial(c.social_links));
-    setAdditionalDetailsText(additionalDetailsToText(c.additional_details));
-    const iids = industryIdsFromCompany(c);
-    setIndustryIds(iids);
-    setLogoFileName("");
-    setLogoFile(null);
-    if (logoPreviewUrl?.startsWith("blob:"))
-      URL.revokeObjectURL(logoPreviewUrl);
-    setLogoPreviewUrl(null);
+      setName(nm);
+      setDomain(readStr(c.domain));
+      setLogo(aggregatorCompanyLogoUrl(c));
+      setPlatform(readStr(c.platform));
+      setDescription(readStr(c.description));
+      setWebsite(readStr(c.website));
+      setFoundedDate(foundedDateForInput(c.founded_date));
+      setEmployeesCount(normalizeEmployeeBand(readStr(c.employees_count)));
+      setCompanyEmail(readStr(c.company_email));
+      setLinkedin(linkedinFromSocial(c.social_links));
+      setAdditionalDetailsText(additionalDetailsToText(c.additional_details));
+      const iids = industryIdsFromCompany(c);
+      setIndustryIds(iids);
+      setLogoFileName("");
+      setLogoFile(null);
+      if (logoPreviewUrl?.startsWith("blob:"))
+        URL.revokeObjectURL(logoPreviewUrl);
+      setLogoPreviewUrl(null);
 
-    const rawSl =
-      c.social_links != null &&
-      typeof c.social_links === "object" &&
-      !Array.isArray(c.social_links)
-        ? { ...(c.social_links as Record<string, unknown>) }
-        : {};
+      const rawSl =
+        c.social_links != null &&
+        typeof c.social_links === "object" &&
+        !Array.isArray(c.social_links)
+          ? { ...(c.social_links as Record<string, unknown>) }
+          : {};
 
-    initialRef.current = {
-      name: nm,
-      domain: readStr(c.domain),
-      logo: aggregatorCompanyLogoUrl(c),
-      platform: readStr(c.platform),
-      description: readStr(c.description),
-      website: readStr(c.website),
-      founded_date: foundedDateForInput(c.founded_date),
-      employees_count: normalizeEmployeeBand(readStr(c.employees_count)),
-      company_email: readStr(c.company_email),
-      linkedin: linkedinFromSocial(c.social_links),
-      raw_social_links: rawSl,
-      additional_details_text: additionalDetailsToText(c.additional_details),
-      industry_ids: [...iids],
-    };
-  }, []);
+      initialRef.current = {
+        name: nm,
+        domain: readStr(c.domain),
+        logo: aggregatorCompanyLogoUrl(c),
+        platform: readStr(c.platform),
+        description: readStr(c.description),
+        website: readStr(c.website),
+        founded_date: foundedDateForInput(c.founded_date),
+        employees_count: normalizeEmployeeBand(readStr(c.employees_count)),
+        company_email: readStr(c.company_email),
+        linkedin: linkedinFromSocial(c.social_links),
+        raw_social_links: rawSl,
+        additional_details_text: additionalDetailsToText(c.additional_details),
+        industry_ids: [...iids],
+      };
+    },
+    [logoPreviewUrl],
+  );
 
   const loadDetail = useCallback(
     async (companyPk: number) => {
@@ -380,15 +396,51 @@ export function EmployerDirectoryCompanyEditSection({
     if (logoFileInputRef.current) logoFileInputRef.current.value = "";
   }, [logoPreviewUrl]);
 
-  const handleSave = async () => {
+  const resetBlock = useCallback(
+    (block: EditableBlockKey) => {
+      const initial = initialRef.current;
+      if (!initial) return;
+      switch (block) {
+        case "logo":
+          setLogo(initial.logo);
+          clearSelectedLogo();
+          break;
+        case "domain":
+          setDomain(initial.domain);
+          break;
+        case "websiteEmail":
+          setWebsite(initial.website);
+          setCompanyEmail(initial.company_email);
+          break;
+        case "linkedin":
+          setLinkedin(initial.linkedin);
+          break;
+        case "description":
+          setDescription(initial.description);
+          break;
+        case "foundedEmployees":
+          setFoundedDate(initial.founded_date);
+          setEmployeesCount(initial.employees_count);
+          break;
+        case "industries":
+          setIndustryIds([...initial.industry_ids]);
+          break;
+      }
+      setFieldErrors({});
+      setEditingBlock(null);
+    },
+    [clearSelectedLogo],
+  );
+
+  const handleSave = async (): Promise<boolean> => {
     const initial = initialRef.current;
     if (!initial) {
       toast.error("Nothing loaded yet.");
-      return;
+      return false;
     }
     if (currentCompanyId == null) {
       toast.error("Company id is missing.");
-      return;
+      return false;
     }
     setFieldErrors({});
     setSaving(true);
@@ -398,7 +450,7 @@ export function EmployerDirectoryCompanyEditSection({
         patch = buildPatch(initial, snapshot, industryCatalog);
       } catch (e: unknown) {
         toast.error(e instanceof Error ? e.message : "Invalid form data.");
-        return;
+        return false;
       }
 
       let updated: AggregatorCompany | null = null;
@@ -421,7 +473,7 @@ export function EmployerDirectoryCompanyEditSection({
       } else {
         if (Object.keys(patch).length === 0) {
           toast.message("No changes to save.");
-          return;
+          return true;
         }
         updated = await patchEmployerAggregatorCompany(currentCompanyId, patch);
       }
@@ -434,6 +486,7 @@ export function EmployerDirectoryCompanyEditSection({
       }
       await onDirectoryUpdated();
       toast.success("Job directory company updated.");
+      return true;
     } catch (e: unknown) {
       const err = e as AggregatorApiError;
       const fe = err.fieldErrors;
@@ -457,9 +510,15 @@ export function EmployerDirectoryCompanyEditSection({
       } else {
         toast.error(err.message || "Could not save.");
       }
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  const saveBlock = async () => {
+    const ok = await handleSave();
+    if (ok) setEditingBlock(null);
   };
 
   if (companiesLoading) {
@@ -507,276 +566,630 @@ export function EmployerDirectoryCompanyEditSection({
       {detailLoading ? (
         <p className="text-sm text-muted-foreground">Loading company…</p>
       ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="agg-name">Company name</Label>
-              <Input
-                id="agg-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled
-              />
-              <p className="text-xs text-muted-foreground">
-                Company name is read-only here. API routes use the numeric
-                company id above.
-              </p>
+        <div className="space-y-4">
+          <input
+            ref={logoFileInputRef}
+            id="agg-logo-upload"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={saving}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (file.size > 10 * 1024 * 1024) {
+                toast.error("Image size must be less than 10MB.");
+                if (logoFileInputRef.current)
+                  logoFileInputRef.current.value = "";
+                return;
+              }
+              const objUrl = URL.createObjectURL(file);
+              if (logoPreviewUrl?.startsWith("blob:"))
+                URL.revokeObjectURL(logoPreviewUrl);
+              setLogoPreviewUrl(objUrl);
+              setLogoFile(file);
+              setLogoFileName(file.name);
+            }}
+          />
+
+          <div className="rounded-3xl bg-white">
+            <div className="px-7 pt-7">
+              <h3 className="text-base font-semibold">Company Overview</h3>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="agg-logo-upload">Profile picture</Label>
-              <input
-                ref={logoFileInputRef}
-                id="agg-logo-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={saving}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 10 * 1024 * 1024) {
-                    toast.error("Image size must be less than 10MB.");
-                    if (logoFileInputRef.current)
-                      logoFileInputRef.current.value = "";
-                    return;
-                  }
-                  const objUrl = URL.createObjectURL(file);
-                  if (logoPreviewUrl?.startsWith("blob:"))
-                    URL.revokeObjectURL(logoPreviewUrl);
-                  setLogoPreviewUrl(objUrl);
-                  setLogoFile(file);
-                  setLogoFileName(file.name);
-                }}
-              />
-              <div className="space-y-2">
-                <div className="relative inline-block">
-                  <label
-                    htmlFor="agg-logo-upload"
-                    className={
-                      "group relative flex h-32 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted transition-colors hover:border-muted-foreground/40 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 dark:border-[#444444] " +
-                      (saving ? "pointer-events-none opacity-60" : "")
-                    }
-                  >
-                    {logoPreviewUrl || logo ? (
-                      <>
+            <div className="px-4 py-2 divide-y divide-border/60">
+              <div className="py-4 flex items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Profile picture
+                  </span>
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="agg-logo-upload"
+                      className={
+                        "group relative flex h-16 w-16 cursor-pointer overflow-hidden rounded-lg border border-border/70 bg-muted " +
+                        (saving ? "pointer-events-none opacity-60" : "")
+                      }
+                    >
+                      {logoPreviewUrl || logo ? (
                         <img
                           src={logoPreviewUrl || logo}
                           alt="Company logo preview"
                           className="h-full w-full object-cover"
                         />
-                        <div
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                          aria-hidden
-                        >
-                          <span className="text-sm font-medium text-background">
-                            Replace
-                          </span>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <UploadCloud className="h-5 w-5 text-muted-foreground" />
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-center">
-                          <UploadCloud className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            PNG, JPG up to 10MB
-                          </span>
-                        </div>
-                        <div
-                          className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                          aria-hidden
-                        >
-                          <span className="text-sm font-medium text-background">
-                            Upload
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </label>
-                  {logoPreviewUrl ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        clearSelectedLogo();
-                      }}
-                      className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-                      aria-label="Remove selected logo"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                      )}
+                      <div
+                        className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                        aria-hidden
+                      >
+                        <span className="text-[11px] font-medium text-background">
+                          Change
+                        </span>
+                      </div>
+                    </label>
+                    {logoPreviewUrl ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => clearSelectedLogo()}
+                        disabled={saving}
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" />
+                        Remove
+                      </Button>
+                    ) : null}
+                    {logoFileName ? (
+                      <p className="text-xs text-muted-foreground">
+                        Selected file: {logoFileName}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-start gap-1.5">
+                  {logoFileName ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={saveBlock}
+                        disabled={saving || detailLoading}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={() => resetBlock("logo")}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </Button>
+                    </>
                   ) : null}
                 </div>
-                {logoFileName ? (
-                  <p className="text-xs text-muted-foreground">
-                    Selected file: {logoFileName}. It will be uploaded and saved
-                    with the other changes.
-                  </p>
-                ) : null}
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agg-domain">Domain</Label>
-              <Input
-                id="agg-domain"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                disabled={saving}
-                aria-invalid={Boolean(fieldMessage.domain)}
-              />
-              {fieldMessage.domain ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.domain}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="agg-desc">Description</Label>
-              <Textarea
-                id="agg-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={saving}
-                rows={5}
-                aria-invalid={Boolean(fieldMessage.description)}
-              />
-              {fieldMessage.description ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.description}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agg-website">Website</Label>
-              <Input
-                id="agg-website"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                disabled={saving}
-                placeholder="https://…"
-                aria-invalid={Boolean(fieldMessage.website)}
-              />
-              {fieldMessage.website ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.website}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agg-email">Company email</Label>
-              <Input
-                id="agg-email"
-                type="email"
-                value={companyEmail}
-                onChange={(e) => setCompanyEmail(e.target.value)}
-                disabled={saving}
-                aria-invalid={Boolean(fieldMessage.company_email)}
-              />
-              {fieldMessage.company_email ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.company_email}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agg-founded">Founded date</Label>
-              <Input
-                id="agg-founded"
-                type="date"
-                value={foundedDate}
-                onChange={(e) => setFoundedDate(e.target.value)}
-                disabled={saving}
-                aria-invalid={Boolean(fieldMessage.founded_date)}
-              />
-              {fieldMessage.founded_date ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.founded_date}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="agg-employees">Employees (range)</Label>
-              <Select
-                value={
-                  normalizeEmployeeBand(employeesCount) || undefined
-                }
-                onValueChange={setEmployeesCount}
-                disabled={saving}
-              >
-                <SelectTrigger
-                  id="agg-employees"
-                  className="w-full"
-                  aria-invalid={Boolean(fieldMessage.employees_count)}
-                >
-                  <SelectValue placeholder="Select range" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EMPLOYEE_BANDS.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldMessage.employees_count ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.employees_count}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="agg-li">LinkedIn (social link)</Label>
-              <Input
-                id="agg-li"
-                type="url"
-                value={linkedin}
-                onChange={(e) => setLinkedin(e.target.value)}
-                disabled={saving}
-                placeholder="https://linkedin.com/company/…"
-                aria-invalid={Boolean(
-                  fieldMessage.social_links || fieldMessage.linkedin,
+
+              <div className="py-4 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Company name
+                  </p>
+                  <p className="text-sm font-medium mt-1 break-words">
+                    {name || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Company name is read-only.
+                  </p>
+                </div>
+              </div>
+
+              <div className="py-4 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Domain
+                  </p>
+                  <div className="flex shrink-0 items-start gap-1.5">
+                    {editingBlock === "domain" ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                          onClick={saveBlock}
+                          disabled={saving}
+                        >
+                          {saving ? "Saving…" : "Save"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                          onClick={() => resetBlock("domain")}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={editButtonClass}
+                        onClick={() => setEditingBlock("domain")}
+                      >
+                        <PencilLine className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                        შეცვლა
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {editingBlock === "domain" ? (
+                  <div className="w-full space-y-2 md:max-w-md">
+                    <Input
+                      id="agg-domain"
+                      className="h-9 w-full md:h-10"
+                      value={domain}
+                      onChange={(e) => setDomain(e.target.value)}
+                      disabled={saving}
+                      aria-invalid={Boolean(fieldMessage("domain"))}
+                    />
+                    {fieldMessage("domain") ? (
+                      <p className="text-xs text-destructive">
+                        {fieldMessage("domain")}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm break-words">{domain || "—"}</p>
                 )}
-              />
-              {fieldMessage.social_links || fieldMessage.linkedin ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.social_links || fieldMessage.linkedin}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Industries</Label>
-              {industryCatalog.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Industry list unavailable. Try again later.
-                </p>
-              ) : (
-                <IndustryMultiSelect
-                  industries={industryCatalog}
-                  value={industryIds}
-                  onChange={setIndustryIds}
-                  disabled={saving}
-                  searchInputClassName="md:max-w-[260px]"
-                  chipClassName="min-h-10 px-3 text-sm"
-                />
-              )}
-              {fieldMessage.industry_ids || fieldMessage.industry_names ? (
-                <p className="text-xs text-destructive">
-                  {fieldMessage.industry_ids || fieldMessage.industry_names}
-                </p>
-              ) : null}
+              </div>
+
+              <div className="py-4 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    LinkedIn
+                  </p>
+                  <div className="flex shrink-0 items-start gap-1.5">
+                    {editingBlock === "linkedin" ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                          onClick={saveBlock}
+                          disabled={saving}
+                        >
+                          {saving ? "Saving…" : "Save"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                          onClick={() => resetBlock("linkedin")}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className={editButtonClass}
+                        onClick={() => setEditingBlock("linkedin")}
+                      >
+                        <PencilLine className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                        შეცვლა
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {editingBlock === "linkedin" ? (
+                  <div className="w-full space-y-2 md:max-w-xl">
+                    <Input
+                      id="agg-li"
+                      type="url"
+                      className="h-9 w-full md:h-10"
+                      value={linkedin}
+                      onChange={(e) => setLinkedin(e.target.value)}
+                      disabled={saving}
+                      placeholder="https://linkedin.com/company/…"
+                      aria-invalid={Boolean(
+                        fieldMessage("social_links") || fieldMessage("linkedin"),
+                      )}
+                    />
+                    {fieldMessage("social_links") || fieldMessage("linkedin") ? (
+                      <p className="text-xs text-destructive">
+                        {fieldMessage("social_links") || fieldMessage("linkedin")}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm break-words">{linkedin || "—"}</p>
+                )}
+              </div>
+
+              <div className="py-4 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Website and company email
+                  </p>
+                  {editingBlock === "websiteEmail" ? (
+                    <div className="flex shrink-0 items-start gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={saveBlock}
+                        disabled={saving}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={() => resetBlock("websiteEmail")}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className={editButtonClass}
+                      onClick={() => setEditingBlock("websiteEmail")}
+                    >
+                      <PencilLine className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                      შეცვლა
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Website</p>
+                    {editingBlock === "websiteEmail" ? (
+                      <>
+                        <Input
+                          id="agg-website"
+                          className="h-9 w-full md:h-10"
+                          value={website}
+                          onChange={(e) => setWebsite(e.target.value)}
+                          disabled={saving}
+                          placeholder="https://…"
+                          aria-invalid={Boolean(fieldMessage("website"))}
+                        />
+                        {fieldMessage("website") ? (
+                          <p className="text-xs text-destructive">
+                            {fieldMessage("website")}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-sm break-words">{website || "—"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Company email
+                    </p>
+                    {editingBlock === "websiteEmail" ? (
+                      <>
+                        <Input
+                          id="agg-email"
+                          type="email"
+                          className="h-9 w-full md:h-10"
+                          value={companyEmail}
+                          onChange={(e) => setCompanyEmail(e.target.value)}
+                          disabled={saving}
+                          aria-invalid={Boolean(fieldMessage("company_email"))}
+                        />
+                        {fieldMessage("company_email") ? (
+                          <p className="text-xs text-destructive">
+                            {fieldMessage("company_email")}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-sm break-words">
+                        {companyEmail || "—"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              
             </div>
           </div>
 
-          {fieldMessage.non_field_errors ? (
+          <div className="rounded-3xl bg-white">
+            <div className="px-7 pt-7">
+              <h3 className="text-base font-semibold">Company Details</h3>
+            </div>
+            <div className="px-4 py-2 divide-y divide-border/60">
+              <div className="py-4 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Description
+                  </p>
+                  {editingBlock === "description" ? (
+                    <div className="flex shrink-0 items-start gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={saveBlock}
+                        disabled={saving}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={() => resetBlock("description")}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className={editButtonClass}
+                      onClick={() => setEditingBlock("description")}
+                    >
+                      <PencilLine className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                      შეცვლა
+                    </Button>
+                  )}
+                </div>
+                {editingBlock === "description" ? (
+                  <div className="max-w-3xl space-y-2">
+                    <Textarea
+                      id="agg-desc"
+                      className="min-h-[120px] text-sm"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      disabled={saving}
+                      rows={5}
+                      aria-invalid={Boolean(fieldMessage("description"))}
+                    />
+                    {fieldMessage("description") ? (
+                      <p className="text-xs text-destructive">
+                        {fieldMessage("description")}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {description || "—"}
+                  </p>
+                )}
+              </div>
+
+              <div className="py-4 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Founded date and employees
+                  </p>
+                  {editingBlock === "foundedEmployees" ? (
+                    <div className="flex shrink-0 items-start gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={saveBlock}
+                        disabled={saving}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={() => resetBlock("foundedEmployees")}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className={editButtonClass}
+                      onClick={() => setEditingBlock("foundedEmployees")}
+                    >
+                      <PencilLine className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                      შეცვლა
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Founded date
+                    </p>
+                    {editingBlock === "foundedEmployees" ? (
+                      <>
+                        <Input
+                          id="agg-founded"
+                          type="date"
+                          className="h-9 w-full md:h-10"
+                          value={foundedDate}
+                          onChange={(e) => setFoundedDate(e.target.value)}
+                          disabled={saving}
+                          aria-invalid={Boolean(fieldMessage("founded_date"))}
+                        />
+                        {fieldMessage("founded_date") ? (
+                          <p className="text-xs text-destructive">
+                            {fieldMessage("founded_date")}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-sm">{foundedDate || "—"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Employees (range)
+                    </p>
+                    {editingBlock === "foundedEmployees" ? (
+                      <>
+                        <Select
+                          value={
+                            normalizeEmployeeBand(employeesCount) || undefined
+                          }
+                          onValueChange={setEmployeesCount}
+                          disabled={saving}
+                        >
+                          <SelectTrigger
+                            id="agg-employees"
+                            className="h-9 w-full md:h-10"
+                            aria-invalid={Boolean(
+                              fieldMessage("employees_count"),
+                            )}
+                          >
+                            <SelectValue placeholder="Select range" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EMPLOYEE_BANDS.map((opt) => (
+                              <SelectItem key={opt} value={opt}>
+                                {opt}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {fieldMessage("employees_count") ? (
+                          <p className="text-xs text-destructive">
+                            {fieldMessage("employees_count")}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="text-sm">{employeesCount || "—"}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="py-4 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Industries
+                  </p>
+                  {editingBlock === "industries" ? (
+                    <div className="flex shrink-0 items-start gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={saveBlock}
+                        disabled={saving}
+                      >
+                        {saving ? "Saving…" : "Save"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
+                        onClick={() => resetBlock("industries")}
+                        disabled={saving}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className={editButtonClass}
+                      onClick={() => setEditingBlock("industries")}
+                    >
+                      <PencilLine className="mr-1.5 h-3.5 w-3.5 md:h-4 md:w-4" />
+                      შეცვლა
+                    </Button>
+                  )}
+                </div>
+                {editingBlock === "industries" ? (
+                  <>
+                    {industryCatalog.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Industry list unavailable. Try again later.
+                      </p>
+                    ) : (
+                      <IndustryMultiSelect
+                        industries={industryCatalog}
+                        value={industryIds}
+                        onChange={setIndustryIds}
+                        disabled={saving}
+                        searchInputClassName="md:max-w-[260px]"
+                        chipClassName="min-h-10 px-3 text-sm"
+                      />
+                    )}
+                    {fieldMessage("industry_ids") ||
+                    fieldMessage("industry_names") ? (
+                      <p className="text-xs text-destructive">
+                        {fieldMessage("industry_ids") ||
+                          fieldMessage("industry_names")}
+                      </p>
+                    ) : null}
+                  </>
+                ) : industryIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {industryIds.map((id) => {
+                      const label =
+                        industryCatalog.find((i) => i.id === id)?.name?.trim() ||
+                        `Industry ${id}`;
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex min-h-10 items-center rounded-md bg-gray-100 px-3 py-2 text-sm text-foreground dark:bg-[#2d2d2d]"
+                        >
+                          {label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm">—</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {fieldMessage("non_field_errors") ? (
             <p className="text-sm text-destructive">
-              {fieldMessage.non_field_errors}
+              {fieldMessage("non_field_errors")}
             </p>
           ) : null}
-
-          <Button onClick={handleSave} disabled={saving || detailLoading}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
-        </>
+        </div>
       )}
     </div>
   );

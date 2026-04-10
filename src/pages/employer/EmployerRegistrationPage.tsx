@@ -844,12 +844,11 @@ const EmployerRegistrationPage = () => {
               Employer registration
             </h1>
             <p className="mb-8 text-muted-foreground">
-              Step {step} of 3 —{" "}
               {step === 1
-                ? "Your details & sign up"
+                ? "Insert your details & sign up"
                 : step === 2
                   ? "Verify your email"
-                  : "Company details"}
+                  : "Insert company details"}
             </p>
 
             {step === 1 && (

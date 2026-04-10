@@ -524,13 +524,13 @@ export default function EmployerProfilePage() {
           </CardHeader>
         </Card>
 
-        <Card className="border-0 rounded-3xl">
-          <CardHeader className="p-4 pb-2 border-b-0">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+        <div className="space-y-3">
+          <CardHeader className="p-0 pb-1 border-b-0">
+            {/* <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               Company
-            </h3>
+            </h3> */}
           </CardHeader>
-          <CardContent className="px-6 pb-6 space-y-4">
+          <CardContent className="p-0 space-y-4">
             {aggregatorLoading ? (
               <p className="text-sm text-muted-foreground">Loading company…</p>
             ) : aggregatorCompanies.length > 0 ? (
@@ -560,7 +560,7 @@ export default function EmployerProfilePage() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </div>
       </div>
 
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
