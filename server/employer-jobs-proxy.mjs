@@ -1570,11 +1570,68 @@ function buildAggregatorPayload(body, company, isPatch = false) {
   if (has("location")) {
     if (body.location != null && String(body.location).trim() !== "") {
       payload.location = String(body.location).trim();
+      if (!has("city")) payload.city = String(body.location).trim();
     } else if (isPatch) {
       payload.location = "";
+      if (!has("city")) payload.city = "";
     }
   } else if (!isPatch && body.location != null && String(body.location).trim() !== "") {
     payload.location = String(body.location).trim();
+    if (!has("city")) payload.city = String(body.location).trim();
+  }
+
+  if (has("location_country")) {
+    if (
+      body.location_country != null &&
+      String(body.location_country).trim() !== ""
+    ) {
+      payload.location_country = String(body.location_country).trim();
+      if (!has("country")) payload.country = String(body.location_country).trim();
+    } else if (isPatch) {
+      payload.location_country = "";
+      if (!has("country")) payload.country = "";
+    }
+  } else if (
+    !isPatch &&
+    body.location_country != null &&
+    String(body.location_country).trim() !== ""
+  ) {
+    payload.location_country = String(body.location_country).trim();
+    if (!has("country")) payload.country = String(body.location_country).trim();
+  }
+
+  if (has("city")) {
+    if (body.city != null && String(body.city).trim() !== "") {
+      payload.city = String(body.city).trim();
+      if (!has("location")) payload.location = String(body.city).trim();
+    } else if (isPatch) {
+      payload.city = "";
+      if (!has("location")) payload.location = "";
+    }
+  } else if (!isPatch && body.city != null && String(body.city).trim() !== "") {
+    payload.city = String(body.city).trim();
+    if (!has("location")) payload.location = String(body.city).trim();
+  }
+
+  if (has("country")) {
+    if (body.country != null && String(body.country).trim() !== "") {
+      payload.country = String(body.country).trim();
+      if (!has("location_country")) {
+        payload.location_country = String(body.country).trim();
+      }
+    } else if (isPatch) {
+      payload.country = "";
+      if (!has("location_country")) payload.location_country = "";
+    }
+  } else if (
+    !isPatch &&
+    body.country != null &&
+    String(body.country).trim() !== ""
+  ) {
+    payload.country = String(body.country).trim();
+    if (!has("location_country")) {
+      payload.location_country = String(body.country).trim();
+    }
   }
 
   if (has("salary")) {

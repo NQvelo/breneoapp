@@ -11,6 +11,9 @@ export type EmployerJob = {
   id: string;
   title: string;
   description: string;
+  country?: string;
+  city?: string;
+  location_country?: string;
   location: string;
   employment_type: string;
   apply_url: string;
@@ -127,8 +130,25 @@ function pickAggregatorListField(
 }
 
 function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
+  const firstNonEmpty = (...vals: unknown[]): string => {
+    for (const v of vals) {
+      const s = String(v ?? "").trim();
+      if (s) return s;
+    }
+    return "";
+  };
   const src = "aggregator";
   const wm = String(raw.work_mode ?? "");
+  const rawEnvelope =
+    raw.raw && typeof raw.raw === "object" && !Array.isArray(raw.raw)
+      ? (raw.raw as Record<string, unknown>)
+      : null;
+  const employerSubmitted =
+    rawEnvelope?.employer_submitted &&
+    typeof rawEnvelope.employer_submitted === "object" &&
+    !Array.isArray(rawEnvelope.employer_submitted)
+      ? (rawEnvelope.employer_submitted as Record<string, unknown>)
+      : null;
   const companyRaw = raw.company;
   const companyObj =
     companyRaw && typeof companyRaw === "object"
@@ -181,7 +201,42 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
     id: jobId,
     title: String(raw.title ?? raw.job_title ?? ""),
     description: editorBody,
-    location: String(raw.location ?? raw.job_location ?? ""),
+    country: firstNonEmpty(
+      raw.country,
+      raw.location_country,
+      employerSubmitted?.location_country,
+      employerSubmitted?.locationCountry,
+      employerSubmitted?.country,
+      rawEnvelope?.location_country,
+      rawEnvelope?.locationCountry,
+      rawEnvelope?.country,
+      companyObj?.country,
+    ),
+    city: firstNonEmpty(
+      raw.city,
+      raw.location,
+      raw.job_location,
+      employerSubmitted?.city,
+      rawEnvelope?.city,
+    ),
+    location_country: firstNonEmpty(
+      raw.location_country,
+      raw.country,
+      employerSubmitted?.location_country,
+      employerSubmitted?.locationCountry,
+      employerSubmitted?.country,
+      rawEnvelope?.location_country,
+      rawEnvelope?.locationCountry,
+      rawEnvelope?.country,
+      companyObj?.country,
+    ),
+    location: firstNonEmpty(
+      raw.location,
+      raw.city,
+      raw.job_location,
+      employerSubmitted?.city,
+      rawEnvelope?.city,
+    ),
     employment_type: String(
       raw.employment_type ?? raw.job_type ?? raw.type ?? workModeLabel(wm),
     ),

@@ -17,6 +17,9 @@ export type PublishEmployerJobBody = {
   title: string;
   full_description: string;
   work_mode: AggregatorWorkMode;
+  country?: string;
+  city?: string;
+  location_country?: string;
   location?: string;
   salary?: string;
   /** Omit or null when empty */

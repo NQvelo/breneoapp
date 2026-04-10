@@ -52,6 +52,7 @@ import {
   fetchEmployerAggregatorCompanies,
   resolveEmployerJobsCompanyFilter,
 } from "@/api/employer/aggregatorBffApi";
+import { City, Country } from "country-state-city";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -72,6 +73,8 @@ const WORK_MODE_OPTIONS: { value: AggregatorWorkMode; label: string }[] = [
   { value: "onsite", label: "Onsite" },
   { value: "unknown", label: "Not specified" },
 ];
+
+const WORLD_COUNTRIES = Country.getAllCountries();
 
 function normalizeBulletLinesKey(text: string): string {
   return text
@@ -113,7 +116,13 @@ export default function EmployerAddJobPage() {
   const [description, setDescription] = useState("");
   const [responsibilitiesText, setResponsibilitiesText] = useState("");
   const [qualificationsText, setQualificationsText] = useState("");
+  const [locationCountry, setLocationCountry] = useState("");
   const [location, setLocation] = useState("");
+  const [countryQuery, setCountryQuery] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+  const [selectedCountryIsoCode, setSelectedCountryIsoCode] = useState("");
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
   const [employmentType, setEmploymentType] = useState<string>(
     EMPLOYMENT_TYPES[0],
   );
@@ -127,6 +136,7 @@ export default function EmployerAddJobPage() {
     responsibilities_key: string;
     qualifications_key: string;
     work_mode: AggregatorWorkMode;
+    location_country: string;
     location: string;
     salary: string;
     apply_url: string;
@@ -218,7 +228,16 @@ export default function EmployerAddJobPage() {
         setDescription(job.description);
         setResponsibilitiesText((job.responsibilities ?? []).join("\n"));
         setQualificationsText((job.qualifications ?? []).join("\n"));
-        setLocation(job.location);
+        const jobCountry = String(job.location_country ?? job.country ?? "").trim();
+        setLocationCountry(jobCountry);
+        setCountryQuery(jobCountry);
+        const matchedCountry = WORLD_COUNTRIES.find(
+          (c) => c.name.toLowerCase() === jobCountry.toLowerCase(),
+        );
+        setSelectedCountryIsoCode(matchedCountry?.isoCode ?? "");
+        const jobCity = String(job.location ?? job.city ?? "").trim();
+        setLocation(jobCity);
+        setCityQuery(jobCity);
         setEmploymentType(
           EMPLOYMENT_TYPES.includes(
             job.employment_type as (typeof EMPLOYMENT_TYPES)[number],
@@ -260,7 +279,8 @@ export default function EmployerAddJobPage() {
           responsibilities_key: normalizeBulletLinesKey(respJoined),
           qualifications_key: normalizeBulletLinesKey(qualJoined),
           work_mode: resolvedWorkMode,
-          location: String(job.location ?? "").trim(),
+          location_country: jobCountry,
+          location: jobCity,
           salary: String(job.salary ?? "").trim(),
           apply_url: String(job.apply_url ?? "").trim(),
           is_active: job.is_active !== false,
@@ -279,6 +299,69 @@ export default function EmployerAddJobPage() {
 
   /** Gemini runs on the server only when publishing a new job (not on edit — structured fields are manual). */
   const willExtractDescriptionOnSave = useMemo(() => !isEdit, [isEdit]);
+
+  const filteredCountries = useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return WORLD_COUNTRIES.filter((c) => c.name.toLowerCase().includes(q)).slice(
+      0,
+      20,
+    );
+  }, [countryQuery]);
+
+  const cityOptions = useMemo(() => {
+    if (!selectedCountryIsoCode) return [];
+    return City.getCitiesOfCountry(selectedCountryIsoCode);
+  }, [selectedCountryIsoCode]);
+
+  const filteredCities = useMemo(() => {
+    const q = cityQuery.trim().toLowerCase();
+    if (!selectedCountryIsoCode || q.length < 2) return [];
+    return cityOptions
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .slice(0, 30);
+  }, [cityQuery, selectedCountryIsoCode, cityOptions]);
+
+  const selectCountry = (name: string, isoCode: string) => {
+    setLocationCountry(name);
+    setCountryQuery(name);
+    setSelectedCountryIsoCode(isoCode);
+    setCountryOpen(false);
+    setLocation("");
+    setCityQuery("");
+    setCityOpen(false);
+  };
+
+  const selectCity = (name: string) => {
+    setLocation(name);
+    setCityQuery(name);
+    setCityOpen(false);
+  };
+
+  const tryResolveCountryFromQuery = (rawQuery: string): boolean => {
+    const q = rawQuery.trim().toLowerCase();
+    if (!q) return false;
+    const exact = WORLD_COUNTRIES.find((c) => c.name.toLowerCase() === q);
+    if (!exact) return false;
+    setLocationCountry(exact.name);
+    setCountryQuery(exact.name);
+    if (selectedCountryIsoCode !== exact.isoCode) {
+      setSelectedCountryIsoCode(exact.isoCode);
+      setLocation("");
+      setCityQuery("");
+    }
+    return true;
+  };
+
+  const tryResolveCityFromQuery = (rawQuery: string): boolean => {
+    const q = rawQuery.trim().toLowerCase();
+    if (!q || !selectedCountryIsoCode) return false;
+    const exact = cityOptions.find((c) => c.name.toLowerCase() === q);
+    if (!exact) return false;
+    setLocation(exact.name);
+    setCityQuery(exact.name);
+    return true;
+  };
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -299,6 +382,39 @@ export default function EmployerAddJobPage() {
       return;
     }
 
+    const normalizedCountry = locationCountry.trim();
+    const normalizedCity = location.trim();
+    if (normalizedCity && !normalizedCountry) {
+      setFieldErrors({ location_country: ["Location country is required."] });
+      toast.error("Select a location country first.");
+      return;
+    }
+    if (normalizedCountry && !normalizedCity) {
+      setFieldErrors({ location: ["Location city is required."] });
+      toast.error("Select a location city.");
+      return;
+    }
+    if (normalizedCountry) {
+      const countryObj = WORLD_COUNTRIES.find(
+        (c) => c.name.toLowerCase() === normalizedCountry.toLowerCase(),
+      );
+      if (!countryObj) {
+        setFieldErrors({ location_country: ["Select a valid country."] });
+        toast.error("Select a valid country from the list.");
+        return;
+      }
+      const validCity = City.getCitiesOfCountry(countryObj.isoCode).some(
+        (c) => c.name.toLowerCase() === normalizedCity.toLowerCase(),
+      );
+      if (!validCity) {
+        setFieldErrors({
+          location: ["Select a city that belongs to the selected country."],
+        });
+        toast.error("Selected city does not belong to the selected country.");
+        return;
+      }
+    }
+
     setFieldErrors({});
     setSaving(true);
     try {
@@ -307,7 +423,10 @@ export default function EmployerAddJobPage() {
           title: title.trim(),
           full_description: description.trim(),
           work_mode: workMode,
-          location: location.trim(),
+          country: normalizedCountry,
+          city: normalizedCity,
+          location_country: normalizedCountry,
+          location: normalizedCity,
           salary: salary.trim(),
           apply_url: applyCheck.url || "",
           is_active: isActive,
@@ -316,6 +435,9 @@ export default function EmployerAddJobPage() {
           title: string;
           full_description: string;
           work_mode: AggregatorWorkMode;
+          country: string;
+          city: string;
+          location_country: string;
           location: string;
           salary: string;
           apply_url: string | null;
@@ -333,6 +455,15 @@ export default function EmployerAddJobPage() {
         }
         if (!snap || nextState.work_mode !== snap.work_mode) {
           patch.work_mode = nextState.work_mode;
+        }
+        if (!snap || nextState.country !== snap.location_country) {
+          patch.country = nextState.country;
+        }
+        if (!snap || nextState.city !== snap.location) {
+          patch.city = nextState.city;
+        }
+        if (!snap || nextState.location_country !== snap.location_country) {
+          patch.location_country = nextState.location_country;
         }
         if (!snap || nextState.location !== snap.location) {
           patch.location = nextState.location;
@@ -372,7 +503,10 @@ export default function EmployerAddJobPage() {
           title: title.trim(),
           full_description: description.trim(),
           work_mode: workMode,
-          location: location.trim() || undefined,
+          country: normalizedCountry || undefined,
+          city: normalizedCity || undefined,
+          location_country: normalizedCountry || undefined,
+          location: normalizedCity || undefined,
           salary: salary.trim() || undefined,
           apply_url: applyCheck.url || null,
           is_active: isActive,
@@ -564,17 +698,172 @@ export default function EmployerAddJobPage() {
             ) : null}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
+              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2 sm:col-span-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <MapPin className="h-4 w-4 text-breneo-blue" />
                   Location
                 </div>
-                <Input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Tbilisi, Georgia"
-                  className="bg-white dark:bg-background"
-                />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="job-location-country"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Country
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="job-location-country"
+                        value={countryQuery}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setCountryQuery(next);
+                          setLocationCountry(next);
+                          setCountryOpen(true);
+                          const exact = WORLD_COUNTRIES.find(
+                            (c) => c.name.toLowerCase() === next.trim().toLowerCase(),
+                          );
+                          if (exact) {
+                            if (selectedCountryIsoCode !== exact.isoCode) {
+                              setSelectedCountryIsoCode(exact.isoCode);
+                              setLocation("");
+                              setCityQuery("");
+                            }
+                          } else {
+                            setSelectedCountryIsoCode("");
+                            setLocation("");
+                            setCityQuery("");
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!tryResolveCountryFromQuery(countryQuery)) {
+                              const first = filteredCountries[0];
+                              if (first) selectCountry(first.name, first.isoCode);
+                            }
+                            setCountryOpen(false);
+                          }
+                        }}
+                        onFocus={() => setCountryOpen(true)}
+                        onBlur={() => {
+                          tryResolveCountryFromQuery(countryQuery);
+                          setTimeout(() => setCountryOpen(false), 120);
+                        }}
+                        placeholder="Select country"
+                        className="bg-white dark:bg-background"
+                        autoComplete="off"
+                      />
+                      {countryOpen ? (
+                        <div className="absolute z-40 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                          {countryQuery.trim().length < 2 ? (
+                            <p className="px-3 py-2 text-sm text-muted-foreground">
+                              Type at least 2 characters
+                            </p>
+                          ) : filteredCountries.length === 0 ? (
+                            <p className="px-3 py-2 text-sm text-muted-foreground">
+                              No matches found
+                            </p>
+                          ) : (
+                            filteredCountries.map((country) => (
+                              <button
+                                key={country.isoCode}
+                                type="button"
+                                className="block w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() =>
+                                  selectCountry(country.name, country.isoCode)
+                                }
+                              >
+                                {country.name}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                    {fieldErrors.location_country?.[0] ? (
+                      <p className="text-sm text-destructive">
+                        {fieldErrors.location_country[0]}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="job-location-city"
+                      className="text-xs text-muted-foreground"
+                    >
+                      City
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="job-location-city"
+                        value={cityQuery}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setCityQuery(next);
+                          setLocation(next);
+                          setCityOpen(true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!tryResolveCityFromQuery(cityQuery)) {
+                              const first = filteredCities[0];
+                              if (first) selectCity(first.name);
+                            }
+                            setCityOpen(false);
+                          }
+                        }}
+                        onFocus={() => selectedCountryIsoCode && setCityOpen(true)}
+                        onBlur={() => {
+                          tryResolveCityFromQuery(cityQuery);
+                          setTimeout(() => setCityOpen(false), 120);
+                        }}
+                        placeholder="Select city"
+                        className="bg-white dark:bg-background"
+                        autoComplete="off"
+                        disabled={!selectedCountryIsoCode}
+                      />
+                      {cityOpen && selectedCountryIsoCode ? (
+                        <div className="absolute z-40 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                          {cityQuery.trim().length < 2 ? (
+                            <p className="px-3 py-2 text-sm text-muted-foreground">
+                              Type at least 2 characters
+                            </p>
+                          ) : filteredCities.length === 0 ? (
+                            <p className="px-3 py-2 text-sm text-muted-foreground">
+                              No matches found
+                            </p>
+                          ) : (
+                            filteredCities.map((city) => (
+                              <button
+                                key={`${city.countryCode}-${city.name}-${city.latitude}-${city.longitude}`}
+                                type="button"
+                                className="block w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => selectCity(city.name)}
+                              >
+                                {city.name}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                    {!selectedCountryIsoCode ? (
+                      <p className="text-xs text-muted-foreground">
+                        Select a country first
+                      </p>
+                    ) : null}
+                    {fieldErrors.location?.[0] ? (
+                      <p className="text-sm text-destructive">
+                        {fieldErrors.location[0]}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
               </div>
 
               <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
