@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
@@ -58,6 +59,8 @@ import {
   type AggregatorCompany,
   type AggregatorIndustry,
 } from "@/api/employer/aggregatorBffApi";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { getLocalizedPath } from "@/utils/localeUtils";
 
 const EMP_AGG_EMPLOYEE_OPTIONS = [
   "1-10",
@@ -69,6 +72,8 @@ const EMP_AGG_EMPLOYEE_OPTIONS = [
 ] as const;
 
 export default function EmployerProfilePage() {
+  const navigate = useNavigate();
+  const { language } = useLanguage();
   const {
     user,
     loading: authLoading,
@@ -499,7 +504,9 @@ export default function EmployerProfilePage() {
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 rounded-full ml-auto"
-                onClick={() => setIsEditing(true)}
+                onClick={() =>
+                  navigate(getLocalizedPath("/employer/settings", language))
+                }
                 aria-label="Account settings"
               >
                 <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
@@ -566,7 +573,9 @@ export default function EmployerProfilePage() {
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">
-              <span className="text-sm font-medium leading-none">Company logo</span>
+              <span className="text-sm font-medium leading-none">
+                Company logo
+              </span>
               <div className="flex items-center gap-4">
                 <div className="h-20 w-20 shrink-0 rounded-full ring-2 ring-border overflow-hidden">
                   <OptimizedAvatar
@@ -722,7 +731,7 @@ export default function EmployerProfilePage() {
                 onValueChange={setPickerEmployees}
                 disabled={pickerSaving}
               >
-                <SelectTrigger className="h-[3rem]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select range" />
                 </SelectTrigger>
                 <SelectContent>

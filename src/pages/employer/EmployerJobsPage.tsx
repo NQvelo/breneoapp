@@ -22,7 +22,6 @@ import {
   fetchEmployerJobsFiltered,
   type EmployerJob,
 } from "@/api/employer/jobsApi";
-import { getEmployerJobsApiDebugInfo } from "@/api/employer/employerJobsApiBase";
 import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -119,21 +118,6 @@ export default function EmployerJobsPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const shown = window.sessionStorage.getItem(
-      "EMPLOYER_API_BASE_DEBUG_TOAST_SHOWN",
-    );
-    if (shown === "1") return;
-    const info = getEmployerJobsApiDebugInfo();
-    const modeLabel =
-      info.mode === "same-origin-bff" ? "same-origin BFF" : "custom BFF";
-    toast.info(`Employer API: ${info.baseUrl} (${modeLabel})`, {
-      duration: 9000,
-    });
-    window.sessionStorage.setItem("EMPLOYER_API_BASE_DEBUG_TOAST_SHOWN", "1");
-  }, []);
 
   const activeJobs = useMemo(
     () => jobs.filter((job) => job.is_active !== false),

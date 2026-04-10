@@ -285,7 +285,11 @@ export function AppSidebar({
     : isEmployer
       ? "/employer/profile"
       : "/profile";
-  const settingsPath = isAcademy ? "/academy/settings" : "/settings";
+  const settingsPath = isAcademy
+    ? "/academy/settings"
+    : isEmployer
+      ? "/employer/settings"
+      : "/settings";
   const homePath = isAcademy
     ? "/academy/home"
     : isEmployer
@@ -508,90 +512,92 @@ export function AppSidebar({
           <div className="px-4 pb-4">
             <div className="mb-4"></div>
 
-            {/* Settings, Help Center, Theme Toggle grouped together */}
-            {!isEmployer && (
-              <div className="space-y-1 mb-4">
-                <LocalizedLink
-                  to={settingsPath}
+            {/* Settings (all roles); Help + Pro for learners/academy only */}
+            <div className="mb-4 space-y-1">
+              <LocalizedLink
+                to={settingsPath}
+                className={cn(
+                  "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                  currentPath === settingsPath
+                    ? "bg-breneo-blue/10 text-breneo-blue"
+                    : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
+                )}
+              >
+                <Settings
+                  size={22}
                   className={cn(
-                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                    "flex-shrink-0 transition-colors duration-200",
                     currentPath === settingsPath
-                      ? "bg-breneo-blue/10 text-breneo-blue"
-                      : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
+                      ? "text-breneo-blue"
+                      : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
                   )}
-                >
-                  <Settings
-                    size={22}
-                    className={cn(
-                      "flex-shrink-0 transition-colors duration-200",
-                      currentPath === settingsPath
-                        ? "text-breneo-blue"
-                        : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
-                    )}
-                  />
-                  {!collapsed && (
-                    <span className="font-medium text-base">
-                      {t.nav.settings}
-                    </span>
-                  )}
-                </LocalizedLink>
+                />
+                {!collapsed && (
+                  <span className="font-medium text-base">
+                    {t.nav.settings}
+                  </span>
+                )}
+              </LocalizedLink>
 
-                <LocalizedLink
-                  to="/help"
-                  className={cn(
-                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                    currentPath === "/help"
-                      ? "bg-breneo-blue/10 text-breneo-blue"
-                      : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
-                  )}
-                >
-                  <HelpCircle
-                    size={22}
+              {!isEmployer && (
+                <>
+                  <LocalizedLink
+                    to="/help"
                     className={cn(
-                      "flex-shrink-0 transition-colors duration-200",
+                      "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                       currentPath === "/help"
-                        ? "text-breneo-blue"
-                        : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
-                    )}
-                  />
-                  {!collapsed && (
-                    <span className="font-medium text-base">{t.nav.help}</span>
-                  )}
-                </LocalizedLink>
-
-                {/* Breneo Pro Plan Widget - Desktop Only */}
-                {!isAcademy && (
-                  <button
-                    onClick={onUpgradeClick}
-                    className={cn(
-                      "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                      "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
-                      "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50 text-left",
-                      collapsed && "justify-center px-4",
+                        ? "bg-breneo-blue/10 text-breneo-blue"
+                        : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
                     )}
                   >
-                    {subscriptionInfo?.is_active ? (
-                      <Sparkles
-                        size={22}
-                        className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
-                      />
-                    ) : (
-                      <ArrowRight
-                        size={22}
-                        className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
-                      />
-                    )}
+                    <HelpCircle
+                      size={22}
+                      className={cn(
+                        "flex-shrink-0 transition-colors duration-200",
+                        currentPath === "/help"
+                          ? "text-breneo-blue"
+                          : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
+                      )}
+                    />
                     {!collapsed && (
-                      <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
-                        {subscriptionInfo?.is_active
-                          ? subscriptionInfo.plan_name || "Pro Plan"
-                          : t.subscription.upgrade}
-                      </span>
+                      <span className="font-medium text-base">{t.nav.help}</span>
                     )}
-                  </button>
-                )}
-              </div>
-            )}
+                  </LocalizedLink>
+
+                  {/* Breneo Pro Plan Widget - Desktop Only */}
+                  {!isAcademy && (
+                    <button
+                      onClick={onUpgradeClick}
+                      className={cn(
+                        "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                        "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
+                        "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50 text-left",
+                        collapsed && "justify-center px-4",
+                      )}
+                    >
+                      {subscriptionInfo?.is_active ? (
+                        <Sparkles
+                          size={22}
+                          className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
+                        />
+                      ) : (
+                        <ArrowRight
+                          size={22}
+                          className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                        />
+                      )}
+                      {!collapsed && (
+                        <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
+                          {subscriptionInfo?.is_active
+                            ? subscriptionInfo.plan_name || "Pro Plan"
+                            : t.subscription.upgrade}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* Profile / employer company */}
             <div className="mt-4 pt-4">

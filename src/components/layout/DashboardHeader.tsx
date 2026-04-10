@@ -80,6 +80,7 @@ const getPageTitle = (
   if (pathname.startsWith("/courses")) return t.courses.title;
   if (
     pathname.startsWith("/settings") ||
+    pathname.startsWith("/employer/settings") ||
     pathname.startsWith("/academy/settings")
   )
     return t.settings.title;

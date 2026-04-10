@@ -1,7 +1,6 @@
 import React, {
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -40,6 +39,11 @@ const EMPLOYEE_BANDS = [
   "501-1000",
   "1000+",
 ] as const;
+
+function normalizeEmployeeBand(raw: string): string {
+  const s = raw.trim();
+  return (EMPLOYEE_BANDS as readonly string[]).includes(s) ? s : "";
+}
 
 function readStr(v: unknown): string {
   if (v == null) return "";
@@ -203,7 +207,6 @@ export function EmployerDirectoryCompanyEditSection({
   breneoUserId,
   onDirectoryUpdated,
 }: EmployerDirectoryCompanyEditSectionProps) {
-  const bandsListId = useId();
   /** Aggregator primary key for `/api/employer/companies/{id}` — not public name-based routes. */
   const [currentCompanyId, setCurrentCompanyId] = useState<number | null>(null);
 
@@ -259,7 +262,7 @@ export function EmployerDirectoryCompanyEditSection({
     setDescription(readStr(c.description));
     setWebsite(readStr(c.website));
     setFoundedDate(foundedDateForInput(c.founded_date));
-    setEmployeesCount(readStr(c.employees_count));
+    setEmployeesCount(normalizeEmployeeBand(readStr(c.employees_count)));
     setCompanyEmail(readStr(c.company_email));
     setLinkedin(linkedinFromSocial(c.social_links));
     setAdditionalDetailsText(additionalDetailsToText(c.additional_details));
@@ -286,7 +289,7 @@ export function EmployerDirectoryCompanyEditSection({
       description: readStr(c.description),
       website: readStr(c.website),
       founded_date: foundedDateForInput(c.founded_date),
-      employees_count: readStr(c.employees_count),
+      employees_count: normalizeEmployeeBand(readStr(c.employees_count)),
       company_email: readStr(c.company_email),
       linkedin: linkedinFromSocial(c.social_links),
       raw_social_links: rawSl,
@@ -693,20 +696,28 @@ export function EmployerDirectoryCompanyEditSection({
             </div>
             <div className="space-y-2">
               <Label htmlFor="agg-employees">Employees (range)</Label>
-              <Input
-                id="agg-employees"
-                value={employeesCount}
-                onChange={(e) => setEmployeesCount(e.target.value)}
+              <Select
+                value={
+                  normalizeEmployeeBand(employeesCount) || undefined
+                }
+                onValueChange={setEmployeesCount}
                 disabled={saving}
-                placeholder="e.g. 51-200"
-                list={bandsListId}
-                aria-invalid={Boolean(fieldMessage.employees_count)}
-              />
-              <datalist id={bandsListId}>
-                {EMPLOYEE_BANDS.map((opt) => (
-                  <option key={opt} value={opt} />
-                ))}
-              </datalist>
+              >
+                <SelectTrigger
+                  id="agg-employees"
+                  className="w-full"
+                  aria-invalid={Boolean(fieldMessage.employees_count)}
+                >
+                  <SelectValue placeholder="Select range" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMPLOYEE_BANDS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {fieldMessage.employees_count ? (
                 <p className="text-xs text-destructive">
                   {fieldMessage.employees_count}
@@ -763,7 +774,7 @@ export function EmployerDirectoryCompanyEditSection({
           ) : null}
 
           <Button onClick={handleSave} disabled={saving || detailLoading}>
-            {saving ? "Saving…" : "Save directory company"}
+            {saving ? "Saving…" : "Save"}
           </Button>
         </>
       )}

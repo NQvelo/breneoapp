@@ -9,7 +9,7 @@ export const ka = {
     settings: "პარამეტრები",
     help: "დახმარების ცენტრი",
     notifications: "შეტყობინებები",
-    yourJobs: "თქვენი ვაკანსიები",
+    yourJobs: "ვაკანსიები",
     members: "წევრები",
   },
   // Common
@@ -126,8 +126,7 @@ export const ka = {
     enrolledStudentsBox: "დარეგისტრირებული სტუდენტები",
     enrolledStudentsListTitle: "ამ კურსზე დარეგისტრირებული სტუდენტები",
     viewEnrolledStudents: "სტუდენტების ნახვა",
-    enrolledStudentsModalEmpty:
-      "ამ კურსზე ჯერ არავინ არის დარეგისტრირებული.",
+    enrolledStudentsModalEmpty: "ამ კურსზე ჯერ არავინ არის დარეგისტრირებული.",
     save: "შენახვა",
     saved: "შენახულია",
     duration: "ხანგრძლივობა",

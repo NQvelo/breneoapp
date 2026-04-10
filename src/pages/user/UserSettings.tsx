@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -41,15 +41,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
   Download,
   Mail,
   Bell,
   CreditCard,
   BookOpen,
   AlertCircle,
-  LogOut,
 } from "lucide-react";
-import { PWAInstallCard } from "@/components/common/PWAInstallCard";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { bogService } from "@/api/bog/bogService";
@@ -74,7 +80,8 @@ const settingsSections: Array<{ id: SettingsSection; label: string }> = [
 ];
 
 export default function SettingsPage() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, employerDisplay, academyDisplay } =
+    useAuth();
   const { theme, setTheme } = useTheme();
   const { fontSize: contextFontSize, setFontSize: setContextFontSize } =
     useFontSize();
@@ -113,6 +120,28 @@ export default function SettingsPage() {
     getInitialSection(),
   );
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+
+  /** Same email shown in AppSidebar (employer company / academy profile when applicable). */
+  const recoveryEmail = useMemo(() => {
+    const role =
+      user?.user_type ||
+      (typeof window !== "undefined"
+        ? localStorage.getItem("userRole")
+        : null) ||
+      "";
+    if (role === "employer" && employerDisplay?.email?.trim()) {
+      return employerDisplay.email.trim();
+    }
+    if (role === "academy" && academyDisplay?.email?.trim()) {
+      return academyDisplay.email.trim();
+    }
+    return (user?.email ?? "").trim();
+  }, [
+    user?.user_type,
+    user?.email,
+    employerDisplay?.email,
+    academyDisplay?.email,
+  ]);
 
   // Handle payment redirect status
   useEffect(() => {
@@ -415,14 +444,14 @@ export default function SettingsPage() {
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordLoading(true);
-    if (!user?.email) {
+    if (!recoveryEmail) {
       toast.error("Email not found. Please log in again.");
       setPasswordLoading(false);
       return;
     }
     try {
       const res = await apiClient.post(API_ENDPOINTS.AUTH.PASSWORD_RESET, {
-        email: user.email,
+        email: recoveryEmail,
       });
       toast.success(res.data.message || "Code sent to your email!");
       setPasswordStep(2);
@@ -439,12 +468,16 @@ export default function SettingsPage() {
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!recoveryEmail) {
+      toast.error("Email not found. Please log in again.");
+      return;
+    }
     setPasswordLoading(true);
     try {
       const res = await apiClient.post(
         API_ENDPOINTS.AUTH.PASSWORD_RESET_VERIFY,
         {
-          email: user?.email,
+          email: recoveryEmail,
           code: code,
         },
       );
@@ -463,6 +496,10 @@ export default function SettingsPage() {
 
   const handleSetNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!recoveryEmail) {
+      toast.error("Email not found. Please log in again.");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -476,7 +513,7 @@ export default function SettingsPage() {
       const res = await apiClient.post(
         API_ENDPOINTS.AUTH.PASSWORD_RESET_CONFIRM,
         {
-          email: user?.email,
+          email: recoveryEmail,
           code: code,
           new_password: newPassword,
           confirm_password: confirmPassword,
@@ -635,35 +672,29 @@ export default function SettingsPage() {
           <div className="space-y-8">
             <h1 className="text-xl font-bold">Account Settings</h1>
 
-            {/* Email & Password */}
             <Card>
               <CardHeader>
-                <CardTitle>Email & Password</CardTitle>
+                <CardTitle>Password recovery</CardTitle>
                 <CardDescription>
-                  Manage your login credentials and security
+                  We&apos;ll send a verification code to the address below (same
+                  as in the sidebar).
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Email Address</Label>
-                  <Input
-                    value={user?.email || ""}
-                    disabled
-                    className="h-[3.2rem] bg-muted/50"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Email cannot be edited. Contact support if you need to
-                    update it.
+                <div className="space-y-1 rounded-lg border border-border/80 bg-muted/40 px-3 py-2.5">
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {recoveryEmail || "—"}
                   </p>
                 </div>
-
-                <Separator />
-
                 <div className="space-y-4">
-                  <Label>Change Password</Label>
+                  <Label>Change password</Label>
                   {passwordStep === 1 && (
                     <form onSubmit={handleSendCode} className="space-y-4">
-                      <Button type="submit" disabled={passwordLoading}>
+                      <Button
+                        type="submit"
+                        disabled={passwordLoading || !recoveryEmail}
+                      >
                         {passwordLoading
                           ? "Sending..."
                           : "Send Verification Code"}
@@ -723,26 +754,6 @@ export default function SettingsPage() {
                     </form>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Log out */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Log out</CardTitle>
-                <CardDescription>
-                  Sign out of your account on this device
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button
-                  variant="outline"
-                  className="text-red-600 border-red-200 hover:border-red-300 dark:border-red-900/50 dark:text-red-600 dark:hover:border-red-800 hover:bg-red-300/20 dark:hover:bg-red-900/20"
-                  onClick={() => setLogoutConfirmOpen(true)}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Log out
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -1332,97 +1343,157 @@ export default function SettingsPage() {
       )}
 
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
-        <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+        <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:items-start">
           {/* Left Column - Content */}
           <div className={cn(isMobile && "min-h-screen pb-32")}>
             {renderContent()}
-            {/* Mobile App Install Card - Mobile Only */}
             {isMobile && (
-              <div className="mt-8">
-                <PWAInstallCard compact />
-              </div>
+              <Card className="mt-8">
+                <CardContent className="p-3">
+                  <div className="relative rounded-full p-1">
+                    <button
+                      type="button"
+                      onClick={() => setLogoutConfirmOpen(true)}
+                      className={cn(
+                        "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950/35 dark:hover:text-red-400",
+                      )}
+                    >
+                      <span className="relative z-10">Log out</span>
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
 
           {/* Right Column - Sidebar Navigation (Desktop Only) */}
           {!isMobile && (
-            <div className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Settings</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3">
-                  <div className="relative rounded-full p-1">
-                    {settingsSections.map((section) => {
-                      const isActive = activeSection === section.id;
-                      
-                      return (
-                        <motion.button
-                          key={section.id}
-                          layout
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleSectionChange(section.id);
-                          }}
-                          className={cn(
-                            "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none",
-                            isActive
-                              ? "text-gray-900 dark:text-gray-100 font-bold"
-                              : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
-                          )}
-                        >
-                          {isActive && (
-                            <motion.div
-                              layoutId="active-settings-pill-desktop"
-                              className="absolute inset-0 bg-gray-200 dark:bg-gray-800 rounded-full"
-                              transition={{
-                                type: "spring",
-                                stiffness: 500,
-                                damping: 40,
-                                mass: 1,
-                              }}
-                            />
-                          )}
-                          <span className="relative z-10">{section.label}</span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-0 p-3 pt-0">
+                <div className="relative rounded-full p-1">
+                  {settingsSections.map((section) => {
+                    const isActive = activeSection === section.id;
 
-              <PWAInstallCard />
-            </div>
+                    return (
+                      <motion.button
+                        key={section.id}
+                        layout
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSectionChange(section.id);
+                        }}
+                        className={cn(
+                          "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none",
+                          isActive
+                            ? "text-gray-900 dark:text-gray-100 font-bold"
+                            : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200",
+                        )}
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="active-settings-pill-desktop"
+                            className="absolute inset-0 bg-gray-200 dark:bg-gray-800 rounded-full"
+                            transition={{
+                              type: "spring",
+                              stiffness: 500,
+                              damping: 40,
+                              mass: 1,
+                            }}
+                          />
+                        )}
+                        <span className="relative z-10">{section.label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-10 border-t border-border/70 pt-8">
+                  <div className="relative rounded-full p-1">
+                    <button
+                      type="button"
+                      onClick={() => setLogoutConfirmOpen(true)}
+                      className={cn(
+                        "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700 focus-visible:ring-2 focus-visible:ring-red-500/30 dark:text-red-500 dark:hover:bg-red-950/35 dark:hover:text-red-400 dark:focus-visible:ring-red-500/40",
+                      )}
+                    >
+                      <span className="relative z-10">Log out</span>
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
 
-      <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Log out</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to log out?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setLogoutConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-red-500 text-white hover:bg-red-600"
-              onClick={() => {
-                setLogoutConfirmOpen(false);
-                logout();
-              }}
-            >
-              Log out
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {isMobile ? (
+        <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader>
+              <DrawerTitle>Log out</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-6 pb-4">
+              <DrawerDescription>
+                Are you sure you want to log out?
+              </DrawerDescription>
+            </div>
+            <DrawerFooter className="gap-4 border-t border-gray-200 pt-4 dark:border-border">
+              <Button
+                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  logout();
+                }}
+              >
+                Log out
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full border-0 !bg-transparent !text-black shadow-none hover:!bg-transparent hover:!text-black dark:!text-white dark:hover:!bg-transparent dark:hover:!text-white"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Log out</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to log out?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col gap-4 sm:flex-col sm:space-x-0">
+              <Button
+                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 sm:w-full"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  logout();
+                }}
+              >
+                Log out
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full border-0 !bg-transparent !text-black shadow-none hover:!bg-transparent hover:!text-black dark:!text-white dark:hover:!bg-transparent dark:hover:!text-white sm:w-full"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 }

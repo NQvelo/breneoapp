@@ -37,6 +37,24 @@ import axios, { AxiosError } from "axios";
 import { Link, useLocation } from "react-router-dom";
 import { Camera } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface AcademyProfile {
   id: string;
@@ -54,7 +72,9 @@ export default function AcademySettingsPage() {
   const { theme, setTheme } = useTheme();
   const { preloadImage } = useImagePreloader();
   const location = useLocation();
+  const isMobile = useMobile();
   const [mounted, setMounted] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   // Preferences state
   const [soundEffects, setSoundEffects] = useState(true);
@@ -589,10 +609,6 @@ export default function AcademySettingsPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-  };
-
   // Show loading state while fetching data
   if (loadingData || authLoading) {
     return (
@@ -610,9 +626,9 @@ export default function AcademySettingsPage() {
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
-        <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+        <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:items-start">
           {/* Left Column - Preferences */}
-          <div className="space-y-8">
+          <div className={cn("space-y-8", isMobile && "min-h-screen pb-32")}>
             <h1 className="text-3xl font-bold">Preferences</h1>
 
             {/* Profile Information */}
@@ -764,6 +780,24 @@ export default function AcademySettingsPage() {
                 </Select>
               </div>
             </div>
+
+            {isMobile && (
+              <Card className="mt-8">
+                <CardContent className="p-3">
+                  <div className="relative rounded-full p-1">
+                    <button
+                      type="button"
+                      onClick={() => setLogoutConfirmOpen(true)}
+                      className={cn(
+                        "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950/35 dark:hover:text-red-400",
+                      )}
+                    >
+                      <span className="relative z-10">Log out</span>
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column - Sidebar Navigation */}
@@ -802,6 +836,21 @@ export default function AcademySettingsPage() {
                 >
                   Privacy settings
                 </Link>
+                {!isMobile && (
+                  <div className="mt-10 border-t border-border/70 pt-8">
+                    <div className="relative rounded-full p-1">
+                      <button
+                        type="button"
+                        onClick={() => setLogoutConfirmOpen(true)}
+                        className={cn(
+                          "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700 focus-visible:ring-2 focus-visible:ring-red-500/30 dark:text-red-500 dark:hover:bg-red-950/35 dark:hover:text-red-400 dark:focus-visible:ring-red-500/40",
+                        )}
+                      >
+                        <span className="relative z-10">Log out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -834,18 +883,73 @@ export default function AcademySettingsPage() {
                 </Link>
               </CardContent>
             </Card>
-
-            {/* Logout Button */}
-            <Button
-              variant="link"
-              onClick={handleLogout}
-              className="w-full text-primary hover:text-primary/80 justify-center"
-            >
-              LOG OUT
-            </Button>
           </div>
         </div>
       </div>
+
+      {isMobile ? (
+        <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader>
+              <DrawerTitle>Log out</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-6 pb-4">
+              <DrawerDescription>
+                Are you sure you want to log out?
+              </DrawerDescription>
+            </div>
+            <DrawerFooter className="gap-4 border-t border-gray-200 pt-4 dark:border-border">
+              <Button
+                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  logout();
+                }}
+              >
+                Log out
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full border-0 !bg-transparent !text-black shadow-none hover:!bg-transparent hover:!text-black dark:!text-white dark:hover:!bg-transparent dark:hover:!text-white"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Log out</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to log out?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col gap-4 sm:flex-col sm:space-x-0">
+              <Button
+                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 sm:w-full"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  logout();
+                }}
+              >
+                Log out
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full border-0 !bg-transparent !text-black shadow-none hover:!bg-transparent hover:!text-black dark:!text-white dark:hover:!bg-transparent dark:hover:!text-white sm:w-full"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 }

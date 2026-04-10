@@ -255,6 +255,12 @@ export const AppRoutes = () => {
         </ProtectedRoute>
       )}
       {createLocalizedRoute(
+        "/employer/settings",
+        <ProtectedRoute requiredRole="employer">
+          <UserSettings />
+        </ProtectedRoute>
+      )}
+      {createLocalizedRoute(
         "/academy/home",
         <ProtectedRoute requiredRole="academy">
           <AcademyHomePage />
