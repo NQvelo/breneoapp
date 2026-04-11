@@ -29,7 +29,7 @@ import {
   type PatchAggregatorCompanyBody,
 } from "@/api/employer/aggregatorBffApi";
 import { uploadEmployerCompanyLogoToAggregator } from "@/api/employer/employerProfileApi";
-import { PencilLine, UploadCloud, X } from "lucide-react";
+import { Loader2, PencilLine, UploadCloud, X } from "lucide-react";
 
 const EMPLOYEE_BANDS = [
   "1-10",
@@ -232,10 +232,9 @@ export function EmployerDirectoryCompanyEditSection({
   const [linkedin, setLinkedin] = useState("");
   const [additionalDetailsText, setAdditionalDetailsText] = useState("");
   const [industryIds, setIndustryIds] = useState<number[]>([]);
-  const [logoFileName, setLogoFileName] = useState("");
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const logoUploadGenRef = useRef(0);
 
   const initialRef = useRef<FormSnapshot | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -282,8 +281,6 @@ export function EmployerDirectoryCompanyEditSection({
       setAdditionalDetailsText(additionalDetailsToText(c.additional_details));
       const iids = industryIdsFromCompany(c);
       setIndustryIds(iids);
-      setLogoFileName("");
-      setLogoFile(null);
       if (logoPreviewUrl?.startsWith("blob:"))
         URL.revokeObjectURL(logoPreviewUrl);
       setLogoPreviewUrl(null);
@@ -388,8 +385,6 @@ export function EmployerDirectoryCompanyEditSection({
   const fieldMessage = (key: string) => fieldErrors[key];
 
   const clearSelectedLogo = useCallback(() => {
-    setLogoFile(null);
-    setLogoFileName("");
     if (logoPreviewUrl?.startsWith("blob:"))
       URL.revokeObjectURL(logoPreviewUrl);
     setLogoPreviewUrl(null);
@@ -432,6 +427,95 @@ export function EmployerDirectoryCompanyEditSection({
     [clearSelectedLogo],
   );
 
+  const applyAggregatorSaveError = useCallback((err: AggregatorApiError) => {
+    const fe = err.fieldErrors;
+    if (fe && Object.keys(fe).length > 0) {
+      const flat: Record<string, string> = {};
+      for (const [k, arr] of Object.entries(fe)) {
+        flat[k] = arr.join(" ");
+      }
+      setFieldErrors(flat);
+    }
+    if (err.status === 403) {
+      toast.error("You are not allowed to update this company.");
+    } else if (err.status === 404) {
+      toast.error(
+        "Company not found. If you renamed it elsewhere, refresh the list.",
+      );
+    } else if (err.status === 400 || err.status === 422) {
+      toast.error(err.message || "Validation failed. Check the fields below.");
+    } else {
+      toast.error(err.message || "Could not save.");
+    }
+  }, []);
+
+  const uploadLogoWithPendingPatch = useCallback(
+    async (file: File) => {
+      const initial = initialRef.current;
+      if (!initial) {
+        toast.error("Nothing loaded yet.");
+        clearSelectedLogo();
+        return;
+      }
+      if (currentCompanyId == null) {
+        toast.error("Company id is missing.");
+        clearSelectedLogo();
+        return;
+      }
+      const ext = breneoUserId.trim();
+      if (!ext) {
+        toast.error("User id is missing. Refresh and try again.");
+        clearSelectedLogo();
+        return;
+      }
+
+      const gen = ++logoUploadGenRef.current;
+      setFieldErrors({});
+      setSaving(true);
+      try {
+        let patch: PatchAggregatorCompanyBody;
+        try {
+          patch = buildPatch(initial, snapshot, industryCatalog);
+        } catch (e: unknown) {
+          toast.error(e instanceof Error ? e.message : "Invalid form data.");
+          return;
+        }
+
+        if (Object.keys(patch).length > 0) {
+          await patchEmployerAggregatorCompany(currentCompanyId, patch);
+        }
+        const data = await uploadEmployerCompanyLogoToAggregator({
+          companyId: currentCompanyId,
+          externalUserId: ext,
+          file,
+        });
+        if (gen !== logoUploadGenRef.current) return;
+
+        applyCompanyDetail(data as AggregatorCompany);
+        clearSelectedLogo();
+        await onDirectoryUpdated();
+        toast.success("Company logo uploaded.");
+      } catch (e: unknown) {
+        if (gen !== logoUploadGenRef.current) return;
+        applyAggregatorSaveError(e as AggregatorApiError);
+      } finally {
+        if (gen === logoUploadGenRef.current) {
+          setSaving(false);
+        }
+      }
+    },
+    [
+      applyAggregatorSaveError,
+      applyCompanyDetail,
+      breneoUserId,
+      clearSelectedLogo,
+      currentCompanyId,
+      industryCatalog,
+      onDirectoryUpdated,
+      snapshot,
+    ],
+  );
+
   const handleSave = async (): Promise<boolean> => {
     const initial = initialRef.current;
     if (!initial) {
@@ -453,63 +537,24 @@ export function EmployerDirectoryCompanyEditSection({
         return false;
       }
 
-      let updated: AggregatorCompany | null = null;
-
-      if (logoFile) {
-        const ext = breneoUserId.trim();
-        if (!ext) {
-          toast.error("User id is missing. Refresh and try again.");
-          return;
-        }
-        if (Object.keys(patch).length > 0) {
-          await patchEmployerAggregatorCompany(currentCompanyId, patch);
-        }
-        const data = await uploadEmployerCompanyLogoToAggregator({
-          companyId: currentCompanyId,
-          externalUserId: ext,
-          file: logoFile,
-        });
-        updated = data as AggregatorCompany;
-      } else {
-        if (Object.keys(patch).length === 0) {
-          toast.message("No changes to save.");
-          return true;
-        }
-        updated = await patchEmployerAggregatorCompany(currentCompanyId, patch);
+      if (Object.keys(patch).length === 0) {
+        toast.message("No changes to save.");
+        return true;
       }
+
+      const updated = await patchEmployerAggregatorCompany(
+        currentCompanyId,
+        patch,
+      );
 
       if (updated) {
         applyCompanyDetail(updated);
-      }
-      if (logoFile) {
-        clearSelectedLogo();
       }
       await onDirectoryUpdated();
       toast.success("Job directory company updated.");
       return true;
     } catch (e: unknown) {
-      const err = e as AggregatorApiError;
-      const fe = err.fieldErrors;
-      if (fe && Object.keys(fe).length > 0) {
-        const flat: Record<string, string> = {};
-        for (const [k, arr] of Object.entries(fe)) {
-          flat[k] = arr.join(" ");
-        }
-        setFieldErrors(flat);
-      }
-      if (err.status === 403) {
-        toast.error("You are not allowed to update this company.");
-      } else if (err.status === 404) {
-        toast.error(
-          "Company not found. If you renamed it elsewhere, refresh the list.",
-        );
-      } else if (err.status === 400 || err.status === 422) {
-        toast.error(
-          err.message || "Validation failed. Check the fields below.",
-        );
-      } else {
-        toast.error(err.message || "Could not save.");
-      }
+      applyAggregatorSaveError(e as AggregatorApiError);
       return false;
     } finally {
       setSaving(false);
@@ -572,11 +617,18 @@ export function EmployerDirectoryCompanyEditSection({
             id="agg-logo-upload"
             type="file"
             accept="image/*"
-            className="hidden"
+            tabIndex={-1}
+            className="sr-only"
             disabled={saving}
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (!file) return;
+              if (!file.type.startsWith("image/")) {
+                toast.error("Please choose an image file.");
+                if (logoFileInputRef.current)
+                  logoFileInputRef.current.value = "";
+                return;
+              }
               if (file.size > 10 * 1024 * 1024) {
                 toast.error("Image size must be less than 10MB.");
                 if (logoFileInputRef.current)
@@ -587,8 +639,7 @@ export function EmployerDirectoryCompanyEditSection({
               if (logoPreviewUrl?.startsWith("blob:"))
                 URL.revokeObjectURL(logoPreviewUrl);
               setLogoPreviewUrl(objUrl);
-              setLogoFile(file);
-              setLogoFileName(file.name);
+              void uploadLogoWithPendingPatch(file);
             }}
           />
 
@@ -603,77 +654,80 @@ export function EmployerDirectoryCompanyEditSection({
                     Profile picture
                   </span>
                   <div className="space-y-2">
-                    <label
-                      htmlFor="agg-logo-upload"
+                    <button
+                      type="button"
+                      disabled={saving || detailLoading}
+                      aria-label="Change company logo"
                       className={
-                        "group relative flex h-16 w-16 cursor-pointer overflow-hidden rounded-lg border border-border/70 bg-muted " +
-                        (saving ? "pointer-events-none opacity-60" : "")
+                        "group relative flex h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-border/70 bg-muted p-0 " +
+                        (saving || detailLoading
+                          ? "pointer-events-none opacity-70"
+                          : "")
                       }
+                      onClick={() => logoFileInputRef.current?.click()}
                     >
-                      {logoPreviewUrl || logo ? (
+                      {logo ? (
                         <img
-                          src={logoPreviewUrl || logo}
-                          alt="Company logo preview"
-                          className="h-full w-full object-cover"
+                          src={logo}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover"
+                          aria-hidden
                         />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center">
+                      ) : !logoPreviewUrl ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted">
                           <UploadCloud className="h-5 w-5 text-muted-foreground" />
                         </div>
-                      )}
+                      ) : null}
+                      {logoPreviewUrl ? (
+                        <>
+                          <img
+                            src={logoPreviewUrl}
+                            alt=""
+                            className="absolute inset-0 z-10 h-full w-full object-cover ring-2 ring-primary/70 ring-inset"
+                            aria-hidden
+                          />
+                          {saving ? (
+                            <div
+                              className="absolute inset-0 z-20 flex items-center justify-center bg-background/55"
+                              aria-hidden
+                            >
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
                       <div
-                        className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                        className={
+                          "pointer-events-none absolute inset-0 z-[21] flex items-center justify-center bg-foreground/60 transition-opacity duration-200 " +
+                          (saving || logoPreviewUrl
+                            ? "opacity-0"
+                            : "opacity-0 group-hover:opacity-100")
+                        }
                         aria-hidden
                       >
                         <span className="text-[11px] font-medium text-background">
                           Change
                         </span>
                       </div>
-                    </label>
-                    {logoPreviewUrl ? (
+                    </button>
+                    {logoPreviewUrl && !saving ? (
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="h-8 px-2 text-xs"
-                        onClick={() => clearSelectedLogo()}
-                        disabled={saving}
+                        onClick={() => resetBlock("logo")}
                       >
                         <X className="h-3.5 w-3.5 mr-1" />
-                        Remove
+                        Discard
                       </Button>
                     ) : null}
-                    {logoFileName ? (
-                      <p className="text-xs text-muted-foreground">
-                        Selected file: {logoFileName}
-                      </p>
-                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      {saving && logoPreviewUrl
+                        ? "Uploading new logo…"
+                        : "Choose an image — it uploads automatically."}
+                    </p>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-start gap-1.5">
-                  {logoFileName ? (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
-                        onClick={saveBlock}
-                        disabled={saving || detailLoading}
-                      >
-                        {saving ? "Saving…" : "Save"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2.5 text-xs md:h-10 md:px-3 md:text-sm"
-                        onClick={() => resetBlock("logo")}
-                        disabled={saving}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : null}
                 </div>
               </div>
 

@@ -31,8 +31,6 @@ import {
   Home,
   GraduationCap,
   Award,
-  Target,
-  FileText,
   CheckCircle2,
   Sparkles,
   Smile,
@@ -1838,8 +1836,7 @@ const JobDetailPage = () => {
                   {/* Responsibilities */}
                   {jobDetail.responsibilities && (
                     <div>
-                      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                        <Target className="h-5 w-5" />
+                      <h2 className="text-lg font-semibold mb-4">
                         Responsibilities
                       </h2>
                       <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
@@ -1854,8 +1851,7 @@ const JobDetailPage = () => {
                   {(jobDetail.qualifications ||
                     requiredSkillsList.length > 0) && (
                     <div>
-                      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                        <Award className="h-5 w-5" />
+                      <h2 className="text-lg font-semibold mb-4">
                         Qualifications
                       </h2>
                       {requiredSkillsList.length > 0 && (

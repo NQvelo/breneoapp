@@ -1284,7 +1284,7 @@ export default function SettingsPage() {
                   damping: 40,
                   mass: 1,
                 }}
-                className="relative inline-flex items-center bg-gray-100/90 dark:bg-[#242424]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-sm min-w-max"
+                className="relative inline-flex items-center bg-white dark:bg-[#242424]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-sm min-w-max"
               >
                 {settingsSections.map((section, index) => {
                   const isFirst = index === 0;
@@ -1314,14 +1314,14 @@ export default function SettingsPage() {
                         !isFirst && !isLast ? "rounded-none" : ""
                       } ${
                         isActive
-                          ? "text-gray-900 dark:text-gray-100 font-bold"
+                          ? "text-sky-950 dark:text-gray-100 font-bold"
                           : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
                       }`}
                     >
                       {isActive && (
                         <motion.div
                           layoutId="active-settings-pill"
-                          className="absolute inset-0 bg-white dark:bg-gray-700 rounded-full"
+                          className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-full"
                           transition={{
                             type: "spring",
                             stiffness: 500,
@@ -1337,7 +1337,7 @@ export default function SettingsPage() {
               </motion.div>
             </div>
             {/* Right side fade gradient */}
-            <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-gray-100/90 dark:from-[#242424]/90 to-transparent rounded-r-full" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-white dark:from-[#242424]/90 to-transparent rounded-r-full" />
           </div>
         </div>
       )}
@@ -1390,14 +1390,14 @@ export default function SettingsPage() {
                         className={cn(
                           "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none",
                           isActive
-                            ? "text-gray-900 dark:text-gray-100 font-bold"
+                            ? "text-sky-950 dark:text-gray-100 font-bold"
                             : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200",
                         )}
                       >
                         {isActive && (
                           <motion.div
                             layoutId="active-settings-pill-desktop"
-                            className="absolute inset-0 bg-gray-200 dark:bg-gray-800 rounded-full"
+                            className="absolute inset-0 bg-sky-100 dark:bg-gray-800 rounded-full"
                             transition={{
                               type: "spring",
                               stiffness: 500,

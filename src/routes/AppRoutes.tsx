@@ -108,103 +108,103 @@ export const AppRoutes = () => {
         "/home",
         <ProtectedRoute requiredRole="user">
           <UserDashboard />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/dashboard",
         <ProtectedRoute requiredRole="user">
           <UserDashboard />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/profile",
         <ProtectedRoute requiredRole="user">
           <UserProfile />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/saved",
         <ProtectedRoute requiredRole="user">
           <SavedPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/settings",
         <ProtectedRoute requiredRole="user">
           <UserSettings />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/notifications",
         <ProtectedRoute requiredRole="user">
           <UserNotificationsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/interests",
         <ProtectedRoute requiredRole="user">
           <InterestsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/skill-test",
         <ProtectedRoute requiredRole="user">
           <SkillTestPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/skill-path/:skillName",
         <ProtectedRoute requiredRole="user">
           <SkillPathDetailPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/skill-path",
         <ProtectedRoute requiredRole="user">
           <SkillPathPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/jobs",
         <ProtectedRoute requiredRole="user">
           <JobsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/jobs/search",
         <ProtectedRoute requiredRole="user">
           <JobSearchResultsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/jobs/:jobId",
         <ProtectedRoute requiredRole="user">
           <JobDetailPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/jobs/company/:companyName",
         <ProtectedRoute requiredRole="user">
           <CompanyJobsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/courses",
         <ProtectedRoute requiredRole="user">
           <CoursesPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/course/:courseId",
         <ProtectedRoute requiredRole="user">
           <CoursePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/webinars",
         <ProtectedRoute requiredRole="user">
           <WebinarsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
 
       {/* ==========================================
@@ -216,91 +216,91 @@ export const AppRoutes = () => {
         "/employer/dashboard",
         <ProtectedRoute requiredRole="employer">
           <EmployerDashboardPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/home",
         <ProtectedRoute requiredRole="employer">
           <EmployerDashboardPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs",
         <ProtectedRoute requiredRole="employer">
           <EmployerJobsPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs/add",
         <ProtectedRoute requiredRole="employer">
           <EmployerAddJobPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs/edit/:jobId",
         <ProtectedRoute requiredRole="employer">
           <EmployerAddJobPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/profile",
         <ProtectedRoute requiredRole="employer">
           <EmployerProfilePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/members",
         <ProtectedRoute requiredRole="employer">
           <EmployerMembersPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/settings",
         <ProtectedRoute requiredRole="employer">
           <UserSettings />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/home",
         <ProtectedRoute requiredRole="academy">
           <AcademyHomePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/dashboard",
         <ProtectedRoute requiredRole="academy">
           <AcademyHomePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/courses",
         <ProtectedRoute requiredRole="academy">
           <AcademyCoursesPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/profile",
         <ProtectedRoute requiredRole="academy">
           <AcademyProfile />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/settings",
         <ProtectedRoute requiredRole="academy">
           <AcademySettings />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/courses/add",
         <ProtectedRoute requiredRole="academy">
           <AddCoursePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/courses/edit/:courseId",
         <ProtectedRoute requiredRole="academy">
           <AddCoursePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
 
       {/* ==========================================
@@ -313,31 +313,31 @@ export const AppRoutes = () => {
         "/academy/:academySlug",
         <ProtectedRoute>
           <AcademyPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/terms-of-use",
         <ProtectedRoute>
           <TermsOfUse />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/help",
         <ProtectedRoute>
           <HelpCenter />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/success",
         <ProtectedRoute>
           <PaymentSuccessPage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
       {createLocalizedRoute(
         "/failure",
         <ProtectedRoute>
           <PaymentFailurePage />
-        </ProtectedRoute>
+        </ProtectedRoute>,
       )}
 
       {/* ==========================================

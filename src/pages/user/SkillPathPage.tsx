@@ -1708,21 +1708,21 @@ const SkillPathPage = () => {
         <motion.div
           layout
           transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
-          className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
+          className="relative inline-flex items-center bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
         >
           <motion.button
             layout
             onClick={() => handleViewChange("skills")}
             className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
               activeView === "skills"
-                ? "text-gray-900 dark:text-gray-100 font-bold"
+                ? "text-sky-950 dark:text-gray-100 font-bold"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
             {activeView === "skills" && (
               <motion.div
                 layoutId="active-pill"
-                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
                 transition={{
                   type: "spring",
                   stiffness: 500,
@@ -1739,14 +1739,14 @@ const SkillPathPage = () => {
             onClick={() => handleViewChange("matchedProfessions")}
             className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
               activeView === "matchedProfessions"
-                ? "text-gray-900 dark:text-gray-100 font-bold"
+                ? "text-sky-950 dark:text-gray-100 font-bold"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
             {activeView === "matchedProfessions" && (
               <motion.div
                 layoutId="active-pill"
-                className="absolute inset-0 bg-white dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
+                className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
                 transition={{
                   type: "spring",
                   stiffness: 500,

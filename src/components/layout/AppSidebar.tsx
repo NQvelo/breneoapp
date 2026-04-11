@@ -124,24 +124,20 @@ export function AppSidebar({
         const res = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
         if (cancelled) return;
         const n = normalizeEmployerProfile(res.data, user?.email);
+
+        let full = "";
+        let emailTrim = "";
         if (n) {
           const first = (n.first_name || "").trim();
           const last = (n.last_name || "").trim();
-          const full = [first, last].filter(Boolean).join(" ").trim();
+          full = [first, last].filter(Boolean).join(" ").trim();
+          emailTrim = (n.email || "").trim();
           setEmployerMemberName(full);
-          setEmployerProfileLogo(n.logo_url || null);
-          setEmployerProfileEmail((n.email || "").trim());
-          if (typeof window !== "undefined") {
-            window.sessionStorage.setItem(
-              EMPLOYER_SIDEBAR_CACHE_KEY,
-              JSON.stringify({
-                memberName: full,
-                logo: n.logo_url || "",
-                email: (n.email || "").trim(),
-              }),
-            );
-          }
+          setEmployerProfileEmail(emailTrim);
         }
+
+        let resolvedLogo: string | null = n?.logo_url || null;
+
         const extId =
           extractBreneoUserIdFromEmployerProfileRaw(res.data) ||
           (user?.id != null ? String(user.id) : "");
@@ -150,21 +146,36 @@ export function AppSidebar({
             extId.trim(),
           );
           if (cancelled) return;
-          const first = companies[0];
-          const logoFromCompany = aggregatorCompanyLogoUrl(first);
+          const logoFromCompany = aggregatorCompanyLogoUrl(companies[0]);
           if (logoFromCompany) {
-            setEmployerProfileLogo(logoFromCompany);
-            if (typeof window !== "undefined") {
-              const current = readEmployerCache();
-              window.sessionStorage.setItem(
-                EMPLOYER_SIDEBAR_CACHE_KEY,
-                JSON.stringify({
-                  memberName: current?.memberName || employerMemberName || "",
-                  logo: logoFromCompany,
-                  email: current?.email || employerProfileEmail || "",
-                }),
-              );
-            }
+            resolvedLogo = logoFromCompany;
+          }
+        }
+
+        if (cancelled) return;
+
+        setEmployerProfileLogo(resolvedLogo);
+
+        if (typeof window !== "undefined") {
+          if (n) {
+            window.sessionStorage.setItem(
+              EMPLOYER_SIDEBAR_CACHE_KEY,
+              JSON.stringify({
+                memberName: full,
+                logo: resolvedLogo || "",
+                email: emailTrim,
+              }),
+            );
+          } else if (resolvedLogo) {
+            const current = readEmployerCache();
+            window.sessionStorage.setItem(
+              EMPLOYER_SIDEBAR_CACHE_KEY,
+              JSON.stringify({
+                memberName: current?.memberName || "",
+                logo: resolvedLogo,
+                email: current?.email || "",
+              }),
+            );
           }
         }
       } catch {
@@ -178,14 +189,7 @@ export function AppSidebar({
     return () => {
       cancelled = true;
     };
-  }, [
-    isEmployer,
-    user?.id,
-    user?.email,
-    readEmployerCache,
-    employerMemberName,
-    employerProfileEmail,
-  ]);
+  }, [isEmployer, user?.id, user?.email, readEmployerCache]);
 
   // ⛔ Removed old useState and useEffect for localStorage
 
@@ -378,6 +382,8 @@ export function AppSidebar({
                 to={item.href}
                 className={cn(
                   "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-0",
+                  index === mobileNavItems.length - 1 &&
+                    "border-l border-border/70 pl-4 -ml-0.5",
                   isActive
                     ? "text-gray-600"
                     : "text-gray-600 hover:text-breneo-blue",
@@ -508,10 +514,8 @@ export function AppSidebar({
             </nav>
           </div>
 
-          {/* Bottom section */}
+          {/* Bottom section: settings / help / pro, then profile (split line above profile) */}
           <div className="px-4 pb-4">
-            <div className="mb-4"></div>
-
             {/* Settings (all roles); Help + Pro for learners/academy only */}
             <div className="mb-4 space-y-1">
               <LocalizedLink
@@ -600,41 +604,43 @@ export function AppSidebar({
             </div>
 
             {/* Profile / employer company */}
-            <div className="mt-4 pt-4">
+            <div className="mt-4 border-t border-border/70 pt-4">
               <LocalizedLink
                 to={profilePath}
-                className="flex items-center space-x-4 px-4 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-[#2d2d2d] transition-all duration-200 group"
+                className="flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-[#2d2d2d] transition-all duration-200 group"
               >
-                {/* Avatar box */}
-                <div
-                  className={cn(
-                    "flex items-center justify-center w-8 h-8 text-sm font-semibold shrink-0",
-                    isRegularUser ? "rounded-full" : "rounded-[8px]",
-                    // ✅ Changed userData to user
-                    sidebarAvatarUrl
-                      ? "overflow-hidden"
-                      : "bg-[#AAF0FF] text-[#099DBC]",
-                  )}
-                >
-                  {sidebarAvatarUrl ? (
-                    <img
-                      src={sidebarAvatarUrl}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    getInitials()
-                  )}
+                {/* 22px-wide column like Lucide icons; 32px avatar centered — label text starts same as nav `space-x-4` */}
+                <div className="flex h-8 w-[22px] shrink-0 items-center justify-center overflow-visible">
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center text-xs font-semibold leading-none",
+                      isRegularUser ? "rounded-full" : "rounded-[8px]",
+                      sidebarAvatarUrl
+                        ? "overflow-hidden"
+                        : "bg-[#AAF0FF] text-[#099DBC]",
+                    )}
+                  >
+                    {sidebarAvatarUrl ? (
+                      <img
+                        src={sidebarAvatarUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      getInitials()
+                    )}
+                  </div>
                 </div>
 
                 {!collapsed && (
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm text-gray-700 dark:text-gray-200 truncate">
+                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-0">
+                    {/* leading-6 = 1.5rem, same as default text-base on nav items */}
+                    <span className="block truncate text-sm font-bold leading-6 text-gray-700 dark:text-gray-200">
                       {getDisplayName()}
-                    </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                    </span>
+                    <span className="-mt-0.5 block truncate text-xs leading-tight text-gray-400 dark:text-gray-500">
                       {getDisplayEmail()}
-                    </p>
+                    </span>
                   </div>
                 )}
               </LocalizedLink>

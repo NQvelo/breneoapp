@@ -42,6 +42,14 @@ const isCourseAddEditPage = (pathname: string): boolean => {
   return courseAddEditPattern.test(pathname);
 };
 
+/** Employer add/edit job — preview mode uses URL hash #preview (same as Job detail back UX) */
+const isEmployerJobFormPreviewPath = (pathname: string): boolean => {
+  return (
+    pathname === "/employer/jobs/add" ||
+    /^\/employer\/jobs\/edit\/[^/]+$/.test(pathname)
+  );
+};
+
 // Helper function to get the page title from the pathname
 const getPageTitle = (
   pathname: string,
@@ -113,7 +121,11 @@ export function DashboardHeader({
     user?.first_name ||
     user?.email?.split("@")[0] ||
     "User";
-  const pageTitle = getPageTitle(currentPath, username, t);
+  const isEmployerJobPreview =
+    isEmployerJobFormPreviewPath(currentPath) && location.hash === "#preview";
+  const pageTitle = isEmployerJobPreview
+    ? null
+    : getPageTitle(currentPath, username, t);
   const isJobDetail = isJobDetailPage(currentPath);
   const isCourseDetail = isCourseDetailPage(currentPath);
   const isSkillPath = isSkillPathPage(currentPath);
@@ -152,11 +164,21 @@ export function DashboardHeader({
     >
       <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">
         <div className="hidden md:flex items-center space-x-3">
-          {isJobDetail || isCourseDetail || isSkillPath || isCourseAddEdit ? (
+          {isJobDetail ||
+          isCourseDetail ||
+          isSkillPath ||
+          isCourseAddEdit ||
+          isEmployerJobPreview ? (
             <>
               <Button
                 variant="ghost"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  if (isEmployerJobPreview) {
+                    navigate({ hash: "" }, { replace: true });
+                  } else {
+                    navigate(-1);
+                  }
+                }}
                 className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
                            text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                            text-sm font-medium flex items-center gap-2 transition-colors"

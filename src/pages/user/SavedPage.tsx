@@ -467,7 +467,7 @@ const SavedPage = () => {
     <DashboardLayout>
       {/* Profile/Courses/Jobs Switcher */}
       <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
-        <div className="relative inline-flex items-center bg-gray-100/80 dark:bg-[#242424]/80 backdrop-blur-xl rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
+        <div className="relative inline-flex items-center bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <button
             onClick={() => navigate("/profile")}
             className="relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
@@ -478,7 +478,7 @@ const SavedPage = () => {
             onClick={() => setActiveTab("courses")}
             className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
               activeTab === "courses"
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold shadow-sm"
+                ? "bg-sky-100 dark:bg-gray-700 text-sky-950 dark:text-gray-100 font-bold shadow-sm"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >
@@ -488,7 +488,7 @@ const SavedPage = () => {
             onClick={() => setActiveTab("jobs")}
             className={`relative px-6 py-2.5 rounded-full text-sm transition-all duration-200 ${
               activeTab === "jobs"
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold shadow-sm"
+                ? "bg-sky-100 dark:bg-gray-700 text-sky-950 dark:text-gray-100 font-bold shadow-sm"
                 : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
             }`}
           >

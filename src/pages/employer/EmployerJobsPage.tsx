@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -205,59 +206,95 @@ export default function EmployerJobsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 md:px-6 lg:px-8">
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center gap-3 justify-between">
-              <Tabs
-                value={statusFilter}
-                onValueChange={(value) =>
-                  setSearchParams(
-                    (prev) => {
-                      const next = new URLSearchParams(prev);
-                      if (value === "all") next.delete("status");
-                      else next.set("status", value);
-                      return next;
-                    },
-                    { replace: true },
-                  )
-                }
-              >
-                <TabsList className="bg-transparent border border-border p-1">
-                  <TabsTrigger
-                    value="all"
-                    className="data-[state=active]:bg-muted"
+        <div className="flex flex-row items-center gap-2 sm:gap-4">
+          <div className="flex min-w-0 flex-1 justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <motion.div
+              layout
+              transition={{
+                type: "spring",
+                stiffness: 500,
+                damping: 40,
+                mass: 1,
+              }}
+              className="relative inline-flex h-12 w-max min-w-0 max-w-full flex-nowrap items-stretch justify-center gap-1 bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
+            >
+              {(
+                [
+                  {
+                    value: "all" as const,
+                    label: `All (${jobs.length})`,
+                  },
+                  {
+                    value: "active" as const,
+                    label: `Active (${activeJobs.length})`,
+                  },
+                  {
+                    value: "inactive" as const,
+                    label: `Inactive (${closedJobs.length})`,
+                  },
+                ] as const
+              ).map((tab) => {
+                const isActive = statusFilter === tab.value;
+                const pillRadius = "rounded-3xl";
+                return (
+                  <motion.button
+                    key={tab.value}
+                    type="button"
+                    layout
+                    onClick={() =>
+                      setSearchParams(
+                        (prev) => {
+                          const next = new URLSearchParams(prev);
+                          if (tab.value === "all") next.delete("status");
+                          else next.set("status", tab.value);
+                          return next;
+                        },
+                        { replace: true },
+                      )
+                    }
+                    className={cn(
+                      "relative inline-flex h-full min-h-0 shrink-0 items-center justify-center px-3 text-sm transition-colors duration-200 outline-none sm:px-6",
+                      pillRadius,
+                      isActive
+                        ? "text-sky-950 dark:text-gray-100 font-bold"
+                        : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200",
+                    )}
                   >
-                    All ({jobs.length})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="active"
-                    className="data-[state=active]:bg-muted"
-                  >
-                    Active ({activeJobs.length})
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="inactive"
-                    className="data-[state=active]:bg-muted"
-                  >
-                    Inactive ({closedJobs.length})
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="relative flex justify-end shrink-0">
-                <Button
-                  onClick={() =>
-                    navigate(getLocalizedPath("/employer/jobs/add", language))
-                  }
-                  className="h-10 w-10 p-0 md:h-auto md:w-auto md:px-4 md:py-2 shrink-0"
-                  aria-label="Add new job"
-                >
-                  <Plus className="h-4 w-4 md:mr-2" />
-                  <span className="hidden md:inline">Add New</span>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                    {isActive && (
+                      <motion.div
+                        layoutId="employer-jobs-status-pill"
+                        className={cn(
+                          "absolute inset-0 bg-sky-100 dark:bg-gray-700",
+                          pillRadius,
+                        )}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 40,
+                          mass: 1,
+                        }}
+                      />
+                    )}
+                    <span className="relative z-10 whitespace-nowrap">
+                      {tab.label}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          </div>
+          <div className="relative flex shrink-0">
+            <Button
+              onClick={() =>
+                navigate(getLocalizedPath("/employer/jobs/add", language))
+              }
+              className="h-12 w-12 shrink-0 rounded-full p-0"
+              aria-label="Add new job"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
 
         <Card>
           <CardContent className="space-y-0 p-0">

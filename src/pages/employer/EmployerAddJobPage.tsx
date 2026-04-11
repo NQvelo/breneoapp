@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -53,6 +59,10 @@ import {
   resolveEmployerJobsCompanyFilter,
 } from "@/api/employer/aggregatorBffApi";
 import { City, Country } from "country-state-city";
+import {
+  EmployerJobFormPreview,
+  type PreviewEditKey,
+} from "@/components/employer/EmployerJobFormPreview";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -141,6 +151,29 @@ export default function EmployerAddJobPage() {
     salary: string;
     apply_url: string;
     is_active: boolean;
+  } | null>(null);
+
+  const [showJobPreview, setShowJobPreview] = useState(false);
+  const [previewLoadingModal, setPreviewLoadingModal] = useState(false);
+  const [previewEditKey, setPreviewEditKey] = useState<PreviewEditKey | null>(
+    null,
+  );
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+  const [draftSalary, setDraftSalary] = useState("");
+  const [draftApplyUrl, setDraftApplyUrl] = useState("");
+  const [draftWorkMode, setDraftWorkMode] =
+    useState<AggregatorWorkMode>("on-site");
+  const [draftEmploymentType, setDraftEmploymentType] = useState("");
+  const [draftResponsibilities, setDraftResponsibilities] = useState("");
+  const [draftQualifications, setDraftQualifications] = useState("");
+  const [draftIsActive, setDraftIsActive] = useState(true);
+  const locationPreviewSnap = useRef<{
+    locationCountry: string;
+    location: string;
+    countryQuery: string;
+    cityQuery: string;
+    selectedCountryIsoCode: string;
   } | null>(null);
 
   const initPage = useCallback(async () => {
@@ -511,6 +544,8 @@ export default function EmployerAddJobPage() {
           apply_url: applyCheck.url || null,
           is_active: isActive,
           employment_type_note: employmentType,
+          responsibilities: linesToBulletArray(responsibilitiesText),
+          qualifications: linesToBulletArray(qualificationsText),
         });
         const id = data.id ?? data.pk ?? data.job_id;
         toast.success(
@@ -562,6 +597,96 @@ export default function EmployerAddJobPage() {
     }
   };
 
+  const openJobPreview = useCallback(async () => {
+    setPreviewLoadingModal(true);
+    await new Promise((r) => setTimeout(r, 450));
+    setPreviewLoadingModal(false);
+    setPreviewEditKey(null);
+    setShowJobPreview(true);
+    navigate({ hash: "preview" }, { replace: true });
+  }, [navigate]);
+
+  /** When hash loses #preview (e.g. DashboardHeader Back), leave preview mode */
+  const prevEmployerJobHashRef = useRef<string>("");
+  useEffect(() => {
+    const prev = prevEmployerJobHashRef.current;
+    prevEmployerJobHashRef.current = locationState.hash;
+    if (
+      prev === "#preview" &&
+      locationState.hash !== "#preview" &&
+      showJobPreview
+    ) {
+      setShowJobPreview(false);
+      setPreviewEditKey(null);
+    }
+  }, [locationState.hash, showJobPreview]);
+
+  /** Open preview when URL is shared with #preview */
+  useEffect(() => {
+    if (loading) return;
+    if (locationState.hash === "#preview" && !showJobPreview) {
+      setShowJobPreview(true);
+    }
+  }, [loading, locationState.hash, showJobPreview]);
+
+  /** Scroll to preview anchor after it mounts */
+  useEffect(() => {
+    if (!showJobPreview) return;
+    const id = window.requestAnimationFrame(() => {
+      document.getElementById("preview")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [showJobPreview]);
+
+  const handleLocationPreviewEditOpen = useCallback(() => {
+    locationPreviewSnap.current = {
+      locationCountry,
+      location,
+      countryQuery,
+      cityQuery,
+      selectedCountryIsoCode,
+    };
+  }, [
+    locationCountry,
+    location,
+    countryQuery,
+    cityQuery,
+    selectedCountryIsoCode,
+  ]);
+
+  const handleLocationPreviewEditCancel = useCallback(() => {
+    const s = locationPreviewSnap.current;
+    if (s) {
+      setLocationCountry(s.locationCountry);
+      setLocation(s.location);
+      setCountryQuery(s.countryQuery);
+      setCityQuery(s.cityQuery);
+      setSelectedCountryIsoCode(s.selectedCountryIsoCode);
+    }
+    locationPreviewSnap.current = null;
+    setPreviewEditKey(null);
+  }, []);
+
+  const workModeLabel = useMemo(
+    () =>
+      WORK_MODE_OPTIONS.find((o) => o.value === workMode)?.label ?? workMode,
+    [workMode],
+  );
+
+  const previewLocationLine = useMemo(() => {
+    const c = locationCountry.trim();
+    const city = location.trim();
+    if (city && c) return `${city}, ${c}`;
+    if (city) return city;
+    if (c) return c;
+    return "Location not specified";
+  }, [locationCountry, location]);
+
+  const previewSalaryLine = salary.trim() ? salary.trim() : "By agreement";
+
   const companyName =
     headerCompanyName.trim() ||
     profile?.company_name?.trim() ||
@@ -580,23 +705,122 @@ export default function EmployerAddJobPage() {
 
   return (
     <DashboardLayout containMainScroll={false}>
+      {previewLoadingModal ? (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-background/90 px-6 text-center backdrop-blur-sm dark:bg-background/95"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
+          <p className="text-base font-semibold text-foreground">
+            Loading preview…
+          </p>
+        </div>
+      ) : null}
+      {saving ? (
+        <div
+          className="fixed inset-0 z-[90] flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center backdrop-blur-sm dark:bg-background/90"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
+          <p className="text-base font-semibold text-foreground">
+            {willExtractDescriptionOnSave
+              ? t.employerJobForm.extractingDescriptionTitle
+              : t.employerJobForm.buttonSaving}
+          </p>
+          {willExtractDescriptionOnSave ? (
+            <p className="max-w-sm text-sm text-muted-foreground">
+              {t.employerJobForm.extractingDescriptionHint}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showJobPreview ? (
+        <EmployerJobFormPreview
+          companyName={companyName}
+          companyLogo={headerCompanyLogo || profile?.logo_url || null}
+          companyWebsite={profile?.website?.trim() || null}
+          workModeOptions={WORK_MODE_OPTIONS}
+          title={title}
+          setTitle={setTitle}
+          description={description}
+          setDescription={setDescription}
+          responsibilitiesText={responsibilitiesText}
+          setResponsibilitiesText={setResponsibilitiesText}
+          qualificationsText={qualificationsText}
+          setQualificationsText={setQualificationsText}
+          workMode={workMode}
+          setWorkMode={setWorkMode}
+          employmentType={employmentType}
+          setEmploymentType={setEmploymentType}
+          applyUrl={applyUrl}
+          setApplyUrl={setApplyUrl}
+          salary={salary}
+          setSalary={setSalary}
+          isActive={isActive}
+          setIsActive={setIsActive}
+          previewLocationLine={previewLocationLine}
+          workModeLabel={workModeLabel}
+          previewSalaryLine={previewSalaryLine}
+          previewEditKey={previewEditKey}
+          setPreviewEditKey={setPreviewEditKey}
+          draftTitle={draftTitle}
+          setDraftTitle={setDraftTitle}
+          draftDescription={draftDescription}
+          setDraftDescription={setDraftDescription}
+          draftSalary={draftSalary}
+          setDraftSalary={setDraftSalary}
+          draftApplyUrl={draftApplyUrl}
+          setDraftApplyUrl={setDraftApplyUrl}
+          draftWorkMode={draftWorkMode}
+          setDraftWorkMode={setDraftWorkMode}
+          draftEmploymentType={draftEmploymentType}
+          setDraftEmploymentType={setDraftEmploymentType}
+          draftResponsibilities={draftResponsibilities}
+          setDraftResponsibilities={setDraftResponsibilities}
+          draftQualifications={draftQualifications}
+          setDraftQualifications={setDraftQualifications}
+          draftIsActive={draftIsActive}
+          setDraftIsActive={setDraftIsActive}
+          isEdit={isEdit}
+          responsibilitiesLabel={t.employerJobForm.responsibilitiesLabel}
+          qualificationsLabel={t.employerJobForm.qualificationsLabel}
+          fieldErrors={fieldErrors}
+          countryQuery={countryQuery}
+          setCountryQuery={setCountryQuery}
+          setLocationCountry={setLocationCountry}
+          countryOpen={countryOpen}
+          setCountryOpen={setCountryOpen}
+          cityQuery={cityQuery}
+          setCityQuery={setCityQuery}
+          setLocation={setLocation}
+          cityOpen={cityOpen}
+          setCityOpen={setCityOpen}
+          selectedCountryIsoCode={selectedCountryIsoCode}
+          setSelectedCountryIsoCode={setSelectedCountryIsoCode}
+          filteredCountries={filteredCountries}
+          filteredCities={filteredCities}
+          worldCountries={WORLD_COUNTRIES}
+          selectCountry={selectCountry}
+          selectCity={selectCity}
+          tryResolveCountryFromQuery={tryResolveCountryFromQuery}
+          tryResolveCityFromQuery={tryResolveCityFromQuery}
+          dashedShell={dashedShell}
+          onPublish={handleSubmit}
+          publishing={saving}
+          publishLabel={
+            willExtractDescriptionOnSave
+              ? t.employerJobForm.buttonExtractingSaving
+              : t.employerJobForm.buttonSaving
+          }
+          onLocationEditOpen={handleLocationPreviewEditOpen}
+          onLocationEditCancel={handleLocationPreviewEditCancel}
+        />
+      ) : (
       <div className="max-w-4xl mx-auto pb-24 space-y-6">
         <Card className="relative rounded-3xl border-0 shadow-none bg-white dark:bg-card overflow-hidden">
-          {saving && willExtractDescriptionOnSave ? (
-            <div
-              className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-3xl bg-background/85 px-6 text-center backdrop-blur-sm dark:bg-background/90"
-              role="status"
-              aria-live="polite"
-            >
-              <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
-              <p className="text-base font-semibold text-foreground">
-                {t.employerJobForm.extractingDescriptionTitle}
-              </p>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                {t.employerJobForm.extractingDescriptionHint}
-              </p>
-            </div>
-          ) : null}
           <CardContent className="p-6 sm:p-8 space-y-6">
             <div className="flex items-center gap-3 pb-2 border-b border-border/60">
               <OptimizedAvatar
@@ -664,9 +888,7 @@ export default function EmployerAddJobPage() {
                     <Textarea
                       id="employer-job-responsibilities"
                       value={responsibilitiesText}
-                      onChange={(e) =>
-                        setResponsibilitiesText(e.target.value)
-                      }
+                      onChange={(e) => setResponsibilitiesText(e.target.value)}
                       className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
                       placeholder="One bullet per line"
                     />
@@ -686,9 +908,7 @@ export default function EmployerAddJobPage() {
                     <Textarea
                       id="employer-job-qualifications"
                       value={qualificationsText}
-                      onChange={(e) =>
-                        setQualificationsText(e.target.value)
-                      }
+                      onChange={(e) => setQualificationsText(e.target.value)}
                       className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
                       placeholder="One bullet per line"
                     />
@@ -984,25 +1204,44 @@ export default function EmployerAddJobPage() {
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} disabled={saving || deleting}>
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {willExtractDescriptionOnSave
-                        ? t.employerJobForm.buttonExtractingSaving
-                        : t.employerJobForm.buttonSaving}
-                    </>
-                  ) : isEdit ? (
-                    "Save changes"
-                  ) : (
-                    "Publish job"
-                  )}
-                </Button>
+                {isEdit ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={openJobPreview}
+                      disabled={saving || deleting}
+                    >
+                      View preview
+                    </Button>
+                    <Button onClick={handleSubmit} disabled={saving || deleting}>
+                      {saving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          {willExtractDescriptionOnSave
+                            ? t.employerJobForm.buttonExtractingSaving
+                            : t.employerJobForm.buttonSaving}
+                        </>
+                      ) : (
+                        "Save changes"
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={openJobPreview}
+                    disabled={saving || deleting}
+                  >
+                    View job preview
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+      )}
     </DashboardLayout>
   );
 }
