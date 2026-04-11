@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -39,8 +38,7 @@ export type PreviewEditKey =
   | "applyUrl"
   | "salary"
   | "responsibilities"
-  | "qualifications"
-  | "listingActive";
+  | "qualifications";
 
 const EMPLOYMENT_TYPES = [
   "Full-time",
@@ -74,8 +72,6 @@ export interface EmployerJobFormPreviewProps {
   setApplyUrl: (v: string) => void;
   salary: string;
   setSalary: (v: string) => void;
-  isActive: boolean;
-  setIsActive: (v: boolean) => void;
 
   previewLocationLine: string;
   workModeLabel: string;
@@ -99,8 +95,6 @@ export interface EmployerJobFormPreviewProps {
   setDraftResponsibilities: (v: string) => void;
   draftQualifications: string;
   setDraftQualifications: (v: string) => void;
-  draftIsActive: boolean;
-  setDraftIsActive: (v: boolean) => void;
 
   isEdit: boolean;
   responsibilitiesLabel: string;
@@ -710,54 +704,6 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
                 )}
               </div>
             </div>
-
-          {p.isEdit ? (
-            <div className="bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0 mt-6">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Listing visibility
-                  </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-200 mt-1">
-                    {p.previewEditKey === "listingActive" ? (
-                      <span className="flex items-center gap-2">
-                        <Checkbox
-                          id="preview-listing-active"
-                          checked={p.draftIsActive}
-                          onCheckedChange={(c) =>
-                            p.setDraftIsActive(c === true)
-                          }
-                        />
-                        <Label
-                          htmlFor="preview-listing-active"
-                          className="cursor-pointer font-normal"
-                        >
-                          Listing is active (visible to candidates)
-                        </Label>
-                      </span>
-                    ) : p.isActive ? (
-                      "Active — visible to candidates"
-                    ) : (
-                      "Inactive — hidden from search"
-                    )}
-                  </p>
-                </div>
-                <EditOrSaveRow
-                  editing={p.previewEditKey === "listingActive"}
-                  editAriaLabel="Edit listing visibility"
-                  onEdit={() => {
-                    p.setDraftIsActive(p.isActive);
-                    p.setPreviewEditKey("listingActive");
-                  }}
-                  onSave={() => {
-                    p.setIsActive(p.draftIsActive);
-                    p.setPreviewEditKey(null);
-                  }}
-                  onCancel={() => p.setPreviewEditKey(null)}
-                />
-              </div>
-            </div>
-          ) : null}
 
           {/* Company strip — simplified JobDetail company block */}
           <div className="bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0 mt-6">

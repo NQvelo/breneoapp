@@ -98,6 +98,8 @@ export interface JobDetail {
   category?: string;
   industry?: string;
   job_industry?: string;
+  /** When false, listing is hidden from candidate search and job lists. */
+  is_active?: boolean;
   [key: string]: unknown;
 }
 

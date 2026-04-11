@@ -1547,6 +1547,13 @@ const JobDetailPage = () => {
     : null;
   const matchLabel = matchQualityKey ? t.jobMatch[matchQualityKey] : "";
 
+  const jobListingActive = useMemo(() => {
+    if (!jobDetail) return true;
+    const v = (jobDetail as Record<string, unknown>).is_active;
+    if (v === false || v === 0) return false;
+    return true;
+  }, [jobDetail]);
+
   return (
     <DashboardLayout>
       <div
@@ -1586,7 +1593,29 @@ const JobDetailPage = () => {
           </div>
         )}
 
-        {!isLoading && jobDetail && (
+        {!isLoading && jobDetail && !jobListingActive && (
+          <Card className="">
+            <CardContent className="p-8 text-center space-y-3">
+              <AlertCircle className="h-12 w-12 text-amber-600 dark:text-amber-500 mx-auto" />
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                This job is no longer available
+              </h1>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                This listing is not active. The employer may have removed it or
+                it is not yet published for candidates.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-2"
+                onClick={() => navigate(-1)}
+              >
+                Go back
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoading && jobDetail && jobListingActive && (
           <Card className="bg-transparent border-0 shadow-none h-full">
             <CardContent className="p-1 sm:p-6 space-y-2">
               {/* Job Header */}

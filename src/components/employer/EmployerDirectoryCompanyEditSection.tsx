@@ -861,12 +861,15 @@ export function EmployerDirectoryCompanyEditSection({
                       disabled={saving}
                       placeholder="https://linkedin.com/company/…"
                       aria-invalid={Boolean(
-                        fieldMessage("social_links") || fieldMessage("linkedin"),
+                        fieldMessage("social_links") ||
+                        fieldMessage("linkedin"),
                       )}
                     />
-                    {fieldMessage("social_links") || fieldMessage("linkedin") ? (
+                    {fieldMessage("social_links") ||
+                    fieldMessage("linkedin") ? (
                       <p className="text-xs text-destructive">
-                        {fieldMessage("social_links") || fieldMessage("linkedin")}
+                        {fieldMessage("social_links") ||
+                          fieldMessage("linkedin")}
                       </p>
                     ) : null}
                   </div>
@@ -968,8 +971,6 @@ export function EmployerDirectoryCompanyEditSection({
                   </div>
                 </div>
               </div>
-
-              
             </div>
           </div>
 
@@ -1219,8 +1220,9 @@ export function EmployerDirectoryCompanyEditSection({
                   <div className="flex flex-wrap gap-2">
                     {industryIds.map((id) => {
                       const label =
-                        industryCatalog.find((i) => i.id === id)?.name?.trim() ||
-                        `Industry ${id}`;
+                        industryCatalog
+                          .find((i) => i.id === id)
+                          ?.name?.trim() || `Industry ${id}`;
                       return (
                         <span
                           key={id}

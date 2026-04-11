@@ -11,13 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Plus,
-  MoreVertical,
-  Briefcase,
-  MapPin,
-  Clock,
-} from "lucide-react";
+import { Plus, MoreVertical, Briefcase, MapPin, Clock } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchEmployerJobsFiltered,
@@ -166,12 +160,17 @@ export default function EmployerJobsPage() {
     );
   };
 
-  const handleSetJobActiveState = async (job: EmployerJob, isActive: boolean) => {
+  const handleSetJobActiveState = async (
+    job: EmployerJob,
+    isActive: boolean,
+  ) => {
     if (!job.id) return;
     const alreadyActive = job.is_active !== false;
     if (alreadyActive === isActive) {
       toast.info(
-        isActive ? "This job is already active." : "This job is already inactive.",
+        isActive
+          ? "This job is already active."
+          : "This job is already inactive.",
       );
       return;
     }
@@ -184,7 +183,9 @@ export default function EmployerJobsPage() {
             : row,
         ),
       );
-      toast.success(isActive ? "Job marked as active." : "Job marked as inactive.");
+      toast.success(
+        isActive ? "Job marked as active." : "Job marked as inactive.",
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to update job.";
       toast.error(message);
@@ -195,7 +196,9 @@ export default function EmployerJobsPage() {
     if (!job.id) return;
     try {
       await deletePublishedEmployerJob(String(job.id));
-      setJobs((prev) => prev.filter((row) => String(row.id) !== String(job.id)));
+      setJobs((prev) =>
+        prev.filter((row) => String(row.id) !== String(job.id)),
+      );
       toast.success("Job deleted.");
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to delete job.";
@@ -308,9 +311,7 @@ export default function EmployerJobsPage() {
             ) : filteredJobs.length === 0 ? (
               <div className="p-12 text-center">
                 <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  No jobs posted yet
-                </p>
+                <p className="text-muted-foreground mb-4">No jobs posted yet</p>
                 <Button
                   onClick={() =>
                     navigate(getLocalizedPath("/employer/jobs/add", language))
@@ -375,7 +376,10 @@ export default function EmployerJobsPage() {
                               >
                                 <DropdownMenuItem
                                   onClick={() =>
-                                    handleSetJobActiveState(job, job.is_active === false)
+                                    handleSetJobActiveState(
+                                      job,
+                                      job.is_active === false,
+                                    )
                                   }
                                 >
                                   {job.is_active === false

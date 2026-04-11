@@ -138,7 +138,12 @@ const mapSearchJobToApiJob = (job: Record<string, unknown>): ApiJob => {
     (job.company_logo as string) ||
     undefined;
 
+  const rawActive = job.is_active;
+  const isListingActive =
+    rawActive === undefined || rawActive === null ? true : rawActive !== false;
+
   return {
+    ...job,
     id: String(job.id ?? ""),
     job_id: String(job.id ?? ""),
     title: (job.title as string) || "",
@@ -159,9 +164,9 @@ const mapSearchJobToApiJob = (job: Record<string, unknown>): ApiJob => {
     posted_date: (job.posted_at as string) || (job.fetched_at as string) || "",
     posted_at: (job.posted_at as string) || (job.fetched_at as string) || "",
     fetched_at: (job.fetched_at as string) || "",
-    status: "active",
+    is_active: isListingActive,
+    status: isListingActive ? "active" : "inactive",
     industry_tags: (job.industry_tags as string) || undefined,
-    ...job,
   } as ApiJob;
 };
 
@@ -265,7 +270,9 @@ const fetchJobsFromSearchAPI = async (
   const rawJobs = data.results || [];
   const pagination = data.pagination;
 
-  const jobsArray = rawJobs.map(mapSearchJobToApiJob);
+  const jobsArray = rawJobs
+    .map(mapSearchJobToApiJob)
+    .filter((j) => (j as { is_active?: boolean }).is_active !== false);
 
   return {
     jobs: jobsArray,
@@ -765,6 +772,7 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
       posted_date: jobData.posted_at || jobData.fetched_at,
       posted_at: jobData.posted_at || jobData.fetched_at,
       fetched_at: jobData.fetched_at,
+      is_active: jobData.is_active,
     };
 
     // Include raw data from the original API if it's an object

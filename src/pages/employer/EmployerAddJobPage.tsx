@@ -154,7 +154,8 @@ export default function EmployerAddJobPage() {
   } | null>(null);
 
   const [showJobPreview, setShowJobPreview] = useState(false);
-  const [previewLoadingModal, setPreviewLoadingModal] = useState(false);
+  /** Saving draft to API when opening preview from add-job flow (before navigating to edit). */
+  const [previewPriming, setPreviewPriming] = useState(false);
   const [previewEditKey, setPreviewEditKey] = useState<PreviewEditKey | null>(
     null,
   );
@@ -167,7 +168,6 @@ export default function EmployerAddJobPage() {
   const [draftEmploymentType, setDraftEmploymentType] = useState("");
   const [draftResponsibilities, setDraftResponsibilities] = useState("");
   const [draftQualifications, setDraftQualifications] = useState("");
-  const [draftIsActive, setDraftIsActive] = useState(true);
   const locationPreviewSnap = useRef<{
     locationCountry: string;
     location: string;
@@ -396,61 +396,111 @@ export default function EmployerAddJobPage() {
     return true;
   };
 
-  const handleSubmit = async () => {
+  const validateFormForSave = useCallback(():
+    | {
+        ok: true;
+        normalizedCountry: string;
+        normalizedCity: string;
+        applyUrl: string;
+      }
+    | {
+        ok: false;
+        fieldErrors: Record<string, string[]>;
+        message: string;
+      } => {
     if (!title.trim()) {
-      setFieldErrors({ title: ["Job title is required."] });
-      toast.error("Job title is required.");
-      return;
+      return {
+        ok: false,
+        fieldErrors: { title: ["Job title is required."] },
+        message: "Job title is required.",
+      };
     }
     if (!description.trim()) {
-      setFieldErrors({ full_description: ["Description is required."] });
-      toast.error("Description is required.");
-      return;
+      return {
+        ok: false,
+        fieldErrors: { full_description: ["Description is required."] },
+        message: "Description is required.",
+      };
     }
 
     const applyCheck = validateHttpUrl(applyUrl);
     if (applyCheck.ok === false) {
-      setFieldErrors({ apply_url: [applyCheck.error] });
-      toast.error(applyCheck.error);
-      return;
+      return {
+        ok: false,
+        fieldErrors: { apply_url: [applyCheck.error] },
+        message: applyCheck.error,
+      };
     }
 
     const normalizedCountry = locationCountry.trim();
     const normalizedCity = location.trim();
     if (normalizedCity && !normalizedCountry) {
-      setFieldErrors({ location_country: ["Location country is required."] });
-      toast.error("Select a location country first.");
-      return;
+      return {
+        ok: false,
+        fieldErrors: {
+          location_country: ["Location country is required."],
+        },
+        message: "Select a location country first.",
+      };
     }
     if (normalizedCountry && !normalizedCity) {
-      setFieldErrors({ location: ["Location city is required."] });
-      toast.error("Select a location city.");
-      return;
+      return {
+        ok: false,
+        fieldErrors: { location: ["Location city is required."] },
+        message: "Select a location city.",
+      };
     }
     if (normalizedCountry) {
       const countryObj = WORLD_COUNTRIES.find(
         (c) => c.name.toLowerCase() === normalizedCountry.toLowerCase(),
       );
       if (!countryObj) {
-        setFieldErrors({ location_country: ["Select a valid country."] });
-        toast.error("Select a valid country from the list.");
-        return;
+        return {
+          ok: false,
+          fieldErrors: { location_country: ["Select a valid country."] },
+          message: "Select a valid country from the list.",
+        };
       }
       const validCity = City.getCitiesOfCountry(countryObj.isoCode).some(
         (c) => c.name.toLowerCase() === normalizedCity.toLowerCase(),
       );
       if (!validCity) {
-        setFieldErrors({
-          location: ["Select a city that belongs to the selected country."],
-        });
-        toast.error("Selected city does not belong to the selected country.");
-        return;
+        return {
+          ok: false,
+          fieldErrors: {
+            location: ["Select a city that belongs to the selected country."],
+          },
+          message: "Selected city does not belong to the selected country.",
+        };
       }
     }
+
+    return {
+      ok: true,
+      normalizedCountry,
+      normalizedCity,
+      applyUrl: applyCheck.url || "",
+    };
+  }, [title, description, applyUrl, locationCountry, location]);
+
+  const handleSubmit = async () => {
+    const validated = validateFormForSave();
+    if (!validated.ok) {
+      setFieldErrors(validated.fieldErrors);
+      toast.error(validated.message);
+      return;
+    }
+
+    const { normalizedCountry, normalizedCity, applyUrl: applyUrlNorm } =
+      validated;
+    const applyCheck = { ok: true as const, url: applyUrlNorm };
 
     setFieldErrors({});
     setSaving(true);
     try {
+      /** Publish from preview always activates the listing; form save uses the checkbox. */
+      const listingShouldBeActive = showJobPreview ? true : isActive;
+
       if (isEdit && jobId) {
         const nextState = {
           title: title.trim(),
@@ -462,7 +512,7 @@ export default function EmployerAddJobPage() {
           location: normalizedCity,
           salary: salary.trim(),
           apply_url: applyCheck.url || "",
-          is_active: isActive,
+          is_active: listingShouldBeActive,
         };
         const patch: Partial<{
           title: string;
@@ -524,13 +574,16 @@ export default function EmployerAddJobPage() {
             patch.qualifications = linesToBulletArray(qualificationsText);
           }
         }
+        if (showJobPreview) {
+          patch.is_active = true;
+        }
         if (Object.keys(patch).length === 0) {
           toast.info("No changes to save.");
           return;
         }
 
         await updatePublishedEmployerJob(jobId, patch);
-        toast.success("Job updated.");
+        toast.success(showJobPreview ? "Job published." : "Job updated.");
       } else {
         const data = await publishEmployerJob({
           title: title.trim(),
@@ -542,7 +595,7 @@ export default function EmployerAddJobPage() {
           location: normalizedCity || undefined,
           salary: salary.trim() || undefined,
           apply_url: applyCheck.url || null,
-          is_active: isActive,
+          is_active: listingShouldBeActive,
           employment_type_note: employmentType,
           responsibilities: linesToBulletArray(responsibilitiesText),
           qualifications: linesToBulletArray(qualificationsText),
@@ -598,13 +651,84 @@ export default function EmployerAddJobPage() {
   };
 
   const openJobPreview = useCallback(async () => {
-    setPreviewLoadingModal(true);
-    await new Promise((r) => setTimeout(r, 450));
-    setPreviewLoadingModal(false);
-    setPreviewEditKey(null);
-    setShowJobPreview(true);
-    navigate({ hash: "preview" }, { replace: true });
-  }, [navigate]);
+    const validated = validateFormForSave();
+    if (!validated.ok) {
+      setFieldErrors(validated.fieldErrors);
+      toast.error(validated.message);
+      return;
+    }
+    const { normalizedCountry, normalizedCity, applyUrl: applyUrlNorm } =
+      validated;
+
+    if (isEdit && jobId) {
+      setPreviewEditKey(null);
+      setShowJobPreview(true);
+      navigate({ hash: "preview" }, { replace: true });
+      return;
+    }
+
+    setPreviewPriming(true);
+    setFieldErrors({});
+    try {
+      const data = await publishEmployerJob({
+        title: title.trim(),
+        full_description: description.trim(),
+        work_mode: workMode,
+        country: normalizedCountry || undefined,
+        city: normalizedCity || undefined,
+        location_country: normalizedCountry || undefined,
+        location: normalizedCity || undefined,
+        salary: salary.trim() || undefined,
+        apply_url: applyUrlNorm || null,
+        is_active: false,
+        employment_type_note: employmentType,
+        responsibilities: linesToBulletArray(responsibilitiesText),
+        qualifications: linesToBulletArray(qualificationsText),
+      });
+      const id = data.id ?? data.pk ?? data.job_id;
+      if (id == null) {
+        toast.error("Draft was saved but the server did not return a job id.");
+        return;
+      }
+      setPreviewEditKey(null);
+      navigate(
+        {
+          pathname: getLocalizedPath(
+            `/employer/jobs/edit/${String(id)}`,
+            language,
+          ),
+          search: "?source=aggregator",
+          hash: "preview",
+        },
+        { replace: true },
+      );
+    } catch (e: unknown) {
+      const err = e as EmployerJobsApiError;
+      if (err.status === 401 || err.status === 403) {
+        toast.error("You are not authorized to manage employer jobs.");
+      } else if (err.status === 400 && err.fieldErrors) {
+        setFieldErrors(err.fieldErrors);
+        toast.error("Please fix the highlighted fields.");
+      } else {
+        toast.error(err.message || "Could not save draft for preview.");
+      }
+    } finally {
+      setPreviewPriming(false);
+    }
+  }, [
+    validateFormForSave,
+    isEdit,
+    jobId,
+    navigate,
+    title,
+    description,
+    workMode,
+    employmentType,
+    salary,
+    language,
+    responsibilitiesText,
+    qualificationsText,
+  ]);
 
   /** When hash loses #preview (e.g. DashboardHeader Back), leave preview mode */
   const prevEmployerJobHashRef = useRef<string>("");
@@ -705,7 +829,7 @@ export default function EmployerAddJobPage() {
 
   return (
     <DashboardLayout containMainScroll={false}>
-      {previewLoadingModal ? (
+      {previewPriming ? (
         <div
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-background/90 px-6 text-center backdrop-blur-sm dark:bg-background/95"
           role="status"
@@ -759,8 +883,6 @@ export default function EmployerAddJobPage() {
           setApplyUrl={setApplyUrl}
           salary={salary}
           setSalary={setSalary}
-          isActive={isActive}
-          setIsActive={setIsActive}
           previewLocationLine={previewLocationLine}
           workModeLabel={workModeLabel}
           previewSalaryLine={previewSalaryLine}
@@ -782,8 +904,6 @@ export default function EmployerAddJobPage() {
           setDraftResponsibilities={setDraftResponsibilities}
           draftQualifications={draftQualifications}
           setDraftQualifications={setDraftQualifications}
-          draftIsActive={draftIsActive}
-          setDraftIsActive={setDraftIsActive}
           isEdit={isEdit}
           responsibilitiesLabel={t.employerJobForm.responsibilitiesLabel}
           qualificationsLabel={t.employerJobForm.qualificationsLabel}
@@ -1210,7 +1330,7 @@ export default function EmployerAddJobPage() {
                       type="button"
                       variant="outline"
                       onClick={openJobPreview}
-                      disabled={saving || deleting}
+                      disabled={saving || deleting || previewPriming}
                     >
                       View preview
                     </Button>
@@ -1231,7 +1351,7 @@ export default function EmployerAddJobPage() {
                   <Button
                     type="button"
                     onClick={openJobPreview}
-                    disabled={saving || deleting}
+                    disabled={saving || deleting || previewPriming}
                   >
                     View job preview
                   </Button>
