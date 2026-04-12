@@ -217,6 +217,43 @@ const isTechJob = (job: ApiJob): boolean => {
   return techKeywords.some((keyword) => textToSearch.includes(keyword));
 };
 
+/** Jobs based in Georgia (country), not the US state. */
+const isGeorgianJob = (job: ApiJob): boolean => {
+  const cc = (job.job_country || job.country || "")
+    .toLowerCase()
+    .trim();
+  if (cc === "georgia" || cc === "ge") return true;
+
+  const loc = [
+    job.job_location,
+    job.location,
+    job.job_city,
+    job.city,
+    job.job_state,
+    job.state,
+  ]
+    .filter(Boolean)
+    .join(", ")
+    .toLowerCase();
+
+  if (
+    /\b(tbilisi|batumi|kutaisi|rustavi|zugdidi|gori|poti|sokhumi)\b/.test(loc)
+  ) {
+    return true;
+  }
+  if (/\bgeorgia\b/.test(loc)) {
+    if (
+      /\b(atlanta|savannah|augusta|macon|columbus,\s*ga|columbus ga)\b/.test(
+        loc,
+      )
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+};
+
 // Transformed Job for UI
 interface Job {
   id: string;
@@ -321,6 +358,7 @@ const UserHome = () => {
   const [userHardSkills, setUserHardSkills] = useState<string[]>([]); // Only tech/hard skills
   const [loadingSkills, setLoadingSkills] = useState(true);
   const [hasCompletedTest, setHasCompletedTest] = useState(false);
+  const georgiaJobsScrollRef = useRef<HTMLDivElement>(null);
   const jobsScrollRef = useRef<HTMLDivElement>(null);
   const coursesScrollRef = useRef<HTMLDivElement>(null);
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
@@ -758,174 +796,14 @@ const UserHome = () => {
     },
   });
 
-  // Transform jobs - handle empty or undefined arrays
-  // Sort by match percentage (highest first), then take top 9
-  const transformedJobs: Job[] = useMemo(() => {
-    // No filtering - display all jobs
-    const filteredJobs = jobs || [];
+  // Georgian vs worldwide: same match ranking; worldwide excludes Georgia to avoid duplicates
+  const { transformedGeorgianJobs, transformedWorldwideJobs } = useMemo(() => {
+    const allJobs = jobs || [];
+    const georgianSource = allJobs.filter(isGeorgianJob);
+    const worldwideSource = allJobs.filter((j) => !isGeorgianJob(j));
 
-    // Transform all jobs first – same total match % as job detail page
-    const jobsWithMatchPercentage = filteredJobs.map((job: ApiJob) => {
-      const matchPercentage =
-        user && userSkillsForMatch.length >= 0
-          ? matchJobDetailToUser(
-              job as unknown as JobDetail,
-              buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-            ).overallPercent
-          : undefined;
-      return { job, matchPercentage };
-    });
-
-    // Sort by match percentage (highest first), then by date as tiebreaker
-    jobsWithMatchPercentage.sort((a, b) => {
-      // First, sort by match percentage (highest first)
-      if (a.matchPercentage !== b.matchPercentage) {
-        return b.matchPercentage - a.matchPercentage;
-      }
-
-      // If match percentages are equal, sort by date (newest first)
-      const dateA =
-        a.job.posted_at || a.job.fetched_at || a.job.date_posted || "";
-      const dateB =
-        b.job.posted_at || b.job.fetched_at || b.job.date_posted || "";
-
-      if (dateA && dateB) {
-        try {
-          const timeA = new Date(dateA as string).getTime();
-          const timeB = new Date(dateB as string).getTime();
-          return timeB - timeA; // Newest first
-        } catch (e) {
-          return 0;
-        }
-      }
-
-      return 0;
-    });
-
-    // Step 3: Take top 9 jobs with highest match percentage
-    const topJobs = jobsWithMatchPercentage.slice(0, 9).map((item) => item.job);
-
-    return topJobs
-      .map((job: ApiJob) => {
-        // Extract job ID - use only id field (not job_id or external_job_id)
-        const jobId = job.id || "";
-        if (!jobId) {
-          console.warn("Skipping job without valid ID:", job);
-          return null;
-        }
-
-        // Extract job title - check all possible fields
-        const jobTitle =
-          job.title || job.job_title || job.position || "Untitled Position";
-
-        // Extract company name - check all possible fields
-        const companyName =
-          job.company_name ||
-          job.employer_name ||
-          (typeof job.company === "string" ? job.company : null) ||
-          "Unknown Company";
-
-        // Extract location - check all possible fields
-        const jobCity = job.job_city || job.city || "";
-        const jobState = job.job_state || job.state || "";
-        const jobCountry = job.job_country || job.country || "";
-        const location =
-          job.job_location ||
-          job.location ||
-          [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-          "Location not specified";
-
-        // Extract logo - check all possible fields
-        const logo =
-          job.logo_upload ||
-          job.employer_logo ||
-          job.company_logo ||
-          job.logo_url ||
-          (typeof job.company === "object" && job.company
-            ? (job.company as { logo_upload?: string; logo?: string }).logo_upload ||
-              (job.company as { logo?: string; company_logo?: string }).logo ||
-              (job.company as { company_logo?: string }).company_logo
-            : undefined);
-
-        // Extract date posted - new API uses posted_at or fetched_at
-        const postedDate =
-          job.posted_at ||
-          job.fetched_at ||
-          job.date_posted ||
-          job.posted_date ||
-          job.job_posted_at_datetime_utc ||
-          undefined;
-
-        // Format salary
-        let salary = "By agreement";
-        const minSalary = job.job_min_salary || job.min_salary;
-        const maxSalary = job.job_max_salary || job.max_salary;
-        const salaryCurrency =
-          job.job_salary_currency || job.salary_currency || "$";
-        const salaryPeriod =
-          job.job_salary_period || job.salary_period || "yearly";
-
-        if (
-          minSalary &&
-          maxSalary &&
-          typeof minSalary === "number" &&
-          typeof maxSalary === "number"
-        ) {
-          const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const maxSalaryFormatted = maxSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym),
-          );
-          if (isCurrencyBefore) {
-            salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          } else {
-            salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          }
-        } else if (minSalary && typeof minSalary === "number") {
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym),
-          );
-          salary = isCurrencyBefore
-            ? `${salaryCurrency}${minSalaryFormatted}+`
-            : `${minSalaryFormatted}+ ${salaryCurrency}`;
-        } else if (job.salary && typeof job.salary === "string") {
-          salary = job.salary;
-        }
-
-        // Format employment type
-        const employmentTypeRaw =
-          job.job_employment_type ||
-          job.employment_type ||
-          job.type ||
-          "FULLTIME";
-        const jobTypeLabels: Record<string, string> = {
-          FULLTIME: "Full time",
-          PARTTIME: "Part time",
-          CONTRACTOR: "Contract",
-          INTERN: "Internship",
-        };
-        const employmentType =
-          jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
-
-        // Determine work arrangement
-        let workArrangement = "On-site";
-        const isRemote =
-          job.job_is_remote || job.is_remote || job.remote === true;
-        if (isRemote) {
-          workArrangement = "Remote";
-        } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-          workArrangement = "Hybrid";
-        }
-
-        // Total match % (same logic as job detail page)
+    const sortAndTakeTopApiJobs = (source: ApiJob[]) => {
+      const jobsWithMatchPercentage = source.map((job: ApiJob) => {
         const matchPercentage =
           user && userSkillsForMatch.length >= 0
             ? matchJobDetailToUser(
@@ -933,37 +811,207 @@ const UserHome = () => {
                 buildUserMatchProfileFromSkillTest(userSkillsForMatch),
               ).overallPercent
             : undefined;
+        return { job, matchPercentage };
+      });
 
-        const transformedJob: Job = {
-          id: jobId,
-          title: jobTitle,
-          company: companyName,
-          company_name: companyName,
-          location:
-            typeof location === "string" ? location : "Location not specified",
-          logo,
-          company_logo: logo,
-          salary,
-          employment_type: employmentType,
-          work_arrangement: workArrangement,
-          is_saved: savedJobs?.includes(String(jobId)),
-          matchPercentage,
-          date: postedDate
-            ? new Date(String(postedDate)).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
-            : new Date().toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              }),
-        };
-        return transformedJob;
-      })
-      .filter((job): job is Job => job !== null); // Filter out null jobs (already limited to 9 above)
+      jobsWithMatchPercentage.sort((a, b) => {
+        if (a.matchPercentage !== b.matchPercentage) {
+          return b.matchPercentage - a.matchPercentage;
+        }
+
+        const dateA =
+          a.job.posted_at || a.job.fetched_at || a.job.date_posted || "";
+        const dateB =
+          b.job.posted_at || b.job.fetched_at || b.job.date_posted || "";
+
+        if (dateA && dateB) {
+          try {
+            const timeA = new Date(dateA as string).getTime();
+            const timeB = new Date(dateB as string).getTime();
+            return timeB - timeA;
+          } catch {
+            return 0;
+          }
+        }
+
+        return 0;
+      });
+
+      return jobsWithMatchPercentage.slice(0, 9).map((item) => item.job);
+    };
+
+    const mapApiJobToJob = (job: ApiJob): Job | null => {
+      const jobId = job.id || "";
+      if (!jobId) {
+        console.warn("Skipping job without valid ID:", job);
+        return null;
+      }
+
+      const jobTitle =
+        job.title || job.job_title || job.position || "Untitled Position";
+
+      const companyName =
+        job.company_name ||
+        job.employer_name ||
+        (typeof job.company === "string" ? job.company : null) ||
+        "Unknown Company";
+
+      const jobCity = job.job_city || job.city || "";
+      const jobState = job.job_state || job.state || "";
+      const jobCountry = job.job_country || job.country || "";
+      const location =
+        job.job_location ||
+        job.location ||
+        [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
+        "Location not specified";
+
+      const logo =
+        job.logo_upload ||
+        job.employer_logo ||
+        job.company_logo ||
+        job.logo_url ||
+        (typeof job.company === "object" && job.company
+          ? (job.company as { logo_upload?: string; logo?: string }).logo_upload ||
+            (job.company as { logo?: string; company_logo?: string }).logo ||
+            (job.company as { company_logo?: string }).company_logo
+          : undefined);
+
+      const postedDate =
+        job.posted_at ||
+        job.fetched_at ||
+        job.date_posted ||
+        job.posted_date ||
+        job.job_posted_at_datetime_utc ||
+        undefined;
+
+      let salary = "By agreement";
+      const minSalary = job.job_min_salary || job.min_salary;
+      const maxSalary = job.job_max_salary || job.max_salary;
+      const salaryCurrency =
+        job.job_salary_currency || job.salary_currency || "$";
+      const salaryPeriod =
+        job.job_salary_period || job.salary_period || "yearly";
+
+      if (
+        minSalary &&
+        maxSalary &&
+        typeof minSalary === "number" &&
+        typeof maxSalary === "number"
+      ) {
+        const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+        const minSalaryFormatted = minSalary.toLocaleString();
+        const maxSalaryFormatted = maxSalary.toLocaleString();
+        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+        const isCurrencyBefore = currencySymbols.some((sym) =>
+          salaryCurrency.includes(sym),
+        );
+        if (isCurrencyBefore) {
+          salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+            periodLabel ? `/${periodLabel}` : ""
+          }`;
+        } else {
+          salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+            periodLabel ? `/${periodLabel}` : ""
+          }`;
+        }
+      } else if (minSalary && typeof minSalary === "number") {
+        const minSalaryFormatted = minSalary.toLocaleString();
+        const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+        const isCurrencyBefore = currencySymbols.some((sym) =>
+          salaryCurrency.includes(sym),
+        );
+        salary = isCurrencyBefore
+          ? `${salaryCurrency}${minSalaryFormatted}+`
+          : `${minSalaryFormatted}+ ${salaryCurrency}`;
+      } else if (job.salary && typeof job.salary === "string") {
+        salary = job.salary;
+      }
+
+      const employmentTypeRaw =
+        job.job_employment_type ||
+        job.employment_type ||
+        job.type ||
+        "FULLTIME";
+      const jobTypeLabels: Record<string, string> = {
+        FULLTIME: "Full time",
+        PARTTIME: "Part time",
+        CONTRACTOR: "Contract",
+        INTERN: "Internship",
+      };
+      const employmentType =
+        jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
+
+      let workArrangement = "On-site";
+      const isRemote =
+        job.job_is_remote || job.is_remote || job.remote === true;
+      if (isRemote) {
+        workArrangement = "Remote";
+      } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+        workArrangement = "Hybrid";
+      }
+
+      const matchPercentage =
+        user && userSkillsForMatch.length >= 0
+          ? matchJobDetailToUser(
+              job as unknown as JobDetail,
+              buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+            ).overallPercent
+          : undefined;
+
+      const transformedJob: Job = {
+        id: jobId,
+        title: jobTitle,
+        company: companyName,
+        company_name: companyName,
+        location:
+          typeof location === "string" ? location : "Location not specified",
+        logo,
+        company_logo: logo,
+        salary,
+        employment_type: employmentType,
+        work_arrangement: workArrangement,
+        is_saved: savedJobs?.includes(String(jobId)),
+        matchPercentage,
+        date: postedDate
+          ? new Date(String(postedDate)).toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+      };
+      return transformedJob;
+    };
+
+    const transformedGeorgianJobs = sortAndTakeTopApiJobs(georgianSource)
+      .map(mapApiJobToJob)
+      .filter((job): job is Job => job !== null);
+
+    const transformedWorldwideJobs = sortAndTakeTopApiJobs(worldwideSource)
+      .map(mapApiJobToJob)
+      .filter((job): job is Job => job !== null);
+
+    return { transformedGeorgianJobs, transformedWorldwideJobs };
   }, [jobs, savedJobs, user, userSkillsForMatch]);
+
+  const scrollGeorgiaJobs = (direction: "left" | "right") => {
+    if (georgiaJobsScrollRef.current) {
+      const scrollAmount = 400;
+      const scrollPosition =
+        direction === "left"
+          ? georgiaJobsScrollRef.current.scrollLeft - scrollAmount
+          : georgiaJobsScrollRef.current.scrollLeft + scrollAmount;
+
+      georgiaJobsScrollRef.current.scrollTo({
+        left: scrollPosition,
+        behavior: "smooth",
+      });
+    }
+  };
 
   // Scroll functions for jobs
   const scrollJobs = (direction: "left" | "right") => {
@@ -996,6 +1044,153 @@ const UserHome = () => {
       });
     }
   };
+
+  const jobsSkeletonRow = (
+    <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
+      {[...Array(3)].map((_, i) => (
+        <Card
+          key={i}
+          className="relative flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px]"
+        >
+          <CardContent className="p-4">
+            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="h-6 w-3/4 mb-4" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
+  const jobsErrorCard = (
+    <Card>
+      <CardContent className="p-6 text-center">
+        <p className="text-gray-500 mb-2">
+          Unable to load jobs at the moment.
+        </p>
+        <p className="text-sm text-gray-400">Please try again later.</p>
+      </CardContent>
+    </Card>
+  );
+
+  const renderJobCardsContent = (jobRows: Job[]) =>
+    jobRows.map((job) => (
+      <Card
+        key={job.id}
+        className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px] hover:shadow-soft"
+        onClick={() => {
+          if (!job.id || String(job.id).trim() === "") return;
+          const encodedId = encodeURIComponent(String(job.id));
+          navigate(`/jobs/${encodedId}`);
+        }}
+      >
+        <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
+          <div className="flex items-start gap-3 mb-3">
+            {job.company_logo ? (
+              <div className="flex-shrink-0 relative w-10 h-10">
+                <img
+                  src={job.company_logo}
+                  alt={`${
+                    job.company_name ||
+                    (typeof job.company === "string"
+                      ? job.company
+                      : job.company?.name || "Company")
+                  } logo`}
+                  className="w-10 h-10 rounded-md object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            ) : null}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm truncate">
+                {job.company_name ||
+                  (typeof job.company === "string"
+                    ? job.company
+                    : job.company?.name || "Company")}
+              </h3>
+              <p className="mt-0.5 text-xs text-gray-500 truncate">
+                {job.location}
+              </p>
+            </div>
+          </div>
+
+          <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+            {job.title}
+          </h4>
+
+          <div className="mt-1 flex flex-wrap gap-2">
+            {job.employment_type && (
+              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                {job.employment_type}
+              </Badge>
+            )}
+            {job.work_arrangement && (
+              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                {job.work_arrangement}
+              </Badge>
+            )}
+          </div>
+
+          <div className="mt-7 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <RadialProgress
+                value={job.matchPercentage ?? 0}
+                size={44}
+                strokeWidth={5}
+                showLabel={false}
+                percentageTextSize="sm"
+                className="text-breneo-blue"
+              />
+              <span className="text-xs font-semibold text-gray-700">
+                {job.matchPercentage != null
+                  ? (() => {
+                      const p = job.matchPercentage!;
+                      const key =
+                        p >= 95
+                          ? "excellentMatch"
+                          : p >= 85
+                            ? "bestMatch"
+                            : p >= 70
+                              ? "goodMatch"
+                              : p >= 50
+                                ? "fairMatch"
+                                : "badMatch";
+                      return t.jobMatch[key];
+                    })()
+                  : ""}
+              </span>
+            </div>
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                saveJobMutation.mutate(job);
+              }}
+              aria-label={job.is_saved ? "Unsave job" : "Save job"}
+              className={cn(
+                "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                job.is_saved
+                  ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                  : "text-black dark:text-white",
+              )}
+            >
+              <Heart
+                className={cn(
+                  "h-4 w-4 transition-colors",
+                  job.is_saved
+                    ? "text-red-500 fill-red-500 animate-heart-pop"
+                    : "text-black dark:text-white",
+                )}
+              />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    ));
 
   // Debug logging
   // console.log("🏠 UserHome render:", {
@@ -1150,63 +1345,97 @@ const UserHome = () => {
 
           {/* Main Content - Top Jobs and Courses */}
           <div className="space-y-6 pt-6 md:pt-8">
-            {/* Top Job Picks Section */}
+            {/* Georgian jobs */}
             <div>
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
-                  Top job picks for you
+                  Georgian jobs for you
                 </h2>
-                {!jobsLoading && !jobsError && transformedJobs.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => scrollJobs("left")}
-                      aria-label="Scroll left"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => scrollJobs("right")}
-                      aria-label="Scroll right"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
+                {!jobsLoading &&
+                  !jobsError &&
+                  transformedGeorgianJobs.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => scrollGeorgiaJobs("left")}
+                        aria-label="Scroll Georgian jobs left"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => scrollGeorgiaJobs("right")}
+                        aria-label="Scroll Georgian jobs right"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
               </div>
 
               {jobsLoading ? (
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-                  {[...Array(3)].map((_, i) => (
-                    <Card
-                      key={i}
-                      className="relative flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px]"
-                    >
-                      <CardContent className="p-4">
-                        <Skeleton className="h-4 w-20 mb-2" />
-                        <Skeleton className="h-6 w-3/4 mb-4" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                jobsSkeletonRow
               ) : jobsError ? (
+                jobsErrorCard
+              ) : transformedGeorgianJobs.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <p className="text-gray-500 mb-2">
-                      Unable to load jobs at the moment.
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Please try again later.
+                    <p className="text-gray-500">
+                      No Georgian jobs available right now.
                     </p>
                   </CardContent>
                 </Card>
-              ) : transformedJobs.length === 0 ? (
+              ) : (
+                <div
+                  ref={georgiaJobsScrollRef}
+                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
+                >
+                  {renderJobCardsContent(transformedGeorgianJobs)}
+                </div>
+              )}
+            </div>
+
+            {/* Worldwide jobs for you */}
+            <div>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">
+                  Worldwide jobs for you
+                </h2>
+                {!jobsLoading &&
+                  !jobsError &&
+                  transformedWorldwideJobs.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => scrollJobs("left")}
+                        aria-label="Scroll worldwide jobs left"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => scrollJobs("right")}
+                        aria-label="Scroll worldwide jobs right"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+              </div>
+
+              {jobsLoading ? (
+                jobsSkeletonRow
+              ) : jobsError ? (
+                jobsErrorCard
+              ) : transformedWorldwideJobs.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center">
                     <p className="text-gray-500">
@@ -1219,130 +1448,7 @@ const UserHome = () => {
                   ref={jobsScrollRef}
                   className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
                 >
-                  {transformedJobs.map((job) => (
-                    <Card
-                      key={job.id}
-                      className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px] hover:shadow-soft"
-                      onClick={() => {
-                        if (!job.id || String(job.id).trim() === "") return;
-                        const encodedId = encodeURIComponent(String(job.id));
-                        navigate(`/jobs/${encodedId}`);
-                      }}
-                    >
-                      <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
-                        {/* Company Logo and Info – copied from JobsPage */}
-                        <div className="flex items-start gap-3 mb-3">
-                          {job.company_logo ? (
-                            <div className="flex-shrink-0 relative w-10 h-10">
-                              <img
-                                src={job.company_logo}
-                                alt={`${
-                                  job.company_name ||
-                                  (typeof job.company === "string"
-                                    ? job.company
-                                    : job.company?.name || "Company")
-                                } logo`}
-                                className="w-10 h-10 rounded-md object-cover"
-                                loading="lazy"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display =
-                                    "none";
-                                }}
-                              />
-                            </div>
-                          ) : null}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-sm truncate">
-                              {job.company_name ||
-                                (typeof job.company === "string"
-                                  ? job.company
-                                  : job.company?.name || "Company")}
-                            </h3>
-                            <p className="mt-0.5 text-xs text-gray-500 truncate">
-                              {job.location}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Job Title */}
-                        <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
-                          {job.title}
-                        </h4>
-
-                        {/* Job Details as chips (without salary) – same style as JobsPage */}
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {job.employment_type && (
-                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                              {job.employment_type}
-                            </Badge>
-                          )}
-                          {job.work_arrangement && (
-                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                              {job.work_arrangement}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Match percentage & Save button – exactly like JobsPage remote jobs */}
-                        <div className="mt-7 flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-3">
-                            <RadialProgress
-                              value={job.matchPercentage ?? 0}
-                              size={44}
-                              strokeWidth={5}
-                              showLabel={false}
-                              percentageTextSize="sm"
-                              className="text-breneo-blue"
-                            />
-                            <span className="text-xs font-semibold text-gray-700">
-                              {job.matchPercentage != null
-                                ? (() => {
-                                    const p = job.matchPercentage!;
-                                    const key =
-                                      p >= 95
-                                        ? "excellentMatch"
-                                        : p >= 85
-                                          ? "bestMatch"
-                                          : p >= 70
-                                            ? "goodMatch"
-                                            : p >= 50
-                                              ? "fairMatch"
-                                              : "badMatch";
-                                    return t.jobMatch[key];
-                                  })()
-                                : ""}
-                            </span>
-                          </div>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              saveJobMutation.mutate(job);
-                            }}
-                            aria-label={
-                              job.is_saved ? "Unsave job" : "Save job"
-                            }
-                            className={cn(
-                              "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
-                              job.is_saved
-                                ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                                : "text-black dark:text-white",
-                            )}
-                          >
-                            <Heart
-                              className={cn(
-                                "h-4 w-4 transition-colors",
-                                job.is_saved
-                                  ? "text-red-500 fill-red-500 animate-heart-pop"
-                                  : "text-black dark:text-white",
-                              )}
-                            />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {renderJobCardsContent(transformedWorldwideJobs)}
                 </div>
               )}
             </div>

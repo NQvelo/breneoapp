@@ -18,14 +18,14 @@ const logoCache = new Map<string, string | null>();
  * @returns Promise<string | undefined> - The logo URL or undefined if not found
  */
 export const fetchCompanyLogo = async (
-  companyName: string
+  companyName: string,
 ): Promise<string | undefined> => {
   if (!companyName || !companyName.trim()) {
     return undefined;
   }
 
   const normalizedName = companyName.trim();
-  
+
   // Check cache first
   if (logoCache.has(normalizedName)) {
     const cachedLogo = logoCache.get(normalizedName);
@@ -47,7 +47,7 @@ export const fetchCompanyLogo = async (
 
     if (response.ok) {
       const data = await response.json();
-      
+
       // Extract logo from response
       const logoUrl =
         data.logo_upload ||
@@ -55,7 +55,7 @@ export const fetchCompanyLogo = async (
         data.company_logo ||
         data.logo_url ||
         data.employer_logo;
-      
+
       if (logoUrl && typeof logoUrl === "string") {
         try {
           // Validate URL
@@ -70,7 +70,7 @@ export const fetchCompanyLogo = async (
         }
       }
     }
-    
+
     // Cache null to indicate we tried but didn't find a logo
     logoCache.set(normalizedName, null);
     return undefined;
@@ -91,7 +91,7 @@ export const fetchCompanyLogo = async (
  */
 export const getCompanyLogo = async (
   companyName: string,
-  fallbackLogo?: string
+  fallbackLogo?: string,
 ): Promise<string | undefined> => {
   // If we already have a valid logo, use it
   if (fallbackLogo && typeof fallbackLogo === "string") {

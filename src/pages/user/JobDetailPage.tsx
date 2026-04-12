@@ -503,7 +503,33 @@ const JobDetailPage = () => {
     if (!jobDetail) return "";
     const jobDetailAny = jobDetail as Record<string, unknown>;
 
-    // Check new API structure - company_name is primary field
+    // Nested `company` object from job-details API (`company.name`)
+    if (jobDetail.company && typeof jobDetail.company === "object") {
+      const companyObj = jobDetail.company as CompanyInfo;
+      if (
+        companyObj.name &&
+        typeof companyObj.name === "string" &&
+        companyObj.name.trim()
+      ) {
+        return String(companyObj.name).trim();
+      }
+      if (
+        companyObj.company_name &&
+        typeof companyObj.company_name === "string" &&
+        companyObj.company_name.trim()
+      ) {
+        return String(companyObj.company_name).trim();
+      }
+      if (
+        companyObj.employer_name &&
+        typeof companyObj.employer_name === "string" &&
+        companyObj.employer_name.trim()
+      ) {
+        return String(companyObj.employer_name).trim();
+      }
+    }
+
+    // Flat company_name (normalized job service / legacy)
     if (
       jobDetail.company_name &&
       typeof jobDetail.company_name === "string" &&
@@ -576,32 +602,6 @@ const JobDetailPage = () => {
       return String(jobDetail.employer_name).trim();
     }
 
-    // Check nested company object
-    if (jobDetail.company && typeof jobDetail.company === "object") {
-      const companyObj = jobDetail.company as CompanyInfo;
-      if (
-        companyObj.name &&
-        typeof companyObj.name === "string" &&
-        companyObj.name.trim()
-      ) {
-        return String(companyObj.name).trim();
-      }
-      if (
-        companyObj.company_name &&
-        typeof companyObj.company_name === "string" &&
-        companyObj.company_name.trim()
-      ) {
-        return String(companyObj.company_name).trim();
-      }
-      if (
-        companyObj.employer_name &&
-        typeof companyObj.employer_name === "string" &&
-        companyObj.employer_name.trim()
-      ) {
-        return String(companyObj.employer_name).trim();
-      }
-    }
-
     // Check employer object
     if (jobDetail.employer && typeof jobDetail.employer === "object") {
       const employerObj = jobDetail.employer as CompanyInfo;
@@ -628,7 +628,12 @@ const JobDetailPage = () => {
       }
     }
 
-    // If still no company name found, return empty string (will be handled in UI)
+    const fromCompanyLookup =
+      companyDetails?.name?.trim() ||
+      companyDetails?.company_name?.trim() ||
+      companyDetails?.employer_name?.trim();
+    if (fromCompanyLookup) return String(fromCompanyLookup);
+
     return "";
   };
 
@@ -746,13 +751,16 @@ const JobDetailPage = () => {
 
         console.log("🔍 Fetching company details from:", companyApiUrl);
 
-        const response = await jobAgg.fetch(`/api/companies/${encodedCompanyName}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+        const response = await jobAgg.fetch(
+          `/api/companies/${encodedCompanyName}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
           },
-        });
+        );
 
         if (response.ok) {
           const data = await response.json();
@@ -813,7 +821,7 @@ const JobDetailPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobDetail]);
 
-  // Company logo: only from job detail payload (not enriched from company lookup)
+  // Company logo: job payload first, then `/api/companies/:name` enrichment
   const getCompanyLogo = () => {
     if (!jobDetail) return undefined;
     const jobDetailAny = jobDetail as Record<string, unknown>;
@@ -958,6 +966,29 @@ const JobDetailPage = () => {
             }
           } catch {
             // Invalid URL, continue
+          }
+        }
+      }
+    }
+
+    if (companyDetails) {
+      const logoFields = [
+        companyDetails.logo,
+        companyDetails.logo_url,
+        companyDetails.company_logo,
+        companyDetails.logo_upload,
+        companyDetails.employer_logo,
+      ];
+      for (const logoField of logoFields) {
+        if (logoField && typeof logoField === "string") {
+          const logoUrl = String(logoField);
+          try {
+            const url = new URL(logoUrl);
+            if (url.protocol.startsWith("http")) {
+              return logoUrl;
+            }
+          } catch {
+            /* ignore */
           }
         }
       }
@@ -1528,7 +1559,7 @@ const JobDetailPage = () => {
     const tags = parseJobIndustryTags(
       (jobDetail as Record<string, unknown>)?.industry_tags as
         | string
-        | undefined
+        | undefined,
     );
     const result = computeIndustryMatchPercent(tags, industryYears);
     return result.percent;
@@ -1623,25 +1654,62 @@ const JobDetailPage = () => {
                 <div className="flex flex-col md:flex-row md:items-start gap-6 bg-white rounded-3xl p-6 shadow-none border-0">
                   {/* Left Side: Job Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-4 mb-3">
-                      {getCompanyLogo() ? (
-                        <img
-                          src={getCompanyLogo()}
-                          alt={getCompanyName() || "Company logo"}
-                          className="h-12 w-12 rounded-md object-cover flex-shrink-0"
-                        />
-                      ) : null}
-
-                      <div className="flex flex-col min-w-0">
-                        {getCompanyName() && (
-                          <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 truncate">
-                            {getCompanyName()}
-                          </p>
-                        )}
-                        <h1 className="text-lg md:text-2xl font-semibold text-gray-900 dark:text-white truncate">
-                          {getJobTitle()}
-                        </h1>
-                      </div>
+                    <div className="mb-6">
+                      {(() => {
+                        const logoUrl = getCompanyLogo();
+                        const companyLabel = getCompanyName();
+                        const renderLogo = () =>
+                          logoUrl ? (
+                            <img
+                              src={logoUrl}
+                              alt={companyLabel || "Company logo"}
+                              className="h-10 w-10 md:h-12 md:w-12 rounded-md object-cover flex-shrink-0 border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                              }}
+                            />
+                          ) : (
+                            <div
+                              className="h-10 w-10 md:h-12 md:w-12 rounded-md flex-shrink-0 border border-gray-100 dark:border-gray-800 bg-muted flex items-center justify-center"
+                                aria-hidden
+                              >
+                              <Building2 className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
+                            </div>
+                          );
+                        return (
+                          <>
+                            {/* Mobile: company beside smaller logo; title on next row */}
+                            <div className="flex flex-col gap-2 md:hidden">
+                              <div className="flex items-center gap-3 min-w-0">
+                                {renderLogo()}
+                                {companyLabel ? (
+                                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 truncate min-w-0 flex-1 leading-tight">
+                                    {companyLabel}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                {getJobTitle()}
+                              </h1>
+                            </div>
+                            {/* md+: logo + company stacked above title */}
+                            <div className="hidden md:flex items-start gap-4">
+                              {renderLogo()}
+                              <div className="flex flex-col min-w-0 gap-1">
+                                {companyLabel ? (
+                                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
+                                    {companyLabel}
+                                  </p>
+                                ) : null}
+                                <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                                  {getJobTitle()}
+                                </h1>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-wrap items-center gap-4 mb-4">
                       <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
@@ -1693,8 +1761,64 @@ const JobDetailPage = () => {
                     </div>
                   </div>
 
-                  {/* Right Side: Action Buttons - Aligned to Top */}
-                  <div className="flex flex-row items-start gap-2 md:pt-0">
+                  {/* Right Side: Action Buttons - Save, Share, then Apply (last) */}
+                  <div className="flex flex-row items-start gap-2 md:pt-0 flex-shrink-0 flex-wrap justify-end">
+                    {user && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={() => saveJobMutation.mutate()}
+                        disabled={saveJobMutation.isPending}
+                        aria-label={isSaved ? "Unsave job" : "Save job"}
+                        className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                      >
+                        <Heart
+                          className={`h-4 w-4 ${
+                            isSaved
+                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              : ""
+                          }`}
+                        />
+                      </Button>
+                    )}
+                    {isMobile && navigator.share ? (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={handleShareClick}
+                        aria-label="Share job"
+                        className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            aria-label="Share job"
+                            className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={handleCopyLink}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            <span>Copy Link</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleFacebookShare}>
+                            <Facebook className="mr-2 h-4 w-4" />
+                            <span>Share on Facebook</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={handleLinkedInShare}>
+                            <Linkedin className="mr-2 h-4 w-4" />
+                            <span>Share on LinkedIn</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                     {getApplyUrl() ? (
                       <Button
                         variant="default"
@@ -1713,65 +1837,6 @@ const JobDetailPage = () => {
                         Apply Link Not Available
                       </Button>
                     )}
-                    <div className="flex flex-row items-start gap-2 ml-auto">
-                      {user && (
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          onClick={() => saveJobMutation.mutate()}
-                          disabled={saveJobMutation.isPending}
-                          aria-label={isSaved ? "Unsave job" : "Save job"}
-                          className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
-                        >
-                          <Heart
-                            className={`h-4 w-4 ${
-                              isSaved
-                                ? "text-red-500 fill-red-500 animate-heart-pop"
-                                : ""
-                            }`}
-                          />
-                        </Button>
-                      )}
-                      {/* Share Button */}
-                      {isMobile && navigator.share ? (
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          onClick={handleShareClick}
-                          aria-label="Share job"
-                          className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                      ) : (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              aria-label="Share job"
-                              className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
-                            >
-                              <Share2 className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={handleCopyLink}>
-                              <Copy className="mr-2 h-4 w-4" />
-                              <span>Copy Link</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleFacebookShare}>
-                              <Facebook className="mr-2 h-4 w-4" />
-                              <span>Share on Facebook</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleLinkedInShare}>
-                              <Linkedin className="mr-2 h-4 w-4" />
-                              <span>Share on LinkedIn</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2080,7 +2145,7 @@ const JobDetailPage = () => {
                           <img
                             src={getCompanyLogo()}
                             alt={getCompanyName() || "Company logo"}
-                            className="h-14 w-14 md:h-14 md:w-14 rounded-2xl object-cover bg-white shadow-sm"
+                            className="h-12 w-12 md:h-12 md:w-12 rounded-2xl object-cover bg-white shadow-sm"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display =
                                 "none";
@@ -2186,9 +2251,9 @@ const JobDetailPage = () => {
         <div
           className={cn(
             "fixed bottom-0 right-0 z-[60]",
-            "bg-[#F8F9FA] dark:bg-[#181818]",
-            "border-t border-black/[0.03] dark:border-white/[0.03]",
-            "shadow-lg transition-all duration-300 ease-in-out",
+            // Match DashboardLayout main background (light: breneo-lightgray; dark: --background via index.css)
+            "bg-breneo-lightgray border-0 shadow-none",
+            "transition-all duration-300 ease-in-out",
             sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
             "left-0",
             showFixedBar
@@ -2198,16 +2263,23 @@ const JobDetailPage = () => {
         >
           <div className="px-5 sm:px-9 md:px-12 lg:px-14 py-4">
             <div className="flex items-center justify-between gap-4">
-              {/* Job Title */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                  {getJobTitle()}
-                </h3>
-                {getCompanyName() && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    {getCompanyName()}
-                  </p>
-                )}
+              {/* Company + job title */}
+              <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                {(() => {
+                  const barCompany = getCompanyName();
+                  return (
+                    <>
+                      {barCompany ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {barCompany}
+                        </p>
+                      ) : null}
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                        {getJobTitle()}
+                      </h3>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Action Buttons */}
@@ -2230,46 +2302,6 @@ const JobDetailPage = () => {
                       }`}
                     />
                   </Button>
-                )}
-
-                {/* Share Button */}
-                {isMobile && navigator.share ? (
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleShareClick}
-                    aria-label="Share job"
-                    className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        aria-label="Share job"
-                        className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleCopyLink}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        <span>Copy Link</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleFacebookShare}>
-                        <Facebook className="mr-2 h-4 w-4" />
-                        <span>Share on Facebook</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleLinkedInShare}>
-                        <Linkedin className="mr-2 h-4 w-4" />
-                        <span>Share on LinkedIn</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 )}
 
                 {/* Apply Button - Last */}

@@ -160,7 +160,6 @@ export default function EmployerAddJobPage() {
     null,
   );
   const [draftTitle, setDraftTitle] = useState("");
-  const [draftDescription, setDraftDescription] = useState("");
   const [draftSalary, setDraftSalary] = useState("");
   const [draftApplyUrl, setDraftApplyUrl] = useState("");
   const [draftWorkMode, setDraftWorkMode] =
@@ -869,8 +868,6 @@ export default function EmployerAddJobPage() {
           workModeOptions={WORK_MODE_OPTIONS}
           title={title}
           setTitle={setTitle}
-          description={description}
-          setDescription={setDescription}
           responsibilitiesText={responsibilitiesText}
           setResponsibilitiesText={setResponsibilitiesText}
           qualificationsText={qualificationsText}
@@ -890,8 +887,6 @@ export default function EmployerAddJobPage() {
           setPreviewEditKey={setPreviewEditKey}
           draftTitle={draftTitle}
           setDraftTitle={setDraftTitle}
-          draftDescription={draftDescription}
-          setDraftDescription={setDraftDescription}
           draftSalary={draftSalary}
           setDraftSalary={setDraftSalary}
           draftApplyUrl={draftApplyUrl}

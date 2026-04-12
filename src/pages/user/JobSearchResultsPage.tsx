@@ -57,7 +57,11 @@ import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { useTranslation } from "@/contexts/LanguageContext";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
-import { getMatchQualityLabel, extractJobSkills } from "@/utils/jobMatchUtils";
+import {
+  getMatchQualityLabel,
+  extractJobSkills,
+  jobDataMatchesSelectedCountries,
+} from "@/utils/jobMatchUtils";
 
 interface Job {
   id: string;
@@ -385,6 +389,12 @@ const JobSearchResultsPage = () => {
 
           return true;
         });
+      }
+
+      if (filters.countries.length > 0) {
+        validJobs = validJobs.filter((job) =>
+          jobDataMatchesSelectedCountries(filters.countries, { apiJob: job }),
+        );
       }
 
       // Note: Removed redundant client-side remote filtering

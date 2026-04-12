@@ -31,7 +31,6 @@ import {
 
 export type PreviewEditKey =
   | "title"
-  | "description"
   | "location"
   | "workMode"
   | "employmentType"
@@ -58,8 +57,6 @@ export interface EmployerJobFormPreviewProps {
 
   title: string;
   setTitle: (v: string) => void;
-  description: string;
-  setDescription: (v: string) => void;
   responsibilitiesText: string;
   setResponsibilitiesText: (v: string) => void;
   qualificationsText: string;
@@ -81,8 +78,6 @@ export interface EmployerJobFormPreviewProps {
   setPreviewEditKey: (k: PreviewEditKey | null) => void;
   draftTitle: string;
   setDraftTitle: (v: string) => void;
-  draftDescription: string;
-  setDraftDescription: (v: string) => void;
   draftSalary: string;
   setDraftSalary: (v: string) => void;
   draftApplyUrl: string;
@@ -590,45 +585,6 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
                 </div>
               ) : null}
             </div>
-          </div>
-
-          {/* Description */}
-          <div className="bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0 mt-6">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <h2 className="text-lg font-semibold">Description</h2>
-              <EditOrSaveRow
-                editing={p.previewEditKey === "description"}
-                editAriaLabel="Edit description"
-                onEdit={() => {
-                  p.setDraftDescription(p.description);
-                  p.setPreviewEditKey("description");
-                }}
-                onSave={() => {
-                  p.setDescription(p.draftDescription);
-                  p.setPreviewEditKey(null);
-                }}
-                onCancel={() => p.setPreviewEditKey(null)}
-              />
-            </div>
-            {p.previewEditKey === "description" ? (
-              <Textarea
-                value={p.draftDescription}
-                onChange={(e) => p.setDraftDescription(e.target.value)}
-                className={cn(p.dashedShell, "min-h-[200px]")}
-                placeholder="Describe the role…"
-              />
-            ) : (
-              <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                  {p.description.trim() || "No description yet."}
-                </p>
-              </div>
-            )}
-            {p.fieldErrors.full_description?.[0] ? (
-              <p className="text-sm text-destructive mt-2">
-                {p.fieldErrors.full_description[0]}
-              </p>
-            ) : null}
           </div>
 
           {/* Responsibilities / qualifications */}

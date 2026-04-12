@@ -91,7 +91,11 @@ import {
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
-import { getMatchQualityLabel, extractJobSkills } from "@/utils/jobMatchUtils";
+import {
+  getMatchQualityLabel,
+  extractJobSkills,
+  jobDataMatchesSelectedCountries,
+} from "@/utils/jobMatchUtils";
 
 // Updated Job interface for the new API
 interface Job {
@@ -1747,91 +1751,118 @@ const JobsPage = () => {
     [jobs, transformApiJobsToJobList],
   );
 
-  // Helper: check if a job matches any one of the active filter criteria (union of filter results)
-  const jobMatchesAnyActiveFilter = useCallback(
+  // Helper: job must satisfy every active filter dimension (AND across skills, country, type, etc.)
+  const jobMatchesActiveFilters = useCallback(
     (
       job: Job,
       rawJob: ApiJob | undefined,
       filters: JobFilters,
     ): boolean => {
-      if (!rawJob) rawJob = allRegularJobs.find((j) => (j.id || j.job_id) === job.id);
+      const raw =
+        rawJob ||
+        allRegularJobs.find((j) => String(j.id || j.job_id) === job.id);
 
-      // Skills: job title or extracted skills contain any of the filter skills
       if (filters.skills.length > 0) {
-        const jobSkills = extractJobSkills(rawJob || (job as unknown as ApiJob));
+        const jobSkills = extractJobSkills(raw || (job as unknown as ApiJob));
         const titleLower = (job.title || "").toLowerCase();
         const hasSkill = filters.skills.some((s) => {
           const sl = s.toLowerCase();
           if (titleLower.includes(sl)) return true;
-          return jobSkills.some((js) => js.toLowerCase().includes(sl) || sl.includes(js.toLowerCase()));
+          return jobSkills.some(
+            (js) =>
+              js.toLowerCase().includes(sl) || sl.includes(js.toLowerCase()),
+          );
         });
-        if (hasSkill) return true;
+        if (!hasSkill) return false;
       }
 
-      // Countries: job location or country matches any selected country
       if (filters.countries.length > 0) {
-        const loc = (job.location || "").toLowerCase();
-        const rawCountry = (rawJob?.job_country || rawJob?.country || "").toString().toLowerCase();
-        const rawCity = (rawJob?.job_city || rawJob?.city || "").toString().toLowerCase();
-        const matchCountry = filters.countries.some((code) => {
-          const c = countries.find((co) => co.code === code);
-          const name = (c?.name || code).toLowerCase();
-          return loc.includes(name) || rawCountry.includes(name) || loc.includes(code.toLowerCase()) || rawCity.includes(name);
-        });
-        if (matchCountry) return true;
+        if (
+          !jobDataMatchesSelectedCountries(filters.countries, {
+            apiJob: raw,
+            locationLabel: job.location,
+          })
+        ) {
+          return false;
+        }
       }
 
-      // Job types: employment type matches any selected type
       if (filters.jobTypes.length > 0) {
-        const empType = (job.employment_type || "").toUpperCase().replace(/[-\s]/g, "");
+        const empType = (job.employment_type || "")
+          .toUpperCase()
+          .replace(/[-\s]/g, "");
         const matchType = filters.jobTypes.some((t) => {
           const label = jobTypeLabels[t] || t;
           const labelNorm = label.toUpperCase().replace(/[-\s]/g, "");
           return empType.includes(labelNorm) || labelNorm.includes(empType);
         });
-        if (matchType) return true;
+        if (!matchType) return false;
       }
 
-      // Remote: job is remote and filter wants remote
-      if (filters.isRemote && (job.work_arrangement === "Remote" || rawJob?.job_is_remote || rawJob?.is_remote || rawJob?.remote)) {
-        return true;
+      if (filters.isRemote) {
+        const isRm =
+          job.work_arrangement === "Remote" ||
+          raw?.job_is_remote ||
+          raw?.is_remote ||
+          raw?.remote;
+        if (!isRm) return false;
       }
 
-      // Date posted: job posted within the selected period
       if (filters.datePosted && filters.datePosted !== "all") {
-        const posted = (rawJob?.posted_at || rawJob?.date_posted || rawJob?.fetched_at || "") as string;
-        if (posted) {
-          const postedTime = new Date(posted).getTime();
-          const now = Date.now();
-          const weekMs = 7 * 24 * 60 * 60 * 1000;
-          const monthMs = 30 * 24 * 60 * 60 * 1000;
-          if (filters.datePosted === "week" && now - postedTime <= weekMs) return true;
-          if (filters.datePosted === "month" && now - postedTime <= monthMs) return true;
+        const posted = (raw?.posted_at ||
+          raw?.date_posted ||
+          raw?.fetched_at ||
+          "") as string;
+        if (!posted) return false;
+        const postedTime = new Date(posted).getTime();
+        const now = Date.now();
+        const weekMs = 7 * 24 * 60 * 60 * 1000;
+        const monthMs = 30 * 24 * 60 * 60 * 1000;
+        if (filters.datePosted === "week" && now - postedTime > weekMs)
+          return false;
+        if (filters.datePosted === "month" && now - postedTime > monthMs)
+          return false;
+        if (filters.datePosted === "today") {
+          const dayMs = 24 * 60 * 60 * 1000;
+          if (now - postedTime > dayMs) return false;
         }
       }
 
-      // Salary: job salary within range or "by agreement"
       if (
         filters.salaryMin !== undefined ||
         filters.salaryMax !== undefined ||
         filters.salaryByAgreement
       ) {
-        const minS = rawJob?.job_min_salary ?? rawJob?.min_salary;
-        const maxS = rawJob?.job_max_salary ?? rawJob?.max_salary;
-        if (filters.salaryByAgreement && minS == null && maxS == null) return true;
-        if (minS != null || maxS != null) {
-          if (filters.salaryMin !== undefined && maxS != null && maxS < filters.salaryMin) return false;
-          if (filters.salaryMax !== undefined && minS != null && minS > filters.salaryMax) return false;
-          return true;
+        const minS = raw?.job_min_salary ?? raw?.min_salary;
+        const maxS = raw?.job_max_salary ?? raw?.max_salary;
+        if (filters.salaryByAgreement && minS == null && maxS == null) {
+          /* ok */
+        } else if (minS != null || maxS != null) {
+          if (
+            filters.salaryMin !== undefined &&
+            maxS != null &&
+            maxS < filters.salaryMin
+          ) {
+            return false;
+          }
+          if (
+            filters.salaryMax !== undefined &&
+            minS != null &&
+            minS > filters.salaryMax
+          ) {
+            return false;
+          }
+        } else {
+          return false;
         }
       }
 
-      return false;
+      return true;
     },
     [allRegularJobs],
   );
 
-  // Display latest 9 jobs - when filters are active, show union of jobs matching ANY filter, then sort by date
+  // Display latest 9 jobs - when filters are active, show jobs matching all active dimensions, then sort by date
   const regularJobs = useMemo(() => {
     const hasActiveFilters =
       activeFilters.skills.length > 0 ||
@@ -1865,16 +1896,11 @@ const JobsPage = () => {
       return sortByDate(transformedJobs).slice(0, 9);
     }
 
-    // Union of jobs matching any active filter - show all matching jobs from full data, not limited to 9
-    const matchingIds = new Set<string>();
-    transformedJobs.forEach((job) => {
-      if (jobMatchesAnyActiveFilter(job, undefined, activeFilters)) {
-        matchingIds.add(job.id);
-      }
-    });
-    const filtered = transformedJobs.filter((j) => matchingIds.has(j.id));
+    const filtered = transformedJobs.filter((job) =>
+      jobMatchesActiveFilters(job, undefined, activeFilters),
+    );
     return sortByDate(filtered);
-  }, [transformedJobs, allRegularJobs, activeFilters, jobMatchesAnyActiveFilter]);
+  }, [transformedJobs, allRegularJobs, activeFilters, jobMatchesActiveFilters]);
 
   // Top matched 9 jobs only: sort by match % descending, take exactly 9 (from same latest jobs data)
   const topMatchedJobs = useMemo(() => {

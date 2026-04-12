@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
@@ -91,11 +91,13 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { RadialProgress } from "@/components/ui/radial-progress";
+import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
+import type { JobDetail } from "@/api/jobs/types";
 import {
-  calculateMatchPercentage,
-  getMatchQualityLabel,
-} from "@/utils/jobMatchUtils";
-import { ApiJob } from "@/api/jobs/types";
+  matchJobDetailToUser,
+  buildUserMatchProfileFromSkillTest,
+  normalizeSkillName as normalizeSkillForMatching,
+} from "@/services/matching";
 import { profileApi } from "@/api/profile";
 import type {
   EducationEntry,
@@ -312,86 +314,6 @@ const platformLabels: Record<SocialPlatform, string> = {
   instagram: "Instagram",
   dribbble: "Dribbble",
   behance: "Behance",
-};
-
-// Helper function to extract skills from job data (copied from JobsPage.tsx for consistency)
-const extractJobSkills = (job: Record<string, unknown>): string[] => {
-  const skills: string[] = [];
-  const textToSearch = [
-    (job.job_title as string) || (job.title as string) || "",
-    (job.description as string) || (job.job_description as string) || "",
-    (job.job_required_experience as string) ||
-      (job.required_experience as string) ||
-      "",
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  // Common tech skills keywords
-  const skillKeywords: Record<string, string[]> = {
-    javascript: [
-      "javascript",
-      "js",
-      "node.js",
-      "nodejs",
-      "react",
-      "vue",
-      "angular",
-    ],
-    python: ["python", "django", "flask", "fastapi"],
-    java: ["java", "spring", "spring boot"],
-    "c++": ["c++", "cpp", "c plus plus"],
-    "c#": ["c#", "csharp", "dotnet", ".net"],
-    go: ["go", "golang"],
-    rust: ["rust"],
-    php: ["php", "laravel", "symfony"],
-    ruby: ["ruby", "rails"],
-    swift: ["swift", "ios"],
-    kotlin: ["kotlin", "android"],
-    typescript: ["typescript", "ts"],
-    html: ["html", "html5"],
-    css: ["css", "css3", "sass", "scss", "tailwind"],
-    sql: ["sql", "mysql", "postgresql", "mongodb", "database"],
-    react: ["react", "reactjs", "react.js"],
-    vue: ["vue", "vuejs", "vue.js"],
-    angular: ["angular", "angularjs"],
-    "node.js": ["node.js", "nodejs", "node"],
-    express: ["express", "express.js"],
-    django: ["django"],
-    flask: ["flask"],
-    spring: ["spring", "spring boot"],
-    laravel: ["laravel"],
-    rails: ["rails", "ruby on rails"],
-    git: ["git", "github", "gitlab"],
-    docker: ["docker", "containerization"],
-    kubernetes: ["kubernetes", "k8s"],
-    aws: ["aws", "amazon web services"],
-    azure: ["azure", "microsoft azure"],
-    gcp: ["gcp", "google cloud", "google cloud platform"],
-    linux: ["linux", "unix"],
-    "machine learning": [
-      "machine learning",
-      "ml",
-      "deep learning",
-      "neural network",
-    ],
-    "data science": ["data science", "data analysis", "data analytics"],
-    ai: ["artificial intelligence", "ai", "nlp", "natural language processing"],
-    blockchain: ["blockchain", "ethereum", "solidity", "web3"],
-    devops: ["devops", "ci/cd", "continuous integration"],
-    testing: ["testing", "qa", "quality assurance", "test automation"],
-    ui: ["ui", "user interface", "ux", "user experience"],
-    design: ["design", "figma", "sketch", "adobe"],
-  };
-
-  Object.keys(skillKeywords).forEach((skill) => {
-    const keywords = skillKeywords[skill];
-    if (keywords.some((keyword) => textToSearch.includes(keyword))) {
-      skills.push(skill);
-    }
-  });
-
-  return [...new Set(skills)];
 };
 
 const normalizeSkillName = (value: string): string =>
@@ -706,6 +628,19 @@ const ProfilePage = () => {
     },
   });
 
+  // Same skill union as JobsPage / JobDetailPage for consistent match %
+  const userSkillsForMatch = useMemo(() => {
+    const fromProfile = (profileSkills || []).map((s) =>
+      normalizeSkillForMatching(s.skill_name),
+    );
+    const fromTest = skillResults?.skills_json?.tech
+      ? Object.keys(skillResults.skills_json.tech).map((k) =>
+          normalizeSkillForMatching(k),
+        )
+      : [];
+    return [...new Set([...fromProfile, ...fromTest])];
+  }, [profileSkills, skillResults]);
+
   // Fetch saved job IDs
   const { data: savedJobIds = [] } = useQuery<string[]>({
     queryKey: ["savedJobIds", user?.id],
@@ -743,7 +678,7 @@ const ProfilePage = () => {
   const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<
     SavedJob[]
   >({
-    queryKey: ["savedJobs", user?.id, skillResults],
+    queryKey: ["savedJobs", user?.id, userSkillsForMatch.join("|")],
     queryFn: async () => {
       if (!user?.id) return [];
       try {
@@ -890,19 +825,14 @@ const ProfilePage = () => {
               workArrangement = "Hybrid";
             }
 
-            // Calculate match percentage if skill results are available
-            let matchPercentage = 0;
-            if (skillResults?.skills_json) {
-              const tech = skillResults.skills_json.tech || {};
-              const soft = skillResults.skills_json.soft || {};
-              const userSkills = [...Object.keys(tech), ...Object.keys(soft)];
-              const jobSkills = extractJobSkills(jobDetail);
-              matchPercentage = calculateMatchPercentage(
-                userSkills,
-                jobSkills,
-                jobTitle,
-              );
-            }
+            // Total match % (same logic as JobsPage / job detail)
+            const matchPercentage =
+              user && userSkillsForMatch.length >= 0
+                ? matchJobDetailToUser(
+                    jobDetail as unknown as JobDetail,
+                    buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                  ).overallPercent
+                : undefined;
 
             return {
               id: jobId,

@@ -10,6 +10,9 @@
  * - Relevance: how many user skills are utilized
  */
 
+import { countries } from "@/data/countries";
+import type { ApiJob } from "@/api/jobs/types";
+
 // Common tech skills keywords for extraction from job text
 // Moved here from UserHome.tsx / JobsPage.tsx to ensure consistency
 const skillKeywords: Record<string, string[]> = {
@@ -396,3 +399,56 @@ export const getMatchQualityLabel = (matchPercentage?: number): string => {
   }
   return "Bad match";
 };
+
+/**
+ * Whether a job matches any of the selected ISO country codes (location / country fields).
+ * Used for client-side enforcement when the API returns inexact matches.
+ */
+export function jobDataMatchesSelectedCountries(
+  countryCodes: string[],
+  options: { apiJob?: ApiJob | null; locationLabel?: string },
+): boolean {
+  if (!countryCodes || countryCodes.length === 0) return true;
+
+  const { apiJob, locationLabel = "" } = options;
+  const loc = (locationLabel || "").toLowerCase();
+
+  const companyObj =
+    apiJob &&
+    apiJob.company &&
+    typeof apiJob.company === "object" &&
+    !Array.isArray(apiJob.company)
+      ? (apiJob.company as Record<string, unknown>)
+      : null;
+
+  const jobLoc = (
+    (apiJob?.job_location as string | undefined) ||
+    (apiJob?.location as string | undefined) ||
+    ""
+  ).toLowerCase();
+  const rawCountry = (
+    (apiJob?.job_country ||
+      apiJob?.country ||
+      (companyObj?.country as string) ||
+      "") as string
+  ).toLowerCase();
+  const rawCity = (
+    (apiJob?.job_city ||
+      apiJob?.city ||
+      (companyObj?.city as string) ||
+      "") as string
+  ).toLowerCase();
+
+  return countryCodes.some((code) => {
+    const c = countries.find((co) => co.code === code);
+    const name = (c?.name || code).toLowerCase();
+    return (
+      loc.includes(name) ||
+      jobLoc.includes(name) ||
+      rawCountry.includes(name) ||
+      rawCity.includes(name) ||
+      loc.includes(code.toLowerCase()) ||
+      jobLoc.includes(code.toLowerCase())
+    );
+  });
+}

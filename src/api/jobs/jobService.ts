@@ -6,7 +6,13 @@
  * Falls back to /api/v1/jobs/ when search endpoint is unavailable.
  */
 
-import { ApiJob, JobSearchParams, JobApiResponse, JobDetail } from "./types";
+import {
+  ApiJob,
+  JobSearchParams,
+  JobApiResponse,
+  JobDetail,
+  CompanyInfo,
+} from "./types";
 import { countries } from "@/data/countries";
 import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
@@ -61,11 +67,14 @@ const rateLimitedFetch = async (
 interface BreneoJobApiResponse {
   id: number;
   title: string;
-  company_name: string;
+  /** Flat name (legacy); newer payloads may only send `company.name`. */
+  company_name?: string;
   company_logo?: string;
-  location: string;
+  /** Nested employer object from job-details API (`name`, `logo`, …). */
+  company?: CompanyInfo | Record<string, unknown>;
+  location: string | null;
   description: string;
-  apply_url: string;
+  apply_url: string | null;
   platform: string;
   external_job_id: string;
   posted_at: string | null;
@@ -744,30 +753,59 @@ export const fetchJobDetail = async (jobId: string): Promise<JobDetail> => {
       throw new Error(`No job found with ID: ${jobId}`);
     }
 
+    const nestedCompanyRaw = jobData.company;
+    const nestedCompany =
+      nestedCompanyRaw &&
+      typeof nestedCompanyRaw === "object" &&
+      !Array.isArray(nestedCompanyRaw)
+        ? (nestedCompanyRaw as CompanyInfo)
+        : undefined;
+
+    const nameFromNested = nestedCompany?.name?.trim?.();
+    const resolvedCompanyName = (
+      (typeof jobData.company_name === "string" && jobData.company_name.trim()
+        ? jobData.company_name
+        : nameFromNested) || ""
+    ).trim();
+
+    const logoFromNested =
+      nestedCompany?.logo ||
+      nestedCompany?.logo_upload ||
+      nestedCompany?.company_logo ||
+      nestedCompany?.logo_url ||
+      nestedCompany?.employer_logo;
+    const resolvedCompanyLogo =
+      (typeof jobData.company_logo === "string" && jobData.company_logo.trim()
+        ? jobData.company_logo
+        : undefined) ||
+      (typeof logoFromNested === "string" && logoFromNested.trim()
+        ? logoFromNested.trim()
+        : undefined);
+
     console.log("✅ Found job:", {
       id: jobData.id,
       title: jobData.title,
-      company: jobData.company_name,
+      company: resolvedCompanyName || nestedCompany?.name,
     });
 
-    // Map to JobDetail format using new API structure
+    // Map to JobDetail format using new API structure (flat + nested `company`)
     let jobDetail: JobDetail = {
       id: String(jobData.id),
       job_id: String(jobData.id), // Use only id field, not external_job_id
       title: jobData.title,
       job_title: jobData.title,
-      company: jobData.company_name,
-      company_logo: jobData.company_logo,
-      companyLogo: jobData.company_logo,
-      company_name: jobData.company_name,
-      employer_name: jobData.company_name,
-      location: jobData.location,
-      job_location: jobData.location,
+      company: nestedCompany ?? resolvedCompanyName,
+      company_logo: resolvedCompanyLogo,
+      companyLogo: resolvedCompanyLogo,
+      company_name: resolvedCompanyName,
+      employer_name: resolvedCompanyName,
+      location: jobData.location ?? undefined,
+      job_location: jobData.location ?? undefined,
       description: jobData.description || "",
       job_description: jobData.description || "",
-      apply_url: jobData.apply_url,
-      job_apply_link: jobData.apply_url,
-      url: jobData.apply_url,
+      apply_url: jobData.apply_url ?? undefined,
+      job_apply_link: jobData.apply_url ?? undefined,
+      url: jobData.apply_url ?? undefined,
       date_posted: jobData.posted_at || jobData.fetched_at,
       posted_date: jobData.posted_at || jobData.fetched_at,
       posted_at: jobData.posted_at || jobData.fetched_at,
