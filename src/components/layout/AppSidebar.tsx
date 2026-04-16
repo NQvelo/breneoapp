@@ -382,8 +382,6 @@ export function AppSidebar({
                 to={item.href}
                 className={cn(
                   "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-0",
-                  index === mobileNavItems.length - 1 &&
-                    "border-l border-border/70 pl-4 -ml-0.5",
                   isActive
                     ? "text-gray-600"
                     : "text-gray-600 hover:text-breneo-blue",

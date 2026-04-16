@@ -11,57 +11,56 @@
  * - Common routes: Available to all authenticated users (terms, help)
  */
 
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 // Auth pages (Public)
-import LoginPage from "@/pages/auth/LoginPage";
-import SignupPage from "@/pages/auth/AuthPage";
-import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
-import EmailVerification from "@/pages/auth/EmailVerification";
-import EmailConfirmed from "@/pages/auth/EmailConfirmed";
+const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
+const SignupPage = lazy(() => import("@/pages/auth/AuthPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPasswordPage"));
+const EmailVerification = lazy(() => import("@/pages/auth/EmailVerification"));
+const EmailConfirmed = lazy(() => import("@/pages/auth/EmailConfirmed"));
 
 // User pages (User-only)
-import UserDashboard from "@/pages/user/UserHome";
-import UserProfile from "@/pages/user/ProfilePage";
-import SavedPage from "@/pages/user/SavedPage";
-import UserSettings from "@/pages/user/UserSettings";
-import JobsPage from "@/pages/user/JobsPage";
-import JobSearchResultsPage from "@/pages/user/JobSearchResultsPage";
-import JobDetailPage from "@/pages/user/JobDetailPage";
-import CompanyJobsPage from "@/pages/user/CompanyJobsPage";
-import CoursesPage from "@/pages/CoursesPage";
-import CoursePage from "@/pages/CoursePage";
-import SkillTestPage from "@/pages/user/SkillTestPage";
-import SkillPathPage from "@/pages/user/SkillPathPage";
-import SkillPathDetailPage from "@/pages/user/SkillPathDetailPage";
-import InterestsPage from "@/pages/user/InterestsPage";
-import UserNotificationsPage from "@/pages/NotificationsPage";
+const UserDashboard = lazy(() => import("@/pages/user/UserHome"));
+const UserProfile = lazy(() => import("@/pages/user/ProfilePage"));
+const SavedPage = lazy(() => import("@/pages/user/SavedPage"));
+const UserSettings = lazy(() => import("@/pages/user/UserSettings"));
+const JobsPage = lazy(() => import("@/pages/user/JobsPage"));
+const JobSearchResultsPage = lazy(() => import("@/pages/user/JobSearchResultsPage"));
+const JobDetailPage = lazy(() => import("@/pages/user/JobDetailPage"));
+const CompanyJobsPage = lazy(() => import("@/pages/user/CompanyJobsPage"));
+const CoursesPage = lazy(() => import("@/pages/CoursesPage"));
+const CoursePage = lazy(() => import("@/pages/CoursePage"));
+const SkillTestPage = lazy(() => import("@/pages/user/SkillTestPage"));
+const SkillPathPage = lazy(() => import("@/pages/user/SkillPathPage"));
+const SkillPathDetailPage = lazy(() => import("@/pages/user/SkillPathDetailPage"));
+const InterestsPage = lazy(() => import("@/pages/user/InterestsPage"));
+const UserNotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 
 // Academy pages (Academy-only)
-import AcademyDashboard from "@/pages/academy/AcademyDashboard";
-import AcademyHomePage from "@/pages/academy/AcademyHomePage";
-import AcademyCoursesPage from "@/pages/academy/AcademyCoursesPage";
-import AcademyProfile from "@/pages/academy/AcademyProfilePage";
-import AcademySettings from "@/pages/academy/AcademySettings";
-import AcademyPage from "@/pages/academy/AcademyPage";
-import AcademyRegistrationPage from "@/pages/academy/AcademyRegistrationPage";
-import AddCoursePage from "@/pages/academy/AddCoursePage";
-import EmployerRegistrationPage from "@/pages/employer/EmployerRegistrationPage";
-import EmployerDashboardPage from "@/pages/employer/EmployerDashboardPage";
-import EmployerJobsPage from "@/pages/employer/EmployerJobsPage";
-import EmployerAddJobPage from "@/pages/employer/EmployerAddJobPage";
-import EmployerProfilePage from "@/pages/employer/EmployerProfilePage";
-import EmployerMembersPage from "@/pages/employer/EmployerMembersPage";
+const AcademyHomePage = lazy(() => import("@/pages/academy/AcademyHomePage"));
+const AcademyCoursesPage = lazy(() => import("@/pages/academy/AcademyCoursesPage"));
+const AcademyProfile = lazy(() => import("@/pages/academy/AcademyProfilePage"));
+const AcademySettings = lazy(() => import("@/pages/academy/AcademySettings"));
+const AcademyPage = lazy(() => import("@/pages/academy/AcademyPage"));
+const AcademyRegistrationPage = lazy(() => import("@/pages/academy/AcademyRegistrationPage"));
+const AddCoursePage = lazy(() => import("@/pages/academy/AddCoursePage"));
+const EmployerRegistrationPage = lazy(() => import("@/pages/employer/EmployerRegistrationPage"));
+const EmployerDashboardPage = lazy(() => import("@/pages/employer/EmployerDashboardPage"));
+const EmployerJobsPage = lazy(() => import("@/pages/employer/EmployerJobsPage"));
+const EmployerAddJobPage = lazy(() => import("@/pages/employer/EmployerAddJobPage"));
+const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfilePage"));
+const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
 
 // Common pages (Available to all authenticated users)
-import TermsOfUse from "@/pages/TermsOfUse";
-import HelpCenter from "@/pages/HelpCenter";
-import NotFound from "@/pages/NotFound";
-import WebinarsPage from "@/pages/user/WebinarsPage";
-import PaymentSuccessPage from "@/pages/PaymentSuccessPage";
-import PaymentFailurePage from "@/pages/PaymentFailurePage";
+const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
+const HelpCenter = lazy(() => import("@/pages/HelpCenter"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const WebinarsPage = lazy(() => import("@/pages/user/WebinarsPage"));
+const PaymentSuccessPage = lazy(() => import("@/pages/PaymentSuccessPage"));
+const PaymentFailurePage = lazy(() => import("@/pages/PaymentFailurePage"));
 
 /**
  * Helper component to create routes with language prefixes
@@ -89,7 +88,8 @@ const createLocalizedRoute = (path: string, element: React.ReactElement) => {
  */
 export const AppRoutes = () => {
   return (
-    <Routes>
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <Routes>
       {/* ==========================================
           PUBLIC ROUTES - No authentication required
           ========================================== */}
@@ -344,6 +344,7 @@ export const AppRoutes = () => {
           404 - Not Found
           ========================================== */}
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };

@@ -3,17 +3,28 @@ import { useState, useEffect } from "react";
 const MOBILE_BREAKPOINT = 768; // Corresponds to Tailwind's `md` breakpoint
 
 export function useMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(
-    window.innerWidth < MOBILE_BREAKPOINT,
-  );
+  const getIsMobile = () =>
+    typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT;
+
+  const [isMobile, setIsMobile] = useState<boolean>(getIsMobile);
 
   useEffect(() => {
-    function handleResize() {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+
+    function syncIsMobile() {
+      setIsMobile(mediaQuery.matches);
     }
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    syncIsMobile();
+    mediaQuery.addEventListener("change", syncIsMobile);
+    window.addEventListener("resize", syncIsMobile);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncIsMobile);
+      window.removeEventListener("resize", syncIsMobile);
+    };
   }, []);
 
   return isMobile;

@@ -284,6 +284,11 @@ interface Course {
   match?: number;
 }
 
+interface UserProfileResponse {
+  saved_jobs?: unknown[];
+  saved_courses?: unknown[];
+}
+
 const normalizeHomeCourseCoverUrl = (
   cover: unknown,
   lecturer: unknown,
@@ -364,6 +369,30 @@ const UserHome = () => {
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  const extractSavedIds = (
+    items: unknown,
+    idKeys: string[],
+  ): string[] => {
+    if (!Array.isArray(items)) return [];
+    return items
+      .map((item: unknown) => {
+        if (typeof item === "string" || typeof item === "number") {
+          return String(item);
+        }
+        if (item && typeof item === "object") {
+          const obj = item as Record<string, unknown>;
+          for (const key of idKeys) {
+            const value = obj[key];
+            if (typeof value === "string" || typeof value === "number") {
+              return String(value);
+            }
+          }
+        }
+        return null;
+      })
+      .filter((id): id is string => id !== null);
+  };
 
   // Profile skills (same source as job detail page for identical total match)
   const { data: profileSkills = [] } = useQuery({
@@ -542,75 +571,32 @@ const UserHome = () => {
     localStorage.setItem("breneo_onboarding_shown", "true");
   };
 
-  // Fetch saved jobs
-  const { data: savedJobs = [] } = useQuery<string[]>({
-    queryKey: ["savedJobs", user?.id],
+  // Fetch profile once and derive saved IDs to avoid duplicate initial requests.
+  const { data: profileData } = useQuery<UserProfileResponse>({
+    queryKey: ["profile", user?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user) return {};
       try {
         const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const savedJobsArray = profileResponse.data?.saved_jobs || [];
-
-        // Handle both array of IDs and array of objects
-        if (!Array.isArray(savedJobsArray)) return [];
-
-        return savedJobsArray
-          .map((item: unknown) => {
-            // If it's already a string or number, convert to string
-            if (typeof item === "string" || typeof item === "number") {
-              return String(item);
-            }
-            // If it's an object, try to extract the ID
-            if (item && typeof item === "object") {
-              const obj = item as Record<string, unknown>;
-              // Try common ID field names
-              if (obj.id) return String(obj.id);
-              if (obj.job_id) return String(obj.job_id);
-              if (obj.jobId) return String(obj.jobId);
-            }
-            return null;
-          })
-          .filter((id): id is string => id !== null);
+        return (profileResponse.data || {}) as UserProfileResponse;
       } catch (error) {
-        console.error("Error fetching saved jobs:", error);
-        return [];
+        console.error("Error fetching profile data:", error);
+        return {};
       }
     },
     enabled: !!user,
   });
 
-  // Fetch saved course IDs (for checking if courses are saved in the regular courses section)
-  const { data: savedCourseIds = [] } = useQuery<string[]>({
-    queryKey: ["savedCourseIds", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      try {
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const savedCoursesArray = profileResponse.data?.saved_courses || [];
+  const savedJobs = useMemo(
+    () => extractSavedIds(profileData?.saved_jobs, ["id", "job_id", "jobId"]),
+    [profileData],
+  );
 
-        if (!Array.isArray(savedCoursesArray)) return [];
-
-        return savedCoursesArray
-          .map((item: unknown) => {
-            if (typeof item === "string" || typeof item === "number") {
-              return String(item);
-            }
-            if (item && typeof item === "object") {
-              const obj = item as Record<string, unknown>;
-              if (obj.id) return String(obj.id);
-              if (obj.course_id) return String(obj.course_id);
-              if (obj.courseId) return String(obj.courseId);
-            }
-            return null;
-          })
-          .filter((id): id is string => id !== null);
-      } catch (error) {
-        console.error("Error fetching saved course IDs:", error);
-        return [];
-      }
-    },
-    enabled: !!user,
-  });
+  const savedCourseIds = useMemo(
+    () =>
+      extractSavedIds(profileData?.saved_courses, ["id", "course_id", "courseId"]),
+    [profileData],
+  );
 
   // Fetch jobs - no filtering
   const {
@@ -655,8 +641,7 @@ const UserHome = () => {
       }
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["savedJobs", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       toast.success(variables.is_saved ? "Job Unsaved" : "Job Saved");
     },
     onError: (error: Error) => {
@@ -746,48 +731,14 @@ const UserHome = () => {
 
       await apiClient.post(`/api/save-course/${id}/`);
     },
-    onMutate: async (id: string) => {
-      await queryClient.cancelQueries({
-        queryKey: ["savedCourseIds", user?.id],
-      });
-
-      const previousSavedCourseIds = queryClient.getQueryData<string[]>([
-        "savedCourseIds",
-        user?.id,
-      ]);
-
-      let wasSaved = false;
-      queryClient.setQueryData<string[]>(
-        ["savedCourseIds", user?.id],
-        (prev) => {
-          if (!prev) return prev;
-          const idString = String(id);
-          wasSaved = prev.includes(idString);
-          return wasSaved
-            ? prev.filter((c) => c !== idString)
-            : [...prev, idString];
-        },
-      );
-
-      return { previousSavedCourseIds, wasSaved };
-    },
-    onError: (error, id, context) => {
-      if (context?.previousSavedCourseIds && user?.id) {
-        queryClient.setQueryData(
-          ["savedCourseIds", user.id],
-          context.previousSavedCourseIds,
-        );
-      }
-
+    onError: (error) => {
       console.error("Error updating saved courses:", error);
       toast.error("Failed to update saved courses. Please try again.");
     },
-    onSuccess: (_, id, context) => {
-      queryClient.invalidateQueries({ queryKey: ["savedCourseIds", user?.id] });
+    onSuccess: (_, id) => {
+      const wasSaved = savedCourseIds.includes(String(id));
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["home-courses"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-
-      const wasSaved = context?.wasSaved ?? false;
       toast.success(
         wasSaved
           ? "Removed from saved courses."
@@ -837,10 +788,13 @@ const UserHome = () => {
         return 0;
       });
 
-      return jobsWithMatchPercentage.slice(0, 9).map((item) => item.job);
+      return jobsWithMatchPercentage.slice(0, 9);
     };
 
-    const mapApiJobToJob = (job: ApiJob): Job | null => {
+    const mapApiJobToJob = (
+      job: ApiJob,
+      precomputedMatchPercentage?: number,
+    ): Job | null => {
       const jobId = job.id || "";
       if (!jobId) {
         console.warn("Skipping job without valid ID:", job);
@@ -950,14 +904,6 @@ const UserHome = () => {
         workArrangement = "Hybrid";
       }
 
-      const matchPercentage =
-        user && userSkillsForMatch.length >= 0
-          ? matchJobDetailToUser(
-              job as unknown as JobDetail,
-              buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-            ).overallPercent
-          : undefined;
-
       const transformedJob: Job = {
         id: jobId,
         title: jobTitle,
@@ -971,7 +917,7 @@ const UserHome = () => {
         employment_type: employmentType,
         work_arrangement: workArrangement,
         is_saved: savedJobs?.includes(String(jobId)),
-        matchPercentage,
+        matchPercentage: precomputedMatchPercentage,
         date: postedDate
           ? new Date(String(postedDate)).toLocaleDateString("en-GB", {
               day: "2-digit",
@@ -988,11 +934,11 @@ const UserHome = () => {
     };
 
     const transformedGeorgianJobs = sortAndTakeTopApiJobs(georgianSource)
-      .map(mapApiJobToJob)
+      .map((item) => mapApiJobToJob(item.job, item.matchPercentage))
       .filter((job): job is Job => job !== null);
 
     const transformedWorldwideJobs = sortAndTakeTopApiJobs(worldwideSource)
-      .map(mapApiJobToJob)
+      .map((item) => mapApiJobToJob(item.job, item.matchPercentage))
       .filter((job): job is Job => job !== null);
 
     return { transformedGeorgianJobs, transformedWorldwideJobs };
