@@ -28,7 +28,6 @@ import {
 } from "@/api/employer/jobsApi";
 import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
 import { getLocalizedPath } from "@/utils/localeUtils";
-import { openExternalHttpUrl } from "@/utils/externalUrl";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const EmployerHomePage = () => {
@@ -243,7 +242,12 @@ const EmployerHomePage = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => openExternalHttpUrl(profile.website)}
+                    onClick={() => {
+                      const w = profile.website.startsWith("http")
+                        ? profile.website
+                        : `https://${profile.website}`;
+                      window.open(w, "_blank");
+                    }}
                   >
                     <Globe className="h-4 w-4 mr-2" />
                     Website

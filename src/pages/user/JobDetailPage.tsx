@@ -77,10 +77,6 @@ import {
   parseJobIndustryTags,
   computeIndustryMatchPercent,
 } from "@/utils/industryMatch";
-import {
-  normalizeExternalHttpUrl,
-  openExternalHttpUrl,
-} from "@/utils/externalUrl";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -436,7 +432,7 @@ const JobDetailPage = () => {
 
     // Check new API structure - apply_url is primary field
     if (jobDetail.apply_url && typeof jobDetail.apply_url === "string") {
-      return normalizeExternalHttpUrl(jobDetail.apply_url);
+      return jobDetail.apply_url;
     }
 
     // Check all possible apply URL fields in order of preference
@@ -462,10 +458,10 @@ const JobDetailPage = () => {
         url?: string;
       };
       if (companyInfo.apply_url && typeof companyInfo.apply_url === "string") {
-        return normalizeExternalHttpUrl(companyInfo.apply_url);
+        return companyInfo.apply_url;
       }
       if (companyInfo.url && typeof companyInfo.url === "string") {
-        return normalizeExternalHttpUrl(companyInfo.url);
+        return companyInfo.url;
       }
     }
 
@@ -477,10 +473,10 @@ const JobDetailPage = () => {
     ) {
       const companyObj = jobDetail.company as Record<string, unknown>;
       if (companyObj.apply_url && typeof companyObj.apply_url === "string") {
-        return normalizeExternalHttpUrl(companyObj.apply_url);
+        return companyObj.apply_url;
       }
       if (companyObj.url && typeof companyObj.url === "string") {
-        return normalizeExternalHttpUrl(companyObj.url);
+        return companyObj.url;
       }
     }
 
@@ -492,16 +488,14 @@ const JobDetailPage = () => {
     ) {
       const employerObj = jobDetail.employer as Record<string, unknown>;
       if (employerObj.apply_url && typeof employerObj.apply_url === "string") {
-        return normalizeExternalHttpUrl(employerObj.apply_url);
+        return employerObj.apply_url;
       }
       if (employerObj.url && typeof employerObj.url === "string") {
-        return normalizeExternalHttpUrl(employerObj.url);
+        return employerObj.url;
       }
     }
 
-    return normalizeExternalHttpUrl(
-      typeof applyUrl === "string" ? applyUrl : "",
-    );
+    return applyUrl;
   };
 
   // Get company name
@@ -1010,13 +1004,11 @@ const JobDetailPage = () => {
       companyDetails?.company_url ||
       companyDetails?.website_url
     ) {
-      const raw =
+      return (
         companyDetails.website ||
         companyDetails.company_url ||
-        companyDetails.website_url;
-      if (typeof raw !== "string") return undefined;
-      const n = normalizeExternalHttpUrl(raw);
-      return n || undefined;
+        companyDetails.website_url
+      );
     }
     if (!jobDetail) return undefined;
     const website =
@@ -1024,9 +1016,7 @@ const JobDetailPage = () => {
       (jobDetail.company_info as CompanyInfo)?.company_url ||
       (jobDetail.company_info as CompanyInfo)?.website_url ||
       jobDetail.company_url;
-    if (typeof website !== "string") return undefined;
-    const n = normalizeExternalHttpUrl(website);
-    return n || undefined;
+    return typeof website === "string" ? website : undefined;
   };
 
   // Get company description - prioritize API data, then fallback to job detail
@@ -1682,8 +1672,8 @@ const JobDetailPage = () => {
                           ) : (
                             <div
                               className="h-10 w-10 md:h-12 md:w-12 rounded-md flex-shrink-0 border border-gray-100 dark:border-gray-800 bg-muted flex items-center justify-center"
-                                aria-hidden
-                              >
+                              aria-hidden
+                            >
                               <Building2 className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
                             </div>
                           );
@@ -1833,7 +1823,7 @@ const JobDetailPage = () => {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => openExternalHttpUrl(getApplyUrl())}
+                        onClick={() => window.open(getApplyUrl(), "_blank")}
                       >
                         Apply Now
                       </Button>
@@ -2319,7 +2309,7 @@ const JobDetailPage = () => {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => openExternalHttpUrl(getApplyUrl())}
+                    onClick={() => window.open(getApplyUrl(), "_blank")}
                     className="whitespace-nowrap"
                   >
                     Apply Now

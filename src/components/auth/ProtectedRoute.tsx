@@ -8,7 +8,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getRole, isRole } from "@/utils/getRole";
+import { getRole } from "@/utils/getRole";
 import { getLocalizedPath, getLanguageFromPath } from "@/utils/localeUtils";
 
 interface ProtectedRouteProps {
@@ -51,6 +51,29 @@ export function ProtectedRoute({
   requiredRole,
   redirectTo = "/auth/login",
 }: ProtectedRouteProps) {
+  const normalizeRole = (
+    raw: string | null | undefined,
+  ): "user" | "academy" | "employer" | "admin" => {
+    const role = String(raw ?? "")
+      .trim()
+      .toLowerCase();
+    if (
+      role === "user" ||
+      role === "academy" ||
+      role === "employer" ||
+      role === "admin"
+    ) {
+      return role;
+    }
+    return "user";
+  };
+
+  const redirectIfNeeded = (target: string) => {
+    const current = window.location.pathname;
+    if (target === current) return <>{children}</>;
+    return <Navigate to={target} replace />;
+  };
+
   // ✅ FIX: Get auth context - it should always be available if component tree is correct
   const { user, loading } = useAuth();
   const language =
@@ -96,11 +119,9 @@ export function ProtectedRoute({
     // 2. localStorage.getItem('userRole') (stored during login/restoration)
     // 3. getRole() utility (checks token and localStorage)
     // This ensures we always have the correct role even during session restoration
-    const userRole =
-      user?.user_type ||
-      localStorage.getItem("userRole") ||
-      getRole() ||
-      "user";
+    const userRole = normalizeRole(
+      user?.user_type || localStorage.getItem("userRole") || getRole(),
+    );
 
     // console.log("🔒 ProtectedRoute role check:", {
     //   requiredRole,
@@ -112,22 +133,22 @@ export function ProtectedRoute({
     if (userRole !== requiredRole) {
       if (userRole === "employer") {
         const employerPath = getLocalizedPath("/employer/jobs", language);
-        return <Navigate to={employerPath} replace />;
+        return redirectIfNeeded(employerPath);
       }
       if (requiredRole === "employer") {
         if (userRole === "academy") {
           const academyPath = getLocalizedPath("/academy/dashboard", language);
-          return <Navigate to={academyPath} replace />;
+          return redirectIfNeeded(academyPath);
         }
         const homePath = getLocalizedPath("/home", language);
-        return <Navigate to={homePath} replace />;
+        return redirectIfNeeded(homePath);
       }
       if (userRole === "academy") {
         const academyPath = getLocalizedPath("/academy/dashboard", language);
-        return <Navigate to={academyPath} replace />;
+        return redirectIfNeeded(academyPath);
       } else {
         const homePath = getLocalizedPath("/home", language);
-        return <Navigate to={homePath} replace />;
+        return redirectIfNeeded(homePath);
       }
     }
   }

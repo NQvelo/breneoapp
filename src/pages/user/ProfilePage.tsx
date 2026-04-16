@@ -3268,7 +3268,7 @@ const ProfilePage = () => {
                         className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
                         onClick={() => {
                           if (job.url) {
-                            openExternalHttpUrl(job.url);
+                            window.open(job.url, "_blank");
                           } else {
                             navigate(`/jobs/${encodeURIComponent(job.id)}`);
                           }

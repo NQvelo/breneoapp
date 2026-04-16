@@ -30,7 +30,6 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
-import { openExternalHttpUrl } from "@/utils/externalUrl";
 import {
   ChartContainer,
   ChartTooltip,
@@ -1119,7 +1118,7 @@ const SkillPathDetailPage = () => {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openExternalHttpUrl(applyLink);
+                              window.open(applyLink, "_blank");
                             }}
                           >
                             Apply
