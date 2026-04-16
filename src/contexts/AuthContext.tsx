@@ -650,6 +650,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.getItem("userRole") || user.user_type || "user";
 
       const pathWithoutLang = removeLanguagePrefix(currentPath);
+      const navigateIfChanged = (targetPath: string) => {
+        if (targetPath === currentPath) return;
+        navigate(targetPath, { replace: true });
+      };
 
       // List of public routes
       const publicRoutes = [
@@ -671,13 +675,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentPath === "/" || isPublicRoute) {
         if (userRole === "academy") {
           const academyPath = getLocalizedPath("/academy/dashboard", language);
-          navigate(academyPath, { replace: true });
+          navigateIfChanged(academyPath);
         } else if (userRole === "employer") {
           const employerPath = getLocalizedPath("/employer/jobs", language);
-          navigate(employerPath, { replace: true });
+          navigateIfChanged(employerPath);
         } else {
           const homePath = getLocalizedPath("/home", language);
-          navigate(homePath, { replace: true });
+          navigateIfChanged(homePath);
         }
         return; // Exit early after redirect
       }
@@ -737,11 +741,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (isEmployerPrivateRoute) return;
         if (pathWithoutLang === "/employer/register") {
           const employerPath = getLocalizedPath("/employer/jobs", language);
-          navigate(employerPath, { replace: true });
+          navigateIfChanged(employerPath);
           return;
         }
         const employerPath = getLocalizedPath("/employer/jobs", language);
-        navigate(employerPath, { replace: true });
+        navigateIfChanged(employerPath);
         return;
       }
 
@@ -752,10 +756,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ) {
         if (userRole === "academy") {
           const academyPath = getLocalizedPath("/academy/dashboard", language);
-          navigate(academyPath, { replace: true });
+          navigateIfChanged(academyPath);
         } else {
           const homePath = getLocalizedPath("/home", language);
-          navigate(homePath, { replace: true });
+          navigateIfChanged(homePath);
         }
         return;
       }
@@ -802,7 +806,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         //   "🔄 Non-academy user on academy-only route, redirecting to /home"
         // );
         const homePath = getLocalizedPath("/home", language);
-        navigate(homePath, { replace: true });
+        navigateIfChanged(homePath);
       } else if (
         userRole === "academy" &&
         (pathWithoutLang === "/dashboard" ||
@@ -813,14 +817,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         //   "🔄 Academy user on user-only route, redirecting to /academy/dashboard"
         // );
         const academyPath = getLocalizedPath("/academy/dashboard", language);
-        navigate(academyPath, { replace: true });
+        navigateIfChanged(academyPath);
       } else if (userRole === "academy" && !isAcademyRoute && !isCommonRoute) {
         // Academy user on an unknown/unmatched route - redirect to academy dashboard
         // console.log(
         //   `🔄 Academy user on unmatched route (${currentPath}), redirecting to /academy/dashboard`
         // );
         const academyPath = getLocalizedPath("/academy/dashboard", language);
-        navigate(academyPath, { replace: true });
+        navigateIfChanged(academyPath);
       }
     }
   }, [user, loading, navigate]); // Re-run when user or loading state changes
