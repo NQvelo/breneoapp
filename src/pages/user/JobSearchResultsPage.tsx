@@ -53,7 +53,7 @@ import {
   getTopSkills,
   filterHardSkills,
 } from "@/utils/skillTestUtils";
-import { jobService, JobFilters, ApiJob } from "@/api/jobs";
+import { jobService, JobFilters, ApiJob, JobSearchSort } from "@/api/jobs";
 import { useTranslation } from "@/contexts/LanguageContext";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
@@ -197,7 +197,7 @@ const JobSearchResultsPage = () => {
       userTopSkills,
     });
     console.log(
-      "🌐 Job API Endpoint: https://breneo-job-aggregator.up.railway.app/api/",
+      "🌐 Job search API: GET …/api/search (via jobService.fetchActiveJobs)",
     );
   }, [searchTerm, page, searchParams, activeFilters, userTopSkills]);
 
@@ -303,12 +303,13 @@ const JobSearchResultsPage = () => {
     fetchUserSkills();
   }, [user]);
 
-  // Fetch jobs
+  // Fetch jobs (GET /api/search via jobService.fetchActiveJobs)
   const fetchJobs = async (
     searchTerm: string,
     filters: JobFilters,
     page: number,
     userTopSkills: string[],
+    sort: JobSearchSort,
   ): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
     try {
       // If all interests are selected, treat as no filter (load all jobs)
@@ -333,6 +334,7 @@ const JobSearchResultsPage = () => {
         filters: filtersForAPI,
         page,
         pageSize,
+        sort,
       });
 
       if (!response || !Array.isArray(response.jobs)) {
@@ -435,8 +437,16 @@ const JobSearchResultsPage = () => {
       filtersKey,
       page,
       userTopSkills.join(","),
+      dateSortOrder,
     ],
-    queryFn: () => fetchJobs(searchTerm, activeFilters, page, userTopSkills),
+    queryFn: () =>
+      fetchJobs(
+        searchTerm,
+        activeFilters,
+        page,
+        userTopSkills,
+        dateSortOrder === "desc" ? "newest" : "oldest",
+      ),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -700,28 +710,8 @@ const JobSearchResultsPage = () => {
       .filter((job): job is Job => job !== null);
   }, [jobs, savedJobs, user, userSkillsForMatch]);
 
-  // Sort jobs by date
-  const regularJobs = useMemo(() => {
-    const sorted = [...transformedJobs].sort((a, b) => {
-      // If no date, put at the end
-      if (!a.datePosted && !b.datePosted) return 0;
-      if (!a.datePosted) return 1;
-      if (!b.datePosted) return -1;
-
-      const dateA = new Date(a.datePosted).getTime();
-      const dateB = new Date(b.datePosted).getTime();
-
-      if (dateSortOrder === "desc") {
-        // Newest first (descending)
-        return dateB - dateA;
-      } else {
-        // Oldest first (ascending)
-        return dateA - dateB;
-      }
-    });
-
-    return sorted;
-  }, [transformedJobs, dateSortOrder]);
+  // Order comes from GET /api/search `sort` (refetch when dateSortOrder changes)
+  const regularJobs = transformedJobs;
 
   // Save job mutation
   const saveJobMutation = useMutation({

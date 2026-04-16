@@ -429,14 +429,15 @@ const fetchInternshipJobs = async (
     );
 
     const response = await jobService.fetchActiveJobs({
-      query: "intern intern internship", // Search term for internships
+      query: "",
       filters: {
         country: undefined,
         countries: [], // No country filtering
-        jobTypes: ["INTERN"], // Filter for internship jobs only
-        isRemote: undefined,
-        datePosted: "week", // Only jobs updated in the last 1 week
-        skills: [], // No skill filtering
+        jobTypes: ["INTERN"], // Client-side employment type filter after fetch
+        isRemote: false,
+        datePosted: "week",
+        // GET /api/search `title` — keyword OR on job title (intern / internship)
+        skills: ["intern", "internship"],
         salaryMin: undefined,
         salaryMax: undefined,
         salaryByAgreement: undefined,
@@ -500,7 +501,7 @@ const fetchLatestJobs = async (
     };
 
     const response = await jobService.fetchActiveJobs({
-      query: "", // No search term - will use "jobs" as default in jobService
+      query: "",
       filters: filtersForAPI,
       page: page,
       pageSize: 12, // Fetch 12 jobs per page
@@ -565,13 +566,6 @@ const fetchLatestJobs = async (
       });
     }
 
-    // Apply client-side remote filter if needed (same as JobSearchResultsPage)
-    if (filters.isRemote) {
-      validJobs = validJobs.filter((job) => {
-        return job.job_is_remote || job.is_remote || job.remote === true;
-      });
-    }
-
     console.log(
       `✅ fetchLatestJobs: ${validJobs.length} jobs found after filtering`,
     );
@@ -580,7 +574,7 @@ const fetchLatestJobs = async (
     return {
       jobs: validJobs,
       hasMore: response.hasMore ?? false,
-      total: validJobs.length,
+      total: response.total ?? validJobs.length,
     };
   } catch (error) {
     console.error("Error fetching latest jobs:", error);
@@ -603,22 +597,21 @@ const fetchRemoteJobs = async (
       userTopSkills,
     );
 
-    // Use "remote" as search term
     const response = await jobService.fetchActiveJobs({
-      query: "remote", // Search for remote jobs
+      query: "",
       filters: {
-        country: undefined, // No single country filter
-        countries: [], // No country filtering - show remote jobs from all countries
-        jobTypes: [], // No job type filtering (will exclude interns client-side)
-        isRemote: true, // Filter for remote jobs only
-        datePosted: "week", // Only jobs updated in the last 1 week
-        skills: [], // No skills filter
+        country: undefined,
+        countries: [],
+        jobTypes: [],
+        isRemote: true, // GET /api/search work_mode=remote
+        datePosted: "week",
+        skills: [],
         salaryMin: undefined,
         salaryMax: undefined,
         salaryByAgreement: undefined,
       },
       page: page,
-      pageSize: 50, // Fetch more jobs per page
+      pageSize: 50,
     });
 
     console.log(`📊 fetchRemoteJobs response:`, {
@@ -1045,7 +1038,7 @@ const JobsPage = () => {
             country: undefined,
             countries: [],
             jobTypes: [],
-            isRemote: undefined,
+            isRemote: false,
             datePosted: undefined, // No date filter - get all jobs, we show latest 9
             skills: [],
             salaryMin: undefined,
@@ -1068,7 +1061,7 @@ const JobsPage = () => {
         const result = {
           jobs: validJobs,
           hasMore: response.hasMore ?? false,
-          total: validJobs.length,
+          total: response.total ?? validJobs.length,
         };
         setCachedLatestJobs(result);
         return result;
@@ -2690,11 +2683,11 @@ const JobsPage = () => {
           countries: [],
           jobTypes: [],
           isRemote: false,
-          datePosted: "week", // Only last 1 week for consistency with job lists
-          skills: [skill], // Filter by this skill only
+          datePosted: "week",
+          skills: [],
         },
         page: 1,
-        pageSize: 50, // Fetch up to 50 jobs to get a better count
+        pageSize: 50,
       });
       // Return the count (if we get 20, there might be more, but we'll show 20+)
       return response.jobs.length;

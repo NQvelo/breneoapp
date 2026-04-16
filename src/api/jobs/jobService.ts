@@ -203,12 +203,21 @@ interface BreneoApiResponse {
 const fetchJobsFromSearchAPI = async (
   params: JobSearchParams
 ): Promise<BreneoApiResponse> => {
-  const { query, filters, page = 1, pageSize = 20 } = params;
+  const {
+    query,
+    titleFilter,
+    filters,
+    page = 1,
+    pageSize = 20,
+    sort = "newest",
+  } = params;
 
   const searchParams = new URLSearchParams();
 
-  // Single-value / text
-  if (query && query.trim()) {
+  // Title: title_filter wins over query per API; title param = keyword OR chips
+  if (titleFilter && titleFilter.trim()) {
+    searchParams.set("title_filter", titleFilter.trim());
+  } else if (query && query.trim()) {
     searchParams.set("query", query.trim());
   }
 
@@ -239,6 +248,24 @@ const fetchJobsFromSearchAPI = async (
   if (filters.company && filters.company.length > 0) {
     searchParams.set("company", filters.company.join(","));
   }
+  if (filters.city && filters.city.length > 0) {
+    searchParams.set("city", filters.city.map((c) => c.trim()).filter(Boolean).join(","));
+  }
+  if (filters.locationCountry && filters.locationCountry.length > 0) {
+    searchParams.set(
+      "location_country",
+      filters.locationCountry.map((c) => c.trim()).filter(Boolean).join(",")
+    );
+  }
+  if (filters.roleCategory && filters.roleCategory.length > 0) {
+    searchParams.set(
+      "role_category",
+      filters.roleCategory.map((c) => c.trim()).filter(Boolean).join(",")
+    );
+  }
+  if (filters.recent === true) {
+    searchParams.set("recent", "true");
+  }
 
   // date_posted
   if (filters.datePosted && filters.datePosted !== "all") {
@@ -249,8 +276,7 @@ const fetchJobsFromSearchAPI = async (
   searchParams.set("page", String(page));
   searchParams.set("num_pages", String(pageSize));
 
-  // Sort
-  searchParams.set("sort", "newest");
+  searchParams.set("sort", sort);
 
   const url = `${JOB_SEARCH_API}?${searchParams.toString()}`;
   console.log("🔍 /api/search request:", url);
@@ -869,14 +895,9 @@ export const fetchActiveJobs = async (
   params: JobSearchParams
 ): Promise<JobApiResponse> => {
   try {
-    const queryParts: string[] = [];
-    if (params.query && params.query.trim()) {
-      queryParts.push(params.query.trim());
-    }
-    if (params.filters.skills.length > 0) {
-      queryParts.push(...params.filters.skills);
-    }
-    const query = queryParts.length > 0 ? queryParts.join(" ") : "";
+    // Canonical /api/search: `query` = NLP title search only; `title` = keyword OR
+    // (from filters.skills) — do not merge skills into query.
+    const query = params.query?.trim() ?? "";
 
     let apiResponse: BreneoApiResponse;
 

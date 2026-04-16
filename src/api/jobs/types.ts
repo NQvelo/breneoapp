@@ -185,14 +185,32 @@ export interface JobFilters {
   seniority?: string[]; // Seniority levels (intern, junior, mid, senior, lead)
   workMode?: string[]; // Work modes (remote, hybrid, onsite)
   company?: string[]; // Company names
+  /** GET /api/search `city` — substrings on free-text location line */
+  city?: string[];
+  /** GET /api/search `location_country` — display names as stored (e.g. USA) */
+  locationCountry?: string[];
+  /** GET /api/search `role_category` — exact OR per value */
+  roleCategory?: string[];
+  /** GET /api/search `recent=true` — fetched in last 24h */
+  recent?: boolean;
 }
 
-// Job search parameters
+/** Matches GET /api/search `sort` enum */
+export type JobSearchSort = "newest" | "oldest" | "recently_fetched";
+
+// Job search parameters (GET /api/search)
 export interface JobSearchParams {
   query: string;
   filters: JobFilters;
   page?: number;
   pageSize?: number;
+  /** Passed through to /api/search as `sort` (default newest in service) */
+  sort?: JobSearchSort;
+  /**
+   * Direct title filter string; if set, backend uses this for NLP title search
+   * and ignores `query` for that path.
+   */
+  titleFilter?: string;
 }
 
 // Normalized job structure (standardized format)

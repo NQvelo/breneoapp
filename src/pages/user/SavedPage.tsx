@@ -20,6 +20,7 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { fetchJobDetail } from "@/api/jobs/jobService";
+import { openExternalHttpUrl } from "@/utils/externalUrl";
 
 interface SavedCourse {
   id: string;
@@ -721,7 +722,7 @@ const SavedPage = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               if (job.url) {
-                                window.open(job.url, "_blank");
+                                openExternalHttpUrl(job.url);
                               } else {
                                 navigate(`/jobs/${encodeURIComponent(job.id)}`);
                               }

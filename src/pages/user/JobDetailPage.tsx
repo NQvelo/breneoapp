@@ -77,6 +77,10 @@ import {
   parseJobIndustryTags,
   computeIndustryMatchPercent,
 } from "@/utils/industryMatch";
+import {
+  normalizeExternalHttpUrl,
+  openExternalHttpUrl,
+} from "@/utils/externalUrl";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -432,7 +436,7 @@ const JobDetailPage = () => {
 
     // Check new API structure - apply_url is primary field
     if (jobDetail.apply_url && typeof jobDetail.apply_url === "string") {
-      return jobDetail.apply_url;
+      return normalizeExternalHttpUrl(jobDetail.apply_url);
     }
 
     // Check all possible apply URL fields in order of preference
@@ -458,10 +462,10 @@ const JobDetailPage = () => {
         url?: string;
       };
       if (companyInfo.apply_url && typeof companyInfo.apply_url === "string") {
-        return companyInfo.apply_url;
+        return normalizeExternalHttpUrl(companyInfo.apply_url);
       }
       if (companyInfo.url && typeof companyInfo.url === "string") {
-        return companyInfo.url;
+        return normalizeExternalHttpUrl(companyInfo.url);
       }
     }
 
@@ -473,10 +477,10 @@ const JobDetailPage = () => {
     ) {
       const companyObj = jobDetail.company as Record<string, unknown>;
       if (companyObj.apply_url && typeof companyObj.apply_url === "string") {
-        return companyObj.apply_url;
+        return normalizeExternalHttpUrl(companyObj.apply_url);
       }
       if (companyObj.url && typeof companyObj.url === "string") {
-        return companyObj.url;
+        return normalizeExternalHttpUrl(companyObj.url);
       }
     }
 
@@ -488,14 +492,16 @@ const JobDetailPage = () => {
     ) {
       const employerObj = jobDetail.employer as Record<string, unknown>;
       if (employerObj.apply_url && typeof employerObj.apply_url === "string") {
-        return employerObj.apply_url;
+        return normalizeExternalHttpUrl(employerObj.apply_url);
       }
       if (employerObj.url && typeof employerObj.url === "string") {
-        return employerObj.url;
+        return normalizeExternalHttpUrl(employerObj.url);
       }
     }
 
-    return applyUrl;
+    return normalizeExternalHttpUrl(
+      typeof applyUrl === "string" ? applyUrl : "",
+    );
   };
 
   // Get company name
@@ -1004,11 +1010,13 @@ const JobDetailPage = () => {
       companyDetails?.company_url ||
       companyDetails?.website_url
     ) {
-      return (
+      const raw =
         companyDetails.website ||
         companyDetails.company_url ||
-        companyDetails.website_url
-      );
+        companyDetails.website_url;
+      if (typeof raw !== "string") return undefined;
+      const n = normalizeExternalHttpUrl(raw);
+      return n || undefined;
     }
     if (!jobDetail) return undefined;
     const website =
@@ -1016,7 +1024,9 @@ const JobDetailPage = () => {
       (jobDetail.company_info as CompanyInfo)?.company_url ||
       (jobDetail.company_info as CompanyInfo)?.website_url ||
       jobDetail.company_url;
-    return typeof website === "string" ? website : undefined;
+    if (typeof website !== "string") return undefined;
+    const n = normalizeExternalHttpUrl(website);
+    return n || undefined;
   };
 
   // Get company description - prioritize API data, then fallback to job detail
@@ -1823,7 +1833,7 @@ const JobDetailPage = () => {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => window.open(getApplyUrl(), "_blank")}
+                        onClick={() => openExternalHttpUrl(getApplyUrl())}
                       >
                         Apply Now
                       </Button>
@@ -2309,7 +2319,7 @@ const JobDetailPage = () => {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => window.open(getApplyUrl(), "_blank")}
+                    onClick={() => openExternalHttpUrl(getApplyUrl())}
                     className="whitespace-nowrap"
                   >
                     Apply Now

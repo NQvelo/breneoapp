@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useNavigate, Link, useLocation } from "react-router-dom";
+import { openExternalHttpUrl } from "@/utils/externalUrl";
 import apiClient, { createFormDataRequest } from "@/api/auth/apiClient";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -3267,7 +3268,7 @@ const ProfilePage = () => {
                         className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
                         onClick={() => {
                           if (job.url) {
-                            window.open(job.url, "_blank");
+                            openExternalHttpUrl(job.url);
                           } else {
                             navigate(`/jobs/${encodeURIComponent(job.id)}`);
                           }

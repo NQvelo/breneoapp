@@ -28,6 +28,7 @@ import {
   validateHttpUrl,
   type AggregatorWorkMode,
 } from "@/api/employer/publishJob";
+import { openExternalHttpUrl } from "@/utils/externalUrl";
 
 export type PreviewEditKey =
   | "title"
@@ -578,7 +579,7 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => window.open(applyValid.url, "_blank")}
+                    onClick={() => openExternalHttpUrl(applyValid.url)}
                   >
                     Apply Now
                   </Button>
