@@ -2673,48 +2673,6 @@ const JobsPage = () => {
     // Just clear filters in UI, don't redirect since we're showing latest jobs
   };
 
-  // Function to fetch job count for a specific skill
-  const fetchJobCountForSkill = async (skill: string): Promise<number> => {
-    try {
-      const response = await jobService.fetchActiveJobs({
-        query: skill,
-        filters: {
-          country: "Georgia",
-          countries: [],
-          jobTypes: [],
-          isRemote: false,
-          datePosted: "week",
-          skills: [],
-        },
-        page: 1,
-        pageSize: 50,
-      });
-      // Return the count (if we get 20, there might be more, but we'll show 20+)
-      return response.jobs.length;
-    } catch (error) {
-      console.error(`Error fetching job count for skill ${skill}:`, error);
-      return 0;
-    }
-  };
-
-  // Fetch job counts for each skill using React Query
-  const skillJobCounts = useQuery<Record<string, number>>({
-    queryKey: ["skillJobCounts", userTopSkills.join(",")],
-    queryFn: async () => {
-      const counts: Record<string, number> = {};
-      // Fetch counts for all skills in parallel
-      await Promise.all(
-        userTopSkills.map(async (skill) => {
-          counts[skill] = await fetchJobCountForSkill(skill);
-        }),
-      );
-      return counts;
-    },
-    enabled: userTopSkills.length > 0 && !loadingSkills,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    refetchOnWindowFocus: false,
-  });
-
   return (
     <DashboardLayout>
       <BetaVersionModal />

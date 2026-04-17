@@ -58,7 +58,7 @@ import {
   fetchEmployerAggregatorCompanies,
   resolveEmployerJobsCompanyFilter,
 } from "@/api/employer/aggregatorBffApi";
-import { City, Country } from "country-state-city";
+import type { ICity, ICountry } from "country-state-city";
 import {
   EmployerJobFormPreview,
   type PreviewEditKey,
@@ -83,8 +83,6 @@ const WORK_MODE_OPTIONS: { value: AggregatorWorkMode; label: string }[] = [
   { value: "onsite", label: "Onsite" },
   { value: "unknown", label: "Not specified" },
 ];
-
-const WORLD_COUNTRIES = Country.getAllCountries();
 
 function normalizeBulletLinesKey(text: string): string {
   return text
@@ -154,6 +152,10 @@ export default function EmployerAddJobPage() {
   } | null>(null);
 
   const [showJobPreview, setShowJobPreview] = useState(false);
+  const [worldCountries, setWorldCountries] = useState<ICountry[]>([]);
+  const resolveCitiesRef = useRef<(countryIsoCode: string) => ICity[]>(
+    () => [],
+  );
   /** Saving draft to API when opening preview from add-job flow (before navigating to edit). */
   const [previewPriming, setPreviewPriming] = useState(false);
   const [previewEditKey, setPreviewEditKey] = useState<PreviewEditKey | null>(
@@ -263,7 +265,7 @@ export default function EmployerAddJobPage() {
         const jobCountry = String(job.location_country ?? job.country ?? "").trim();
         setLocationCountry(jobCountry);
         setCountryQuery(jobCountry);
-        const matchedCountry = WORLD_COUNTRIES.find(
+        const matchedCountry = worldCountries.find(
           (c) => c.name.toLowerCase() === jobCountry.toLowerCase(),
         );
         setSelectedCountryIsoCode(matchedCountry?.isoCode ?? "");
@@ -323,11 +325,43 @@ export default function EmployerAddJobPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, isEdit, jobId, navigate, language, editSource]);
+  }, [user, isEdit, jobId, navigate, language, editSource, worldCountries]);
 
   useEffect(() => {
     initPage();
   }, [initPage]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCountryCityData = async () => {
+      try {
+        const module = await import("country-state-city");
+        if (!isMounted) return;
+        setWorldCountries(module.Country.getAllCountries());
+        resolveCitiesRef.current = (countryIsoCode: string) =>
+          module.City.getCitiesOfCountry(countryIsoCode);
+      } catch {
+        setWorldCountries([]);
+        resolveCitiesRef.current = () => [];
+      }
+    };
+    void loadCountryCityData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedCountryIsoCode || !locationCountry || worldCountries.length === 0) {
+      return;
+    }
+    const matchedCountry = worldCountries.find(
+      (c) => c.name.toLowerCase() === locationCountry.toLowerCase(),
+    );
+    if (matchedCountry) {
+      setSelectedCountryIsoCode(matchedCountry.isoCode);
+    }
+  }, [locationCountry, selectedCountryIsoCode, worldCountries]);
 
   /** Gemini runs on the server only when publishing a new job (not on edit — structured fields are manual). */
   const willExtractDescriptionOnSave = useMemo(() => !isEdit, [isEdit]);
@@ -335,15 +369,15 @@ export default function EmployerAddJobPage() {
   const filteredCountries = useMemo(() => {
     const q = countryQuery.trim().toLowerCase();
     if (q.length < 2) return [];
-    return WORLD_COUNTRIES.filter((c) => c.name.toLowerCase().includes(q)).slice(
+    return worldCountries.filter((c) => c.name.toLowerCase().includes(q)).slice(
       0,
       20,
     );
-  }, [countryQuery]);
+  }, [countryQuery, worldCountries]);
 
   const cityOptions = useMemo(() => {
     if (!selectedCountryIsoCode) return [];
-    return City.getCitiesOfCountry(selectedCountryIsoCode);
+    return resolveCitiesRef.current(selectedCountryIsoCode);
   }, [selectedCountryIsoCode]);
 
   const filteredCities = useMemo(() => {
@@ -373,7 +407,7 @@ export default function EmployerAddJobPage() {
   const tryResolveCountryFromQuery = (rawQuery: string): boolean => {
     const q = rawQuery.trim().toLowerCase();
     if (!q) return false;
-    const exact = WORLD_COUNTRIES.find((c) => c.name.toLowerCase() === q);
+    const exact = worldCountries.find((c) => c.name.toLowerCase() === q);
     if (!exact) return false;
     setLocationCountry(exact.name);
     setCountryQuery(exact.name);
@@ -450,7 +484,7 @@ export default function EmployerAddJobPage() {
       };
     }
     if (normalizedCountry) {
-      const countryObj = WORLD_COUNTRIES.find(
+      const countryObj = worldCountries.find(
         (c) => c.name.toLowerCase() === normalizedCountry.toLowerCase(),
       );
       if (!countryObj) {
@@ -460,7 +494,7 @@ export default function EmployerAddJobPage() {
           message: "Select a valid country from the list.",
         };
       }
-      const validCity = City.getCitiesOfCountry(countryObj.isoCode).some(
+      const validCity = resolveCitiesRef.current(countryObj.isoCode).some(
         (c) => c.name.toLowerCase() === normalizedCity.toLowerCase(),
       );
       if (!validCity) {
@@ -480,11 +514,11 @@ export default function EmployerAddJobPage() {
       normalizedCity,
       applyUrl: applyCheck.url || "",
     };
-  }, [title, description, applyUrl, locationCountry, location]);
+  }, [title, description, applyUrl, locationCountry, location, worldCountries]);
 
   const handleSubmit = async () => {
     const validated = validateFormForSave();
-    if (!validated.ok) {
+    if ("fieldErrors" in validated) {
       setFieldErrors(validated.fieldErrors);
       toast.error(validated.message);
       return;
@@ -651,7 +685,7 @@ export default function EmployerAddJobPage() {
 
   const openJobPreview = useCallback(async () => {
     const validated = validateFormForSave();
-    if (!validated.ok) {
+    if ("fieldErrors" in validated) {
       setFieldErrors(validated.fieldErrors);
       toast.error(validated.message);
       return;
@@ -917,7 +951,7 @@ export default function EmployerAddJobPage() {
           setSelectedCountryIsoCode={setSelectedCountryIsoCode}
           filteredCountries={filteredCountries}
           filteredCities={filteredCities}
-          worldCountries={WORLD_COUNTRIES}
+          worldCountries={worldCountries}
           selectCountry={selectCountry}
           selectCity={selectCity}
           tryResolveCountryFromQuery={tryResolveCountryFromQuery}
@@ -1055,7 +1089,7 @@ export default function EmployerAddJobPage() {
                           setCountryQuery(next);
                           setLocationCountry(next);
                           setCountryOpen(true);
-                          const exact = WORLD_COUNTRIES.find(
+                          const exact = worldCountries.find(
                             (c) => c.name.toLowerCase() === next.trim().toLowerCase(),
                           );
                           if (exact) {

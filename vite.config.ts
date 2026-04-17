@@ -114,9 +114,10 @@ export default defineConfig(({ mode }) => ({
           "**/lovable-uploads/future.png",
           "**/lovable-uploads/way.png",
           "**/lovable-uploads/full-shot-student-library.jpg",
+          "**/assets/geo-vendor-*.js",
         ],
-        // Keep large hashed JS bundle in precache; CI currently produces ~10.4 MB main chunk.
-        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024, // 12 MB
+        // Keep service-worker install fast by skipping oversized optional assets.
+        maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2 MB
         // Handle SPA routing - fallback to index.html for navigation requests
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [
@@ -164,6 +165,21 @@ export default defineConfig(({ mode }) => ({
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+            },
+          },
+          {
+            urlPattern: /\.(?:js|css)$/i,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "assets-cache",
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+                purgeOnQuotaError: true,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },
@@ -230,5 +246,78 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version || "0.0.0"),
+  },
+  build: {
+    minify: "esbuild",
+    target: "es2020",
+    sourcemap: false,
+    cssCodeSplit: true,
+    modulePreload: {
+      polyfill: false,
+    },
+    esbuild: {
+      drop: mode === "production" ? ["console", "debugger"] : [],
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          // Keep React stack in one stable chunk.
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/")
+          ) {
+            return "react-vendor";
+          }
+
+          // Router + data/cache layer used on most pages.
+          if (
+            id.includes("/react-router/") ||
+            id.includes("/react-router-dom/") ||
+            id.includes("/@tanstack/react-query/")
+          ) {
+            return "routing-data-vendor";
+          }
+
+          // Heavy charting libs.
+          if (id.includes("/recharts/") || id.includes("/d3-")) {
+            return "charts-vendor";
+          }
+
+          // Animation and 3D dependencies are large and route-specific.
+          if (
+            id.includes("/framer-motion/") ||
+            id.includes("/three/") ||
+            id.includes("/@react-three/")
+          ) {
+            return "animation-3d-vendor";
+          }
+
+          // Very large world country/city dataset; keep isolated and lazy-loadable.
+          if (id.includes("/country-state-city/")) {
+            return "geo-vendor";
+          }
+
+          // UI primitives (Radix + utility wrappers).
+          if (
+            id.includes("/@radix-ui/") ||
+            id.includes("/cmdk/") ||
+            id.includes("/vaul/")
+          ) {
+            return "ui-vendor";
+          }
+
+          if (id.includes("/posthog-js/")) {
+            return "analytics-vendor";
+          }
+
+          if (id.includes("/@supabase/") || id.includes("/firebase/")) {
+            return "backend-vendor";
+          }
+        },
+      },
+    },
   },
 }));

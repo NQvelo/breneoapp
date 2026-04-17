@@ -11,8 +11,8 @@
  * - Common routes: Available to all authenticated users (terms, help)
  */
 
-import React, { Suspense, lazy } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense, lazy, useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 // Auth pages (Public)
@@ -62,6 +62,34 @@ const WebinarsPage = lazy(() => import("@/pages/user/WebinarsPage"));
 const PaymentSuccessPage = lazy(() => import("@/pages/PaymentSuccessPage"));
 const PaymentFailurePage = lazy(() => import("@/pages/PaymentFailurePage"));
 
+const preloadCommonChunks = [
+  () => import("@/pages/user/UserHome"),
+  () => import("@/pages/user/JobsPage"),
+  () => import("@/pages/CoursesPage"),
+  () => import("@/pages/user/ProfilePage"),
+];
+
+const preloadEmployerChunks = [
+  () => import("@/pages/employer/EmployerJobsPage"),
+  () => import("@/pages/employer/EmployerAddJobPage"),
+  () => import("@/pages/employer/EmployerProfilePage"),
+];
+
+const preloadAcademyChunks = [
+  () => import("@/pages/academy/AcademyHomePage"),
+  () => import("@/pages/academy/AcademyCoursesPage"),
+  () => import("@/pages/academy/AcademyProfilePage"),
+];
+
+const RouteLoadingFallback = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+      <p className="text-sm">Loading page...</p>
+    </div>
+  </div>
+);
+
 /**
  * Helper component to create routes with language prefixes
  */
@@ -87,8 +115,37 @@ const createLocalizedRoute = (path: string, element: React.ReactElement) => {
  * Supports language prefixes: /en and /ka
  */
 export const AppRoutes = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
+    const preloads =
+      role === "employer"
+        ? [...preloadCommonChunks, ...preloadEmployerChunks]
+        : role === "academy"
+          ? [...preloadCommonChunks, ...preloadAcademyChunks]
+          : preloadCommonChunks;
+
+    const runPreload = () => {
+      preloads.forEach((load) => {
+        void load();
+      });
+    };
+
+    const w = typeof window !== "undefined" ? window : undefined;
+    if (!w) return;
+
+    if ("requestIdleCallback" in w) {
+      const id = w.requestIdleCallback(runPreload, { timeout: 1500 });
+      return () => w.cancelIdleCallback(id);
+    }
+
+    const timeoutId = w.setTimeout(runPreload, 300);
+    return () => w.clearTimeout(timeoutId);
+  }, [location.pathname]);
+
   return (
-    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+    <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
       {/* ==========================================
           PUBLIC ROUTES - No authentication required
