@@ -63,6 +63,7 @@ import {
   EmployerJobFormPreview,
   type PreviewEditKey,
 } from "@/components/employer/EmployerJobFormPreview";
+import { EmployerJobApplicantsPanel } from "@/components/employer/EmployerJobApplicantsPanel";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -1389,6 +1390,8 @@ export default function EmployerAddJobPage() {
             </div>
           </CardContent>
         </Card>
+
+        {isEdit && jobId ? <EmployerJobApplicantsPanel jobId={jobId} /> : null}
       </div>
       )}
     </DashboardLayout>

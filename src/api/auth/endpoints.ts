@@ -24,6 +24,8 @@ export const API_ENDPOINTS = {
   },
   // Profile page: me profile, educations, work-experiences, skills
   ME: {
+    /** Current user profile */
+    ROOT: "/api/me/",
     PROFILE: "/api/me/profile/",
     SKILLS: "/api/me/skills/",
     INDUSTRY_PROFILE: "/api/me/industry-profile/",

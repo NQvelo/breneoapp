@@ -37,6 +37,11 @@ export default defineConfig(({ mode }) => ({
               target: "http://127.0.0.1:8787",
               changeOrigin: true,
             },
+            // Job applications BFF: apply / my applications / withdraw / applicants (Breneo JWT + server secret).
+            "/api/app": {
+              target: "http://127.0.0.1:8787",
+              changeOrigin: true,
+            },
             "/api/job-details": {
               target: "https://breneo-job-aggregator.up.railway.app/",
               changeOrigin: true,

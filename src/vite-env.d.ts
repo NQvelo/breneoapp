@@ -9,9 +9,13 @@ interface ImportMetaEnv {
    * `VITE_API_BASE_URL` / Railway. Helps when that remote host does not resolve locally.
    */
   readonly VITE_DEV_SAME_ORIGIN_BRENEO_API?: string;
-  /** Job aggregator — same role as `VITE_JOB_API_BASE_URL` and server `JOB_AGGREGATOR_BASE_URL`. */
+  /**
+   * Public job aggregator (search, job detail, in-app applications).
+   * Deploy as NEXT_PUBLIC_JOB_AGGREGATOR_URL → set this VITE_* name in CI (see .env.example).
+   */
+  readonly VITE_NEXT_PUBLIC_JOB_AGGREGATOR_URL?: string;
+  /** Legacy alias — prefer `VITE_NEXT_PUBLIC_JOB_AGGREGATOR_URL`. */
   readonly VITE_JOB_AGGREGATOR_BASE_URL?: string;
-  /** Public job aggregator (search, v1 jobs, logos). Same role as server `JOB_AGGREGATOR_BASE_URL`. */
   readonly VITE_JOB_API_BASE_URL?: string;
   /**
    * Employer dashboard BFF origin (`/api/employer/companies`, `/api/employer/jobs`, …).

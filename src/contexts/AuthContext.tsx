@@ -21,7 +21,6 @@ import {
   getLanguageFromPath,
   removeLanguagePrefix,
 } from "@/utils/localeUtils";
-
 interface User {
   id: number | string; // Allow both number and string IDs
   username?: string; // Make optional since profile might not have username

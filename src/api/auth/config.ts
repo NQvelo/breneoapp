@@ -25,12 +25,14 @@ function resolveBreneoApiBaseUrl(): string {
 export const BRENEO_API_BASE_URL = resolveBreneoApiBaseUrl();
 
 /**
- * Job aggregator (public jobs, search, v1, companies, industries, health/docs).
- * Prefer `VITE_JOB_AGGREGATOR_BASE_URL`; `VITE_JOB_API_BASE_URL` remains supported.
- * Do not use for Breneo-only routes; employer CRUD from the browser uses the BFF base, not this origin alone.
+ * Job aggregator (public jobs, search, applications).
+ * Prefer `VITE_NEXT_PUBLIC_JOB_AGGREGATOR_URL` (maps to NEXT_PUBLIC_JOB_AGGREGATOR_URL in deploy docs).
+ * Public job reads only. Apply/list/withdraw use same-origin `/api/app/*` BFF (Breneo JWT), not this origin.
+ * Employer CRUD from the browser still uses the BFF base, not this origin alone.
  */
 export const JOB_AGGREGATOR_BASE_URL = trimApiBase(
-  import.meta.env.VITE_JOB_AGGREGATOR_BASE_URL ||
+  import.meta.env.VITE_NEXT_PUBLIC_JOB_AGGREGATOR_URL ||
+    import.meta.env.VITE_JOB_AGGREGATOR_BASE_URL ||
     import.meta.env.VITE_JOB_API_BASE_URL ||
     "https://breneo-job-aggregator.up.railway.app",
 );

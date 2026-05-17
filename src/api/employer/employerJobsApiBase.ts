@@ -176,6 +176,14 @@ export function getEmployerJobsApiBaseUrl(): string {
   return resolveBaseFromEnvOrBrowser();
 }
 
+/**
+ * Job seeker application routes use the public aggregator only (`jobApplicationsApi.ts`).
+ * @deprecated Use `JOB_AGGREGATOR_BASE_URL` / `getJobAggregatorClient()` directly.
+ */
+export function getJobApplicationsApiBaseUrl(): string {
+  return JOB_AGGREGATOR_BASE_URL.replace(/\/$/, "");
+}
+
 export function getEmployerJobsApiDebugInfo(): {
   baseUrl: string;
   mode: "same-origin-bff" | "custom-bff" | "unknown";

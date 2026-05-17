@@ -3,7 +3,8 @@
  *
  * The browser must NOT call https://breneo-job-aggregator.up.railway.app directly
  * (no X-Employer-Key in the client). Same-origin /api/industries, /api/employer/companies,
- * /api/employer/jobs are handled here
+ * /api/employer/jobs (and recruiter applicants) are handled here.
+ * Job seeker apply/list/withdraw: browser → same-origin /api/app/* (BFF + EMPLOYER_POST_SECRET).
  * and forwarded to JOB_AGGREGATOR_BASE_URL (default: job aggregator on Railway).
  *
  * Railway: Build = `npm run build`, Start = `npm start`.

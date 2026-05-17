@@ -17,11 +17,17 @@
  * - PATCH /api/employer/jobs/:jobId — forwards ?company_id; Gemini when full_description without client bullets
  * - POST /api/employer/jobs/:jobId — same handler as PATCH (for clients that cannot PATCH)
  * - DELETE /api/employer/jobs/:jobId — forwards ?company_id
+ * - GET /api/employer/jobs/:jobId/applicants — JWT → GET aggregator /api/jobs/:id/applicants + X-Employer-Key
+ * - POST /api/app/jobs/:jobId/apply — JWT → aggregator POST apply + X-Application-Key + external_user_id
+ * - GET /api/app/users/me/applications — JWT → aggregator list (query external_user_id, page, limit, sort)
+ * - DELETE /api/app/jobs/:jobId/application — JWT → aggregator DELETE withdraw
+ * - GET /api/app/jobs/:jobId/applicants — employer JWT → aggregator applicants + X-Employer-Key
  *
  * Run: node server/employer-jobs-proxy.mjs (see npm run dev).
  *
  * Env (never use VITE_* or NEXT_PUBLIC_* for secrets):
- *   JOB_AGGREGATOR_EMPLOYER_KEY — required for POST; must match Django EMPLOYER_POST_SECRET
+ *   EMPLOYER_POST_SECRET — preferred; must match Django EMPLOYER_POST_SECRET (X-Application-Key / X-Employer-Key)
+ *   JOB_AGGREGATOR_EMPLOYER_KEY — alias of EMPLOYER_POST_SECRET
  *   MAIN_API_BASE_URL — main Breneo API (no trailing slash); JWT/profile checks hit …/api/employer/profile/ here (same as VITE_API_BASE_URL)
  *   VITE_API_BASE_URL — optional fallback if MAIN_API_BASE_URL unset (dotenv loads VITE_* for Node in dev)
  *   JOB_AGGREGATOR_BASE_URL — job aggregator origin (employer CRUD, industries, companies search); default breneo-job-aggregator Railway
@@ -182,11 +188,16 @@ function aggregatorJobDetailUrl(encodedJobId) {
   const root = AGGREGATOR_EMPLOYER_JOBS_URL.replace(/\/$/, "");
   return `${root}/${encodedJobId}`;
 }
-const AGGREGATOR_KEY = process.env.JOB_AGGREGATOR_EMPLOYER_KEY;
+/** Same secret as Django EMPLOYER_POST_SECRET (application + employer upstream headers). */
+const AGGREGATOR_KEY = (
+  process.env.EMPLOYER_POST_SECRET ||
+  process.env.JOB_AGGREGATOR_EMPLOYER_KEY ||
+  ""
+).trim();
 
 if (!AGGREGATOR_KEY) {
   console.warn(
-    "[employer-jobs-proxy] JOB_AGGREGATOR_EMPLOYER_KEY is missing — POST /api/employer/jobs returns 500. Add it to .env (server-only, not VITE_*). See .env.example.",
+    "[employer-jobs-proxy] EMPLOYER_POST_SECRET (or JOB_AGGREGATOR_EMPLOYER_KEY) is missing — employer POST and /api/app/* return 500. Add to .env (server-only). See .env.example.",
   );
 }
 
@@ -577,6 +588,183 @@ async function requireEmployerAuth(req, res) {
   }
 
   return { auth, userId };
+}
+
+/**
+ * Job seeker auth: validate Breneo JWT on MAIN_API /api/profile/ (not employer profile).
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns {Promise<{ auth: string; userId: string } | null>}
+ */
+async function requireUserAuth(req, res) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) {
+    res.status(401).json({
+      success: false,
+      message: "Authentication credentials were not provided.",
+      data: null,
+      error: "not_authenticated",
+    });
+    return null;
+  }
+
+  const profRes = await fetch(`${MAIN_API_BASE}/api/profile/`, {
+    headers: {
+      Authorization: auth,
+      Accept: "application/json",
+    },
+  });
+
+  if (!profRes.ok) {
+    res.status(401).json({
+      success: false,
+      message: `Authentication failed (${profRes.status}).${employerAuthFailureHint(profRes.status)}`,
+      data: null,
+      error: "not_authenticated",
+    });
+    return null;
+  }
+
+  const profile = await profRes.json();
+  let userId = extractStaffUserIdFromEmployerProfile(
+    /** @type {Record<string, unknown>} */ (profile),
+  );
+  if (!userId) {
+    userId = extractUserIdFromBearerJwt(auth);
+  }
+  if (!userId) {
+    res.status(400).json({
+      success: false,
+      message:
+        "Could not resolve Breneo user id from profile or JWT. Ensure MAIN_API_BASE_URL matches your login host.",
+      data: null,
+      error: "invalid_user",
+    });
+    return null;
+  }
+
+  return { auth, userId };
+}
+
+/**
+ * Normalize aggregator JSON to SPA contract: { success, message, data, error? }.
+ * @param {string} text
+ * @param {number} status
+ * @param {boolean} ok
+ */
+function normalizeAppBffJson(text, status, ok) {
+  let raw = {};
+  try {
+    raw = text ? JSON.parse(text) : {};
+  } catch {
+    return {
+      success: false,
+      message: "Invalid response from job aggregator",
+      data: null,
+      error: "bad_gateway",
+      httpStatus: 502,
+    };
+  }
+  if (raw && typeof raw === "object" && "success" in raw) {
+    return {
+      success: Boolean(raw.success),
+      message:
+        typeof raw.message === "string"
+          ? raw.message
+          : ok
+            ? ""
+            : "Request failed",
+      data: raw.data ?? null,
+      error: typeof raw.error === "string" ? raw.error : undefined,
+      httpStatus: status,
+    };
+  }
+  if (ok) {
+    return {
+      success: true,
+      message: "",
+      data: raw,
+      httpStatus: status,
+    };
+  }
+  const msg =
+    (typeof raw.detail === "string" && raw.detail) ||
+    (typeof raw.message === "string" && raw.message) ||
+    `Request failed (${status})`;
+  return {
+    success: false,
+    message: msg,
+    data: null,
+    error: typeof raw.error === "string" ? raw.error : "upstream_error",
+    httpStatus: status,
+  };
+}
+
+/**
+ * Job seeker application routes: Breneo JWT → aggregator with X-Application-Key + external_user_id.
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @param {{ method: string; upstreamPath: string; queryMode?: "applications" | "withdraw" | "none" }} opts
+ */
+async function forwardAppJobApplication(req, res, opts) {
+  const ctx = await requireUserAuth(req, res);
+  if (!ctx) return;
+
+  if (!AGGREGATOR_KEY) {
+    return res.status(500).json({
+      success: false,
+      message:
+        "EMPLOYER_POST_SECRET is not set. Add it to .env and restart the BFF.",
+      data: null,
+      error: "server_config",
+    });
+  }
+
+  const upstreamUrl = new URL(
+    `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${opts.upstreamPath}`,
+  );
+
+  if (opts.queryMode === "applications") {
+    upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+    upstreamUrl.searchParams.set(
+      "page",
+      String(req.query.page ?? "1").trim() || "1",
+    );
+    upstreamUrl.searchParams.set(
+      "limit",
+      String(req.query.limit ?? "20").trim() || "20",
+    );
+    upstreamUrl.searchParams.set(
+      "sort",
+      String(req.query.sort ?? "-applied_at").trim() || "-applied_at",
+    );
+  } else if (opts.queryMode === "withdraw") {
+    upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+  }
+
+  /** @type {RequestInit} */
+  const fetchInit = {
+    method: opts.method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Application-Key": AGGREGATOR_KEY,
+    },
+  };
+
+  if (opts.method === "POST") {
+    fetchInit.body = JSON.stringify({ external_user_id: ctx.userId });
+  }
+
+  const upstream = await fetch(upstreamUrl.toString(), fetchInit);
+  const text = await upstream.text();
+  const normalized = normalizeAppBffJson(text, upstream.status, upstream.ok);
+  return res.status(normalized.httpStatus).json({
+    success: normalized.success,
+    message: normalized.message,
+    data: normalized.data,
+    ...(normalized.error ? { error: normalized.error } : {}),
+  });
 }
 
 /**
@@ -1476,6 +1664,196 @@ async function handleEmployerJobDetail(req, res) {
 
 app.get("/api/employer/jobs/:jobId", handleEmployerJobDetail);
 app.get("/api/employer/jobs/:jobId/", handleEmployerJobDetail);
+
+/**
+ * GET /api/employer/jobs/:jobId/applicants — recruiter view (BFF adds X-Employer-Key).
+ * Upstream: GET {AGGREGATOR}/api/jobs/{job_id}/applicants
+ */
+async function handleEmployerJobApplicants(req, res) {
+  try {
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        detail:
+          "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
+      });
+    }
+    const { jobId } = req.params;
+    const id = encodeURIComponent(String(jobId || "").trim());
+    const upstreamUrl = new URL(
+      `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}/api/jobs/${id}/applicants`,
+    );
+    for (const [key, val] of Object.entries(req.query || {})) {
+      if (val == null || val === "") continue;
+      if (Array.isArray(val)) {
+        val.forEach((v) => upstreamUrl.searchParams.append(key, String(v)));
+      } else {
+        upstreamUrl.searchParams.set(key, String(val));
+      }
+    }
+    if (!upstreamUrl.searchParams.has("external_user_id") && ctx.userId) {
+      upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+    }
+    const upstream = await fetch(upstreamUrl.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    const text = await upstream.text();
+    const parsed = parseAggregatorJsonResponse(
+      text,
+      upstream.status,
+      upstream.ok,
+    );
+    if (!parsed.ok) {
+      return res.status(parsed.status).json({ detail: parsed.detail });
+    }
+    return res.status(upstream.status).json(parsed.data);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ detail: "Internal server error" });
+  }
+}
+
+app.get("/api/employer/jobs/:jobId/applicants", handleEmployerJobApplicants);
+app.get("/api/employer/jobs/:jobId/applicants/", handleEmployerJobApplicants);
+
+/** GET /api/app/users/me/applications */
+async function handleAppMyApplications(req, res) {
+  try {
+    await forwardAppJobApplication(req, res, {
+      method: "GET",
+      upstreamPath: "/api/users/me/applications",
+      queryMode: "applications",
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+app.get("/api/app/users/me/applications", handleAppMyApplications);
+app.get("/api/app/users/me/applications/", handleAppMyApplications);
+
+/** POST /api/app/jobs/:jobId/apply */
+async function handleAppJobApply(req, res) {
+  try {
+    const id = encodeURIComponent(String(req.params.jobId || "").trim());
+    await forwardAppJobApplication(req, res, {
+      method: "POST",
+      upstreamPath: `/api/jobs/${id}/apply`,
+      queryMode: "none",
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+app.post("/api/app/jobs/:jobId/apply", handleAppJobApply);
+app.post("/api/app/jobs/:jobId/apply/", handleAppJobApply);
+
+/** DELETE /api/app/jobs/:jobId/application */
+async function handleAppJobWithdrawApplication(req, res) {
+  try {
+    const id = encodeURIComponent(String(req.params.jobId || "").trim());
+    await forwardAppJobApplication(req, res, {
+      method: "DELETE",
+      upstreamPath: `/api/jobs/${id}/application`,
+      queryMode: "withdraw",
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+app.delete(
+  "/api/app/jobs/:jobId/application",
+  handleAppJobWithdrawApplication,
+);
+app.delete(
+  "/api/app/jobs/:jobId/application/",
+  handleAppJobWithdrawApplication,
+);
+
+/**
+ * GET /api/app/jobs/:jobId/applicants — recruiter view (X-Employer-Key).
+ * Upstream: GET {AGGREGATOR}/api/jobs/{job_id}/applicants
+ */
+async function handleAppJobApplicants(req, res) {
+  try {
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "EMPLOYER_POST_SECRET is not set. Add it to .env and restart the BFF.",
+        data: null,
+        error: "server_config",
+      });
+    }
+    const { jobId } = req.params;
+    const id = encodeURIComponent(String(jobId || "").trim());
+    const upstreamUrl = new URL(
+      `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}/api/jobs/${id}/applicants`,
+    );
+    for (const [key, val] of Object.entries(req.query || {})) {
+      if (val == null || val === "") continue;
+      if (Array.isArray(val)) {
+        val.forEach((v) => upstreamUrl.searchParams.append(key, String(v)));
+      } else {
+        upstreamUrl.searchParams.set(key, String(val));
+      }
+    }
+    if (!upstreamUrl.searchParams.has("external_user_id") && ctx.userId) {
+      upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+    }
+    const upstream = await fetch(upstreamUrl.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    const text = await upstream.text();
+    const normalized = normalizeAppBffJson(text, upstream.status, upstream.ok);
+    return res.status(normalized.httpStatus).json({
+      success: normalized.success,
+      message: normalized.message,
+      data: normalized.data,
+      ...(normalized.error ? { error: normalized.error } : {}),
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+app.get("/api/app/jobs/:jobId/applicants", handleAppJobApplicants);
+app.get("/api/app/jobs/:jobId/applicants/", handleAppJobApplicants);
 
 function parseUpstreamJson(text) {
   try {

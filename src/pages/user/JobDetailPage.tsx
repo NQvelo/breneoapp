@@ -77,6 +77,9 @@ import {
   parseJobIndustryTags,
   computeIndustryMatchPercent,
 } from "@/utils/industryMatch";
+import { JobApplyButton } from "@/components/jobs/JobApplyButton";
+import { useMyApplications } from "@/hooks/useMyApplications";
+import { jobSupportsInAppApply } from "@/api/jobs/applicationAuth";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -201,6 +204,11 @@ const JobDetailPage = () => {
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
+
+  const { data: myApplications } = useMyApplications(!!user);
+  const appliedJobIds = myApplications?.appliedJobIds;
+  const applicationJobId =
+    jobDetail?.id ?? jobDetail?.job_id ?? jobId ?? "";
 
   // Handle scroll detection for fixed bottom bar
   useEffect(() => {
@@ -1585,6 +1593,11 @@ const JobDetailPage = () => {
     return true;
   }, [jobDetail]);
 
+  const supportsInAppApply = useMemo(
+    () => jobSupportsInAppApply(jobDetail as Record<string, unknown> | undefined),
+    [jobDetail],
+  );
+
   return (
     <DashboardLayout>
       <div
@@ -1819,24 +1832,14 @@ const JobDetailPage = () => {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                    {getApplyUrl() ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => window.open(getApplyUrl(), "_blank")}
-                      >
-                        Apply Now
-                      </Button>
-                    ) : (
-                      <Button
-                        disabled
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        Apply Link Not Available
-                      </Button>
-                    )}
+                    <JobApplyButton
+                      jobId={applicationJobId}
+                      supportsInAppApply={supportsInAppApply}
+                      appliedJobIds={appliedJobIds}
+                      externalApplyUrl={getApplyUrl()}
+                      userLoggedIn={!!user}
+                      size="sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -2304,26 +2307,15 @@ const JobDetailPage = () => {
                   </Button>
                 )}
 
-                {/* Apply Button - Last */}
-                {getApplyUrl() ? (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => window.open(getApplyUrl(), "_blank")}
-                    className="whitespace-nowrap"
-                  >
-                    Apply Now
-                  </Button>
-                ) : (
-                  <Button
-                    disabled
-                    variant="outline"
-                    size="sm"
-                    className="whitespace-nowrap"
-                  >
-                    Apply Unavailable
-                  </Button>
-                )}
+                <JobApplyButton
+                  jobId={applicationJobId}
+                  supportsInAppApply={supportsInAppApply}
+                  appliedJobIds={appliedJobIds}
+                  externalApplyUrl={getApplyUrl()}
+                  userLoggedIn={!!user}
+                  size="sm"
+                  className="whitespace-nowrap"
+                />
               </div>
             </div>
           </div>

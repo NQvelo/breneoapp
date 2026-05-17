@@ -56,6 +56,8 @@ export interface JobDetail {
   is_remote?: boolean;
   remote?: boolean;
   apply_url?: string;
+  /** Breneo employer job: apply in-app via aggregator signature headers */
+  supports_in_app_apply?: boolean;
   job_apply_link?: string;
   url?: string;
   applyUrl?: string;
@@ -133,6 +135,7 @@ export interface ApiJob {
   apply_link?: string;
   url?: string;
   apply_url?: string;
+  supports_in_app_apply?: boolean;
   logo?: string;
   logo_upload?: string;
   company_logo?: string;

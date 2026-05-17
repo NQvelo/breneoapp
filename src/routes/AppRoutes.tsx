@@ -91,22 +91,23 @@ const RouteLoadingFallback = () => (
 );
 
 /**
- * Helper component to create routes with language prefixes
+ * Helper to create routes with language prefixes (/en, /ka, and unprefixed).
+ * Returns an array (not Fragment) so dev tooling does not attach invalid props to Fragment.
  */
-const createLocalizedRoute = (path: string, element: React.ReactElement) => {
+const createLocalizedRoute = (
+  path: string,
+  element: React.ReactElement,
+): React.ReactElement | React.ReactElement[] => {
   // Auth routes don't get language prefix
   if (path.startsWith("/auth") || path === "/") {
     return <Route key={path} path={path} element={element} />;
   }
 
-  // For other routes, create both /en and /ka versions
-  return (
-    <React.Fragment key={path}>
-      <Route path={`/en${path}`} element={element} />
-      <Route path={`/ka${path}`} element={element} />
-      <Route path={path} element={element} />
-    </React.Fragment>
-  );
+  return [
+    <Route key={`en${path}`} path={`/en${path}`} element={element} />,
+    <Route key={`ka${path}`} path={`/ka${path}`} element={element} />,
+    <Route key={path} path={path} element={element} />,
+  ];
 };
 
 /**

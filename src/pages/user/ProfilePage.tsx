@@ -1,5 +1,5 @@
 import React, { Suspense, useState, useEffect, useRef, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
@@ -96,6 +96,8 @@ import {
   EditWorkExperienceModal,
   EditSkillsModal,
 } from "@/components/profile";
+import { ProfileAppliedView } from "@/components/profile/ProfileAppliedView";
+import { ProfileViewSwitcher } from "@/components/profile/ProfileViewSwitcher";
 const SkillsBarChart = React.lazy(
   () => import("@/components/profile/SkillsBarChart").then((m) => ({ default: m.SkillsBarChart })),
 );
@@ -329,8 +331,13 @@ const ProfilePage = () => {
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [aboutMe, setAboutMe] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<"profile" | "saved">("profile");
+  const [activeView, setActiveView] = useState<
+    "profile" | "saved" | "applied"
+  >("profile");
   const [activeSavedTab, setActiveSavedTab] = useState<"courses" | "jobs">(
+    "courses",
+  );
+  const [activeAppliedTab, setActiveAppliedTab] = useState<"courses" | "jobs">(
     "courses",
   );
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -352,6 +359,17 @@ const ProfilePage = () => {
         setActiveSavedTab("jobs");
       } else {
         setActiveSavedTab("courses");
+      }
+    } else if (
+      hash === "#applied" ||
+      hash === "#appliedjobs" ||
+      hash === "#appliedcourses"
+    ) {
+      setActiveView("applied");
+      if (hash === "#appliedjobs") {
+        setActiveAppliedTab("jobs");
+      } else {
+        setActiveAppliedTab("courses");
       }
     } else {
       setActiveView("profile");
@@ -1995,113 +2013,18 @@ const ProfilePage = () => {
 
   return (
     <DashboardLayout>
-      {/* Profile/Saved/Jobs Switcher */}
-      <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
-        <motion.div
-          layout
-          transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}
-          className="relative inline-flex items-center bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
-        >
-          <motion.button
-            layout
-            onClick={() => navigate("#")}
-            className={`relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
-              activeView === "profile"
-                ? "text-sky-950 dark:text-gray-100 font-bold"
-                : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {activeView === "profile" && (
-              <motion.div
-                layoutId="active-pill"
-                className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
-                transition={{
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 40,
-                  mass: 1,
-                }}
-              />
-            )}
-            <span className="relative z-10">Profile</span>
-          </motion.button>
-
-          <AnimatePresence mode="popLayout" initial={false}>
-            {activeView === "profile" ? (
-              <motion.button
-                layout
-                key="saved-summary"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => navigate("#savedcourses")}
-                className="relative px-6 py-2.5 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200 whitespace-nowrap outline-none"
-              >
-                <span className="relative z-10">Saved</span>
-              </motion.button>
-            ) : (
-              <motion.div
-                key="saved-tabs"
-                layout
-                className="flex items-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <motion.button
-                  layout
-                  key="saved-courses"
-                  onClick={() => navigate("#savedcourses")}
-                  className={`relative px-4 py-2.5 md:px-6 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
-                    activeSavedTab === "courses"
-                      ? "text-sky-950 dark:text-gray-100 font-bold"
-                      : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {activeSavedTab === "courses" && (
-                    <motion.div
-                      layoutId="active-pill"
-                      className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
-                      transition={{
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 40,
-                        mass: 1,
-                      }}
-                    />
-                  )}
-                  <span className="relative z-10">Saved Courses</span>
-                </motion.button>
-                <motion.button
-                  layout
-                  key="saved-jobs"
-                  onClick={() => navigate("#savedjobs")}
-                  className={`relative px-4 py-2.5 md:px-6 rounded-l-3xl rounded-r-3xl text-sm transition-colors duration-200 whitespace-nowrap outline-none ${
-                    activeSavedTab === "jobs"
-                      ? "text-sky-950 dark:text-gray-100 font-bold"
-                      : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {activeSavedTab === "jobs" && (
-                    <motion.div
-                      layoutId="active-pill"
-                      className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-l-3xl rounded-r-3xl"
-                      transition={{
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 40,
-                        mass: 1,
-                      }}
-                    />
-                  )}
-                  <span className="relative z-10">Saved Jobs</span>
-                </motion.button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-      </div>
-
+      <ProfileViewSwitcher
+        activeView={activeView}
+        activeSavedTab={activeSavedTab}
+        activeAppliedTab={activeAppliedTab}
+        onProfile={() => navigate("#")}
+        onSavedSummary={() => navigate("#savedcourses")}
+        onAppliedSummary={() => navigate("#appliedcourses")}
+        onSavedCourses={() => navigate("#savedcourses")}
+        onSavedJobs={() => navigate("#savedjobs")}
+        onAppliedCourses={() => navigate("#appliedcourses")}
+        onAppliedJobs={() => navigate("#appliedjobs")}
+      />
       {activeView === "profile" ? (
         <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
           {/* 1. Personal information */}
@@ -2628,7 +2551,7 @@ const ProfilePage = () => {
             Version {__APP_VERSION__}
           </p>
         </div>
-      ) : (
+      ) : activeView === "saved" ? (
         <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
           {/* Saved Courses Tab */}
           {activeSavedTab === "courses" && (
@@ -3146,6 +3069,10 @@ const ProfilePage = () => {
               )}
             </div>
           )}
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <ProfileAppliedView activeTab={activeAppliedTab} />
         </div>
       )}
 

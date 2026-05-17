@@ -80,6 +80,7 @@ interface BreneoJobApiResponse {
   posted_at: string | null;
   fetched_at: string;
   is_active: boolean;
+  supports_in_app_apply?: boolean;
   raw?: {
     absolute_url?: string;
     location?: {
@@ -122,6 +123,7 @@ const mapBreneoJobToApiJob = (job: BreneoJobApiResponse): ApiJob => {
     posted_at: job.posted_at || job.fetched_at,
     fetched_at: job.fetched_at,
     status: job.is_active ? "active" : "inactive",
+    supports_in_app_apply: job.supports_in_app_apply,
   };
 
   // Include raw data from the original API if it's an object
