@@ -9,6 +9,8 @@ import { useEnrolledCourses } from "@/hooks/useEnrolledCourses";
 import { useMyApplications } from "@/hooks/useMyApplications";
 import {
   jobIdFromApplication,
+  applicationUserDisplayName,
+  applicationUserEmail,
   type JobApplicationItem,
 } from "@/api/jobs/jobApplicationsApi";
 import {
@@ -125,14 +127,14 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
               (job?.title && String(job.title)) || "Job application";
             const company =
               (job?.company_name && String(job.company_name)) || "";
-            const location =
-              (job?.location && String(job.location)) || "";
+            const location = (job?.location && String(job.location)) || "";
             const logo = jobLogoFromApplication(item);
             const when = formatAppliedDate(
               typeof item.applied_at === "string" ? item.applied_at : undefined,
             );
-            const status =
-              typeof item.status === "string" ? item.status : null;
+            const status = typeof item.status === "string" ? item.status : null;
+            const applicantName = applicationUserDisplayName(item);
+            const applicantEmail = applicationUserEmail(item);
 
             return (
               <div
@@ -149,6 +151,8 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
                   logo={logo}
                   when={when}
                   status={status}
+                  applicantName={applicantName}
+                  applicantEmail={applicantEmail}
                   appliedLabel={t.jobs.applied}
                   isMobile={isMobile}
                 />
@@ -272,6 +276,8 @@ function JobRow({
   logo,
   when,
   status,
+  applicantName,
+  applicantEmail,
   appliedLabel,
   isMobile,
 }: {
@@ -281,6 +287,8 @@ function JobRow({
   logo?: string;
   when: string | null;
   status: string | null;
+  applicantName: string;
+  applicantEmail: string;
   appliedLabel: string;
   isMobile: boolean;
 }) {
@@ -314,6 +322,21 @@ function JobRow({
         <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-2 mt-0.5">
           {title}
         </h3>
+        {applicantName || applicantEmail ? (
+          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+            {applicantName ? (
+              <span className="font-medium">{applicantName}</span>
+            ) : null}
+            {applicantName && applicantEmail ? (
+              <span className="text-gray-400 dark:text-gray-500"> · </span>
+            ) : null}
+            {applicantEmail ? (
+              <span className="text-gray-500 dark:text-gray-400">
+                {applicantEmail}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
           {location ? (
             <span className="inline-flex items-center gap-1">

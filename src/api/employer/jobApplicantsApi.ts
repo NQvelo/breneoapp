@@ -1,11 +1,10 @@
 import { TokenManager } from "@/api/auth/tokenManager";
+import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 import type { AppBffEnvelope } from "@/api/jobs/jobApplicationsApi";
+import type { JobApplicationUserFields } from "@/api/jobs/applicationUserFields";
 
-export interface JobApplicant {
+export interface JobApplicant extends JobApplicationUserFields {
   id?: string | number;
-  external_user_id?: string;
-  email?: string;
-  name?: string;
   applied_at?: string;
   status?: string;
   [key: string]: unknown;
@@ -35,11 +34,8 @@ function extractApplicants(data: unknown): JobApplicant[] {
 export async function fetchEmployerJobApplicants(
   jobId: string,
 ): Promise<JobApplicant[]> {
-  const origin =
-    typeof window !== "undefined"
-      ? window.location.origin.replace(/\/$/, "")
-      : "";
-  const url = `${origin}/api/app/jobs/${encodeURIComponent(jobId)}/applicants`;
+  const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
+  const url = `${base}/api/app/jobs/${encodeURIComponent(jobId)}/applicants`;
   const res = await fetch(url, { headers: authHeaders() });
   const body = (await res.json().catch(() => ({}))) as AppBffEnvelope;
 

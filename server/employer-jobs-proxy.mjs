@@ -18,7 +18,7 @@
  * - POST /api/employer/jobs/:jobId — same handler as PATCH (for clients that cannot PATCH)
  * - DELETE /api/employer/jobs/:jobId — forwards ?company_id
  * - GET /api/employer/jobs/:jobId/applicants — JWT → GET aggregator /api/jobs/:id/applicants + X-Employer-Key
- * - POST /api/app/jobs/:jobId/apply — JWT → aggregator POST apply + X-Application-Key + external_user_id
+ * - POST /api/app/jobs/:jobId/apply — JWT → aggregator POST apply + X-Application-Key + applicant profile
  * - GET /api/app/users/me/applications — JWT → aggregator list (query external_user_id, page, limit, sort)
  * - DELETE /api/app/jobs/:jobId/application — JWT → aggregator DELETE withdraw
  * - GET /api/app/jobs/:jobId/applicants — employer JWT → aggregator applicants + X-Employer-Key
@@ -54,15 +54,14 @@ const hasPlatformPort = Boolean(
   process.env.PORT && String(process.env.PORT).trim() !== "",
 );
 const PORT = Number(
-  hasPlatformPort
-    ? process.env.PORT
-    : process.env.EMPLOYER_PROXY_PORT || 8787,
+  hasPlatformPort ? process.env.PORT : process.env.EMPLOYER_PROXY_PORT || 8787,
 );
 const LISTEN_HOST = hasPlatformPort
   ? "0.0.0.0"
   : process.env.BIND_HOST || "127.0.0.1";
 
-const DEFAULT_AGGREGATOR_BASE_URL = "https://breneo-job-aggregator.up.railway.app";
+const DEFAULT_AGGREGATOR_BASE_URL =
+  "https://breneo-job-aggregator.up.railway.app";
 
 /**
  * All employer job/company/industry upstream calls use this origin + `/api/employer/…`.
@@ -112,7 +111,9 @@ function resolveMainApiBaseForBff() {
     }
   }
   // Same-origin Breneo via Vite `/api` → breneo.onrender.com; must run before generic VITE_* so a stale Railway URL in .env does not break JWT checks.
-  if (String(process.env.VITE_DEV_SAME_ORIGIN_BRENEO_API || "").trim() === "1") {
+  if (
+    String(process.env.VITE_DEV_SAME_ORIGIN_BRENEO_API || "").trim() === "1"
+  ) {
     return "https://breneo.onrender.com";
   }
   const fromVite =
@@ -132,10 +133,8 @@ function resolveMainApiBaseForBff() {
 }
 
 const MAIN_API_BASE = resolveMainApiBaseForBff();
-const {
-  origin: AGGREGATOR_BASE_URL,
-  source: AGGREGATOR_BASE_SOURCE,
-} = readAggregatorOriginFromEnv();
+const { origin: AGGREGATOR_BASE_URL, source: AGGREGATOR_BASE_SOURCE } =
+  readAggregatorOriginFromEnv();
 
 function employerAuthFailureHint(status) {
   if (status !== 401 && status !== 403) return "";
@@ -154,10 +153,11 @@ const COMPANIES_PATH_RAW = (
 const COMPANIES_PATH_NORM = COMPANIES_PATH_RAW.startsWith("/")
   ? COMPANIES_PATH_RAW
   : `/${COMPANIES_PATH_RAW}`;
-const AGGREGATOR_COMPANIES_ROOT = `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${COMPANIES_PATH_NORM}`.replace(
-  /\/$/,
-  "",
-);
+const AGGREGATOR_COMPANIES_ROOT =
+  `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${COMPANIES_PATH_NORM}`.replace(
+    /\/$/,
+    "",
+  );
 /** Legacy list/detail query shapes (e.g. staff_user_id on GET). */
 const COMPANIES_API_LEGACY = COMPANIES_PATH_NORM.includes("employer/companies");
 
@@ -174,10 +174,11 @@ const STAFF_MEM_PATH_RAW = (
 const STAFF_MEM_PATH_NORM = STAFF_MEM_PATH_RAW.startsWith("/")
   ? STAFF_MEM_PATH_RAW
   : `/${STAFF_MEM_PATH_RAW}`;
-const AGGREGATOR_STAFF_MEMBERSHIPS_ROOT = `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${STAFF_MEM_PATH_NORM}`.replace(
-  /\/$/,
-  "",
-);
+const AGGREGATOR_STAFF_MEMBERSHIPS_ROOT =
+  `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${STAFF_MEM_PATH_NORM}`.replace(
+    /\/$/,
+    "",
+  );
 
 /**
  * Job detail path (no trailing slash). With `AGGREGATOR_JOB_DETAIL_COMPANY_QUERY=1`, the BFF appends
@@ -277,7 +278,10 @@ const MULTIPART_BODY_MAX_BYTES = 12 * 1024 * 1024;
  * @param {number} maxBytes
  * @returns {Promise<Buffer>}
  */
-async function readRequestBodyIntoBuffer(req, maxBytes = MULTIPART_BODY_MAX_BYTES) {
+async function readRequestBodyIntoBuffer(
+  req,
+  maxBytes = MULTIPART_BODY_MAX_BYTES,
+) {
   const chunks = [];
   let total = 0;
   for await (const chunk of req) {
@@ -323,7 +327,9 @@ function validateApplyUrl(raw) {
   }
   const t = String(raw).trim();
   try {
-    const u = new URL(t.startsWith("http://") || t.startsWith("https://") ? t : `https://${t}`);
+    const u = new URL(
+      t.startsWith("http://") || t.startsWith("https://") ? t : `https://${t}`,
+    );
     if (u.protocol !== "http:" && u.protocol !== "https:") {
       return { ok: false, error: "apply_url must use http or https" };
     }
@@ -342,10 +348,13 @@ function extractCompanyNameFromBreneoProfile(profile) {
   const o = profile;
   const rs = (v) => (v == null ? "" : String(v).trim());
   let companyName = rs(o.company_name);
-  if (!companyName && o.company && typeof o.company === "object" && !Array.isArray(o.company)) {
-    companyName = rs(
-      /** @type {Record<string, unknown>} */ (o.company).name,
-    );
+  if (
+    !companyName &&
+    o.company &&
+    typeof o.company === "object" &&
+    !Array.isArray(o.company)
+  ) {
+    companyName = rs(/** @type {Record<string, unknown>} */ (o.company).name);
   }
   if (!companyName) companyName = rs(o.name);
   return companyName;
@@ -364,7 +373,9 @@ function extractCompanyIdFromBreneoProfile(profile) {
     typeof profile.company === "object" &&
     /** @type {Record<string, unknown>} */ (profile.company).id != null
   ) {
-    return String(/** @type {Record<string, unknown>} */ (profile.company).id).trim();
+    return String(
+      /** @type {Record<string, unknown>} */ (profile.company).id,
+    ).trim();
   }
   return "";
 }
@@ -509,7 +520,11 @@ function extractStaffUserIdFromEmployerProfile(profile) {
     if (v != null && String(v).trim() !== "") return String(v).trim();
   }
   const account = profile.account;
-  if (account != null && typeof account === "object" && !Array.isArray(account)) {
+  if (
+    account != null &&
+    typeof account === "object" &&
+    !Array.isArray(account)
+  ) {
     const aid = /** @type {Record<string, unknown>} */ (account).id;
     if (aid != null && String(aid).trim() !== "") return String(aid).trim();
   }
@@ -594,7 +609,7 @@ async function requireEmployerAuth(req, res) {
  * Job seeker auth: validate Breneo JWT on MAIN_API /api/profile/ (not employer profile).
  * @param {import("express").Request} req
  * @param {import("express").Response} res
- * @returns {Promise<{ auth: string; userId: string } | null>}
+ * @returns {Promise<{ auth: string; userId: string; email: string; firstName: string; lastName: string } | null>}
  */
 async function requireUserAuth(req, res) {
   const auth = req.headers.authorization;
@@ -643,7 +658,102 @@ async function requireUserAuth(req, res) {
     return null;
   }
 
-  return { auth, userId };
+  const applicant = extractApplicantProfileFromBreneoProfile(
+    /** @type {Record<string, unknown>} */ (profile),
+    auth,
+  );
+  if (String(process.env.EMPLOYER_PROXY_DEBUG || "").trim() === "1") {
+    console.log("[employer-jobs-proxy] job seeker session:", {
+      userId,
+      email: applicant.email,
+      firstName: applicant.firstName,
+      lastName: applicant.lastName,
+    });
+  }
+  return {
+    auth,
+    userId,
+    email: applicant.email,
+    firstName: applicant.firstName,
+    lastName: applicant.lastName,
+  };
+}
+
+/**
+ * @param {Record<string, unknown>} profile Breneo GET /api/profile/ JSON
+ * @param {string} authHeader Authorization: Bearer …
+ */
+function extractApplicantProfileFromBreneoProfile(profile, authHeader) {
+  const readStr = (v) =>
+    typeof v === "string" ? v.trim() : v != null ? String(v).trim() : "";
+
+  const fromObj = (o) => ({
+    firstName:
+      readStr(o.first_name) ||
+      readStr(o.firstName) ||
+      readStr(o.given_name) ||
+      readStr(o.name),
+    lastName:
+      readStr(o.last_name) ||
+      readStr(o.lastName) ||
+      readStr(o.surname) ||
+      readStr(o.family_name),
+    email: readStr(o.email) || readStr(o.user_email),
+  });
+
+  let { firstName, lastName, email } = fromObj(profile);
+  const u = profile.user;
+  if (u != null && typeof u === "object" && !Array.isArray(u)) {
+    const inner = fromObj(/** @type {Record<string, unknown>} */ (u));
+    if (!firstName) firstName = inner.firstName;
+    if (!lastName) lastName = inner.lastName;
+    if (!email) email = inner.email;
+  }
+
+  if (!email && authHeader) {
+    try {
+      const m = authHeader.match(/^Bearer\s+(\S+)/i);
+      if (m) {
+        const parts = m[1].split(".");
+        if (parts.length >= 2) {
+          const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+          const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+          const payload = JSON.parse(
+            Buffer.from(b64 + pad, "base64").toString("utf8"),
+          );
+          for (const key of ["email", "user_email", "username"]) {
+            const v = payload[key];
+            if (typeof v === "string" && v.includes("@") && v.trim()) {
+              email = v.trim().toLowerCase();
+              break;
+            }
+          }
+          if (!firstName) {
+            firstName =
+              readStr(payload.first_name) ||
+              readStr(payload.firstName) ||
+              readStr(payload.name) ||
+              "";
+          }
+          if (!lastName) {
+            lastName =
+              readStr(payload.last_name) ||
+              readStr(payload.lastName) ||
+              readStr(payload.surname) ||
+              "";
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return {
+    email: email || "",
+    firstName: firstName || "",
+    lastName: lastName || "",
+  };
 }
 
 /**
@@ -701,7 +811,7 @@ function normalizeAppBffJson(text, status, ok) {
 }
 
 /**
- * Job seeker application routes: Breneo JWT → aggregator with X-Application-Key + external_user_id.
+ * Job seeker application routes: Breneo JWT → aggregator with X-Application-Key + applicant profile.
  * @param {import("express").Request} req
  * @param {import("express").Response} res
  * @param {{ method: string; upstreamPath: string; queryMode?: "applications" | "withdraw" | "none" }} opts
@@ -753,7 +863,16 @@ async function forwardAppJobApplication(req, res, opts) {
   };
 
   if (opts.method === "POST") {
-    fetchInit.body = JSON.stringify({ external_user_id: ctx.userId });
+    const applyBody = {
+      external_user_id: String(ctx.userId),
+      external_user_email: ctx.email ?? "",
+      external_user_name: ctx.firstName ?? "",
+      external_user_surname: ctx.lastName ?? "",
+    };
+    fetchInit.body = JSON.stringify(applyBody);
+    if (String(process.env.EMPLOYER_PROXY_DEBUG || "").trim() === "1") {
+      console.log("[employer-jobs-proxy] POST apply upstream body:", applyBody);
+    }
   }
 
   const upstream = await fetch(upstreamUrl.toString(), fetchInit);
@@ -779,7 +898,8 @@ function jobDetailUpstreamUrl(jobId, req, ctx) {
   const id = encodeURIComponent(String(jobId || "").trim());
   const base = aggregatorJobDetailUrl(id);
   const legacyQuery =
-    String(process.env.AGGREGATOR_JOB_DETAIL_COMPANY_QUERY || "").trim() === "1";
+    String(process.env.AGGREGATOR_JOB_DETAIL_COMPANY_QUERY || "").trim() ===
+    "1";
   if (!legacyQuery) {
     return base;
   }
@@ -847,14 +967,18 @@ async function handleIndustriesList(req, res) {
     try {
       data = text ? JSON.parse(text) : [];
     } catch {
-      return res.status(502).json({ detail: "Invalid response from job aggregator" });
+      return res
+        .status(502)
+        .json({ detail: "Invalid response from job aggregator" });
     }
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator industries error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator industries error" },
+        );
     }
     return res.status(200).json(data);
   } catch (e) {
@@ -995,18 +1119,23 @@ async function handleStaffMembershipsCreate(req, res) {
     });
     const text = await upstream.text();
     const data = parseUpstreamJson(text);
-    if (!upstream.ok && !isDuplicateStaffMembershipResponse(upstream.status, data)) {
-      return res.status(upstream.status >= 400 ? upstream.status : 502).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Staff membership error" },
-      );
+    if (
+      !upstream.ok &&
+      !isDuplicateStaffMembershipResponse(upstream.status, data)
+    ) {
+      return res
+        .status(upstream.status >= 400 ? upstream.status : 502)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Staff membership error" },
+        );
     }
     const okStatus =
       upstream.status >= 200 && upstream.status < 300 ? upstream.status : 201;
-    return res.status(okStatus).json(
-      typeof data === "object" && data !== null ? data : {},
-    );
+    return res
+      .status(okStatus)
+      .json(typeof data === "object" && data !== null ? data : {});
   } catch (e) {
     console.error(e);
     return res.status(500).json({ detail: "Internal server error" });
@@ -1046,11 +1175,13 @@ async function handleStaffMembershipsList(req, res) {
     const text = await upstream.text();
     const data = parseUpstreamJson(text);
     if (!upstream.ok) {
-      return res.status(upstream.status >= 400 ? upstream.status : 502).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Staff memberships list error" },
-      );
+      return res
+        .status(upstream.status >= 400 ? upstream.status : 502)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Staff memberships list error" },
+        );
     }
     return res.status(200).json(data);
   } catch (e) {
@@ -1089,14 +1220,18 @@ async function handleEmployerCompaniesForUser(req, res) {
     try {
       data = text ? JSON.parse(text) : {};
     } catch {
-      return res.status(502).json({ detail: "Invalid response from job aggregator" });
+      return res
+        .status(502)
+        .json({ detail: "Invalid response from job aggregator" });
     }
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator companies (for-user) error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator companies (for-user) error" },
+        );
     }
     return res.status(200).json(data);
   } catch (e) {
@@ -1117,12 +1252,15 @@ async function handleEmployerCompanyDetailRead(req, res) {
     }
     const raw = String(req.params.companyId || "").trim();
     if (!raw || raw === "for-user") {
-      return res.status(400).json({ detail: "company id is required in the URL path" });
+      return res
+        .status(400)
+        .json({ detail: "company id is required in the URL path" });
     }
     const pk = Number(raw);
     if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
       return res.status(400).json({
-        detail: "Employer company routes use numeric primary key in the path, not company name.",
+        detail:
+          "Employer company routes use numeric primary key in the path, not company name.",
       });
     }
     const root = AGGREGATOR_COMPANIES_ROOT.replace(/\/$/, "");
@@ -1147,14 +1285,18 @@ async function handleEmployerCompanyDetailRead(req, res) {
     try {
       data = text ? JSON.parse(text) : {};
     } catch {
-      return res.status(502).json({ detail: "Invalid response from job aggregator" });
+      return res
+        .status(502)
+        .json({ detail: "Invalid response from job aggregator" });
     }
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator company detail read error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator company detail read error" },
+        );
     }
     return res.status(200).json(data);
   } catch (e) {
@@ -1175,27 +1317,34 @@ async function handleEmployerCompanyMembers(req, res) {
     }
     const raw = String(req.params.companyId || "").trim();
     if (!raw) {
-      return res.status(400).json({ detail: "company id is required in the URL path" });
+      return res
+        .status(400)
+        .json({ detail: "company id is required in the URL path" });
     }
     const pk = Number(raw);
     if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
       return res.status(400).json({
-        detail: "Employer company routes use numeric primary key in the path, not company name.",
+        detail:
+          "Employer company routes use numeric primary key in the path, not company name.",
       });
     }
     const link = await postStaffMembership(pk, ctx);
     if (!link.ok) {
-      return res.status(link.status >= 400 ? link.status : 502).json(
-        typeof link.data === "object" && link.data !== null
-          ? link.data
-          : { detail: link.text || "Could not create staff membership" },
-      );
+      return res
+        .status(link.status >= 400 ? link.status : 502)
+        .json(
+          typeof link.data === "object" && link.data !== null
+            ? link.data
+            : { detail: link.text || "Could not create staff membership" },
+        );
     }
     const okStatus =
       link.status >= 200 && link.status < 300 ? link.status : 201;
-    return res.status(okStatus).json(
-      typeof link.data === "object" && link.data !== null ? link.data : {},
-    );
+    return res
+      .status(okStatus)
+      .json(
+        typeof link.data === "object" && link.data !== null ? link.data : {},
+      );
   } catch (e) {
     console.error(e);
     return res.status(500).json({ detail: "Internal server error" });
@@ -1222,7 +1371,13 @@ async function handleEmployerCompaniesList(req, res) {
       /** Upstream list URL must be …/companies?search=… not …/companies/?… (404 on Railway). */
       const listUrl = new URL(AGGREGATOR_COMPANIES_ROOT.replace(/\/$/, ""));
       if (pickerList) {
-        for (const key of ["page", "page_size", "limit", "ordering", "search"]) {
+        for (const key of [
+          "page",
+          "page_size",
+          "limit",
+          "ordering",
+          "search",
+        ]) {
           const v = req.query[key];
           if (v === undefined || v === "") continue;
           const val = Array.isArray(v) ? v[0] : v;
@@ -1267,14 +1422,18 @@ async function handleEmployerCompaniesList(req, res) {
       try {
         data = text ? JSON.parse(text) : {};
       } catch {
-        return res.status(502).json({ detail: "Invalid response from job aggregator" });
+        return res
+          .status(502)
+          .json({ detail: "Invalid response from job aggregator" });
       }
       if (!upstream.ok) {
-        return res.status(upstream.status).json(
-          typeof data === "object" && data !== null
-            ? data
-            : { detail: text || "Aggregator companies error" },
-        );
+        return res
+          .status(upstream.status)
+          .json(
+            typeof data === "object" && data !== null
+              ? data
+              : { detail: text || "Aggregator companies error" },
+          );
       }
       return res.status(200).json(data);
     }
@@ -1313,14 +1472,18 @@ async function handleEmployerCompaniesList(req, res) {
     try {
       data = text ? JSON.parse(text) : {};
     } catch {
-      return res.status(502).json({ detail: "Invalid response from job aggregator" });
+      return res
+        .status(502)
+        .json({ detail: "Invalid response from job aggregator" });
     }
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator companies error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator companies error" },
+        );
     }
     return res.status(200).json(data);
   } catch (e) {
@@ -1354,11 +1517,13 @@ async function handleEmployerCompaniesCreate(req, res) {
     const text = await upstream.text();
     const data = parseUpstreamJson(text);
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator company create error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator company create error" },
+        );
     }
     if (!EMBED_STAFF_USER_IDS_IN_COMPANY_BODY) {
       const newId = extractCompanyIdFromUpstreamCreate(data);
@@ -1402,12 +1567,15 @@ async function handleEmployerCompanyDetailWrite(req, res) {
     }
     const raw = String(req.params.companyId || "").trim();
     if (!raw) {
-      return res.status(400).json({ detail: "company id is required in the URL path" });
+      return res
+        .status(400)
+        .json({ detail: "company id is required in the URL path" });
     }
     const pk = Number(raw);
     if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
       return res.status(400).json({
-        detail: "Employer company routes use numeric primary key in the path, not company name.",
+        detail:
+          "Employer company routes use numeric primary key in the path, not company name.",
       });
     }
     const method = String(req.method || "PATCH").toUpperCase();
@@ -1449,11 +1617,13 @@ async function handleEmployerCompanyDetailWrite(req, res) {
       const text = await upstream.text();
       const data = parseUpstreamJson(text);
       if (!upstream.ok) {
-        return res.status(upstream.status).json(
-          typeof data === "object" && data !== null
-            ? data
-            : { detail: text || "Aggregator company detail error" },
-        );
+        return res
+          .status(upstream.status)
+          .json(
+            typeof data === "object" && data !== null
+              ? data
+              : { detail: text || "Aggregator company detail error" },
+          );
       }
       return res.status(upstream.status).json(data);
     }
@@ -1471,11 +1641,13 @@ async function handleEmployerCompanyDetailWrite(req, res) {
     const text = await upstream.text();
     const data = parseUpstreamJson(text);
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator company detail error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator company detail error" },
+        );
     }
     return res.status(upstream.status).json(data);
   } catch (e) {
@@ -1543,11 +1715,13 @@ async function handleEmployerJobsList(req, res) {
     const data = parsed.data;
 
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator list error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator list error" },
+        );
     }
 
     const results = Array.isArray(data)
@@ -1562,7 +1736,9 @@ async function handleEmployerJobsList(req, res) {
       source: "aggregator",
     }));
 
-    return res.status(200).json({ results: mapped, pagination: data.pagination });
+    return res
+      .status(200)
+      .json({ results: mapped, pagination: data.pagination });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ detail: "Internal server error" });
@@ -1587,12 +1763,27 @@ app.post(
 );
 app.get("/api/employer/companies/:companyId", handleEmployerCompanyDetailRead);
 app.get("/api/employer/companies/:companyId/", handleEmployerCompanyDetailRead);
-app.patch("/api/employer/companies/:companyId", handleEmployerCompanyDetailWrite);
-app.patch("/api/employer/companies/:companyId/", handleEmployerCompanyDetailWrite);
-app.post("/api/employer/companies/:companyId", handleEmployerCompanyDetailWrite);
-app.post("/api/employer/companies/:companyId/", handleEmployerCompanyDetailWrite);
+app.patch(
+  "/api/employer/companies/:companyId",
+  handleEmployerCompanyDetailWrite,
+);
+app.patch(
+  "/api/employer/companies/:companyId/",
+  handleEmployerCompanyDetailWrite,
+);
+app.post(
+  "/api/employer/companies/:companyId",
+  handleEmployerCompanyDetailWrite,
+);
+app.post(
+  "/api/employer/companies/:companyId/",
+  handleEmployerCompanyDetailWrite,
+);
 app.put("/api/employer/companies/:companyId", handleEmployerCompanyDetailWrite);
-app.put("/api/employer/companies/:companyId/", handleEmployerCompanyDetailWrite);
+app.put(
+  "/api/employer/companies/:companyId/",
+  handleEmployerCompanyDetailWrite,
+);
 app.get("/api/employer/companies", handleEmployerCompaniesList);
 app.get("/api/employer/companies/", handleEmployerCompaniesList);
 app.post("/api/employer/companies", handleEmployerCompaniesCreate);
@@ -1645,11 +1836,13 @@ async function handleEmployerJobDetail(req, res) {
           url,
         );
       }
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator job detail error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator job detail error" },
+        );
     }
     const enriched =
       typeof data === "object" && data !== null && !Array.isArray(data)
@@ -1785,10 +1978,7 @@ async function handleAppJobWithdrawApplication(req, res) {
   }
 }
 
-app.delete(
-  "/api/app/jobs/:jobId/application",
-  handleAppJobWithdrawApplication,
-);
+app.delete("/api/app/jobs/:jobId/application", handleAppJobWithdrawApplication);
 app.delete(
   "/api/app/jobs/:jobId/application/",
   handleAppJobWithdrawApplication,
@@ -1862,7 +2052,6 @@ function parseUpstreamJson(text) {
     return { raw: text };
   }
 }
-
 
 /**
  * Raw description text for Gemini = user field only (not employment_type_note appended later).
@@ -1953,7 +2142,11 @@ function buildAggregatorPayload(body, company, isPatch = false) {
       payload.location = "";
       if (!has("city")) payload.city = "";
     }
-  } else if (!isPatch && body.location != null && String(body.location).trim() !== "") {
+  } else if (
+    !isPatch &&
+    body.location != null &&
+    String(body.location).trim() !== ""
+  ) {
     payload.location = String(body.location).trim();
     if (!has("city")) payload.city = String(body.location).trim();
   }
@@ -1964,7 +2157,8 @@ function buildAggregatorPayload(body, company, isPatch = false) {
       String(body.location_country).trim() !== ""
     ) {
       payload.location_country = String(body.location_country).trim();
-      if (!has("country")) payload.country = String(body.location_country).trim();
+      if (!has("country"))
+        payload.country = String(body.location_country).trim();
     } else if (isPatch) {
       payload.location_country = "";
       if (!has("country")) payload.country = "";
@@ -2018,7 +2212,11 @@ function buildAggregatorPayload(body, company, isPatch = false) {
     } else if (isPatch) {
       payload.salary = "";
     }
-  } else if (!isPatch && body.salary != null && String(body.salary).trim() !== "") {
+  } else if (
+    !isPatch &&
+    body.salary != null &&
+    String(body.salary).trim() !== ""
+  ) {
     payload.salary = String(body.salary).trim();
   }
 
@@ -2097,11 +2295,13 @@ app.post("/api/employer/jobs", async (req, res) => {
     const data = parseUpstreamJson(text);
 
     if (!upstream.ok) {
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator error" },
+        );
     }
 
     return res.status(upstream.status).json(data);
@@ -2181,11 +2381,13 @@ async function handleEmployerJobUpdate(req, res) {
           upstreamUrl,
         );
       }
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator patch error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator patch error" },
+        );
     }
     return res.status(upstream.status).json(data);
   } catch (e) {
@@ -2216,11 +2418,13 @@ async function handleEmployerJobDelete(req, res) {
     const text = await upstream.text();
     if (!upstream.ok) {
       const data = parseUpstreamJson(text);
-      return res.status(upstream.status).json(
-        typeof data === "object" && data !== null
-          ? data
-          : { detail: text || "Aggregator delete error" },
-      );
+      return res
+        .status(upstream.status)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Aggregator delete error" },
+        );
     }
     return res.status(204).send();
   } catch (e) {

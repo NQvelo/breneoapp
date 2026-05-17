@@ -150,11 +150,11 @@ export default function EmployerJobsPage() {
     return job.employment_type;
   };
 
-  const handleOpenJobEdit = (job: EmployerJob) => {
+  const handleOpenJobStats = (job: EmployerJob) => {
     if (!job.id) return;
     navigate(
       getLocalizedPath(
-        `/employer/jobs/edit/${job.id}?source=${job.source ?? "aggregator"}`,
+        `/employer/jobs/${job.id}?source=${job.source ?? "aggregator"}`,
         language,
       ),
     );
@@ -331,7 +331,7 @@ export default function EmployerJobsPage() {
                     <div
                       key={`${job.source ?? "breneo"}-${job.id || job.title}`}
                       className="group cursor-pointer transition-colors hover:bg-muted/30"
-                      onClick={() => handleOpenJobEdit(job)}
+                      onClick={() => handleOpenJobStats(job)}
                     >
                       <div className="flex gap-4 py-4">
                         <div className="flex-1 min-w-0">

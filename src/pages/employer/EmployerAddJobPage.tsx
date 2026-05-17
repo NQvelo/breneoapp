@@ -59,11 +59,7 @@ import {
   resolveEmployerJobsCompanyFilter,
 } from "@/api/employer/aggregatorBffApi";
 import type { ICity, ICountry } from "country-state-city";
-import {
-  EmployerJobFormPreview,
-  type PreviewEditKey,
-} from "@/components/employer/EmployerJobFormPreview";
-import { EmployerJobApplicantsPanel } from "@/components/employer/EmployerJobApplicantsPanel";
+import { EmployerJobFormPreview } from "@/components/employer/EmployerJobFormPreview";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -159,24 +155,6 @@ export default function EmployerAddJobPage() {
   );
   /** Saving draft to API when opening preview from add-job flow (before navigating to edit). */
   const [previewPriming, setPreviewPriming] = useState(false);
-  const [previewEditKey, setPreviewEditKey] = useState<PreviewEditKey | null>(
-    null,
-  );
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftSalary, setDraftSalary] = useState("");
-  const [draftApplyUrl, setDraftApplyUrl] = useState("");
-  const [draftWorkMode, setDraftWorkMode] =
-    useState<AggregatorWorkMode>("on-site");
-  const [draftEmploymentType, setDraftEmploymentType] = useState("");
-  const [draftResponsibilities, setDraftResponsibilities] = useState("");
-  const [draftQualifications, setDraftQualifications] = useState("");
-  const locationPreviewSnap = useRef<{
-    locationCountry: string;
-    location: string;
-    countryQuery: string;
-    cityQuery: string;
-    selectedCountryIsoCode: string;
-  } | null>(null);
 
   const initPage = useCallback(async () => {
     if (!user) return;
@@ -695,7 +673,6 @@ export default function EmployerAddJobPage() {
       validated;
 
     if (isEdit && jobId) {
-      setPreviewEditKey(null);
       setShowJobPreview(true);
       navigate({ hash: "preview" }, { replace: true });
       return;
@@ -724,7 +701,6 @@ export default function EmployerAddJobPage() {
         toast.error("Draft was saved but the server did not return a job id.");
         return;
       }
-      setPreviewEditKey(null);
       navigate(
         {
           pathname: getLocalizedPath(
@@ -775,7 +751,6 @@ export default function EmployerAddJobPage() {
       showJobPreview
     ) {
       setShowJobPreview(false);
-      setPreviewEditKey(null);
     }
   }, [locationState.hash, showJobPreview]);
 
@@ -799,34 +774,10 @@ export default function EmployerAddJobPage() {
     return () => window.cancelAnimationFrame(id);
   }, [showJobPreview]);
 
-  const handleLocationPreviewEditOpen = useCallback(() => {
-    locationPreviewSnap.current = {
-      locationCountry,
-      location,
-      countryQuery,
-      cityQuery,
-      selectedCountryIsoCode,
-    };
-  }, [
-    locationCountry,
-    location,
-    countryQuery,
-    cityQuery,
-    selectedCountryIsoCode,
-  ]);
-
-  const handleLocationPreviewEditCancel = useCallback(() => {
-    const s = locationPreviewSnap.current;
-    if (s) {
-      setLocationCountry(s.locationCountry);
-      setLocation(s.location);
-      setCountryQuery(s.countryQuery);
-      setCityQuery(s.cityQuery);
-      setSelectedCountryIsoCode(s.selectedCountryIsoCode);
-    }
-    locationPreviewSnap.current = null;
-    setPreviewEditKey(null);
-  }, []);
+  const handleExitPreview = useCallback(() => {
+    setShowJobPreview(false);
+    navigate({ hash: "" }, { replace: true });
+  }, [navigate]);
 
   const workModeLabel = useMemo(
     () =>
@@ -900,64 +851,18 @@ export default function EmployerAddJobPage() {
           companyName={companyName}
           companyLogo={headerCompanyLogo || profile?.logo_url || null}
           companyWebsite={profile?.website?.trim() || null}
-          workModeOptions={WORK_MODE_OPTIONS}
           title={title}
-          setTitle={setTitle}
           responsibilitiesText={responsibilitiesText}
-          setResponsibilitiesText={setResponsibilitiesText}
           qualificationsText={qualificationsText}
-          setQualificationsText={setQualificationsText}
-          workMode={workMode}
-          setWorkMode={setWorkMode}
-          employmentType={employmentType}
-          setEmploymentType={setEmploymentType}
-          applyUrl={applyUrl}
-          setApplyUrl={setApplyUrl}
-          salary={salary}
-          setSalary={setSalary}
-          previewLocationLine={previewLocationLine}
           workModeLabel={workModeLabel}
+          employmentType={employmentType}
+          applyUrl={applyUrl}
+          previewLocationLine={previewLocationLine}
           previewSalaryLine={previewSalaryLine}
-          previewEditKey={previewEditKey}
-          setPreviewEditKey={setPreviewEditKey}
-          draftTitle={draftTitle}
-          setDraftTitle={setDraftTitle}
-          draftSalary={draftSalary}
-          setDraftSalary={setDraftSalary}
-          draftApplyUrl={draftApplyUrl}
-          setDraftApplyUrl={setDraftApplyUrl}
-          draftWorkMode={draftWorkMode}
-          setDraftWorkMode={setDraftWorkMode}
-          draftEmploymentType={draftEmploymentType}
-          setDraftEmploymentType={setDraftEmploymentType}
-          draftResponsibilities={draftResponsibilities}
-          setDraftResponsibilities={setDraftResponsibilities}
-          draftQualifications={draftQualifications}
-          setDraftQualifications={setDraftQualifications}
           isEdit={isEdit}
           responsibilitiesLabel={t.employerJobForm.responsibilitiesLabel}
           qualificationsLabel={t.employerJobForm.qualificationsLabel}
-          fieldErrors={fieldErrors}
-          countryQuery={countryQuery}
-          setCountryQuery={setCountryQuery}
-          setLocationCountry={setLocationCountry}
-          countryOpen={countryOpen}
-          setCountryOpen={setCountryOpen}
-          cityQuery={cityQuery}
-          setCityQuery={setCityQuery}
-          setLocation={setLocation}
-          cityOpen={cityOpen}
-          setCityOpen={setCityOpen}
-          selectedCountryIsoCode={selectedCountryIsoCode}
-          setSelectedCountryIsoCode={setSelectedCountryIsoCode}
-          filteredCountries={filteredCountries}
-          filteredCities={filteredCities}
-          worldCountries={worldCountries}
-          selectCountry={selectCountry}
-          selectCity={selectCity}
-          tryResolveCountryFromQuery={tryResolveCountryFromQuery}
-          tryResolveCityFromQuery={tryResolveCityFromQuery}
-          dashedShell={dashedShell}
+          onExitPreview={handleExitPreview}
           onPublish={handleSubmit}
           publishing={saving}
           publishLabel={
@@ -965,8 +870,6 @@ export default function EmployerAddJobPage() {
               ? t.employerJobForm.buttonExtractingSaving
               : t.employerJobForm.buttonSaving
           }
-          onLocationEditOpen={handleLocationPreviewEditOpen}
-          onLocationEditCancel={handleLocationPreviewEditCancel}
         />
       ) : (
       <div className="max-w-4xl mx-auto pb-24 space-y-6">
@@ -1391,7 +1294,6 @@ export default function EmployerAddJobPage() {
           </CardContent>
         </Card>
 
-        {isEdit && jobId ? <EmployerJobApplicantsPanel jobId={jobId} /> : null}
       </div>
       )}
     </DashboardLayout>

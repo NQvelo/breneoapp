@@ -51,6 +51,7 @@ const EmployerRegistrationPage = lazy(() => import("@/pages/employer/EmployerReg
 const EmployerDashboardPage = lazy(() => import("@/pages/employer/EmployerDashboardPage"));
 const EmployerJobsPage = lazy(() => import("@/pages/employer/EmployerJobsPage"));
 const EmployerAddJobPage = lazy(() => import("@/pages/employer/EmployerAddJobPage"));
+const EmployerJobStatsPage = lazy(() => import("@/pages/employer/EmployerJobStatsPage"));
 const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfilePage"));
 const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
 
@@ -72,6 +73,7 @@ const preloadCommonChunks = [
 const preloadEmployerChunks = [
   () => import("@/pages/employer/EmployerJobsPage"),
   () => import("@/pages/employer/EmployerAddJobPage"),
+  () => import("@/pages/employer/EmployerJobStatsPage"),
   () => import("@/pages/employer/EmployerProfilePage"),
 ];
 
@@ -298,6 +300,12 @@ export const AppRoutes = () => {
         "/employer/jobs/edit/:jobId",
         <ProtectedRoute requiredRole="employer">
           <EmployerAddJobPage />
+        </ProtectedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/employer/jobs/:jobId",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerJobStatsPage />
         </ProtectedRoute>,
       )}
       {createLocalizedRoute(

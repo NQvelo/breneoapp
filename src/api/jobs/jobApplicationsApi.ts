@@ -4,6 +4,13 @@ import {
   getJobApplicationsApiBaseUrl,
   jobApplicationsUseBffPaths,
 } from "@/api/employer/employerJobsApiBase";
+import type { JobApplicationUserFields } from "@/api/jobs/applicationUserFields";
+
+export type { JobApplicationUserFields } from "@/api/jobs/applicationUserFields";
+export {
+  applicationUserDisplayName,
+  applicationUserEmail,
+} from "@/api/jobs/applicationUserFields";
 
 export interface AppBffEnvelope<T = unknown> {
   success: boolean;
@@ -22,7 +29,7 @@ export interface ApplicationJobSummary {
   [key: string]: unknown;
 }
 
-export interface JobApplicationItem {
+export interface JobApplicationItem extends JobApplicationUserFields {
   job_id?: string | number;
   jobId?: string | number;
   status?: string;
@@ -79,10 +86,7 @@ function requireExternalUserId(): string {
   return userId;
 }
 
-function applicationsUrl(
-  path: string,
-  query?: Record<string, string>,
-): string {
+function applicationsUrl(path: string, query?: Record<string, string>): string {
   const base = getJobApplicationsApiBaseUrl().replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   const url = new URL(p, `${base}/`);
@@ -169,9 +173,7 @@ function extractApplicationsPage(data: unknown): MyApplicationsPage {
 export async function applyToJob(jobId: string): Promise<unknown> {
   const id = encodeURIComponent(String(jobId).trim());
   const useBff = jobApplicationsUseBffPaths();
-  const path = useBff
-    ? `/api/app/jobs/${id}/apply`
-    : `/api/jobs/${id}/apply`;
+  const path = useBff ? `/api/app/jobs/${id}/apply` : `/api/jobs/${id}/apply`;
   const externalUserId = useBff ? undefined : requireExternalUserId();
   return requestApplicationsApi(path, {
     method: "POST",
@@ -197,7 +199,11 @@ export async function fetchMyApplications(
         limit: "20",
         sort: "-applied_at",
       };
-  const data = await requestApplicationsApi<unknown>(path, { method: "GET" }, query);
+  const data = await requestApplicationsApi<unknown>(
+    path,
+    { method: "GET" },
+    query,
+  );
   return extractApplicationsPage(data);
 }
 
