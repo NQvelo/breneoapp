@@ -1,13 +1,9 @@
 import { TokenManager } from "@/api/auth/tokenManager";
-
-/** Same-origin BFF (`production.mjs` or Vite proxy → employer-jobs-proxy). */
-function appBffUrl(path: string): string {
-  const p = path.startsWith("/") ? path : `/${path}`;
-  if (typeof window !== "undefined") {
-    return `${window.location.origin.replace(/\/$/, "")}${p}`;
-  }
-  return p;
-}
+import { extractBreneoUserIdFromJwt } from "@/api/employer/profile";
+import {
+  getJobApplicationsApiBaseUrl,
+  jobApplicationsUseBffPaths,
+} from "@/api/employer/employerJobsApiBase";
 
 export interface AppBffEnvelope<T = unknown> {
   success: boolean;
@@ -71,6 +67,33 @@ function authHeaders(): HeadersInit {
   };
 }
 
+function requireExternalUserId(): string {
+  const token = TokenManager.getAccessToken();
+  if (!token) {
+    throw new AppBffAuthError();
+  }
+  const userId = extractBreneoUserIdFromJwt(token);
+  if (!userId) {
+    throw new AppBffAuthError("Could not resolve your user id.");
+  }
+  return userId;
+}
+
+function applicationsUrl(
+  path: string,
+  query?: Record<string, string>,
+): string {
+  const base = getJobApplicationsApiBaseUrl().replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(p, `${base}/`);
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      if (value) url.searchParams.set(key, value);
+    }
+  }
+  return url.toString();
+}
+
 async function parseJson(res: Response): Promise<AppBffEnvelope> {
   const text = await res.text();
   if (!text) return { success: res.ok };
@@ -81,11 +104,12 @@ async function parseJson(res: Response): Promise<AppBffEnvelope> {
   }
 }
 
-async function requestAppBff<T>(
+async function requestApplicationsApi<T>(
   path: string,
   init: RequestInit,
+  query?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(appBffUrl(path), {
+  const res = await fetch(applicationsUrl(path, query), {
     ...init,
     headers: {
       ...authHeaders(),
@@ -141,30 +165,53 @@ function extractApplicationsPage(data: unknown): MyApplicationsPage {
   return { items: [] };
 }
 
-/** POST /api/app/jobs/{id}/apply */
+/** POST apply — BFF `/api/app/jobs/{id}/apply` or aggregator `/api/jobs/{id}/apply`. */
 export async function applyToJob(jobId: string): Promise<unknown> {
   const id = encodeURIComponent(String(jobId).trim());
-  return requestAppBff(`/api/app/jobs/${id}/apply`, { method: "POST" });
+  const useBff = jobApplicationsUseBffPaths();
+  const path = useBff
+    ? `/api/app/jobs/${id}/apply`
+    : `/api/jobs/${id}/apply`;
+  const externalUserId = useBff ? undefined : requireExternalUserId();
+  return requestApplicationsApi(path, {
+    method: "POST",
+    ...(externalUserId
+      ? { body: JSON.stringify({ external_user_id: externalUserId }) }
+      : {}),
+  });
 }
 
-/** GET /api/app/users/me/applications?page=1 */
+/** GET my applications — BFF `/api/app/users/me/applications` or aggregator `/api/users/me/applications`. */
 export async function fetchMyApplications(
   page = 1,
 ): Promise<MyApplicationsPage> {
-  const q = new URLSearchParams({ page: String(page) });
-  const data = await requestAppBff<unknown>(
-    `/api/app/users/me/applications?${q.toString()}`,
-    { method: "GET" },
-  );
+  const useBff = jobApplicationsUseBffPaths();
+  const path = useBff
+    ? "/api/app/users/me/applications"
+    : "/api/users/me/applications";
+  const query = useBff
+    ? { page: String(page) }
+    : {
+        external_user_id: requireExternalUserId(),
+        page: String(page),
+        limit: "20",
+        sort: "-applied_at",
+      };
+  const data = await requestApplicationsApi<unknown>(path, { method: "GET" }, query);
   return extractApplicationsPage(data);
 }
 
-/** DELETE /api/app/jobs/{id}/application */
+/** DELETE withdraw — BFF `/api/app/jobs/{id}/application` or aggregator `/api/jobs/{id}/application`. */
 export async function withdrawJobApplication(jobId: string): Promise<unknown> {
   const id = encodeURIComponent(String(jobId).trim());
-  return requestAppBff(`/api/app/jobs/${id}/application`, {
-    method: "DELETE",
-  });
+  const useBff = jobApplicationsUseBffPaths();
+  const path = useBff
+    ? `/api/app/jobs/${id}/application`
+    : `/api/jobs/${id}/application`;
+  const query = useBff
+    ? undefined
+    : { external_user_id: requireExternalUserId() };
+  return requestApplicationsApi(path, { method: "DELETE" }, query);
 }
 
 /** @deprecated Use `JobApplicationItem` */

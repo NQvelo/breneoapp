@@ -177,11 +177,48 @@ export function getEmployerJobsApiBaseUrl(): string {
 }
 
 /**
- * Job seeker application routes use the public aggregator only (`jobApplicationsApi.ts`).
- * @deprecated Use `JOB_AGGREGATOR_BASE_URL` / `getJobAggregatorClient()` directly.
+ * Base URL for job seeker apply / list / withdraw (`jobApplicationsApi.ts`).
+ * - Static hosts (e.g. dashboard.breneo.app): `JOB_AGGREGATOR_BASE_URL` (not the SPA origin).
+ * - Local dev / same-origin BFF: `window.location.origin` (Vite → employer-jobs-proxy).
  */
 export function getJobApplicationsApiBaseUrl(): string {
-  return JOB_AGGREGATOR_BASE_URL.replace(/\/$/, "");
+  const aggregator = JOB_AGGREGATOR_BASE_URL.replace(/\/$/, "");
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const host = window.location.hostname;
+    if (isStaticEmployerDashboardHost(host)) {
+      const bff = employerBffBaseFromEnv();
+      if (bff) return bff;
+      return aggregator;
+    }
+    const local =
+      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    if (import.meta.env.DEV && local) {
+      return window.location.origin.replace(/\/$/, "");
+    }
+    try {
+      const pageOrigin = window.location.origin.replace(/\/$/, "");
+      const aggOrigin = new URL(aggregator).origin;
+      if (pageOrigin !== aggOrigin) {
+        return pageOrigin;
+      }
+    } catch {
+      return window.location.origin.replace(/\/$/, "");
+    }
+  }
+
+  return aggregator;
+}
+
+/** True when requests use `/api/app/*` on a same-origin BFF; false for direct aggregator `/api/jobs/*`. */
+export function jobApplicationsUseBffPaths(): boolean {
+  try {
+    const base = new URL(getJobApplicationsApiBaseUrl()).origin;
+    const agg = new URL(JOB_AGGREGATOR_BASE_URL).origin;
+    return base !== agg;
+  } catch {
+    return true;
+  }
 }
 
 export function getEmployerJobsApiDebugInfo(): {
