@@ -325,30 +325,50 @@ const mapApiCourseToHomeCourse = (
   };
 };
 
-// Fetch jobs from job service API - no filtering
-const fetchJobs = async () => {
+const EMPTY_JOB_FILTERS: JobFilters = {
+  country: "",
+  countries: [],
+  jobTypes: [],
+  isRemote: false,
+  datePosted: undefined,
+  skills: [],
+};
+
+const GEORGIAN_JOB_FILTERS: JobFilters = {
+  country: "Georgia",
+  countries: ["georgia"], // /api/search?country=georgia
+  jobTypes: [],
+  isRemote: false,
+  datePosted: undefined,
+  skills: [],
+};
+
+const fetchGeorgianJobs = async () => {
   try {
-    // No filters - fetch all jobs
-    const filters: JobFilters = {
-      country: "",
-      countries: [], // No country filter
-      jobTypes: [], // No job type filter
-      isRemote: false, // No remote filter
-      datePosted: undefined, // No date filter
-      skills: [], // No skills filter
-    };
-
-    // Fetch jobs using the job service - no filtering
     const response = await jobService.fetchActiveJobs({
-      query: "", // No query filter
-      filters,
+      query: "",
+      filters: GEORGIAN_JOB_FILTERS,
       page: 1,
-      pageSize: 50, // Fetch more jobs to have enough for careful filtering and sorting
+      pageSize: 50,
     });
-
     return response.jobs || [];
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    console.error("Error fetching Georgian jobs:", error);
+    throw error;
+  }
+};
+
+const fetchWorldwideJobs = async () => {
+  try {
+    const response = await jobService.fetchActiveJobs({
+      query: "",
+      filters: EMPTY_JOB_FILTERS,
+      page: 1,
+      pageSize: 50,
+    });
+    return response.jobs || [];
+  } catch (error) {
+    console.error("Error fetching worldwide jobs:", error);
     throw error;
   }
 };
@@ -598,25 +618,41 @@ const UserHome = () => {
     [profileData],
   );
 
-  // Fetch jobs - no filtering
   const {
-    data: jobs = [],
-    isLoading: jobsLoading,
-    error: jobsError,
+    data: georgianJobs = [],
+    isLoading: georgianJobsLoading,
+    error: georgianJobsError,
   } = useQuery({
-    queryKey: ["home-jobs"],
-    queryFn: () => fetchJobs(),
-    enabled: !!user, // Fetch when user is available
+    queryKey: ["home-georgian-jobs"],
+    queryFn: () => fetchGeorgianJobs(),
+    enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
-  // Handle jobs error
+  const {
+    data: worldwideJobs = [],
+    isLoading: worldwideJobsLoading,
+    error: worldwideJobsError,
+  } = useQuery({
+    queryKey: ["home-worldwide-jobs"],
+    queryFn: () => fetchWorldwideJobs(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
   useEffect(() => {
-    if (jobsError) {
-      console.error("Error fetching jobs:", jobsError);
+    if (georgianJobsError) {
+      console.error("Error fetching Georgian jobs:", georgianJobsError);
     }
-  }, [jobsError]);
+  }, [georgianJobsError]);
+
+  useEffect(() => {
+    if (worldwideJobsError) {
+      console.error("Error fetching worldwide jobs:", worldwideJobsError);
+    }
+  }, [worldwideJobsError]);
 
   // Save/unsave job mutation (uses backend save-job endpoint)
   const saveJobMutation = useMutation({
@@ -747,11 +783,10 @@ const UserHome = () => {
     },
   });
 
-  // Georgian vs worldwide: same match ranking; worldwide excludes Georgia to avoid duplicates
+  // Georgian jobs from API (country=georgia); worldwide excludes Georgia to avoid duplicates
   const { transformedGeorgianJobs, transformedWorldwideJobs } = useMemo(() => {
-    const allJobs = jobs || [];
-    const georgianSource = allJobs.filter(isGeorgianJob);
-    const worldwideSource = allJobs.filter((j) => !isGeorgianJob(j));
+    const georgianSource = georgianJobs || [];
+    const worldwideSource = (worldwideJobs || []).filter((j) => !isGeorgianJob(j));
 
     const sortAndTakeTopApiJobs = (source: ApiJob[]) => {
       const jobsWithMatchPercentage = source.map((job: ApiJob) => {
@@ -942,7 +977,7 @@ const UserHome = () => {
       .filter((job): job is Job => job !== null);
 
     return { transformedGeorgianJobs, transformedWorldwideJobs };
-  }, [jobs, savedJobs, user, userSkillsForMatch]);
+  }, [georgianJobs, worldwideJobs, savedJobs, user, userSkillsForMatch]);
 
   const scrollGeorgiaJobs = (direction: "left" | "right") => {
     if (georgiaJobsScrollRef.current) {
@@ -1297,8 +1332,8 @@ const UserHome = () => {
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
                   Georgian jobs for you
                 </h2>
-                {!jobsLoading &&
-                  !jobsError &&
+                {!georgianJobsLoading &&
+                  !georgianJobsError &&
                   transformedGeorgianJobs.length > 0 && (
                     <div className="flex items-center gap-2">
                       <Button
@@ -1323,9 +1358,9 @@ const UserHome = () => {
                   )}
               </div>
 
-              {jobsLoading ? (
+              {georgianJobsLoading ? (
                 jobsSkeletonRow
-              ) : jobsError ? (
+              ) : georgianJobsError ? (
                 jobsErrorCard
               ) : transformedGeorgianJobs.length === 0 ? (
                 <Card>
@@ -1351,8 +1386,8 @@ const UserHome = () => {
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
                   Worldwide jobs for you
                 </h2>
-                {!jobsLoading &&
-                  !jobsError &&
+                {!worldwideJobsLoading &&
+                  !worldwideJobsError &&
                   transformedWorldwideJobs.length > 0 && (
                     <div className="flex items-center gap-2">
                       <Button
@@ -1377,9 +1412,9 @@ const UserHome = () => {
                   )}
               </div>
 
-              {jobsLoading ? (
+              {worldwideJobsLoading ? (
                 jobsSkeletonRow
-              ) : jobsError ? (
+              ) : worldwideJobsError ? (
                 jobsErrorCard
               ) : transformedWorldwideJobs.length === 0 ? (
                 <Card>
