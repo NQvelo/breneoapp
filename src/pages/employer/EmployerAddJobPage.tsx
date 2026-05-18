@@ -59,6 +59,12 @@ import {
   resolveEmployerJobsCompanyFilter,
 } from "@/api/employer/aggregatorBffApi";
 import type { ICity, ICountry } from "country-state-city";
+import {
+  applyResolvedCountryToForm,
+  normalizeJobCityForApi,
+  normalizeJobCountryForApi,
+  resolveCountryFromStoredValue,
+} from "@/utils/jobLocationFields";
 import { EmployerJobFormPreview } from "@/components/employer/EmployerJobFormPreview";
 
 const dashedShell =
@@ -153,8 +159,6 @@ export default function EmployerAddJobPage() {
   const resolveCitiesRef = useRef<(countryIsoCode: string) => ICity[]>(
     () => [],
   );
-  /** Saving draft to API when opening preview from add-job flow (before navigating to edit). */
-  const [previewPriming, setPreviewPriming] = useState(false);
 
   const initPage = useCallback(async () => {
     if (!user) return;
@@ -242,13 +246,22 @@ export default function EmployerAddJobPage() {
         setResponsibilitiesText((job.responsibilities ?? []).join("\n"));
         setQualificationsText((job.qualifications ?? []).join("\n"));
         const jobCountry = String(job.location_country ?? job.country ?? "").trim();
-        setLocationCountry(jobCountry);
-        setCountryQuery(jobCountry);
-        const matchedCountry = worldCountries.find(
-          (c) => c.name.toLowerCase() === jobCountry.toLowerCase(),
-        );
-        setSelectedCountryIsoCode(matchedCountry?.isoCode ?? "");
         const jobCity = String(job.location ?? job.city ?? "").trim();
+        const resolvedCountry = resolveCountryFromStoredValue(
+          worldCountries,
+          jobCountry,
+        );
+        if (resolvedCountry) {
+          applyResolvedCountryToForm(resolvedCountry, {
+            setLocationCountry,
+            setCountryQuery,
+            setSelectedCountryIsoCode,
+          });
+        } else {
+          setLocationCountry(jobCountry);
+          setCountryQuery(jobCountry);
+          setSelectedCountryIsoCode("");
+        }
         setLocation(jobCity);
         setCityQuery(jobCity);
         setEmploymentType(
@@ -292,7 +305,7 @@ export default function EmployerAddJobPage() {
           responsibilities_key: normalizeBulletLinesKey(respJoined),
           qualifications_key: normalizeBulletLinesKey(qualJoined),
           work_mode: resolvedWorkMode,
-          location_country: jobCountry,
+          location_country: resolvedCountry?.name ?? jobCountry,
           location: jobCity,
           salary: String(job.salary ?? "").trim(),
           apply_url: String(job.apply_url ?? "").trim(),
@@ -304,7 +317,7 @@ export default function EmployerAddJobPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, isEdit, jobId, navigate, language, editSource, worldCountries]);
+  }, [user, isEdit, jobId, navigate, language, editSource]);
 
   useEffect(() => {
     initPage();
@@ -330,17 +343,41 @@ export default function EmployerAddJobPage() {
     };
   }, []);
 
+  /** When country-state-city loads after the job, resolve ISO codes / aliases into form state. */
   useEffect(() => {
-    if (selectedCountryIsoCode || !locationCountry || worldCountries.length === 0) {
+    if (worldCountries.length === 0) return;
+    const raw = locationCountry.trim() || countryQuery.trim();
+    if (!raw) return;
+    const resolved = resolveCountryFromStoredValue(worldCountries, raw);
+    if (!resolved) return;
+    if (
+      selectedCountryIsoCode === resolved.isoCode &&
+      locationCountry === resolved.name &&
+      countryQuery === resolved.name
+    ) {
       return;
     }
-    const matchedCountry = worldCountries.find(
-      (c) => c.name.toLowerCase() === locationCountry.toLowerCase(),
-    );
-    if (matchedCountry) {
-      setSelectedCountryIsoCode(matchedCountry.isoCode);
-    }
-  }, [locationCountry, selectedCountryIsoCode, worldCountries]);
+    applyResolvedCountryToForm(resolved, {
+      setLocationCountry,
+      setCountryQuery,
+      setSelectedCountryIsoCode,
+    });
+    setInitialSnapshot((snap) => {
+      if (!snap) return snap;
+      const snapResolved = resolveCountryFromStoredValue(
+        worldCountries,
+        snap.location_country,
+      );
+      if (snapResolved?.isoCode !== resolved.isoCode) return snap;
+      if (snap.location_country === resolved.name) return snap;
+      return { ...snap, location_country: resolved.name };
+    });
+  }, [
+    worldCountries,
+    locationCountry,
+    countryQuery,
+    selectedCountryIsoCode,
+  ]);
 
   /** Gemini runs on the server only when publishing a new job (not on edit — structured fields are manual). */
   const willExtractDescriptionOnSave = useMemo(() => !isEdit, [isEdit]);
@@ -384,14 +421,14 @@ export default function EmployerAddJobPage() {
   };
 
   const tryResolveCountryFromQuery = (rawQuery: string): boolean => {
-    const q = rawQuery.trim().toLowerCase();
-    if (!q) return false;
-    const exact = worldCountries.find((c) => c.name.toLowerCase() === q);
-    if (!exact) return false;
-    setLocationCountry(exact.name);
-    setCountryQuery(exact.name);
-    if (selectedCountryIsoCode !== exact.isoCode) {
-      setSelectedCountryIsoCode(exact.isoCode);
+    const resolved = resolveCountryFromStoredValue(worldCountries, rawQuery);
+    if (!resolved) return false;
+    applyResolvedCountryToForm(resolved, {
+      setLocationCountry,
+      setCountryQuery,
+      setSelectedCountryIsoCode,
+    });
+    if (selectedCountryIsoCode !== resolved.isoCode) {
       setLocation("");
       setCityQuery("");
     }
@@ -444,8 +481,13 @@ export default function EmployerAddJobPage() {
       };
     }
 
-    const normalizedCountry = locationCountry.trim();
-    const normalizedCity = location.trim();
+    const normalizedCountry = normalizeJobCountryForApi(
+      worldCountries,
+      locationCountry,
+      countryQuery,
+      selectedCountryIsoCode,
+    );
+    const normalizedCity = normalizeJobCityForApi(location, cityQuery);
     if (normalizedCity && !normalizedCountry) {
       return {
         ok: false,
@@ -493,7 +535,17 @@ export default function EmployerAddJobPage() {
       normalizedCity,
       applyUrl: applyCheck.url || "",
     };
-  }, [title, description, applyUrl, locationCountry, location, worldCountries]);
+  }, [
+    title,
+    description,
+    applyUrl,
+    locationCountry,
+    countryQuery,
+    selectedCountryIsoCode,
+    location,
+    cityQuery,
+    worldCountries,
+  ]);
 
   const handleSubmit = async () => {
     const validated = validateFormForSave();
@@ -589,6 +641,17 @@ export default function EmployerAddJobPage() {
         if (showJobPreview) {
           patch.is_active = true;
         }
+        const hasLocationPatch =
+          patch.country != null ||
+          patch.location_country != null ||
+          patch.city != null ||
+          patch.location != null;
+        if (hasLocationPatch) {
+          patch.country = normalizedCountry;
+          patch.location_country = normalizedCountry;
+          patch.city = normalizedCity;
+          patch.location = normalizedCity;
+        }
         if (Object.keys(patch).length === 0) {
           toast.info("No changes to save.");
           return;
@@ -669,76 +732,23 @@ export default function EmployerAddJobPage() {
       toast.error(validated.message);
       return;
     }
-    const { normalizedCountry, normalizedCity, applyUrl: applyUrlNorm } =
-      validated;
+    const { normalizedCountry, normalizedCity } = validated;
 
-    if (isEdit && jobId) {
-      setShowJobPreview(true);
-      navigate({ hash: "preview" }, { replace: true });
-      return;
+    setLocationCountry(normalizedCountry);
+    setCountryQuery(normalizedCountry);
+    setLocation(normalizedCity);
+    setCityQuery(normalizedCity);
+    const resolved = resolveCountryFromStoredValue(
+      worldCountries,
+      normalizedCountry,
+    );
+    if (resolved) {
+      setSelectedCountryIsoCode(resolved.isoCode);
     }
 
-    setPreviewPriming(true);
-    setFieldErrors({});
-    try {
-      const data = await publishEmployerJob({
-        title: title.trim(),
-        full_description: description.trim(),
-        work_mode: workMode,
-        country: normalizedCountry || undefined,
-        city: normalizedCity || undefined,
-        location_country: normalizedCountry || undefined,
-        location: normalizedCity || undefined,
-        salary: salary.trim() || undefined,
-        apply_url: applyUrlNorm || null,
-        is_active: false,
-        employment_type_note: employmentType,
-        responsibilities: linesToBulletArray(responsibilitiesText),
-        qualifications: linesToBulletArray(qualificationsText),
-      });
-      const id = data.id ?? data.pk ?? data.job_id;
-      if (id == null) {
-        toast.error("Draft was saved but the server did not return a job id.");
-        return;
-      }
-      navigate(
-        {
-          pathname: getLocalizedPath(
-            `/employer/jobs/edit/${String(id)}`,
-            language,
-          ),
-          search: "?source=aggregator",
-          hash: "preview",
-        },
-        { replace: true },
-      );
-    } catch (e: unknown) {
-      const err = e as EmployerJobsApiError;
-      if (err.status === 401 || err.status === 403) {
-        toast.error("You are not authorized to manage employer jobs.");
-      } else if (err.status === 400 && err.fieldErrors) {
-        setFieldErrors(err.fieldErrors);
-        toast.error("Please fix the highlighted fields.");
-      } else {
-        toast.error(err.message || "Could not save draft for preview.");
-      }
-    } finally {
-      setPreviewPriming(false);
-    }
-  }, [
-    validateFormForSave,
-    isEdit,
-    jobId,
-    navigate,
-    title,
-    description,
-    workMode,
-    employmentType,
-    salary,
-    language,
-    responsibilitiesText,
-    qualificationsText,
-  ]);
+    setShowJobPreview(true);
+    navigate({ hash: "preview" }, { replace: true });
+  }, [validateFormForSave, navigate, worldCountries]);
 
   /** When hash loses #preview (e.g. DashboardHeader Back), leave preview mode */
   const prevEmployerJobHashRef = useRef<string>("");
@@ -814,18 +824,6 @@ export default function EmployerAddJobPage() {
 
   return (
     <DashboardLayout containMainScroll={false}>
-      {previewPriming ? (
-        <div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-background/90 px-6 text-center backdrop-blur-sm dark:bg-background/95"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
-          <p className="text-base font-semibold text-foreground">
-            Loading preview…
-          </p>
-        </div>
-      ) : null}
       {saving ? (
         <div
           className="fixed inset-0 z-[90] flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center backdrop-blur-sm dark:bg-background/90"
@@ -993,12 +991,15 @@ export default function EmployerAddJobPage() {
                           setCountryQuery(next);
                           setLocationCountry(next);
                           setCountryOpen(true);
-                          const exact = worldCountries.find(
-                            (c) => c.name.toLowerCase() === next.trim().toLowerCase(),
+                          const resolved = resolveCountryFromStoredValue(
+                            worldCountries,
+                            next,
                           );
-                          if (exact) {
-                            if (selectedCountryIsoCode !== exact.isoCode) {
-                              setSelectedCountryIsoCode(exact.isoCode);
+                          if (resolved) {
+                            if (selectedCountryIsoCode !== resolved.isoCode) {
+                              setSelectedCountryIsoCode(resolved.isoCode);
+                              setLocationCountry(resolved.name);
+                              setCountryQuery(resolved.name);
                               setLocation("");
                               setCityQuery("");
                             }
@@ -1263,7 +1264,7 @@ export default function EmployerAddJobPage() {
                       type="button"
                       variant="outline"
                       onClick={openJobPreview}
-                      disabled={saving || deleting || previewPriming}
+                      disabled={saving || deleting}
                     >
                       View preview
                     </Button>
@@ -1284,7 +1285,7 @@ export default function EmployerAddJobPage() {
                   <Button
                     type="button"
                     onClick={openJobPreview}
-                    disabled={saving || deleting || previewPriming}
+                    disabled={saving || deleting}
                   >
                     View job preview
                   </Button>

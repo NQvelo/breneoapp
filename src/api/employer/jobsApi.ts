@@ -204,13 +204,21 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
     country: firstNonEmpty(
       raw.country,
       raw.location_country,
+      raw.job_country,
       employerSubmitted?.location_country,
       employerSubmitted?.locationCountry,
       employerSubmitted?.country,
       rawEnvelope?.location_country,
       rawEnvelope?.locationCountry,
       rawEnvelope?.country,
+      rawEnvelope?.job_country,
       companyObj?.country,
+      typeof raw.location === "object" && raw.location !== null
+        ? (raw.location as Record<string, unknown>).country
+        : undefined,
+      typeof raw.location === "object" && raw.location !== null
+        ? (raw.location as Record<string, unknown>).location_country
+        : undefined,
     ),
     city: firstNonEmpty(
       raw.city,
@@ -222,13 +230,21 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
     location_country: firstNonEmpty(
       raw.location_country,
       raw.country,
+      raw.job_country,
       employerSubmitted?.location_country,
       employerSubmitted?.locationCountry,
       employerSubmitted?.country,
       rawEnvelope?.location_country,
       rawEnvelope?.locationCountry,
       rawEnvelope?.country,
+      rawEnvelope?.job_country,
       companyObj?.country,
+      typeof raw.location === "object" && raw.location !== null
+        ? (raw.location as Record<string, unknown>).location_country
+        : undefined,
+      typeof raw.location === "object" && raw.location !== null
+        ? (raw.location as Record<string, unknown>).country
+        : undefined,
     ),
     location: firstNonEmpty(
       raw.location,

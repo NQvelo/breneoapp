@@ -8,8 +8,6 @@ import {
   Pencil,
   PiggyBank,
   Clock,
-  Building2,
-  Globe,
   Loader2,
 } from "lucide-react";
 import { validateHttpUrl } from "@/api/employer/publishJob";
@@ -49,18 +47,21 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
       id="preview"
       className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 sm:px-4 md:px-6 space-y-4 scroll-mt-4"
     >
-      <div className="flex justify-end">
-        <Button type="button" variant="outline" onClick={p.onExitPreview}>
-          <Pencil className="h-4 w-4 mr-2" />
-          Edit
-        </Button>
-      </div>
-
       <Card className="bg-transparent border-0 shadow-none h-full">
         <CardContent className="p-1 sm:p-6 space-y-2">
           <div>
-            <div className="flex flex-col md:flex-row md:items-start gap-6 bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0">
-              <div className="flex-1 min-w-0 space-y-3">
+            <div className="relative flex flex-col md:flex-row md:items-start gap-6 bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 shrink-0"
+                onClick={p.onExitPreview}
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+              <div className="flex-1 min-w-0 space-y-3 pr-2 sm:pr-24">
                 <div className="flex items-center gap-4 mb-1">
                   {p.companyLogo ? (
                     <img
@@ -147,42 +148,6 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0 mt-6">
-            <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-              <Building2 className="h-5 w-5" />
-              Company details
-            </h2>
-            <div className="flex items-center gap-4">
-              {p.companyLogo ? (
-                <img
-                  src={p.companyLogo}
-                  alt=""
-                  className="h-14 w-14 rounded-2xl object-cover bg-white shadow-sm"
-                />
-              ) : null}
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white break-words">
-                {p.companyName}
-              </h3>
-            </div>
-            {p.companyWebsite ? (
-              <div className="mt-4">
-                <a
-                  href={
-                    p.companyWebsite.startsWith("http")
-                      ? p.companyWebsite
-                      : `https://${p.companyWebsite}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 h-10 rounded-full bg-primary text-white dark:text-black hover:opacity-80 transition-opacity font-medium text-sm"
-                >
-                  <Globe className="h-4 w-4" />
-                  Visit Website
-                </a>
-              </div>
-            ) : null}
-          </div>
-
           <Card className="rounded-3xl border border-border/80 mt-8 bg-muted/30">
             <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
@@ -197,8 +162,6 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
               </div>
               <Button
                 type="button"
-                size="lg"
-                className="sm:min-w-[200px]"
                 disabled={p.publishing}
                 onClick={p.onPublish}
               >
