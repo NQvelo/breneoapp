@@ -1,7 +1,9 @@
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
+import { X } from "lucide-react";
 import * as React from "react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const Sheet = SheetPrimitive.Root;
@@ -38,9 +40,9 @@ const sheetVariants = cva(
         left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
         right:
           "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
-        /** Profile style: full height, full width on mobile (fade), 30% on desktop (slide from right) */
+        /** Profile style: full-screen on mobile; wider floating panel on desktop */
         rightProfile:
-          "inset-y-0 right-0 h-full w-full md:w-[30%] border-l md:rounded-l-[24px] data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:data-[state=closed]:slide-out-to-right md:data-[state=open]:slide-in-from-right",
+          "inset-0 h-full w-full max-w-none border-0 rounded-none shadow-lg data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:inset-y-4 md:right-4 md:left-auto md:h-[calc(100vh-2rem)] md:w-[42%] md:max-w-[600px] md:min-w-[min(100%,22rem)] md:rounded-[24px] md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-xl md:overflow-hidden md:data-[state=closed]:slide-out-to-right md:data-[state=open]:slide-in-from-right",
       },
     },
     defaultVariants: {
@@ -136,6 +138,33 @@ const SheetDescription = React.forwardRef<
 ));
 SheetDescription.displayName = SheetPrimitive.Description.displayName;
 
+/** Close control used in profile-style sheet headers (matches edit profile modals). */
+function SheetHeaderCloseButton({
+  onClose,
+  disabled,
+  className,
+  "aria-label": ariaLabel = "Close",
+}: {
+  onClose: () => void;
+  disabled?: boolean;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      className={cn("h-10 w-10 p-0 shrink-0", className)}
+      onClick={onClose}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    >
+      <X className="h-4 w-4" />
+    </Button>
+  );
+}
+
 export {
   Sheet,
   SheetClose,
@@ -143,6 +172,7 @@ export {
   SheetDescription,
   SheetFooter,
   SheetHeader,
+  SheetHeaderCloseButton,
   SheetOverlay,
   SheetPortal,
   SheetTitle,

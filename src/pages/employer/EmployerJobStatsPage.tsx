@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Briefcase,
   Loader2,
@@ -99,14 +98,7 @@ export default function EmployerJobStatsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 md:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button onClick={handleEdit} disabled={!jobId || loading}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit job
-          </Button>
-        </div>
-
+      <div className="space-y-6 px-4 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -124,25 +116,28 @@ export default function EmployerJobStatsPage() {
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1">
-                    {job.company_name ? (
-                      <p className="text-sm text-muted-foreground">
-                        {job.company_name}
-                      </p>
-                    ) : null}
+                    <p
+                      className={
+                        job.is_active !== false
+                          ? "text-sm font-medium text-green-600 dark:text-green-400"
+                          : "text-sm text-muted-foreground"
+                      }
+                    >
+                      {job.is_active !== false ? "Active" : "Inactive"}
+                    </p>
                     <CardTitle className="text-xl md:text-2xl font-bold">
                       {job.title || "Untitled"}
                     </CardTitle>
                   </div>
-                  <Badge
-                    variant={job.is_active !== false ? "default" : "secondary"}
-                    className={
-                      job.is_active !== false
-                        ? "bg-green-500 hover:bg-green-500"
-                        : undefined
-                    }
+                  <Button
+                    onClick={handleEdit}
+                    disabled={!jobId}
+                    size="sm"
+                    className="shrink-0"
                   >
-                    {job.is_active !== false ? "Active" : "Inactive"}
-                  </Badge>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit job
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -175,7 +170,9 @@ export default function EmployerJobStatsPage() {
               </CardContent>
             </Card>
 
-            {jobId ? <EmployerJobApplicantsPanel jobId={jobId} /> : null}
+            {jobId ? (
+              <EmployerJobApplicantsPanel jobId={jobId} job={job} />
+            ) : null}
           </>
         ) : null}
       </div>

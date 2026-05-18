@@ -206,7 +206,7 @@ export function EditSkillsModal({
                   <Badge
                     key={s.id}
                     variant="outline"
-                    className="inline-flex items-center gap-1 capitalize px-3 py-1.5 text-xs rounded-[10px] bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+                    className="inline-flex items-center gap-1 capitalize px-3 py-1.5 text-xs rounded-[10px] bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
                   >
                     {s.skill_name}
                     <button
