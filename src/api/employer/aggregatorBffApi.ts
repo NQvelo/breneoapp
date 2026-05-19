@@ -19,6 +19,22 @@ import {
   parseAggregatorFieldErrors,
 } from "@/api/employer/aggregatorHttpErrors";
 import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
+import {
+  type CompanyStaffMembership,
+  normalizeStaffMembership,
+  staffMembershipActionErrorMessage,
+  unwrapStaffMemberships,
+} from "@/api/employer/staffMembership";
+
+export type { CompanyStaffMembership } from "@/api/employer/staffMembership";
+export {
+  staffDisplayName,
+  staffFirstName,
+  staffSurname,
+  staffEmail,
+  isCurrentUserAdmin,
+  countAdmins,
+} from "@/api/employer/staffMembership";
 
 export type AggregatorIndustry = { id: number; name: string };
 
@@ -113,14 +129,8 @@ export function aggregatorCompanyLogoUrl(
   return fromLogo;
 }
 
-export type AggregatorStaffMembership = {
-  id: number;
-  company_id: number;
-  external_user_id: string;
-  created_at?: string;
-  updated_at?: string;
-  [key: string]: unknown;
-};
+/** @deprecated Use CompanyStaffMembership */
+export type AggregatorStaffMembership = CompanyStaffMembership;
 
 /** Aggregator returns 400 + non_field_errors for duplicate membership, not always 409. */
 function isDuplicateStaffMembershipError(
@@ -158,29 +168,6 @@ function unwrapCompanies(data: unknown): AggregatorCompany[] {
     const d = inner as Record<string, unknown>;
     if (Array.isArray(d.results)) return d.results as AggregatorCompany[];
     if (Array.isArray(d.data)) return d.data as AggregatorCompany[];
-  }
-  return [];
-}
-
-function unwrapStaffMemberships(data: unknown): AggregatorStaffMembership[] {
-  if (Array.isArray(data)) return data as AggregatorStaffMembership[];
-  if (!data || typeof data !== "object") return [];
-  const o = data as Record<string, unknown>;
-  for (const key of [
-    "results",
-    "staff_memberships",
-    "data",
-    "items",
-  ] as const) {
-    const v = o[key];
-    if (Array.isArray(v)) return v as AggregatorStaffMembership[];
-  }
-  const inner = o.data;
-  if (inner && typeof inner === "object") {
-    const d = inner as Record<string, unknown>;
-    if (Array.isArray(d.results))
-      return d.results as AggregatorStaffMembership[];
-    if (Array.isArray(d.data)) return d.data as AggregatorStaffMembership[];
   }
   return [];
 }
@@ -270,7 +257,7 @@ export async function fetchEmployerAggregatorCompanies(
 export async function fetchEmployerStaffMemberships(params: {
   companyId?: number | string;
   externalUserId?: string;
-}): Promise<AggregatorStaffMembership[]> {
+}): Promise<CompanyStaffMembership[]> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") return [];
   assertEmployerJobsProxyConfigured("GET");
@@ -299,6 +286,109 @@ export async function fetchEmployerStaffMemberships(params: {
     throw err;
   }
   return unwrapStaffMemberships(body);
+}
+
+/** Team list via `GET /api/employer/companies/{companyId}/staff`. */
+export async function fetchEmployerCompanyStaff(
+  companyId: number | string,
+): Promise<CompanyStaffMembership[]> {
+  const token = TokenManager.getAccessToken();
+  if (!token || typeof window === "undefined") return [];
+  assertEmployerJobsProxyConfigured("GET");
+  const id = requireAggregatorCompanyPk(companyId, "companyId");
+  const url = new URL(
+    `/api/employer/companies/${id}/staff`,
+    `${employerBffOrigin()}/`,
+  );
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const err = new Error(
+      extractAggregatorErrorMessage(body, "Could not load company team."),
+    ) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  return unwrapStaffMemberships(body);
+}
+
+export async function deleteEmployerStaffMembership(
+  membershipId: number | string,
+): Promise<void> {
+  const token = TokenManager.getAccessToken();
+  if (!token || typeof window === "undefined") {
+    throw new Error("Not authenticated");
+  }
+  assertEmployerJobsProxyConfigured("DELETE");
+  const url = new URL(
+    `/api/employer/staff-memberships/${encodeURIComponent(String(membershipId))}`,
+    `${employerBffOrigin()}/`,
+  );
+  const res = await fetch(url.toString(), {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+  if (res.status === 204) return;
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const err = new Error(
+      staffMembershipActionErrorMessage(
+        res.status,
+        body,
+        extractAggregatorErrorMessage(body, "Could not remove team member."),
+      ),
+    ) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+}
+
+export async function patchEmployerStaffMembershipAdmin(
+  membershipId: number | string,
+  isAdmin: boolean,
+): Promise<CompanyStaffMembership> {
+  const token = TokenManager.getAccessToken();
+  if (!token || typeof window === "undefined") {
+    throw new Error("Not authenticated");
+  }
+  assertEmployerJobsProxyConfigured("PATCH");
+  const url = new URL(
+    `/api/employer/staff-memberships/${encodeURIComponent(String(membershipId))}`,
+    `${employerBffOrigin()}/`,
+  );
+  const res = await fetch(url.toString(), {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ is_admin: isAdmin }),
+  });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const err = new Error(
+      extractAggregatorErrorMessage(
+        body,
+        "Could not update admin status.",
+      ),
+    ) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  const row = normalizeStaffMembership(body);
+  if (!row) {
+    throw new Error("Invalid staff membership response.");
+  }
+  return row;
 }
 
 /**
@@ -680,7 +770,7 @@ export async function createEmployerAggregatorCompany(
 export async function linkEmployerToAggregatorCompany(
   companyId: string,
   externalUserId: string,
-): Promise<void> {
+): Promise<CompanyStaffMembership> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
@@ -720,6 +810,17 @@ export async function linkEmployerToAggregatorCompany(
     err.status = res.status;
     throw err;
   }
+  const row = normalizeStaffMembership(body);
+  if (row) return row;
+  if (isDuplicateStaffMembershipError(res.status, body)) {
+    const existing = await fetchEmployerStaffMemberships({
+      companyId: n,
+      externalUserId: userId,
+    });
+    const mine = existing.find((m) => m.external_user_id === userId);
+    if (mine) return mine;
+  }
+  throw new Error("Could not read staff membership after linking.");
 }
 
 /**

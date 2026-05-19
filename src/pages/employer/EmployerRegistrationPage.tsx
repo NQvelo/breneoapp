@@ -22,7 +22,10 @@ import {
   aggregatorCompanyLogoUrl,
   buildAggregatorCompanyCreatePayload,
   joinOrCreateEmployerAggregatorCompany,
+  linkEmployerToAggregatorCompany,
+  fetchEmployerStaffMemberships,
   fetchAggregatorIndustries,
+  parseAggregatorCompanyPk,
   type AggregatorCompany,
   type AggregatorIndustry,
 } from "@/api/employer/aggregatorBffApi";
@@ -665,15 +668,15 @@ const EmployerRegistrationPage = () => {
 
       let aggregatorCompanyOk = false;
       let aggregatorCompanyId: number | string | undefined;
+      let joinedAsAdmin = false;
       try {
         if (selectedDirectoryCompany?.id != null) {
           aggregatorCompanyId = selectedDirectoryCompany.id;
-          await joinOrCreateEmployerAggregatorCompany({
+          const membership = await linkEmployerToAggregatorCompany(
+            String(selectedDirectoryCompany.id),
             breneoUserId,
-            mode: "existing",
-            existingCompanyId: String(selectedDirectoryCompany.id),
-            existingCompanyName: String(selectedDirectoryCompany.name ?? ""),
-          });
+          );
+          joinedAsAdmin = membership.is_admin;
         } else {
           const aggregatorPayload = buildAggregatorCompanyCreatePayload({
             name: companyName.trim(),
@@ -693,6 +696,16 @@ const EmployerRegistrationPage = () => {
           });
           if (created && typeof created === "object" && "id" in created) {
             aggregatorCompanyId = created.id as number | string | undefined;
+          }
+          const pk = parseAggregatorCompanyPk(aggregatorCompanyId);
+          if (pk != null) {
+            const rows = await fetchEmployerStaffMemberships({
+              companyId: pk,
+              externalUserId: breneoUserId,
+            });
+            joinedAsAdmin = rows.some(
+              (m) => m.external_user_id === breneoUserId && m.is_admin,
+            );
           }
         }
 
@@ -769,7 +782,13 @@ const EmployerRegistrationPage = () => {
       sessionStorage.removeItem(SESSION_EMPLOYER_LAST);
 
       if (aggregatorCompanyOk) {
-        toast.success("Profile saved. Welcome!");
+        if (joinedAsAdmin) {
+          toast.success(
+            "Profile saved. You are the company admin — as the first member, you manage team access.",
+          );
+        } else {
+          toast.success("Profile saved. Welcome!");
+        }
       }
       window.location.href = getLocalizedPath("/employer/jobs", language);
     } catch (err: unknown) {

@@ -4,7 +4,10 @@
  * - GET /api/employer/companies/for-user — JWT → GET aggregator “my companies” (for-user or legacy ?staff_user_id=)
  * - GET /api/employer/companies?search=|name= — JWT → company picker search (new API only)
  * - GET /api/employer/companies/:companyId — JWT → company detail (`companyId` = numeric PK; not public name-based /api/companies/…)
- * - POST /api/employer/staff-memberships — JWT → POST aggregator /api/employer/staff-memberships { company_id, external_user_id }
+ * - POST /api/employer/staff-memberships — JWT → POST aggregator with profile fields + is_admin (first member forced admin upstream)
+ * - PATCH /api/employer/staff-memberships/:membershipId — JWT → PATCH is_admin (?external_user_id=acting admin)
+ * - DELETE /api/employer/staff-memberships/:membershipId — JWT → DELETE (?external_user_id=acting admin)
+ * - GET /api/employer/companies/:companyId/staff — JWT → GET staff-memberships?company_id=
  * - POST /api/employer/companies/:companyId/members — JWT → same as staff-memberships (`companyId` = numeric PK)
  * - POST /api/employer/companies — JWT → create company; new API: no staff_user_ids in body; BFF POSTs membership after create
  * - PATCH|POST|PUT /api/employer/companies/:companyId — JWT → partial/full update (`companyId` = numeric PK; new API strips staff_user_ids from body)
@@ -564,7 +567,7 @@ function extractUserIdFromBearerJwt(authHeader) {
 /**
  * @param {import("express").Request} req
  * @param {import("express").Response} res
- * @returns {Promise<{ auth: string; userId: string } | null>}
+ * @returns {Promise<{ auth: string; userId: string; email: string; firstName: string; lastName: string } | null>}
  */
 async function requireEmployerAuth(req, res) {
   const auth = req.headers.authorization;
@@ -602,7 +605,35 @@ async function requireEmployerAuth(req, res) {
     return null;
   }
 
-  return { auth, userId };
+  const person = extractApplicantProfileFromBreneoProfile(
+    /** @type {Record<string, unknown>} */ (profile),
+    auth,
+  );
+
+  return {
+    auth,
+    userId,
+    email: person.email,
+    firstName: person.firstName,
+    lastName: person.lastName,
+  };
+}
+
+/**
+ * @param {number} companyId
+ * @param {{ userId: string; email?: string; firstName?: string; lastName?: string }} ctx
+ * @param {Record<string, unknown>} [extra]
+ */
+function buildStaffMembershipBody(companyId, ctx, extra = {}) {
+  return {
+    company_id: companyId,
+    external_user_id: String(ctx.userId),
+    external_user_email: ctx.email ?? "",
+    external_user_name: ctx.firstName ?? "",
+    external_user_surname: ctx.lastName ?? "",
+    is_admin: false,
+    ...extra,
+  };
 }
 
 /**
@@ -1076,7 +1107,7 @@ async function postStaffMembership(companyIdRaw, ctx) {
       "Content-Type": "application/json",
       "X-Employer-Key": AGGREGATOR_KEY || "",
     },
-    body: JSON.stringify({ company_id: n, external_user_id: ctx.userId }),
+    body: JSON.stringify(buildStaffMembershipBody(n, ctx)),
   });
   const text = await res.text();
   const data = parseUpstreamJson(text);
@@ -1104,10 +1135,7 @@ async function handleStaffMembershipsCreate(req, res) {
         detail: "company_id is required and must be a number",
       });
     }
-    const payload = {
-      company_id: n,
-      external_user_id: ctx.userId,
-    };
+    const payload = buildStaffMembershipBody(n, ctx);
     const url = AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "");
     const upstream = await fetch(url, {
       method: "POST",
@@ -1184,6 +1212,165 @@ async function handleStaffMembershipsList(req, res) {
         );
     }
     return res.status(200).json(data);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ detail: "Internal server error" });
+  }
+}
+
+async function handleEmployerCompanyStaffList(req, res) {
+  try {
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        detail:
+          "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
+      });
+    }
+    const raw = String(req.params.companyId || "").trim();
+    const pk = Number(raw);
+    if (!Number.isFinite(pk) || pk <= 0 || !Number.isInteger(pk)) {
+      return res.status(400).json({
+        detail:
+          "Employer company routes use numeric primary key in the path, not company name.",
+      });
+    }
+    const url = new URL(AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, ""));
+    url.searchParams.set("company_id", String(pk));
+    const upstream = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    const text = await upstream.text();
+    const data = parseUpstreamJson(text);
+    if (!upstream.ok) {
+      return res
+        .status(upstream.status >= 400 ? upstream.status : 502)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Staff memberships list error" },
+        );
+    }
+    return res.status(200).json(data);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ detail: "Internal server error" });
+  }
+}
+
+async function handleStaffMembershipDelete(req, res) {
+  try {
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        detail:
+          "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
+      });
+    }
+    const membershipId = String(req.params.membershipId || "").trim();
+    if (!membershipId) {
+      return res.status(400).json({ detail: "membership id is required" });
+    }
+    const url = new URL(
+      `${AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "")}/${encodeURIComponent(membershipId)}`,
+    );
+    url.searchParams.set("external_user_id", String(ctx.userId));
+    const upstream = await fetch(url.toString(), {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    if (upstream.status === 204) {
+      return res.status(204).send();
+    }
+    const text = await upstream.text();
+    const data = parseUpstreamJson(text);
+    if (upstream.status === 403) {
+      const errMsg =
+        data &&
+        typeof data === "object" &&
+        data !== null &&
+        typeof /** @type {Record<string, unknown>} */ (data).error === "string"
+          ? /** @type {Record<string, unknown>} */ (data).error
+          : typeof /** @type {Record<string, unknown>} */ (data).detail ===
+              "string"
+            ? /** @type {Record<string, unknown>} */ (data).detail
+            : "Not allowed";
+      return res.status(403).json({ error: errMsg });
+    }
+    if (!upstream.ok) {
+      return res
+        .status(upstream.status >= 400 ? upstream.status : 502)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Staff membership delete error" },
+        );
+    }
+    return res
+      .status(upstream.status)
+      .json(typeof data === "object" && data !== null ? data : {});
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ detail: "Internal server error" });
+  }
+}
+
+async function handleStaffMembershipPatch(req, res) {
+  try {
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        detail:
+          "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart npm run dev.",
+      });
+    }
+    const membershipId = String(req.params.membershipId || "").trim();
+    if (!membershipId) {
+      return res.status(400).json({ detail: "membership id is required" });
+    }
+    const raw =
+      req.body && typeof req.body === "object" && !Array.isArray(req.body)
+        ? /** @type {Record<string, unknown>} */ ({ ...req.body })
+        : {};
+    if (!Object.prototype.hasOwnProperty.call(raw, "is_admin")) {
+      return res.status(400).json({ detail: "is_admin is required in body" });
+    }
+    const url = new URL(
+      `${AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "")}/${encodeURIComponent(membershipId)}`,
+    );
+    url.searchParams.set("external_user_id", String(ctx.userId));
+    const upstream = await fetch(url.toString(), {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+      body: JSON.stringify({ is_admin: Boolean(raw.is_admin) }),
+    });
+    const text = await upstream.text();
+    const data = parseUpstreamJson(text);
+    if (!upstream.ok) {
+      return res
+        .status(upstream.status >= 400 ? upstream.status : 502)
+        .json(
+          typeof data === "object" && data !== null
+            ? data
+            : { detail: text || "Staff membership update error" },
+        );
+    }
+    return res
+      .status(upstream.status >= 200 && upstream.status < 300 ? upstream.status : 200)
+      .json(typeof data === "object" && data !== null ? data : {});
   } catch (e) {
     console.error(e);
     return res.status(500).json({ detail: "Internal server error" });
@@ -1751,6 +1938,30 @@ app.get("/api/employer/staff-memberships", handleStaffMembershipsList);
 app.get("/api/employer/staff-memberships/", handleStaffMembershipsList);
 app.post("/api/employer/staff-memberships", handleStaffMembershipsCreate);
 app.post("/api/employer/staff-memberships/", handleStaffMembershipsCreate);
+app.patch(
+  "/api/employer/staff-memberships/:membershipId",
+  handleStaffMembershipPatch,
+);
+app.patch(
+  "/api/employer/staff-memberships/:membershipId/",
+  handleStaffMembershipPatch,
+);
+app.delete(
+  "/api/employer/staff-memberships/:membershipId",
+  handleStaffMembershipDelete,
+);
+app.delete(
+  "/api/employer/staff-memberships/:membershipId/",
+  handleStaffMembershipDelete,
+);
+app.get(
+  "/api/employer/companies/:companyId/staff",
+  handleEmployerCompanyStaffList,
+);
+app.get(
+  "/api/employer/companies/:companyId/staff/",
+  handleEmployerCompanyStaffList,
+);
 app.get("/api/employer/companies/for-user", handleEmployerCompaniesForUser);
 app.get("/api/employer/companies/for-user/", handleEmployerCompaniesForUser);
 app.post(

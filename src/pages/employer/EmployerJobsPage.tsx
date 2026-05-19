@@ -37,7 +37,6 @@ export default function EmployerJobsPage() {
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [linkedCompanyName, setLinkedCompanyName] = useState("");
   const statusFilter = (() => {
     const s = searchParams.get("status");
     if (s === "inactive") return "inactive";
@@ -67,17 +66,13 @@ export default function EmployerJobsPage() {
             ? String((profileObj.company as Record<string, unknown>).id)
             : "";
       const companyName = (n?.company_name || "").trim();
-      const {
-        companyId: resolvedId,
-        companyName: resolvedName,
-        linkedDirectoryCompanyName,
-      } = await resolveEmployerJobsCompanyFilter({
-        breneoUserId: user?.id,
-        employerProfileRaw: prof?.data,
-        profileCompanyId: companyId,
-        profileCompanyName: companyName,
-      });
-      setLinkedCompanyName(linkedDirectoryCompanyName);
+      const { companyId: resolvedId, companyName: resolvedName } =
+        await resolveEmployerJobsCompanyFilter({
+          breneoUserId: user?.id,
+          employerProfileRaw: prof?.data,
+          profileCompanyId: companyId,
+          profileCompanyName: companyName,
+        });
       const list = await fetchEmployerJobsFiltered({
         companyId: resolvedId,
         companyName: resolvedName,
@@ -323,40 +318,31 @@ export default function EmployerJobsPage() {
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {filteredJobs.map((job) => {
-                  const rowCompany =
-                    (job.company_name && job.company_name.trim()) ||
-                    linkedCompanyName;
-                  return (
+                {filteredJobs.map((job) => (
                     <div
                       key={`${job.source ?? "breneo"}-${job.id || job.title}`}
                       className="group cursor-pointer transition-colors hover:bg-muted/30"
                       onClick={() => handleOpenJobStats(job)}
                     >
-                      <div className="flex gap-4 py-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-normal text-sm text-muted-foreground mb-1 line-clamp-1">
-                            {rowCompany || "Company"}
-                          </h3>
-                          <div className="flex flex-wrap items-center gap-3">
-                            <h4 className="font-bold text-base md:text-lg line-clamp-2">
-                              {job.title || "Untitled"}
-                            </h4>
+                      <div className="grid grid-cols-[minmax(0,11rem)_1fr_auto] sm:grid-cols-[minmax(0,14rem)_1fr_auto] gap-x-4 gap-y-2 items-center px-4 md:px-6 py-4">
+                        <h4 className="font-bold text-base md:text-lg line-clamp-2 min-w-0">
+                          {job.title || "Untitled"}
+                        </h4>
+                        <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 min-w-0">
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
+                              <MapPin className="h-4 w-4 shrink-0" />
                               <span>{job.location || "N/A"}</span>
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Clock className="h-4 w-4" />
+                              <Clock className="h-4 w-4 shrink-0" />
                               <span>{modeLabel(job)}</span>
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Briefcase className="h-4 w-4" />
+                              <Briefcase className="h-4 w-4 shrink-0" />
                               <span>{relativePosted(job.created_at)}</span>
                             </div>
-                          </div>
                         </div>
-                        <div className="flex-shrink-0 flex items-center">
+                        <div className="flex shrink-0 items-center justify-self-end">
                           {job.id ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -398,8 +384,7 @@ export default function EmployerJobsPage() {
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                ))}
               </div>
             )}
           </CardContent>

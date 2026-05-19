@@ -9,52 +9,47 @@ import {
   extractBreneoUserIdFromJwt,
 } from "@/api/employer/profile";
 import {
+  countAdmins,
+  deleteEmployerStaffMembership,
   fetchEmployerAggregatorCompanies,
-  fetchEmployerStaffMemberships,
+  fetchEmployerCompanyStaff,
+  isCurrentUserAdmin,
   parseAggregatorCompanyPk,
-  type AggregatorCompany,
-  type AggregatorStaffMembership,
+  patchEmployerStaffMembershipAdmin,
+  staffDisplayName,
+  staffFirstName,
+  staffSurname,
+  staffEmail,
+  type CompanyStaffMembership,
 } from "@/api/employer/aggregatorBffApi";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Users } from "lucide-react";
 import { toast } from "sonner";
 
-function readStr(v: unknown): string {
-  if (v == null) return "";
-  return String(v).trim();
-}
-
-function formatDate(v: unknown): string {
-  const s = readStr(v);
-  if (!s) return "—";
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleString();
-}
-
 export default function EmployerMembersPage() {
   const { user, loading: authLoading } = useAuth();
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [companies, setCompanies] = useState<AggregatorCompany[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
-    null,
-  );
-  const [memberships, setMemberships] = useState<AggregatorStaffMembership[]>(
-    [],
-  );
+  const [loading, setLoading] = useState(true);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [memberships, setMemberships] = useState<CompanyStaffMembership[]>([]);
   const [breneoUserId, setBreneoUserId] = useState("");
-  const [memberNamesByUserId, setMemberNamesByUserId] = useState<
-    Record<string, string>
-  >({});
+  const [actionId, setActionId] = useState<number | null>(null);
 
   const resolveBreneoUserId = useCallback(async (): Promise<string> => {
     const token = TokenManager.getAccessToken();
@@ -78,34 +73,36 @@ export default function EmployerMembersPage() {
     if (authLoading || !user) return;
     let cancelled = false;
     (async () => {
-      setLoadingCompanies(true);
+      setLoading(true);
+      setMemberships([]);
+      setCompanyId(null);
       try {
         const uid = await resolveBreneoUserId();
         if (cancelled) return;
         setBreneoUserId(uid);
-        if (!uid) {
-          setCompanies([]);
-          setSelectedCompanyId(null);
-          return;
-        }
+        if (!uid) return;
+
         const list = await fetchEmployerAggregatorCompanies(uid);
         if (cancelled) return;
-        setCompanies(list);
-        const firstPk =
-          list
-            .map((c) => parseAggregatorCompanyPk(c.id))
-            .find((x) => x != null) ?? null;
-        setSelectedCompanyId(firstPk);
+
+        const first = list[0];
+        const pk = first ? parseAggregatorCompanyPk(first.id) : null;
+        if (pk == null) return;
+
+        setCompanyId(pk);
+        const rows = await fetchEmployerCompanyStaff(pk);
+        if (cancelled) return;
+        setMemberships(rows);
       } catch (e) {
         if (!cancelled) {
-          setCompanies([]);
-          setSelectedCompanyId(null);
+          setMemberships([]);
+          setCompanyId(null);
           toast.error(
-            e instanceof Error ? e.message : "Could not load your companies.",
+            e instanceof Error ? e.message : "Could not load company team.",
           );
         }
       } finally {
-        if (!cancelled) setLoadingCompanies(false);
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -113,220 +110,235 @@ export default function EmployerMembersPage() {
     };
   }, [authLoading, user, resolveBreneoUserId]);
 
-  useEffect(() => {
-    if (selectedCompanyId == null) {
-      setMemberships([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setLoadingMembers(true);
-      try {
-        const rows = await fetchEmployerStaffMemberships({
-          companyId: selectedCompanyId,
-        });
-        if (cancelled) return;
-        setMemberships(rows);
-      } catch (e) {
-        if (!cancelled) {
-          setMemberships([]);
-          toast.error(
-            e instanceof Error ? e.message : "Could not load company members.",
-          );
-        }
-      } finally {
-        if (!cancelled) setLoadingMembers(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCompanyId]);
-
-  const resolveMemberNameByUserId = useCallback(
-    async (externalUserId: string): Promise<string> => {
-      const id = externalUserId.trim();
-      if (!id) return "";
-      const candidateEndpoints = [
-        `/api/users/${encodeURIComponent(id)}/`,
-        `/api/profile/${encodeURIComponent(id)}/`,
-        `/api/profile/?user_id=${encodeURIComponent(id)}`,
-      ];
-      for (const endpoint of candidateEndpoints) {
-        try {
-          const res = await apiClient.get(endpoint);
-          const raw =
-            res?.data && typeof res.data === "object"
-              ? (res.data as Record<string, unknown>)
-              : null;
-          if (!raw) continue;
-          const first = readStr(raw.first_name);
-          const last = readStr(raw.last_name);
-          const full = [first, last].filter(Boolean).join(" ").trim();
-          if (full) return full;
-        } catch {
-          // Try next candidate endpoint.
-        }
-      }
-      return "";
-    },
-    [],
+  const currentUserIsAdmin = useMemo(
+    () =>
+      breneoUserId ? isCurrentUserAdmin(memberships, breneoUserId) : false,
+    [memberships, breneoUserId],
   );
 
-  useEffect(() => {
-    if (memberships.length === 0) return;
-    const uniqueIds = Array.from(
-      new Set(
-        memberships
-          .map((m) => readStr(m.external_user_id))
-          .filter((id) => id.length > 0),
-      ),
-    );
-    const unresolved = uniqueIds.filter(
-      (id) => memberNamesByUserId[id] == null,
-    );
-    if (unresolved.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const resolvedEntries = await Promise.all(
-        unresolved.map(async (id) => {
-          const name = await resolveMemberNameByUserId(id);
-          return [id, name] as const;
-        }),
-      );
-      if (cancelled) return;
-      setMemberNamesByUserId((prev) => {
-        const next = { ...prev };
-        for (const [id, name] of resolvedEntries) {
-          next[id] = name;
-        }
-        return next;
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [memberships, memberNamesByUserId, resolveMemberNameByUserId]);
+  const adminCount = useMemo(() => countAdmins(memberships), [memberships]);
 
-  const selectedCompanyName = useMemo(() => {
-    if (selectedCompanyId == null) return "";
-    const row = companies.find(
-      (c) => parseAggregatorCompanyPk(c.id) === selectedCompanyId,
-    );
-    return readStr(row?.name) || `Company ${selectedCompanyId}`;
-  }, [companies, selectedCompanyId]);
+  const handleToggleAdmin = async (
+    member: CompanyStaffMembership,
+    nextAdmin: boolean,
+  ) => {
+    if (!currentUserIsAdmin) return;
+    const isSelf = member.external_user_id === breneoUserId;
+    if (isSelf && !nextAdmin && adminCount <= 1) {
+      toast.error("Cannot demote the only admin for this company.");
+      return;
+    }
+    setActionId(member.id);
+    try {
+      const updated = await patchEmployerStaffMembershipAdmin(
+        member.id,
+        nextAdmin,
+      );
+      setMemberships((prev) =>
+        prev.map((m) => (m.id === updated.id ? updated : m)),
+      );
+      toast.success(
+        nextAdmin ? "Member is now an admin." : "Admin role removed.",
+      );
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not update admin status.",
+      );
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleRemove = async (member: CompanyStaffMembership) => {
+    if (!currentUserIsAdmin) return;
+    if (member.external_user_id === breneoUserId) return;
+    setActionId(member.id);
+    try {
+      await deleteEmployerStaffMembership(member.id);
+      setMemberships((prev) => prev.filter((m) => m.id !== member.id));
+      toast.success("Team member removed.");
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not remove team member.",
+      );
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const canToggleAdminOnRow = (member: CompanyStaffMembership): boolean => {
+    if (!currentUserIsAdmin) return false;
+    const isSelf = member.external_user_id === breneoUserId;
+    if (!isSelf) return true;
+    return adminCount > 1;
+  };
+
+  const adminToggleDisabledReason = (
+    member: CompanyStaffMembership,
+  ): string => {
+    if (member.external_user_id !== breneoUserId) return "";
+    if (adminCount <= 1) {
+      return "You are the only admin. Promote another member before removing your admin role.";
+    }
+    return "";
+  };
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto pt-2 pb-24 md:pb-8 px-2 sm:px-6 lg:px-8 space-y-4">
-        <Card className="border-0 rounded-3xl">
-          <CardHeader className="p-4 pb-2 border-b-0">
-            <div className="flex items-start gap-3">
-              <Users className="h-6 w-6 text-breneo-blue shrink-0 mt-0.5" />
-              <div>
-                <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                  Company members
-                </h1>
-                <p className="text-sm text-muted-foreground font-normal mt-1">
-                  Members are read from staff memberships for the selected
-                  company.
+      <TooltipProvider>
+        <div className="space-y-6 md:px-6 lg:px-8 pb-24 md:pb-8">
+          <Card>
+            <CardHeader className="p-6 pb-4">
+              <div className="flex items-start gap-3">
+                {/* <Users className="h-6 w-6 text-breneo-blue shrink-0 mt-0.5" /> */}
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    Company team
+                  </h1>
+                  <p className="text-sm text-muted-foreground font-normal mt-1">
+                    Manage admins and members for your company. Only admins can
+                    change roles or remove others.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 pt-0 space-y-4">
+              {loading ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  Loading team…
                 </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="px-6 pb-6 space-y-4">
-            {loadingCompanies ? (
-              <p className="text-sm text-muted-foreground">
-                Loading companies…
-              </p>
-            ) : companies.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No linked company found for this account.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                <Label>Company</Label>
-                <Select
-                  value={
-                    selectedCompanyId != null ? String(selectedCompanyId) : ""
-                  }
-                  onValueChange={(v) => {
-                    const n = Number(v);
-                    if (Number.isInteger(n) && n > 0) setSelectedCompanyId(n);
-                  }}
-                  disabled={loadingCompanies || loadingMembers}
-                >
-                  <SelectTrigger className="h-[3rem]">
-                    <SelectValue placeholder="Select company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies
-                      .filter((c) => parseAggregatorCompanyPk(c.id) != null)
-                      .map((c) => {
-                        const id = parseAggregatorCompanyPk(c.id)!;
-                        const label = readStr(c.name) || `Company ${id}`;
-                        return (
-                          <SelectItem key={id} value={String(id)}>
-                            {label}
-                          </SelectItem>
-                        );
-                      })}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+              ) : companyId == null ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No linked company found. Complete company setup from your
+                  profile to manage team members.
+                </p>
+              ) : memberships.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No team members yet. Members appear here after they join your
+                  company during employer onboarding.
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Surname</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead className="w-[100px]">Admin</TableHead>
+                      <TableHead className="w-[100px] text-right">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {memberships.map((m) => {
+                      const isSelf = m.external_user_id === breneoUserId;
+                      const showRemove = currentUserIsAdmin && !isSelf;
+                      const canToggle = canToggleAdminOnRow(m);
+                      const toggleReason = adminToggleDisabledReason(m);
+                      const busy = actionId === m.id;
 
-            {selectedCompanyId != null ? (
-              <p className="text-xs text-muted-foreground">
-                Showing memberships for{" "}
-                <span className="font-medium text-foreground">
-                  {selectedCompanyName}
-                </span>{" "}
-                (company_id{" "}
-                <span className="font-mono">{selectedCompanyId}</span>)
-                {breneoUserId ? (
-                  <>
-                    {" "}
-                    · current user_id{" "}
-                    <span className="font-mono">{breneoUserId}</span>
-                  </>
-                ) : null}
-              </p>
-            ) : null}
-
-            {loadingMembers ? (
-              <p className="text-sm text-muted-foreground">Loading members…</p>
-            ) : selectedCompanyId != null && memberships.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No staff memberships found for this company.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {memberships.map((m) => (
-                  <div
-                    key={`${m.id}-${m.external_user_id}`}
-                    className="rounded-xl border border-border/60 p-3 bg-muted/20"
-                  >
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Member:</span>{" "}
-                      <span className="font-medium">
-                        {memberNamesByUserId[readStr(m.external_user_id)] ||
-                          "Unknown member"}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      user_id{" "}
-                      <span className="font-mono">{m.external_user_id}</span> ·{" "}
-                      membership_id {m.id} · created {formatDate(m.created_at)}{" "}
-                      · updated {formatDate(m.updated_at)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                      return (
+                        <TableRow key={m.id}>
+                          <TableCell className="font-medium">
+                            {staffFirstName(m) || "—"}
+                            {isSelf ? (
+                              <span className="text-muted-foreground font-normal text-xs ml-1">
+                                (you)
+                              </span>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {staffSurname(m) || "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {staffEmail(m) || "—"}
+                          </TableCell>
+                          <TableCell>
+                            {currentUserIsAdmin ? (
+                              canToggle ? (
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={m.is_admin}
+                                    disabled={busy}
+                                    onCheckedChange={(checked) =>
+                                      void handleToggleAdmin(m, checked)
+                                    }
+                                    aria-label={`Admin for ${staffDisplayName(m)}`}
+                                  />
+                                  {m.is_admin ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      Admin
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 opacity-70">
+                                      <Switch
+                                        checked={m.is_admin}
+                                        disabled
+                                        aria-label="Admin (locked)"
+                                      />
+                                      {m.is_admin ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          Admin
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                  </TooltipTrigger>
+                                  {toggleReason ? (
+                                    <TooltipContent>
+                                      {toggleReason}
+                                    </TooltipContent>
+                                  ) : null}
+                                </Tooltip>
+                              )
+                            ) : m.is_admin ? (
+                              <Badge variant="outline" className="text-xs">
+                                Admin
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                —
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {showRemove ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                disabled={busy}
+                                onClick={() => void handleRemove(m)}
+                              >
+                                Remove
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                —
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TooltipProvider>
     </DashboardLayout>
   );
 }
