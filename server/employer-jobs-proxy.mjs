@@ -1195,6 +1195,13 @@ async function handleStaffMembershipsList(req, res) {
         detail: "external_user_id does not match authenticated user",
       });
     }
+    if (
+      !url.searchParams.has("external_user_id") &&
+      !url.searchParams.has("staff_user_id") &&
+      ctx.userId
+    ) {
+      url.searchParams.set("external_user_id", String(ctx.userId));
+    }
     const upstream = await fetch(url.toString(), {
       headers: {
         Accept: "application/json",
@@ -1298,9 +1305,10 @@ async function handleStaffMembershipDelete(req, res) {
         data &&
         typeof data === "object" &&
         data !== null &&
-        typeof /** @type {Record<string, unknown>} */ (data).error === "string"
+        typeof (/** @type {Record<string, unknown>} */ (data).error) ===
+          "string"
           ? /** @type {Record<string, unknown>} */ (data).error
-          : typeof /** @type {Record<string, unknown>} */ (data).detail ===
+          : typeof (/** @type {Record<string, unknown>} */ (data).detail) ===
               "string"
             ? /** @type {Record<string, unknown>} */ (data).detail
             : "Not allowed";
@@ -1370,7 +1378,9 @@ async function handleStaffMembershipPatch(req, res) {
         );
     }
     return res
-      .status(upstream.status >= 200 && upstream.status < 300 ? upstream.status : 200)
+      .status(
+        upstream.status >= 200 && upstream.status < 300 ? upstream.status : 200,
+      )
       .json(typeof data === "object" && data !== null ? data : {});
   } catch (e) {
     console.error(e);
@@ -1932,76 +1942,6 @@ async function handleEmployerJobsList(req, res) {
     return res.status(500).json({ detail: "Internal server error" });
   }
 }
-
-/**
- * List staff rows for one company (admin notifications).
- * @param {number} companyId
- */
-async function fetchCompanyStaffByCompanyId(companyId) {
-  if (!AGGREGATOR_KEY) return [];
-  const url = new URL(AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, ""));
-  url.searchParams.set("company_id", String(companyId));
-  try {
-    const upstream = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/json",
-        "X-Employer-Key": AGGREGATOR_KEY,
-      },
-    });
-    const text = await upstream.text();
-    const data = parseUpstreamJson(text);
-    if (!upstream.ok) return [];
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Create membership for a specific user (admin approve join request).
- * @param {number} companyIdRaw
- * @param {{ userId: string; email?: string; firstName?: string; lastName?: string }} target
- */
-async function postStaffMembershipForUser(companyIdRaw, target) {
-  const n = Number(companyIdRaw);
-  if (!Number.isFinite(n)) {
-    return {
-      ok: false,
-      status: 400,
-      data: { detail: "company_id must be a finite number" },
-    };
-  }
-  const url = AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "");
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Employer-Key": AGGREGATOR_KEY || "",
-    },
-    body: JSON.stringify({
-      company_id: n,
-      external_user_id: String(target.userId),
-      external_user_email: target.email ?? "",
-      external_user_name: target.firstName ?? "",
-      external_user_surname: target.lastName ?? "",
-      is_admin: false,
-    }),
-  });
-  const text = await res.text();
-  const data = parseUpstreamJson(text);
-  const ok =
-    res.ok || isDuplicateStaffMembershipResponse(res.status, data);
-  return { ok, status: res.status, data, text };
-}
-
-registerEmployerJoinRequestRoutes({
-  app,
-  requireEmployerAuth,
-  aggregatorStaffRoot: AGGREGATOR_STAFF_MEMBERSHIPS_ROOT,
-  aggregatorKey: AGGREGATOR_KEY,
-  postStaffMembershipForUser,
-  fetchCompanyStaff: fetchCompanyStaffByCompanyId,
-});
 
 app.get("/api/industries", handleIndustriesList);
 app.get("/api/industries/", handleIndustriesList);
@@ -2714,6 +2654,66 @@ async function handleEmployerJobDelete(req, res) {
     return res.status(500).json({ detail: "Internal server error" });
   }
 }
+
+/**
+ * @param {number} companyId
+ */
+async function fetchStaffForCompany(companyId) {
+  const url = new URL(AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, ""));
+  url.searchParams.set("company_id", String(companyId));
+  const res = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY || "",
+    },
+  });
+  if (!res.ok) return [];
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * @param {string | number} companyIdRaw
+ * @param {{ userId: string; email?: string; firstName?: string; lastName?: string }} userCtx
+ */
+async function postStaffMembershipForUser(companyIdRaw, userCtx) {
+  const n = Number(companyIdRaw);
+  if (!Number.isFinite(n)) {
+    return {
+      ok: false,
+      status: 400,
+      data: { detail: "company_id must be a finite number" },
+    };
+  }
+  const url = AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY || "",
+    },
+    body: JSON.stringify({
+      company_id: n,
+      external_user_id: String(userCtx.userId),
+      external_user_email: userCtx.email ?? "",
+      external_user_name: userCtx.firstName ?? "",
+      external_user_surname: userCtx.lastName ?? "",
+      is_admin: false,
+    }),
+  });
+  const text = await res.text();
+  const data = parseUpstreamJson(text);
+  const ok = res.ok || isDuplicateStaffMembershipResponse(res.status, data);
+  return { ok, status: res.status, data, text };
+}
+
+registerEmployerJoinRequestRoutes(app, {
+  requireEmployerAuth,
+  aggregatorStaffRoot: AGGREGATOR_STAFF_MEMBERSHIPS_ROOT,
+  aggregatorKey: AGGREGATOR_KEY,
+  postStaffMembershipForUser,
+  fetchStaffForCompany,
+});
 
 export { app };
 

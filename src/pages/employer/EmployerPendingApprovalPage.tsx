@@ -1,116 +1,86 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Clock } from "lucide-react";
-import { BreneoLogo } from "@/components/common/BreneoLogo";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Button } from "@/components/ui/button";
-import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  fetchEmployerAccessState,
+  fetchMyEmployerJoinRequest,
+  type EmployerJoinRequest,
+} from "@/api/employer/employerJoinRequests";
 import { getLocalizedPath } from "@/utils/localeUtils";
-import { resolveEmployerAccessFromSession } from "@/api/employer/employerAccess";
-import { useAuth } from "@/contexts/AuthContext";
-import apiClient from "@/api/auth/apiClient";
-import { API_ENDPOINTS } from "@/api/auth/endpoints";
-
-const POLL_MS = 10_000;
+import { useLanguage } from "@/contexts/LanguageContext";
+import { toast } from "sonner";
 
 export default function EmployerPendingApprovalPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { user } = useAuth();
-  const [companyName, setCompanyName] = useState("");
-  const [checking, setChecking] = useState(true);
+  const [request, setRequest] = useState<EmployerJoinRequest | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
-
-    const check = async () => {
+    const poll = async () => {
       try {
-        let profileRaw: unknown;
-        try {
-          const res = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
-          profileRaw = res.data;
-        } catch {
-          profileRaw = undefined;
-        }
-        const access = await resolveEmployerAccessFromSession(
-          profileRaw,
-          user?.email,
-        );
+        const access = await fetchEmployerAccessState();
         if (cancelled) return;
-
         if (access.state === "active") {
-          navigate(getLocalizedPath("/employer/jobs", language), {
+          toast.success("Your company access was approved.");
+          navigate(getLocalizedPath("/employer/home", language), {
             replace: true,
           });
           return;
         }
-        if (access.state === "needs_company") {
-          navigate(getLocalizedPath("/employer/join-company", language), {
-            replace: true,
-          });
+        if (access.state === "pending" && access.request) {
+          setRequest(access.request);
           return;
         }
-
-        setCompanyName(
-          access.pendingRequest?.company_name ||
-            access.companyName ||
-            "your company",
-        );
-        setChecking(false);
+        const row = await fetchMyEmployerJoinRequest();
+        if (cancelled) return;
+        setRequest(row);
+        if (row?.status === "approved") {
+          toast.success("Your company access was approved.");
+          navigate(getLocalizedPath("/employer/home", language), {
+            replace: true,
+          });
+        }
       } catch {
-        if (!cancelled) setChecking(false);
+        /* keep waiting UI */
       }
     };
-
-    void check();
-    timer = setInterval(() => void check(), POLL_MS);
-
+    void poll();
+    const id = window.setInterval(poll, 8000);
     return () => {
       cancelled = true;
-      if (timer) clearInterval(timer);
+      window.clearInterval(id);
     };
-  }, [language, navigate, user?.email]);
+  }, [navigate, language]);
 
-  if (checking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
-      </div>
-    );
-  }
+  const companyLabel = request?.company_name?.trim() || "your selected company";
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <BreneoLogo className="h-6" />
-        <ThemeToggle />
-      </header>
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 text-center max-w-md mx-auto">
-        <div className="mb-8 flex h-28 w-28 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-          <Clock className="h-14 w-14" strokeWidth={1.25} />
-        </div>
-        <h1 className="text-2xl font-semibold mb-2">Waiting for approval</h1>
-        <p className="text-muted-foreground text-sm mb-6">
-          Your request to join{" "}
-          <span className="font-medium text-foreground">{companyName}</span>{" "}
-          was sent to the company admin. You will get access once they approve
-          you.
-        </p>
-        <p className="text-xs text-muted-foreground mb-8">
-          This page refreshes automatically. You can also check back later.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          className="rounded-xl"
-          onClick={() =>
-            navigate(getLocalizedPath("/employer/join-company", language))
-          }
-        >
-          Choose a different company
-        </Button>
-      </main>
-    </div>
+    <DashboardLayout>
+      <div className="max-w-lg mx-auto pt-8 pb-24 px-4">
+        <Card className="border-0 rounded-3xl">
+          <CardHeader className="p-6 pb-2">
+            <div className="flex items-start gap-3">
+              <Clock className="h-8 w-8 text-breneo-blue shrink-0" />
+              <div>
+                <h1 className="text-lg font-bold">Waiting for approval</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your request to join {companyLabel} was sent to the company
+                  admin. You will get access once they approve you.
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-6 pb-6 text-sm text-muted-foreground">
+            <p>
+              This page refreshes automatically. You can also check back later
+              from your email once an admin accepts your request.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
   );
 }

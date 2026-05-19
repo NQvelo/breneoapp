@@ -12,8 +12,14 @@ import {
   assertEmployerJobsProxyConfigured,
   getEmployerJobsApiBaseUrl,
 } from "@/api/employer/employerJobsApiBase";
-import { extractBreneoUserIdFromEmployerProfileRaw } from "@/api/employer/profile";
-import { uploadEmployerCompanyLogoToAggregator } from "@/api/employer/employerProfileApi";
+import {
+  extractBreneoUserIdFromEmployerProfileRaw,
+  resolveEmployerStaffUserId,
+} from "@/api/employer/profile";
+import {
+  fetchEmployerCompanyFromAggregator,
+  uploadEmployerCompanyLogoToAggregator,
+} from "@/api/employer/employerProfileApi";
 import {
   extractAggregatorErrorMessage,
   parseAggregatorFieldErrors,
@@ -881,10 +887,79 @@ export async function joinOrCreateEmployerAggregatorCompany(args: {
   });
 }
 
+export type EmployerLinkedCompany = {
+  companyId: number;
+  companyName: string;
+  companies: AggregatorCompany[];
+};
+
+/**
+ * Resolve the employer's linked directory company from for-user listings or staff memberships.
+ */
+export async function resolveEmployerLinkedCompany(params: {
+  breneoUserId?: string | number;
+  employerProfileRaw?: unknown;
+}): Promise<EmployerLinkedCompany | null> {
+  const staffUserId = resolveEmployerStaffUserId({
+    accessToken: TokenManager.getAccessToken(),
+    employerProfileRaw: params.employerProfileRaw,
+    authUserId: params.breneoUserId,
+  });
+  if (!staffUserId) return null;
+
+  try {
+    const companies = await fetchEmployerAggregatorCompanies(staffUserId);
+    if (companies.length > 0) {
+      const first = companies[0];
+      const pk = parseAggregatorCompanyPk(first.id);
+      if (pk != null) {
+        const name =
+          first.name != null && String(first.name).trim() !== ""
+            ? String(first.name).trim()
+            : `Company ${pk}`;
+        return { companyId: pk, companyName: name, companies };
+      }
+    }
+  } catch {
+    /* staff-memberships fallback */
+  }
+
+  try {
+    const memberships = await fetchEmployerStaffMemberships({
+      externalUserId: staffUserId,
+    });
+    const membership =
+      memberships.find((m) => m.external_user_id === staffUserId) ??
+      memberships[0];
+    if (!membership?.company_id) return null;
+
+    const pk = membership.company_id;
+    let companyName = `Company ${pk}`;
+    try {
+      const detail = await fetchEmployerCompanyFromAggregator({
+        companyId: pk,
+        externalUserId: staffUserId,
+      });
+      const rawName = detail.name ?? detail.company_name;
+      if (rawName != null && String(rawName).trim() !== "") {
+        companyName = String(rawName).trim();
+      }
+    } catch {
+      /* name optional */
+    }
+    return {
+      companyId: pk,
+      companyName,
+      companies: [{ id: pk, name: companyName }],
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Prefer aggregator company id from `/api/employer/companies/for-user` for job list/detail when present.
- * Pass `employerProfileRaw` so `external_user_id` matches the profile/directory page (nested `user.id`
- * may differ from auth context `user.id` on some backends).
+ * Falls back to staff-memberships when for-user is empty (e.g. after join approval).
  */
 export async function resolveEmployerJobsCompanyFilter(params: {
   breneoUserId: string | number | undefined;
@@ -899,46 +974,20 @@ export async function resolveEmployerJobsCompanyFilter(params: {
 }> {
   const { profileCompanyId, profileCompanyName } = params;
   const profileFallback = (profileCompanyName || "").trim();
-  const fromProfile = params.employerProfileRaw
-    ? extractBreneoUserIdFromEmployerProfileRaw(params.employerProfileRaw)
-    : null;
-  const staffUserId =
-    fromProfile && fromProfile.trim() !== ""
-      ? fromProfile.trim()
-      : params.breneoUserId != null && String(params.breneoUserId).trim() !== ""
-        ? String(params.breneoUserId).trim()
-        : "";
-  if (staffUserId === "") {
+
+  const linked = await resolveEmployerLinkedCompany({
+    breneoUserId: params.breneoUserId,
+    employerProfileRaw: params.employerProfileRaw,
+  });
+  if (linked) {
     return {
-      companyId: profileCompanyId,
-      companyName: profileCompanyName,
-      linkedDirectoryCompanyName: profileFallback,
+      companyId: String(linked.companyId),
+      companyName: linked.companyName || profileCompanyName,
+      linkedDirectoryCompanyName:
+        linked.companyName || profileFallback,
     };
   }
-  try {
-    const list = await fetchEmployerAggregatorCompanies(staffUserId);
-    const first = list[0];
-    const fromDirectory =
-      first != null && first.name != null && String(first.name).trim() !== ""
-        ? String(first.name).trim()
-        : "";
-    if (first?.id != null && String(first.id).trim() !== "") {
-      return {
-        companyId: String(first.id),
-        companyName: fromDirectory || profileCompanyName,
-        linkedDirectoryCompanyName: fromDirectory || profileFallback,
-      };
-    }
-    if (fromDirectory) {
-      return {
-        companyId: profileCompanyId,
-        companyName: fromDirectory,
-        linkedDirectoryCompanyName: fromDirectory,
-      };
-    }
-  } catch {
-    /* use Breneo profile fallback */
-  }
+
   return {
     companyId: profileCompanyId,
     companyName: profileCompanyName,

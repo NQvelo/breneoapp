@@ -1,141 +1,51 @@
 /**
- * Employer company join requests (pending admin approval) + Supabase notifications.
+ * Employer join requests + admin notifications (Supabase + aggregator staff-memberships).
  */
-import { supabaseRest } from "./supabaseAdmin.mjs";
+import { supabaseRest, hasSupabaseServiceRole } from "./supabaseAdmin.mjs";
 
-const JOIN_REQUEST_KIND = "employer_join_request";
+const JOIN_NOTIF_PREFIX = "employer_join_request:";
 
 /**
- * @param {object} deps
- * @param {typeof import("express").Express} deps.app
- * @param {() => Promise<{ auth: string; userId: string; email: string; firstName: string; lastName: string } | null>} deps.requireEmployerAuth
- * @param {string} deps.aggregatorStaffRoot
- * @param {string} deps.aggregatorKey
- * @param {(companyIdRaw: string | number, ctx: { userId: string; email?: string; firstName?: string; lastName?: string }) => Promise<{ ok: boolean; status: number; data: unknown }>} deps.postStaffMembershipForUser
- * @param {(companyId: number) => Promise<Array<{ external_user_id: string; is_admin?: boolean }>>} deps.fetchCompanyStaff
+ * @param {import("express").Express} app
+ * @param {{
+ *   requireEmployerAuth: (req: import("express").Request, res: import("express").Response) => Promise<{ userId: string; email: string; firstName: string; lastName: string } | null>;
+ *   aggregatorStaffRoot: string;
+ *   aggregatorKey: string;
+ *   postStaffMembershipForUser: (companyIdRaw: string | number, ctx: { userId: string; email?: string; firstName?: string; lastName?: string }) => Promise<{ ok: boolean; status: number; data: unknown }>;
+ *   fetchStaffForCompany: (companyId: number) => Promise<Array<{ external_user_id: string; is_admin?: boolean }>>;
+ * }} deps
  */
-export function registerEmployerJoinRequestRoutes(deps) {
-  const { app, requireEmployerAuth, postStaffMembershipForUser, fetchCompanyStaff } =
-    deps;
+export function registerEmployerJoinRequestRoutes(app, deps) {
+  const {
+    requireEmployerAuth,
+    postStaffMembershipForUser,
+    fetchStaffForCompany,
+  } = deps;
 
-  async function insertNotification(row) {
-    return supabaseRest("notifications", {
-      method: "POST",
-      body: row,
-      prefer: "return=minimal",
-    });
-  }
+  app.get("/api/employer/access-state", handleAccessState);
+  app.get("/api/employer/access-state/", handleAccessState);
 
-  async function notifyCompanyAdmins(companyId, companyName, joinRequestId, requester) {
-    const staff = await fetchCompanyStaff(companyId);
-    const admins = staff.filter((m) => m.is_admin);
-    const targets = admins.length > 0 ? admins : staff;
-    const name = [requester.firstName, requester.lastName].filter(Boolean).join(" ").trim();
-    const display = name || requester.email || "Someone";
-    const message = JSON.stringify({
-      kind: JOIN_REQUEST_KIND,
-      join_request_id: joinRequestId,
-      company_id: companyId,
-      company_name: companyName,
-      requester_user_id: requester.userId,
-      requester_name: requester.firstName,
-      requester_surname: requester.lastName,
-      requester_email: requester.email,
-    });
-    for (const admin of targets) {
-      const adminId = String(admin.external_user_id || "").trim();
-      if (!adminId || adminId === requester.userId) continue;
-      await insertNotification({
-        title: "Company join request",
-        message,
-        type: "info",
-        recipient_id: adminId,
-        is_read: false,
-      });
-    }
-  }
+  app.get("/api/employer/join-requests/me", handleJoinRequestMe);
+  app.get("/api/employer/join-requests/me/", handleJoinRequestMe);
 
-  async function notifyRequester(userId, title, message, type = "success") {
-    await insertNotification({
-      title,
-      message,
-      type,
-      recipient_id: userId,
-      is_read: false,
-    });
-  }
+  app.get("/api/employer/join-requests/inbox", handleJoinRequestInbox);
+  app.get("/api/employer/join-requests/inbox/", handleJoinRequestInbox);
 
   app.post("/api/employer/join-requests", handleJoinRequestCreate);
   app.post("/api/employer/join-requests/", handleJoinRequestCreate);
-  app.get("/api/employer/join-requests/me", handleJoinRequestMe);
-  app.get("/api/employer/join-requests/me/", handleJoinRequestMe);
-  app.get("/api/employer/join-requests/inbox", handleJoinRequestInbox);
-  app.get("/api/employer/join-requests/inbox/", handleJoinRequestInbox);
-  app.post("/api/employer/join-requests/:requestId/approve", handleJoinRequestApprove);
-  app.post("/api/employer/join-requests/:requestId/approve/", handleJoinRequestApprove);
-  app.post("/api/employer/join-requests/:requestId/reject", handleJoinRequestReject);
-  app.post("/api/employer/join-requests/:requestId/reject/", handleJoinRequestReject);
 
-  async function handleJoinRequestCreate(req, res) {
+  app.post("/api/employer/join-requests/:requestId/approve", handleJoinRequestApprove);
+  app.post(
+    "/api/employer/join-requests/:requestId/approve/",
+    handleJoinRequestApprove,
+  );
+
+  async function handleAccessState(req, res) {
     try {
       const ctx = await requireEmployerAuth(req, res);
       if (!ctx) return;
-      const raw =
-        req.body && typeof req.body === "object" && !Array.isArray(req.body)
-          ? /** @type {Record<string, unknown>} */ (req.body)
-          : {};
-      const companyId = Number(raw.company_id);
-      const companyName = String(raw.company_name || "").trim();
-      if (!Number.isFinite(companyId) || !companyName) {
-        return res.status(400).json({
-          detail: "company_id and company_name are required",
-        });
-      }
-
-      const existingPending = await supabaseRest("employer_join_requests", {
-        query: `requester_user_id=eq.${encodeURIComponent(ctx.userId)}&status=eq.pending&select=id&limit=1`,
-      });
-      if (
-        existingPending.ok &&
-        Array.isArray(existingPending.data) &&
-        existingPending.data.length > 0
-      ) {
-        return res.status(409).json({
-          detail: "You already have a pending join request.",
-        });
-      }
-
-      const insert = await supabaseRest("employer_join_requests", {
-        method: "POST",
-        body: {
-          company_id: companyId,
-          company_name: companyName,
-          requester_user_id: ctx.userId,
-          requester_email: ctx.email || "",
-          requester_name: ctx.firstName || "",
-          requester_surname: ctx.lastName || "",
-          status: "pending",
-        },
-        prefer: "return=representation",
-      });
-      if (!insert.ok) {
-        return res.status(insert.status >= 400 ? insert.status : 502).json({
-          detail:
-            (insert.data && typeof insert.data === "object" && insert.data.message) ||
-            "Could not create join request",
-        });
-      }
-      const row = Array.isArray(insert.data) ? insert.data[0] : insert.data;
-      const joinRequestId = row?.id ? String(row.id) : "";
-
-      await notifyCompanyAdmins(companyId, companyName, joinRequestId, {
-        userId: ctx.userId,
-        email: ctx.email,
-        firstName: ctx.firstName,
-        lastName: ctx.lastName,
-      });
-
-      return res.status(201).json(row);
+      const state = await resolveEmployerAccessState(ctx.userId);
+      return res.status(200).json(state);
     } catch (e) {
       console.error(e);
       return res.status(500).json({ detail: "Internal server error" });
@@ -146,16 +56,13 @@ export function registerEmployerJoinRequestRoutes(deps) {
     try {
       const ctx = await requireEmployerAuth(req, res);
       if (!ctx) return;
-      const q = await supabaseRest("employer_join_requests", {
-        query: `requester_user_id=eq.${encodeURIComponent(ctx.userId)}&status=eq.pending&select=*&order=created_at.desc&limit=1`,
-      });
-      if (!q.ok) {
-        return res.status(q.status >= 400 ? q.status : 502).json({
-          detail: "Could not load join request",
+      if (!hasSupabaseServiceRole()) {
+        return res.status(500).json({
+          detail: "Join requests require SUPABASE_SERVICE_ROLE_KEY on the BFF.",
         });
       }
-      const row = Array.isArray(q.data) && q.data.length > 0 ? q.data[0] : null;
-      return res.status(200).json(row);
+      const row = await getLatestJoinRequestForUser(ctx.userId);
+      return res.status(200).json({ request: row });
     } catch (e) {
       console.error(e);
       return res.status(500).json({ detail: "Internal server error" });
@@ -166,124 +73,186 @@ export function registerEmployerJoinRequestRoutes(deps) {
     try {
       const ctx = await requireEmployerAuth(req, res);
       if (!ctx) return;
-      const staff = await fetchCompanyStaffForAdmin(ctx.userId);
-      const adminCompanyIds = [
-        ...new Set(
-          staff
-            .filter((m) => m.is_admin)
-            .map((m) => Number(m.company_id))
-            .filter((n) => Number.isFinite(n)),
-        ),
-      ];
-      if (adminCompanyIds.length === 0) {
-        return res.status(200).json([]);
-      }
-      const idList = adminCompanyIds.join(",");
-      const q = await supabaseRest("employer_join_requests", {
-        query: `status=eq.pending&company_id=in.(${idList})&select=*&order=created_at.desc`,
-      });
-      if (!q.ok) {
-        return res.status(q.status >= 400 ? q.status : 502).json({
-          detail: "Could not load join requests",
+      if (!hasSupabaseServiceRole()) {
+        return res.status(500).json({
+          detail: "Join requests require SUPABASE_SERVICE_ROLE_KEY on the BFF.",
         });
       }
-      return res.status(200).json(Array.isArray(q.data) ? q.data : []);
+      const adminCompanyIds = await listAdminCompanyIdsForUser(ctx.userId);
+      if (adminCompanyIds.length === 0) {
+        return res.status(200).json({ requests: [] });
+      }
+      const companyFilter = adminCompanyIds.join(",");
+      const pending = await supabaseRest(
+        `employer_join_requests?status=eq.pending&company_id=in.(${companyFilter})&order=created_at.desc`,
+        { method: "GET" },
+      );
+      if (!pending.ok) {
+        return res
+          .status(pending.status >= 400 ? pending.status : 502)
+          .json(pending.data ?? { detail: "Could not load join requests." });
+      }
+      const requests = Array.isArray(pending.data) ? pending.data : [];
+      return res.status(200).json({ requests });
     } catch (e) {
       console.error(e);
       return res.status(500).json({ detail: "Internal server error" });
     }
   }
 
-  async function fetchCompanyStaffForAdmin(userId) {
-    const url = new URL(deps.aggregatorStaffRoot.replace(/\/$/, ""));
-    url.searchParams.set("external_user_id", userId);
-    const upstream = await fetch(url.toString(), {
-      headers: {
-        Accept: "application/json",
-        "X-Employer-Key": deps.aggregatorKey,
-      },
-    });
-    const text = await upstream.text();
-    let data = [];
+  async function handleJoinRequestCreate(req, res) {
     try {
-      data = text ? JSON.parse(text) : [];
-    } catch {
-      return [];
-    }
-    if (!upstream.ok || !Array.isArray(data)) return [];
-    return data;
-  }
+      const ctx = await requireEmployerAuth(req, res);
+      if (!ctx) return;
+      if (!hasSupabaseServiceRole()) {
+        return res.status(500).json({
+          detail: "Join requests require SUPABASE_SERVICE_ROLE_KEY on the BFF.",
+        });
+      }
+      const raw =
+        req.body && typeof req.body === "object" && !Array.isArray(req.body)
+          ? /** @type {Record<string, unknown>} */ (req.body)
+          : {};
+      const companyId = Number(raw.company_id ?? raw.companyId);
+      const companyName = String(raw.company_name ?? raw.companyName ?? "").trim();
+      if (!Number.isFinite(companyId) || companyId <= 0) {
+        return res.status(400).json({ detail: "company_id is required" });
+      }
+      if (!companyName) {
+        return res.status(400).json({ detail: "company_name is required" });
+      }
 
-  async function loadJoinRequest(requestId) {
-    const q = await supabaseRest("employer_join_requests", {
-      query: `id=eq.${encodeURIComponent(requestId)}&select=*&limit=1`,
-    });
-    if (!q.ok || !Array.isArray(q.data) || q.data.length === 0) return null;
-    return q.data[0];
-  }
+      const access = await resolveEmployerAccessState(ctx.userId);
+      if (access.state === "active") {
+        return res.status(400).json({
+          detail: "You are already a member of a company.",
+        });
+      }
+      if (access.state === "pending" && access.request) {
+        return res.status(200).json({ request: access.request });
+      }
 
-  async function assertAdminForCompany(ctx, companyId) {
-    const staff = await fetchCompanyStaff(companyId);
-    const isAdmin = staff.some(
-      (m) =>
-        String(m.external_user_id) === ctx.userId && Boolean(m.is_admin),
-    );
-    if (!isAdmin) {
-      return false;
+      const staff = await fetchStaffForCompany(companyId);
+      const alreadyMember = staff.some(
+        (m) => String(m.external_user_id) === String(ctx.userId),
+      );
+      if (alreadyMember) {
+        return res.status(400).json({
+          detail: "You are already a member of this company.",
+        });
+      }
+
+      const insert = await supabaseRest("employer_join_requests", {
+        method: "POST",
+        body: JSON.stringify({
+          company_id: companyId,
+          company_name: companyName,
+          requester_user_id: ctx.userId,
+          requester_email: ctx.email ?? "",
+          requester_name: ctx.firstName ?? "",
+          requester_surname: ctx.lastName ?? "",
+          status: "pending",
+        }),
+      });
+      if (!insert.ok) {
+        return res
+          .status(insert.status >= 400 ? insert.status : 502)
+          .json(insert.data ?? { detail: "Could not create join request." });
+      }
+      const row = Array.isArray(insert.data) ? insert.data[0] : insert.data;
+      await notifyCompanyAdminsOfJoinRequest(row, ctx);
+      return res.status(201).json({ request: row });
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ detail: "Internal server error" });
     }
-    return true;
   }
 
   async function handleJoinRequestApprove(req, res) {
     try {
       const ctx = await requireEmployerAuth(req, res);
       if (!ctx) return;
-      const requestId = String(req.params.requestId || "").trim();
-      const row = await loadJoinRequest(requestId);
-      if (!row || row.status !== "pending") {
-        return res.status(404).json({ detail: "Join request not found" });
+      if (!hasSupabaseServiceRole()) {
+        return res.status(500).json({
+          detail: "Join requests require SUPABASE_SERVICE_ROLE_KEY on the BFF.",
+        });
       }
+      const requestId = String(req.params.requestId || "").trim();
+      if (!requestId) {
+        return res.status(400).json({ detail: "request id is required" });
+      }
+
+      const get = await supabaseRest(
+        `employer_join_requests?id=eq.${encodeURIComponent(requestId)}&limit=1`,
+        { method: "GET" },
+      );
+      if (!get.ok || !Array.isArray(get.data) || get.data.length === 0) {
+        return res.status(404).json({ detail: "Join request not found." });
+      }
+      const row = /** @type {Record<string, unknown>} */ (get.data[0]);
+      if (String(row.status) !== "pending") {
+        return res.status(400).json({ detail: "Join request is no longer pending." });
+      }
+
       const companyId = Number(row.company_id);
-      if (!(await assertAdminForCompany(ctx, companyId))) {
+      const adminCompanyIds = await listAdminCompanyIdsForUser(ctx.userId);
+      if (!adminCompanyIds.includes(companyId)) {
         return res.status(403).json({
           detail: "Only company admins can approve join requests.",
         });
       }
 
+      const requesterId = String(row.requester_user_id ?? "");
       const link = await postStaffMembershipForUser(companyId, {
-        userId: String(row.requester_user_id),
-        email: String(row.requester_email || ""),
-        firstName: String(row.requester_name || ""),
-        lastName: String(row.requester_surname || ""),
+        userId: requesterId,
+        email: String(row.requester_email ?? ""),
+        firstName: String(row.requester_name ?? ""),
+        lastName: String(row.requester_surname ?? ""),
       });
       if (!link.ok) {
-        return res.status(link.status >= 400 ? link.status : 502).json(
-          typeof link.data === "object" && link.data !== null
-            ? link.data
-            : { detail: "Could not add staff membership" },
-        );
+        return res
+          .status(link.status >= 400 ? link.status : 502)
+          .json(
+            typeof link.data === "object" && link.data !== null
+              ? link.data
+              : { detail: "Could not add member to company." },
+          );
       }
 
-      await supabaseRest("employer_join_requests", {
-        method: "PATCH",
-        query: `id=eq.${encodeURIComponent(requestId)}`,
-        body: {
-          status: "approved",
-          reviewed_by_user_id: ctx.userId,
-          updated_at: new Date().toISOString(),
+      const patch = await supabaseRest(
+        `employer_join_requests?id=eq.${encodeURIComponent(requestId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: "approved",
+            reviewed_by_user_id: ctx.userId,
+            updated_at: new Date().toISOString(),
+          }),
         },
-        prefer: "return=minimal",
+      );
+      if (!patch.ok) {
+        return res
+          .status(patch.status >= 400 ? patch.status : 502)
+          .json(patch.data ?? { detail: "Member added but request update failed." });
+      }
+
+      const requesterName = [row.requester_name, row.requester_surname]
+        .map((x) => String(x ?? "").trim())
+        .filter(Boolean)
+        .join(" ");
+      await supabaseRest("notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Company join approved",
+          message: `Your request to join ${row.company_name} was approved. You can now use the employer dashboard.`,
+          type: "success",
+          recipient_id: requesterId,
+          is_read: false,
+        }),
       });
 
-      await notifyRequester(
-        String(row.requester_user_id),
-        "Join request approved",
-        `You can now access ${row.company_name}. Open your employer dashboard to get started.`,
-        "success",
-      );
-
       return res.status(200).json({
-        join_request: { ...row, status: "approved" },
+        request: Array.isArray(patch.data) ? patch.data[0] : patch.data,
         membership: link.data,
       });
     } catch (e) {
@@ -292,44 +261,103 @@ export function registerEmployerJoinRequestRoutes(deps) {
     }
   }
 
-  async function handleJoinRequestReject(req, res) {
-    try {
-      const ctx = await requireEmployerAuth(req, res);
-      if (!ctx) return;
-      const requestId = String(req.params.requestId || "").trim();
-      const row = await loadJoinRequest(requestId);
-      if (!row || row.status !== "pending") {
-        return res.status(404).json({ detail: "Join request not found" });
+  async function resolveEmployerAccessState(userId) {
+    const staffUrl = new URL(
+      `${deps.aggregatorStaffRoot.replace(/\/$/, "")}`,
+    );
+    staffUrl.searchParams.set("external_user_id", userId);
+    const staffRes = await fetch(staffUrl.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": deps.aggregatorKey || "",
+      },
+    });
+    if (staffRes.ok) {
+      const data = await staffRes.json().catch(() => []);
+      const rows = Array.isArray(data) ? data : [];
+      if (rows.length > 0) {
+        return { state: "active", membership: rows[0] };
       }
-      const companyId = Number(row.company_id);
-      if (!(await assertAdminForCompany(ctx, companyId))) {
-        return res.status(403).json({
-          detail: "Only company admins can reject join requests.",
-        });
-      }
+    }
 
-      await supabaseRest("employer_join_requests", {
-        method: "PATCH",
-        query: `id=eq.${encodeURIComponent(requestId)}`,
-        body: {
-          status: "rejected",
-          reviewed_by_user_id: ctx.userId,
-          updated_at: new Date().toISOString(),
-        },
-        prefer: "return=minimal",
+    const pending = await getLatestJoinRequestForUser(userId);
+    if (pending && String(pending.status) === "pending") {
+      return { state: "pending", request: pending };
+    }
+    if (pending && String(pending.status) === "approved") {
+      return { state: "active", request: pending };
+    }
+
+    return { state: "needs_company", request: pending };
+  }
+
+  async function getLatestJoinRequestForUser(userId) {
+    const res = await supabaseRest(
+      `employer_join_requests?requester_user_id=eq.${encodeURIComponent(userId)}&order=created_at.desc&limit=1`,
+      { method: "GET" },
+    );
+    if (!res.ok || !Array.isArray(res.data) || res.data.length === 0) {
+      return null;
+    }
+    return res.data[0];
+  }
+
+  async function listAdminCompanyIdsForUser(userId) {
+    const staffUrl = new URL(
+      `${deps.aggregatorStaffRoot.replace(/\/$/, "")}`,
+    );
+    staffUrl.searchParams.set("external_user_id", userId);
+    const staffRes = await fetch(staffUrl.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": deps.aggregatorKey || "",
+      },
+    });
+    if (!staffRes.ok) return [];
+    const memberships = await staffRes.json().catch(() => []);
+    const rows = Array.isArray(memberships) ? memberships : [];
+    const adminCompanyIds = rows
+      .filter((m) => m && m.is_admin && m.company_id != null)
+      .map((m) => Number(m.company_id))
+      .filter((n) => Number.isFinite(n));
+    return [...new Set(adminCompanyIds)];
+  }
+
+  async function notifyCompanyAdminsOfJoinRequest(requestRow, requesterCtx) {
+    if (!requestRow || typeof requestRow !== "object") return;
+    const companyId = Number(
+      /** @type {Record<string, unknown>} */ (requestRow).company_id,
+    );
+    if (!Number.isFinite(companyId)) return;
+    const staff = await fetchStaffForCompany(companyId);
+    const admins = staff.filter((m) => m.is_admin && m.external_user_id);
+    const companyName = String(
+      /** @type {Record<string, unknown>} */ (requestRow).company_name ?? "",
+    );
+    const requesterLabel =
+      [requesterCtx.firstName, requesterCtx.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      requesterCtx.email ||
+      requesterCtx.userId;
+    const requestId = String(
+      /** @type {Record<string, unknown>} */ (requestRow).id ?? "",
+    );
+
+    for (const admin of admins) {
+      const adminId = String(admin.external_user_id);
+      if (adminId === requesterCtx.userId) continue;
+      await supabaseRest("notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Company join request",
+          message: `${JOIN_NOTIF_PREFIX}${requestId}|${requesterLabel} wants to join ${companyName}. Open Notifications to approve.`,
+          type: "info",
+          recipient_id: adminId,
+          is_read: false,
+        }),
       });
-
-      await notifyRequester(
-        String(row.requester_user_id),
-        "Join request declined",
-        `Your request to join ${row.company_name} was declined. You can search for another company.`,
-        "warning",
-      );
-
-      return res.status(200).json({ ...row, status: "rejected" });
-    } catch (e) {
-      console.error(e);
-      return res.status(500).json({ detail: "Internal server error" });
     }
   }
 }

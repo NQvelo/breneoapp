@@ -1,25 +1,78 @@
 import React, { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
-  resolveEmployerAccessFromSession,
-  type EmployerAccessSnapshot,
-} from "@/api/employer/employerAccess";
+  fetchEmployerStaffMemberships,
+} from "@/api/employer/aggregatorBffApi";
+import {
+  fetchEmployerAccessState,
+  type EmployerAccessState,
+} from "@/api/employer/employerJoinRequests";
+import { resolveEmployerStaffUserId } from "@/api/employer/profile";
+import { TokenManager } from "@/api/auth/tokenManager";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
-import apiClient from "@/api/auth/apiClient";
-import { API_ENDPOINTS } from "@/api/auth/endpoints";
 
-type Props = { children: React.ReactNode };
+const ALLOWED_WHEN_PENDING = [
+  "/employer/pending-approval",
+  "/employer/notifications",
+  "/employer/settings",
+];
 
-/**
- * Redirects employers without company membership to join / pending flows.
- */
-export function EmployerAccessGate({ children }: Props) {
-  const { user } = useAuth();
-  const { language } = useLanguage();
+const ALLOWED_WHEN_NEEDS_COMPANY = [
+  "/employer/join-company",
+  "/employer/register",
+  "/employer/pending-approval",
+  "/employer/notifications",
+  "/employer/settings",
+];
+
+function pathWithoutLocale(pathname: string): string {
+  if (pathname.startsWith("/en/")) return pathname.slice(3) || "/";
+  if (pathname.startsWith("/ka/")) return pathname.slice(3) || "/";
+  return pathname;
+}
+
+function isAllowed(path: string, allowed: string[]): boolean {
+  return allowed.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+  );
+}
+
+async function userHasStaffMembership(): Promise<boolean> {
+  const staffUserId = resolveEmployerStaffUserId({
+    accessToken: TokenManager.getAccessToken(),
+  });
+  if (!staffUserId) return false;
+  try {
+    const rows = await fetchEmployerStaffMemberships({
+      externalUserId: staffUserId,
+    });
+    return rows.some((m) => m.external_user_id === staffUserId);
+  } catch {
+    return false;
+  }
+}
+
+async function loadEmployerAccessState(): Promise<EmployerAccessState> {
+  try {
+    const state = await fetchEmployerAccessState();
+    if (state.state === "needs_company" && (await userHasStaffMembership())) {
+      return { state: "active" };
+    }
+    return state;
+  } catch {
+    if (await userHasStaffMembership()) {
+      return { state: "active" };
+    }
+    return { state: "needs_company" };
+  }
+}
+
+export function EmployerAccessGate({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
   const location = useLocation();
-  const [snapshot, setSnapshot] = useState<EmployerAccessSnapshot | null>(null);
+  const { language } = useLanguage();
+  const [access, setAccess] = useState<EmployerAccessState | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,26 +80,9 @@ export function EmployerAccessGate({ children }: Props) {
     (async () => {
       setLoading(true);
       try {
-        let profileRaw: unknown;
-        try {
-          const res = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
-          profileRaw = res.data;
-        } catch {
-          profileRaw = undefined;
-        }
-        const access = await resolveEmployerAccessFromSession(
-          profileRaw,
-          user?.email,
-        );
-        if (!cancelled) setSnapshot(access);
-      } catch {
-        if (!cancelled) {
-          setSnapshot({
-            state: "needs_company",
-            companyName: "",
-            pendingRequest: null,
-          });
-        }
+        const state = await loadEmployerAccessState();
+        if (cancelled) return;
+        setAccess(state);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -54,24 +90,43 @@ export function EmployerAccessGate({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [user?.email, user?.id, location.pathname]);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (loading || !access) return;
+    const path = pathWithoutLocale(location.pathname);
+
+    if (access.state === "active") {
+      if (path === "/employer/pending-approval") {
+        navigate(getLocalizedPath("/employer/home", language), { replace: true });
+      }
+      return;
+    }
+
+    if (access.state === "pending") {
+      if (!isAllowed(path, ALLOWED_WHEN_PENDING)) {
+        navigate(getLocalizedPath("/employer/pending-approval", language), {
+          replace: true,
+        });
+      }
+      return;
+    }
+
+    if (access.state === "needs_company") {
+      if (!isAllowed(path, ALLOWED_WHEN_NEEDS_COMPANY)) {
+        navigate(getLocalizedPath("/employer/join-company", language), {
+          replace: true,
+        });
+      }
+    }
+  }, [access, loading, location.pathname, navigate, language]);
 
   if (loading) {
     return (
-      <div className="min-h-[40vh] flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+      <div className="min-h-[40vh] flex items-center justify-center text-muted-foreground text-sm">
+        Loading…
       </div>
     );
-  }
-
-  const joinPath = getLocalizedPath("/employer/join-company", language);
-  const pendingPath = getLocalizedPath("/employer/pending-approval", language);
-
-  if (snapshot?.state === "needs_company") {
-    return <Navigate to={joinPath} replace />;
-  }
-  if (snapshot?.state === "pending_approval") {
-    return <Navigate to={pendingPath} replace />;
   }
 
   return <>{children}</>;

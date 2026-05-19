@@ -667,24 +667,25 @@ const EmployerRegistrationPage = () => {
       let directoryLogoUrl = companyLogoUrl.trim() || undefined;
 
       let aggregatorCompanyOk = false;
-      let pendingJoinRequest = false;
       let aggregatorCompanyId: number | string | undefined;
       let joinedAsAdmin = false;
+      let pendingJoinApproval = false;
       try {
         if (selectedDirectoryCompany?.id != null) {
+          aggregatorCompanyId = selectedDirectoryCompany.id;
           const pk = parseAggregatorCompanyPk(selectedDirectoryCompany.id);
           if (pk == null) {
-            throw new Error("Invalid company id.");
+            throw new Error("Invalid company id from directory.");
           }
-          const joinCompanyName =
+          const joinName =
             String(selectedDirectoryCompany.name ?? breneoCompanyName).trim() ||
             `Company ${pk}`;
           await createEmployerJoinRequest({
             companyId: pk,
-            companyName: joinCompanyName,
+            companyName: joinName,
           });
+          pendingJoinApproval = true;
           aggregatorCompanyOk = true;
-          pendingJoinRequest = true;
         } else {
           const aggregatorPayload = buildAggregatorCompanyCreatePayload({
             name: companyName.trim(),
@@ -790,11 +791,17 @@ const EmployerRegistrationPage = () => {
       sessionStorage.removeItem(SESSION_EMPLOYER_LAST);
 
       if (aggregatorCompanyOk) {
-        if (pendingJoinRequest) {
+        if (pendingJoinApproval) {
           toast.success(
-            "Profile saved. Your join request was sent to the company admin.",
+            "Profile saved. Your join request was sent — a company admin must approve you.",
           );
-        } else if (joinedAsAdmin) {
+          window.location.href = getLocalizedPath(
+            "/employer/pending-approval",
+            language,
+          );
+          return;
+        }
+        if (joinedAsAdmin) {
           toast.success(
             "Profile saved. You are the company admin — as the first member, you manage team access.",
           );
@@ -802,12 +809,7 @@ const EmployerRegistrationPage = () => {
           toast.success("Profile saved. Welcome!");
         }
       }
-      window.location.href = getLocalizedPath(
-        pendingJoinRequest
-          ? "/employer/pending-approval"
-          : "/employer/jobs",
-        language,
-      );
+      window.location.href = getLocalizedPath("/employer/jobs", language);
     } catch (err: unknown) {
       const ax = err as {
         response?: { data?: unknown; status?: number };

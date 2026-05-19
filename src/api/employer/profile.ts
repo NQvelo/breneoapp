@@ -44,6 +44,27 @@ export function extractBreneoCompanyIdFromEmployerProfileRaw(
 }
 
 /** Breneo user id for job-aggregator `staff_user_id` / `staff_user_ids`. */
+/** Prefer JWT id — must match BFF `requireEmployerAuth` / aggregator `external_user_id`. */
+export function resolveEmployerStaffUserId(params: {
+  accessToken?: string | null;
+  employerProfileRaw?: unknown;
+  authUserId?: string | number | null;
+}): string {
+  const token = params.accessToken?.trim() || null;
+  if (token) {
+    const fromJwt = extractBreneoUserIdFromJwt(token);
+    if (fromJwt?.trim()) return fromJwt.trim();
+  }
+  const fromProfile = params.employerProfileRaw
+    ? extractBreneoUserIdFromEmployerProfileRaw(params.employerProfileRaw)
+    : null;
+  if (fromProfile?.trim()) return fromProfile.trim();
+  if (params.authUserId != null && String(params.authUserId).trim() !== "") {
+    return String(params.authUserId).trim();
+  }
+  return "";
+}
+
 export function extractBreneoUserIdFromEmployerProfileRaw(
   data: unknown,
 ): string | null {

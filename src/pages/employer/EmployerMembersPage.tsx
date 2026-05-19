@@ -5,23 +5,19 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
 import {
-  extractBreneoUserIdFromEmployerProfileRaw,
-  extractBreneoUserIdFromJwt,
-} from "@/api/employer/profile";
-import {
   countAdmins,
   deleteEmployerStaffMembership,
-  fetchEmployerAggregatorCompanies,
   fetchEmployerCompanyStaff,
   isCurrentUserAdmin,
-  parseAggregatorCompanyPk,
   patchEmployerStaffMembershipAdmin,
+  resolveEmployerLinkedCompany,
   staffDisplayName,
   staffFirstName,
   staffSurname,
   staffEmail,
   type CompanyStaffMembership,
 } from "@/api/employer/aggregatorBffApi";
+import { resolveEmployerStaffUserId } from "@/api/employer/profile";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,18 +51,17 @@ export default function EmployerMembersPage() {
     const token = TokenManager.getAccessToken();
     try {
       const prof = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
-      const fromProf = extractBreneoUserIdFromEmployerProfileRaw(prof.data);
-      if (fromProf?.trim()) return fromProf.trim();
+      return resolveEmployerStaffUserId({
+        accessToken: token,
+        employerProfileRaw: prof.data,
+        authUserId: user?.id,
+      });
     } catch {
-      /* fallback */
+      return resolveEmployerStaffUserId({
+        accessToken: token,
+        authUserId: user?.id,
+      });
     }
-    if (token) {
-      const fromJwt = extractBreneoUserIdFromJwt(token);
-      if (fromJwt?.trim()) return fromJwt.trim();
-    }
-    if (user?.id != null && String(user.id).trim() !== "")
-      return String(user.id).trim();
-    return "";
   }, [user?.id]);
 
   useEffect(() => {
@@ -82,15 +77,23 @@ export default function EmployerMembersPage() {
         setBreneoUserId(uid);
         if (!uid) return;
 
-        const list = await fetchEmployerAggregatorCompanies(uid);
+        let profRaw: unknown;
+        try {
+          const prof = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
+          profRaw = prof.data;
+        } catch {
+          profRaw = undefined;
+        }
+
+        const linked = await resolveEmployerLinkedCompany({
+          breneoUserId: uid,
+          employerProfileRaw: profRaw,
+        });
         if (cancelled) return;
+        if (!linked) return;
 
-        const first = list[0];
-        const pk = first ? parseAggregatorCompanyPk(first.id) : null;
-        if (pk == null) return;
-
-        setCompanyId(pk);
-        const rows = await fetchEmployerCompanyStaff(pk);
+        setCompanyId(linked.companyId);
+        const rows = await fetchEmployerCompanyStaff(linked.companyId);
         if (cancelled) return;
         setMemberships(rows);
       } catch (e) {
