@@ -22,7 +22,6 @@ import {
   aggregatorCompanyLogoUrl,
   buildAggregatorCompanyCreatePayload,
   joinOrCreateEmployerAggregatorCompany,
-  linkEmployerToAggregatorCompany,
   fetchEmployerStaffMemberships,
   fetchAggregatorIndustries,
   parseAggregatorCompanyPk,
@@ -33,6 +32,7 @@ import {
   extractBreneoUserIdFromEmployerProfileRaw,
   extractBreneoUserIdFromJwt,
 } from "@/api/employer/profile";
+import { createEmployerJoinRequest } from "@/api/employer/employerJoinRequests";
 import {
   fetchEmployerCompanyFromAggregator,
   uploadEmployerCompanyLogoToAggregator,
@@ -667,16 +667,24 @@ const EmployerRegistrationPage = () => {
       let directoryLogoUrl = companyLogoUrl.trim() || undefined;
 
       let aggregatorCompanyOk = false;
+      let pendingJoinRequest = false;
       let aggregatorCompanyId: number | string | undefined;
       let joinedAsAdmin = false;
       try {
         if (selectedDirectoryCompany?.id != null) {
-          aggregatorCompanyId = selectedDirectoryCompany.id;
-          const membership = await linkEmployerToAggregatorCompany(
-            String(selectedDirectoryCompany.id),
-            breneoUserId,
-          );
-          joinedAsAdmin = membership.is_admin;
+          const pk = parseAggregatorCompanyPk(selectedDirectoryCompany.id);
+          if (pk == null) {
+            throw new Error("Invalid company id.");
+          }
+          const joinCompanyName =
+            String(selectedDirectoryCompany.name ?? breneoCompanyName).trim() ||
+            `Company ${pk}`;
+          await createEmployerJoinRequest({
+            companyId: pk,
+            companyName: joinCompanyName,
+          });
+          aggregatorCompanyOk = true;
+          pendingJoinRequest = true;
         } else {
           const aggregatorPayload = buildAggregatorCompanyCreatePayload({
             name: companyName.trim(),
@@ -782,7 +790,11 @@ const EmployerRegistrationPage = () => {
       sessionStorage.removeItem(SESSION_EMPLOYER_LAST);
 
       if (aggregatorCompanyOk) {
-        if (joinedAsAdmin) {
+        if (pendingJoinRequest) {
+          toast.success(
+            "Profile saved. Your join request was sent to the company admin.",
+          );
+        } else if (joinedAsAdmin) {
           toast.success(
             "Profile saved. You are the company admin — as the first member, you manage team access.",
           );
@@ -790,7 +802,12 @@ const EmployerRegistrationPage = () => {
           toast.success("Profile saved. Welcome!");
         }
       }
-      window.location.href = getLocalizedPath("/employer/jobs", language);
+      window.location.href = getLocalizedPath(
+        pendingJoinRequest
+          ? "/employer/pending-approval"
+          : "/employer/jobs",
+        language,
+      );
     } catch (err: unknown) {
       const ax = err as {
         response?: { data?: unknown; status?: number };

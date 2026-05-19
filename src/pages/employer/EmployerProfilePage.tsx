@@ -56,9 +56,11 @@ import {
   fetchAggregatorIndustries,
   fetchEmployerAggregatorCompanies,
   joinOrCreateEmployerAggregatorCompany,
+  parseAggregatorCompanyPk,
   type AggregatorCompany,
   type AggregatorIndustry,
 } from "@/api/employer/aggregatorBffApi";
+import { createEmployerJoinRequest } from "@/api/employer/employerJoinRequests";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getLocalizedPath } from "@/utils/localeUtils";
 
@@ -333,12 +335,23 @@ export default function EmployerProfilePage() {
       });
 
       if (pickerSelected?.id != null) {
-        await joinOrCreateEmployerAggregatorCompany({
-          breneoUserId,
-          mode: "existing",
-          existingCompanyId: String(pickerSelected.id),
-          existingCompanyName: String(pickerSelected.name ?? ""),
+        const pk = parseAggregatorCompanyPk(pickerSelected.id);
+        if (pk == null) {
+          throw new Error("Invalid company id.");
+        }
+        const joinName =
+          String(pickerSelected.name ?? breneoCompanyName).trim() ||
+          `Company ${pk}`;
+        await createEmployerJoinRequest({
+          companyId: pk,
+          companyName: joinName,
         });
+        toast.success(
+          "Join request sent. A company admin will review your request.",
+        );
+        setCompanyPickerOpen(false);
+        navigate(getLocalizedPath("/employer/pending-approval", language));
+        return;
       } else {
         const payload = buildAggregatorCompanyCreatePayload({
           name: pickerName.trim(),
@@ -358,11 +371,7 @@ export default function EmployerProfilePage() {
         });
       }
 
-      toast.success(
-        pickerSelected
-          ? "Linked to the company on the job directory."
-          : "Company added to the job directory.",
-      );
+      toast.success("Company added to the job directory.");
       setCompanyPickerOpen(false);
       await fetchProfile();
       await loadAggregatorCompanies();

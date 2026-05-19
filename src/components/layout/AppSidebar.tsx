@@ -106,6 +106,10 @@ export function AppSidebar({
     (typeof window !== "undefined" &&
       localStorage.getItem("userRole") === "employer");
 
+  const notificationsPath = isEmployer
+    ? "/employer/notifications"
+    : "/notifications";
+
   // Handle mounted state to avoid hydration mismatch
   React.useEffect(() => {
     setMounted(true);
@@ -337,7 +341,7 @@ export function AppSidebar({
               )}
             </button>
             <LocalizedLink
-              to="/notifications"
+              to={notificationsPath}
               className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
                          bg-black/[0.06] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.05] transition-colors rounded-full"
             >

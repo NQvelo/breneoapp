@@ -14,6 +14,7 @@
 import React, { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { EmployerAccessGate } from "@/components/employer/EmployerAccessGate";
 
 // Auth pages (Public)
 const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
@@ -54,6 +55,15 @@ const EmployerAddJobPage = lazy(() => import("@/pages/employer/EmployerAddJobPag
 const EmployerJobStatsPage = lazy(() => import("@/pages/employer/EmployerJobStatsPage"));
 const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfilePage"));
 const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
+const EmployerJoinCompanyPage = lazy(
+  () => import("@/pages/employer/EmployerJoinCompanyPage"),
+);
+const EmployerPendingApprovalPage = lazy(
+  () => import("@/pages/employer/EmployerPendingApprovalPage"),
+);
+const EmployerNotificationsPage = lazy(
+  () => import("@/pages/employer/EmployerNotificationsPage"),
+);
 
 // Common pages (Available to all authenticated users)
 const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
@@ -82,6 +92,14 @@ const preloadAcademyChunks = [
   () => import("@/pages/academy/AcademyCoursesPage"),
   () => import("@/pages/academy/AcademyProfilePage"),
 ];
+
+function EmployerGatedRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <ProtectedRoute requiredRole="employer">
+      <EmployerAccessGate>{children}</EmployerAccessGate>
+    </ProtectedRoute>
+  );
+}
 
 const RouteLoadingFallback = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -273,58 +291,76 @@ export const AppRoutes = () => {
       <Route path="/academy/register" element={<AcademyRegistrationPage />} />
       <Route path="/employer/register" element={<EmployerRegistrationPage />} />
       {createLocalizedRoute(
-        "/employer/dashboard",
+        "/employer/join-company",
         <ProtectedRoute requiredRole="employer">
-          <EmployerDashboardPage />
+          <EmployerJoinCompanyPage />
         </ProtectedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/employer/pending-approval",
+        <ProtectedRoute requiredRole="employer">
+          <EmployerPendingApprovalPage />
+        </ProtectedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/employer/notifications",
+        <EmployerGatedRoute>
+          <EmployerNotificationsPage />
+        </EmployerGatedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/employer/dashboard",
+        <EmployerGatedRoute>
+          <EmployerDashboardPage />
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/home",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerDashboardPage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerJobsPage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs/add",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerAddJobPage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs/edit/:jobId",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerAddJobPage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/jobs/:jobId",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerJobStatsPage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/profile",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerProfilePage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/members",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <EmployerMembersPage />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/employer/settings",
-        <ProtectedRoute requiredRole="employer">
+        <EmployerGatedRoute>
           <UserSettings />
-        </ProtectedRoute>,
+        </EmployerGatedRoute>,
       )}
       {createLocalizedRoute(
         "/academy/home",

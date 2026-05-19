@@ -52,6 +52,7 @@ import express from "express";
 import cors from "cors";
 
 import { extractJobSectionsFromDescription } from "./geminiJobParser.mjs";
+import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
 
 const hasPlatformPort = Boolean(
   process.env.PORT && String(process.env.PORT).trim() !== "",
@@ -1931,6 +1932,76 @@ async function handleEmployerJobsList(req, res) {
     return res.status(500).json({ detail: "Internal server error" });
   }
 }
+
+/**
+ * List staff rows for one company (admin notifications).
+ * @param {number} companyId
+ */
+async function fetchCompanyStaffByCompanyId(companyId) {
+  if (!AGGREGATOR_KEY) return [];
+  const url = new URL(AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, ""));
+  url.searchParams.set("company_id", String(companyId));
+  try {
+    const upstream = await fetch(url.toString(), {
+      headers: {
+        Accept: "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    const text = await upstream.text();
+    const data = parseUpstreamJson(text);
+    if (!upstream.ok) return [];
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Create membership for a specific user (admin approve join request).
+ * @param {number} companyIdRaw
+ * @param {{ userId: string; email?: string; firstName?: string; lastName?: string }} target
+ */
+async function postStaffMembershipForUser(companyIdRaw, target) {
+  const n = Number(companyIdRaw);
+  if (!Number.isFinite(n)) {
+    return {
+      ok: false,
+      status: 400,
+      data: { detail: "company_id must be a finite number" },
+    };
+  }
+  const url = AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY || "",
+    },
+    body: JSON.stringify({
+      company_id: n,
+      external_user_id: String(target.userId),
+      external_user_email: target.email ?? "",
+      external_user_name: target.firstName ?? "",
+      external_user_surname: target.lastName ?? "",
+      is_admin: false,
+    }),
+  });
+  const text = await res.text();
+  const data = parseUpstreamJson(text);
+  const ok =
+    res.ok || isDuplicateStaffMembershipResponse(res.status, data);
+  return { ok, status: res.status, data, text };
+}
+
+registerEmployerJoinRequestRoutes({
+  app,
+  requireEmployerAuth,
+  aggregatorStaffRoot: AGGREGATOR_STAFF_MEMBERSHIPS_ROOT,
+  aggregatorKey: AGGREGATOR_KEY,
+  postStaffMembershipForUser,
+  fetchCompanyStaff: fetchCompanyStaffByCompanyId,
+});
 
 app.get("/api/industries", handleIndustriesList);
 app.get("/api/industries/", handleIndustriesList);

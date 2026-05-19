@@ -6,6 +6,7 @@ import { Bell, Moon, Sun, Globe, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { getRole } from "@/utils/getRole";
 import { useTheme } from "next-themes";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 
@@ -106,7 +107,11 @@ const getPageTitle = (
     pathname.startsWith("/academy/profile")
   )
     return t.profile.title;
-  if (pathname.startsWith("/notifications")) return t.notifications.title;
+  if (
+    pathname.startsWith("/notifications") ||
+    pathname.startsWith("/employer/notifications")
+  )
+    return t.notifications.title;
   if (pathname.startsWith("/skill-test")) return t.skillTest.title;
   // Don't show title for skill-path page - show back button instead
   if (pathname.startsWith("/skill-path")) return null;
@@ -156,6 +161,8 @@ export function DashboardHeader({
   const courseAddEditTitle = getCourseAddEditTitle();
 
   const currentLanguageText = language === "ka" ? "GEO" : "EN";
+  const notificationsPath =
+    getRole() === "employer" ? "/employer/notifications" : "/notifications";
 
   React.useEffect(() => {
     setMounted(true);
@@ -241,7 +248,7 @@ export function DashboardHeader({
             )}
             <span className="sr-only">Toggle theme</span>
           </Button>
-          <LocalizedLink to="/notifications">
+          <LocalizedLink to={notificationsPath}>
             <Button
               variant="ghost"
               size="icon"
