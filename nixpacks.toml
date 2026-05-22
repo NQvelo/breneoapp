@@ -4,5 +4,10 @@ NIXPACKS_NODE_PACKAGE_MANAGER = "npm"
 [phases.install]
 cmds = ["npm ci"]
 
+[phases.build]
+cmds = ["npm run build"]
+
+# Serves Vite dist/ + employer BFF (same-origin /api/employer/*). Do not use start:bff here —
+# that mode is API-only and has no SPA; Railway health checks on / will fail.
 [start]
-cmd = "npm run start:bff"
+cmd = "npm start"

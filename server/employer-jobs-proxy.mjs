@@ -274,6 +274,14 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 
+/** Railway / load-balancer health checks (BFF-only or production.mjs mount). */
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true, service: "employer-jobs-proxy" });
+});
+app.get("/health/", (_req, res) => {
+  res.status(200).json({ ok: true, service: "employer-jobs-proxy" });
+});
+
 /** Multipart: buffer before `fetch` to upstream — streaming `IncomingMessage` as `fetch` body + `duplex` often drops the connection in Node. */
 const MULTIPART_BODY_MAX_BYTES = 12 * 1024 * 1024;
 

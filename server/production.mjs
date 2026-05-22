@@ -21,6 +21,10 @@ const dist = path.resolve(__dirname, "../dist");
 
 const root = express();
 
+root.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true, service: "breneoapp-production" });
+});
+
 // Static first so GET / and /assets/* work; /api/* falls through when no file matches.
 root.use(express.static(dist));
 root.use(employerJobsApp);
