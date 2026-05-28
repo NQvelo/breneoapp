@@ -13,6 +13,7 @@ import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 interface DashboardHeaderProps {
   sidebarCollapsed: boolean;
   isVisible: boolean; // Prop for visibility
+  showSidebar: boolean;
 }
 
 // Helper function to check if current path is a job detail page
@@ -121,6 +122,7 @@ const getPageTitle = (
 export function DashboardHeader({
   sidebarCollapsed,
   isVisible,
+  showSidebar,
 }: DashboardHeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -174,7 +176,7 @@ export function DashboardHeader({
         "fixed top-0 right-0 z-30",
         "bg-gradient-to-b from-breneo-lightgray dark:from-background to-transparent",
         "transition-opacity duration-300 ease-in-out",
-        sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
+        showSidebar ? (sidebarCollapsed ? "md:left-24" : "md:left-[17rem]") : "md:left-0",
         "left-0",
         isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
       )}

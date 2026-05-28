@@ -58,6 +58,9 @@ const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersP
 const EmployerJoinCompanyPage = lazy(
   () => import("@/pages/employer/EmployerJoinCompanyPage"),
 );
+const EmployerAcceptInvitePage = lazy(
+  () => import("@/pages/employer/EmployerAcceptInvitePage"),
+);
 const EmployerPendingApprovalPage = lazy(
   () => import("@/pages/employer/EmployerPendingApprovalPage"),
 );
@@ -295,6 +298,10 @@ export const AppRoutes = () => {
         <ProtectedRoute requiredRole="employer">
           <EmployerJoinCompanyPage />
         </ProtectedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/employer/accept-invite",
+        <EmployerAcceptInvitePage />,
       )}
       {createLocalizedRoute(
         "/employer/pending-approval",

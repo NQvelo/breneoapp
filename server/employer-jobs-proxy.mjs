@@ -53,6 +53,7 @@ import cors from "cors";
 
 import { extractJobSectionsFromDescription } from "./geminiJobParser.mjs";
 import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
+import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
 
 const hasPlatformPort = Boolean(
   process.env.PORT && String(process.env.PORT).trim() !== "",
@@ -2715,13 +2716,31 @@ async function postStaffMembershipForUser(companyIdRaw, userCtx) {
   return { ok, status: res.status, data, text };
 }
 
-registerEmployerJoinRequestRoutes(app, {
+async function fetchMembershipsForUser(userId) {
+  const url = new URL(AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, ""));
+  url.searchParams.set("external_user_id", String(userId));
+  const res = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY || "",
+    },
+  });
+  if (!res.ok) return [];
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data : [];
+}
+
+const employerMembershipRouteDeps = {
   requireEmployerAuth,
   aggregatorStaffRoot: AGGREGATOR_STAFF_MEMBERSHIPS_ROOT,
   aggregatorKey: AGGREGATOR_KEY,
   postStaffMembershipForUser,
   fetchStaffForCompany,
-});
+  fetchMembershipsForUser,
+};
+
+registerEmployerJoinRequestRoutes(app, employerMembershipRouteDeps);
+registerEmployerMemberInviteRoutes(app, employerMembershipRouteDeps);
 
 export { app };
 

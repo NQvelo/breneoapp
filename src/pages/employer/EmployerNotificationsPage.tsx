@@ -11,8 +11,11 @@ import {
   joinRequestDisplayName,
   type EmployerJoinRequest,
 } from "@/api/employer/employerJoinRequests";
+import { markJoinRequestNotificationsRead } from "@/api/notifications/notificationsApi";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function EmployerNotificationsPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<EmployerJoinRequest[]>([]);
   const [actingId, setActingId] = useState<string | null>(null);
@@ -40,7 +43,16 @@ export default function EmployerNotificationsPage() {
     setActingId(row.id);
     try {
       await approveEmployerJoinRequest(row.id);
-      toast.success(`${joinRequestDisplayName(row)} was added to your company.`);
+      if (user?.id) {
+        try {
+          await markJoinRequestNotificationsRead(row.id);
+        } catch {
+          /* non-blocking — inbox action already succeeded */
+        }
+      }
+      toast.success(
+        `${joinRequestDisplayName(row)} was added to your company.`,
+      );
       setRequests((prev) => prev.filter((r) => r.id !== row.id));
     } catch (e) {
       toast.error(

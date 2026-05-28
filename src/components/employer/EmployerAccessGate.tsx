@@ -20,6 +20,7 @@ const ALLOWED_WHEN_PENDING = [
 
 const ALLOWED_WHEN_NEEDS_COMPANY = [
   "/employer/join-company",
+  "/employer/accept-invite",
   "/employer/register",
   "/employer/pending-approval",
   "/employer/notifications",

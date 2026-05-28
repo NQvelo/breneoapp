@@ -57,5 +57,21 @@ export const API_ENDPOINTS = {
     PROFILE: "/api/employer/profile/",
     /** List/create employer-owned jobs (trailing slash for Django) */
     JOBS: "/api/employer/jobs/",
+    ACCESS_STATE: "/api/employer/access-state/",
+    JOIN_REQUESTS: "/api/employer/join-requests/",
+    JOIN_REQUESTS_ME: "/api/employer/join-requests/me/",
+    JOIN_REQUESTS_INBOX: "/api/employer/join-requests/inbox/",
+    JOIN_REQUEST_APPROVE: (id: string) =>
+      `/api/employer/join-requests/${encodeURIComponent(id)}/approve/`,
+  },
+  /** In-app notifications (Django — not Supabase) */
+  NOTIFICATIONS: {
+    LIST: "/api/me/notifications/",
+    CREATE: "/api/me/notifications/",
+    READ_ALL: "/api/me/notifications/read-all/",
+    MARK_READ: (id: string) =>
+      `/api/me/notifications/${encodeURIComponent(id)}/read/`,
+    JOB_IDS: "/api/me/job-notifications/",
+    JOB_MARK: "/api/me/job-notifications/",
   },
 } as const;

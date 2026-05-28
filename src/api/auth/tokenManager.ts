@@ -113,9 +113,13 @@ export const TokenManager = {
    */
   isTokenExpired: (token: string): boolean => {
     try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
+      const parts = token.split(".");
+      if (parts.length !== 3) return true;
+      const payload = JSON.parse(atob(parts[1])) as { exp?: unknown };
+      const exp = Number(payload?.exp);
+      if (!Number.isFinite(exp)) return true;
       const currentTime = Math.floor(Date.now() / 1000);
-      return payload.exp < currentTime;
+      return exp < currentTime;
     } catch {
       return true; // If we can't parse, consider it expired
     }

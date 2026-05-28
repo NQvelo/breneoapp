@@ -21,7 +21,18 @@ import { resolveEmployerStaffUserId } from "@/api/employer/profile";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { createEmployerMemberInvite } from "@/api/employer/memberInvitesApi";
 import {
   Table,
   TableBody,
@@ -36,16 +47,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Users } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 export default function EmployerMembersPage() {
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<number | null>(null);
+  const [companyName, setCompanyName] = useState("");
   const [memberships, setMemberships] = useState<CompanyStaffMembership[]>([]);
   const [breneoUserId, setBreneoUserId] = useState("");
   const [actionId, setActionId] = useState<number | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteSending, setInviteSending] = useState(false);
 
   const resolveBreneoUserId = useCallback(async (): Promise<string> => {
     const token = TokenManager.getAccessToken();
@@ -93,6 +108,7 @@ export default function EmployerMembersPage() {
         if (!linked) return;
 
         setCompanyId(linked.companyId);
+        setCompanyName(linked.companyName);
         const rows = await fetchEmployerCompanyStaff(linked.companyId);
         if (cancelled) return;
         setMemberships(rows);
@@ -176,6 +192,30 @@ export default function EmployerMembersPage() {
     return adminCount > 1;
   };
 
+  const handleSendInvite = async () => {
+    if (companyId == null) return;
+    const email = inviteEmail.trim();
+    if (!email) {
+      toast.error("Enter the employer's work email.");
+      return;
+    }
+    setInviteSending(true);
+    try {
+      await createEmployerMemberInvite({
+        companyId,
+        companyName: companyName || `Company ${companyId}`,
+        email,
+      });
+      toast.success("Invite email sent.");
+      setInviteOpen(false);
+      setInviteEmail("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not send invite.");
+    } finally {
+      setInviteSending(false);
+    }
+  };
+
   const adminToggleDisabledReason = (
     member: CompanyStaffMembership,
   ): string => {
@@ -192,8 +232,7 @@ export default function EmployerMembersPage() {
         <div className="space-y-6 md:px-6 lg:px-8 pb-24 md:pb-8">
           <Card>
             <CardHeader className="p-6 pb-4">
-              <div className="flex items-start gap-3">
-                {/* <Users className="h-6 w-6 text-breneo-blue shrink-0 mt-0.5" /> */}
+              <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                     Company team
@@ -203,6 +242,17 @@ export default function EmployerMembersPage() {
                     change roles or remove others.
                   </p>
                 </div>
+                {currentUserIsAdmin && companyId != null ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setInviteOpen(true)}
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add new member
+                  </Button>
+                ) : null}
               </div>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-0 space-y-4">
@@ -341,6 +391,48 @@ export default function EmployerMembersPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add new member</DialogTitle>
+              <DialogDescription>
+                Enter their Breneo employer work email. They will receive an
+                email with a link to join{" "}
+                {companyName || "your company"}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <Label htmlFor="invite-email">Work email</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                autoComplete="email"
+                placeholder="colleague@company.com"
+                value={inviteEmail}
+                disabled={inviteSending}
+                onChange={(e) => setInviteEmail(e.target.value)}
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={inviteSending}
+                onClick={() => setInviteOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={inviteSending || !inviteEmail.trim()}
+                onClick={() => void handleSendInvite()}
+              >
+                {inviteSending ? "Sending…" : "Send invite"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </TooltipProvider>
     </DashboardLayout>
   );

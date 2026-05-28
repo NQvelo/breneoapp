@@ -1,13 +1,9 @@
 /**
- * Employer company join requests (BFF → Supabase + staff-memberships on approve).
+ * Employer company join requests — BFF API (not Django notifications API).
  */
 
 import { TokenManager } from "@/api/auth/tokenManager";
-import {
-  assertEmployerJobsProxyConfigured,
-  getEmployerJobsApiBaseUrl,
-} from "@/api/employer/employerJobsApiBase";
-import { extractAggregatorErrorMessage } from "@/api/employer/aggregatorHttpErrors";
+import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 
 export type EmployerJoinRequestStatus = "pending" | "approved" | "rejected";
 
@@ -30,13 +26,15 @@ export type EmployerAccessState =
   | { state: "pending"; request: EmployerJoinRequest }
   | { state: "needs_company"; request?: EmployerJoinRequest | null };
 
-function bffOrigin(): string {
-  return getEmployerJobsApiBaseUrl().replace(/\/$/, "");
+function resolveEmployerBffUrl(path: string): string {
+  const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
 }
 
 function authHeaders(): HeadersInit {
   const token = TokenManager.getAccessToken();
-  if (!token) throw new Error("Not authenticated");
+  if (!token) throw new Error("Authentication required.");
   return {
     Authorization: `Bearer ${token}`,
     Accept: "application/json",
@@ -44,105 +42,168 @@ function authHeaders(): HeadersInit {
   };
 }
 
-async function parseJson(res: Response): Promise<Record<string, unknown>> {
-  return (await res.json().catch(() => ({}))) as Record<string, unknown>;
+async function parseJsonSafe(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function extractErrorMessage(data: unknown, fallback: string): string {
+  if (data instanceof Error && data.message) return data.message;
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    if (typeof o.detail === "string" && o.detail.trim()) return o.detail;
+    if (Array.isArray(o.detail) && o.detail[0]) return String(o.detail[0]);
+    const firstKey = Object.keys(o)[0];
+    const firstVal = firstKey ? o[firstKey] : null;
+    if (typeof firstVal === "string" && firstVal.trim()) return firstVal;
+    if (Array.isArray(firstVal) && firstVal[0]) return String(firstVal[0]);
+  }
+  if (typeof data === "string" && data.trim()) return data;
+  return fallback;
+}
+
+async function bffRequest<T = unknown>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(resolveEmployerBffUrl(path), {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init?.headers || {}),
+    },
+  });
+  const data = await parseJsonSafe(res);
+  if (!res.ok) {
+    throw new Error(extractErrorMessage(data, "Employer request failed."));
+  }
+  return data as T;
+}
+
+function normalizeJoinRequest(row: unknown): EmployerJoinRequest | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const id = r.id != null ? String(r.id) : "";
+  if (!id) return null;
+  return {
+    id,
+    company_id: Number(r.company_id) || 0,
+    company_name: String(r.company_name ?? ""),
+    requester_user_id: String(r.requester_user_id ?? ""),
+    requester_email: String(r.requester_email ?? ""),
+    requester_name: String(r.requester_name ?? ""),
+    requester_surname: String(r.requester_surname ?? ""),
+    status:
+      (String(r.status ?? "pending") as EmployerJoinRequestStatus) || "pending",
+    reviewed_by_user_id:
+      r.reviewed_by_user_id != null ? String(r.reviewed_by_user_id) : null,
+    created_at: String(r.created_at ?? new Date().toISOString()),
+    updated_at: r.updated_at ? String(r.updated_at) : undefined,
+  };
+}
+
+function extractJoinRequestList(data: unknown): EmployerJoinRequest[] {
+  if (Array.isArray(data)) {
+    return data
+      .map((row) => normalizeJoinRequest(row))
+      .filter((r): r is EmployerJoinRequest => r != null);
+  }
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    const list = o.requests ?? o.results ?? o.data;
+    if (Array.isArray(list)) {
+      return list
+        .map((row) => normalizeJoinRequest(row))
+        .filter((r): r is EmployerJoinRequest => r != null);
+    }
+  }
+  return [];
 }
 
 export async function fetchEmployerAccessState(): Promise<EmployerAccessState> {
-  assertEmployerJobsProxyConfigured("GET");
-  const res = await fetch(`${bffOrigin()}/api/employer/access-state`, {
-    headers: authHeaders(),
-  });
-  const body = await parseJson(res);
-  if (!res.ok) {
-    throw new Error(
-      extractAggregatorErrorMessage(body, "Could not load employer access state."),
+  try {
+    const data = await bffRequest<EmployerAccessState>(
+      "/api/employer/access-state/",
+      { method: "GET" },
     );
+    return data;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Could not load employer access state."));
   }
-  return body as unknown as EmployerAccessState;
 }
 
 export async function fetchMyEmployerJoinRequest(): Promise<EmployerJoinRequest | null> {
-  assertEmployerJobsProxyConfigured("GET");
-  const res = await fetch(`${bffOrigin()}/api/employer/join-requests/me`, {
-    headers: authHeaders(),
-  });
-  const body = await parseJson(res);
-  if (!res.ok) {
-    throw new Error(
-      extractAggregatorErrorMessage(body, "Could not load your join request."),
-    );
+  try {
+    const body = await bffRequest<unknown>("/api/employer/join-requests/me/", {
+      method: "GET",
+    });
+    if (body && typeof body === "object" && "request" in body) {
+      return normalizeJoinRequest((body as { request: unknown }).request);
+    }
+    return normalizeJoinRequest(body);
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Could not load your join request."));
   }
-  const req = body.request;
-  if (!req || typeof req !== "object") return null;
-  return req as EmployerJoinRequest;
 }
 
 export async function fetchEmployerJoinRequestInbox(): Promise<
   EmployerJoinRequest[]
 > {
-  assertEmployerJobsProxyConfigured("GET");
-  const res = await fetch(`${bffOrigin()}/api/employer/join-requests/inbox`, {
-    headers: authHeaders(),
-  });
-  const body = await parseJson(res);
-  if (!res.ok) {
-    throw new Error(
-      extractAggregatorErrorMessage(body, "Could not load join requests."),
-    );
+  try {
+    const body = await bffRequest<unknown>("/api/employer/join-requests/inbox/", {
+      method: "GET",
+    });
+    return extractJoinRequestList(body);
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Could not load join requests."));
   }
-  const list = body.requests;
-  return Array.isArray(list) ? (list as EmployerJoinRequest[]) : [];
 }
 
 export async function createEmployerJoinRequest(params: {
   companyId: number | string;
   companyName: string;
 }): Promise<EmployerJoinRequest> {
-  assertEmployerJobsProxyConfigured("POST");
   const company_id = Number(params.companyId);
   if (!Number.isFinite(company_id)) {
     throw new Error("companyId must be numeric.");
   }
-  const res = await fetch(`${bffOrigin()}/api/employer/join-requests`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      company_id,
-      company_name: params.companyName.trim(),
-    }),
-  });
-  const body = await parseJson(res);
-  if (!res.ok) {
-    throw new Error(
-      extractAggregatorErrorMessage(body, "Could not submit join request."),
-    );
+  try {
+    const body = await bffRequest<unknown>("/api/employer/join-requests/", {
+      method: "POST",
+      body: JSON.stringify({
+        company_id,
+        company_name: params.companyName.trim(),
+      }),
+    });
+    const row =
+      body && typeof body === "object" && "request" in body
+        ? (body as { request: unknown }).request
+        : body;
+    const normalized = normalizeJoinRequest(row);
+    if (!normalized) throw new Error("Invalid join request response.");
+    return normalized;
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Could not submit join request."));
   }
-  const req = body.request;
-  if (!req || typeof req !== "object") {
-    throw new Error("Invalid join request response.");
-  }
-  return req as EmployerJoinRequest;
 }
 
 export async function approveEmployerJoinRequest(
   requestId: string,
 ): Promise<void> {
-  assertEmployerJobsProxyConfigured("POST");
   const id = requestId.trim();
   if (!id) throw new Error("request id is required");
-  const res = await fetch(
-    `${bffOrigin()}/api/employer/join-requests/${encodeURIComponent(id)}/approve`,
-    {
+  try {
+    await bffRequest(`/api/employer/join-requests/${encodeURIComponent(id)}/approve/`, {
       method: "POST",
-      headers: authHeaders(),
-    },
-  );
-  const body = await parseJson(res);
-  if (!res.ok) {
-    throw new Error(
-      extractAggregatorErrorMessage(body, "Could not approve join request."),
-    );
+      body: "{}",
+    });
+  } catch (err) {
+    throw new Error(extractErrorMessage(err, "Could not approve join request."));
   }
 }
 

@@ -15,7 +15,10 @@
  * `employer-jobs-proxy` → job aggregator — even when `VITE_API_BASE_URL` points at Railway.
  */
 
-import { BRENEO_API_BASE_URL, JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
+import {
+  BRENEO_API_BASE_URL,
+  JOB_AGGREGATOR_BASE_URL,
+} from "@/api/auth/config";
 
 function trimBase(raw: string | undefined): string | undefined {
   const t = raw?.trim();
@@ -104,8 +107,7 @@ function resolveBaseFromEnvOrBrowser(): string {
     import.meta.env.DEV
   ) {
     const host = window.location.hostname;
-    const local =
-      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
     if (local && !explicitEmployerBff) {
       return window.location.origin;
     }
@@ -191,8 +193,7 @@ export function getJobApplicationsApiBaseUrl(): string {
       if (bff) return bff;
       return aggregator;
     }
-    const local =
-      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
     if (import.meta.env.DEV && local) {
       return window.location.origin.replace(/\/$/, "");
     }

@@ -8,7 +8,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { checkForNewJobMatches } from "@/services/jobs/jobNotificationService";
 import { ApiJob } from "@/api/jobs/types";
-import { numericIdToUuid } from "@/lib/utils";
 
 interface UseJobNotificationsOptions {
   enabled?: boolean;

@@ -662,7 +662,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         "/email-verification",
         "/email-confirmed",
       ];
-      const isPublicRoute = publicRoutes.includes(currentPath);
+      const isPublicRoute = publicRoutes.includes(pathWithoutLang);
 
       // List of common routes (available to all authenticated users)
       const commonRoutes = ["/terms-of-use", "/help"];
@@ -672,6 +672,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // If we're on root or a public route, redirect to appropriate dashboard
       if (currentPath === "/" || isPublicRoute) {
+        const postLoginRedirect = sessionStorage.getItem(
+          "breneo_post_login_redirect",
+        );
+        if (postLoginRedirect?.startsWith("/")) {
+          sessionStorage.removeItem("breneo_post_login_redirect");
+          navigateIfChanged(postLoginRedirect);
+          return;
+        }
         if (userRole === "academy") {
           const academyPath = getLocalizedPath("/academy/dashboard", language);
           navigateIfChanged(academyPath);
@@ -751,7 +759,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (
         userRole !== "employer" &&
         pathWithoutLang.startsWith("/employer/") &&
-        pathWithoutLang !== "/employer/register"
+        pathWithoutLang !== "/employer/register" &&
+        pathWithoutLang !== "/employer/accept-invite"
       ) {
         if (userRole === "academy") {
           const academyPath = getLocalizedPath("/academy/dashboard", language);

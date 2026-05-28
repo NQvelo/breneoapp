@@ -1,34 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
-import {
-  Bell,
-  Users,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-  Settings,
-} from "lucide-react";
+import { Bell, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
-
-// Define the shape of a notification
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: "info" | "success" | "warning" | "error";
-  recipient_id: string | null;
-  is_read: boolean;
-  created_at: string;
-}
+import {
+  fetchMyNotifications,
+  formatNotificationMessage,
+  markNotificationRead,
+  type Notification,
+} from "@/api/notifications/notificationsApi";
 
 const NotificationsPage = () => {
   const { user } = useAuth();
@@ -36,51 +20,30 @@ const NotificationsPage = () => {
   const queryClient = useQueryClient();
   const queryKey = ["user-notifications", user?.id];
 
-  // Enable job notifications - checks for new jobs matching user skills
-  // Only enable for regular users (not academy users)
   const isRegularUser = user?.user_type !== "academy";
-  const {
-    permission: notificationPermission,
-    requestPermission,
-    isChecking,
-  } = useJobNotifications({
+  useJobNotifications({
     enabled: isRegularUser && !!user?.id,
-    checkInterval: 30 * 60 * 1000, // Check every 30 minutes
+    checkInterval: 30 * 60 * 1000,
   });
 
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-
-  // Fetch all notifications for the current user (personal and broadcast)
-  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+  const {
+    data: notifications = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery<Notification[]>({
     queryKey,
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from("notifications" as any)
-        .select("*")
-        .or(`recipient_id.is.null,recipient_id.eq.${user.id}`)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching notifications:", error);
-        throw new Error("Could not fetch notifications.");
-      }
-      return (data || []) as Notification[];
-    },
+    queryFn: () => fetchMyNotifications(),
     enabled: !!user?.id,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
-  // Mutation to mark a notification as read with optimistic updates
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
       if (!user?.id) throw new Error("User not authenticated.");
-      const { error } = await supabase
-        .from("notifications" as any)
-        .update({ is_read: true, updated_at: new Date().toISOString() })
-        .eq("id", notificationId)
-        .eq("recipient_id", user.id);
-
-      if (error) throw error;
+      await markNotificationRead(notificationId);
     },
     onMutate: async (notificationId: string) => {
       await queryClient.cancelQueries({ queryKey });
@@ -89,12 +52,12 @@ const NotificationsPage = () => {
 
       queryClient.setQueryData<Notification[]>(queryKey, (old) =>
         (old || []).map((n) =>
-          n.id === notificationId ? { ...n, is_read: true } : n
-        )
+          n.id === notificationId ? { ...n, is_read: true } : n,
+        ),
       );
       return { previousNotifications };
     },
-    onError: (err, _, context) => {
+    onError: (_err, _, context) => {
       if (context?.previousNotifications) {
         queryClient.setQueryData(queryKey, context.previousNotifications);
       }
@@ -105,66 +68,6 @@ const NotificationsPage = () => {
     },
   });
 
-  // Set up a real-time subscription to listen for new notifications
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const handleNewNotification = (payload: { new?: Notification }) => {
-      queryClient.invalidateQueries({ queryKey });
-      if (payload.new) {
-        const notification = payload.new;
-        const message = `${notification.title}: ${notification.message}`;
-        switch (notification.type) {
-          case "success":
-            toast.success(message);
-            break;
-          case "error":
-            toast.error(message);
-            break;
-          case "warning":
-            toast.warning(message);
-            break;
-          default:
-            toast.info(message);
-        }
-      }
-    };
-
-    const personalChannel = supabase
-      .channel("personal-user-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications" as any,
-          filter: `recipient_id=eq.${user.id}`,
-        },
-        handleNewNotification
-      )
-      .subscribe();
-
-    const broadcastChannel = supabase
-      .channel("broadcast-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications" as any,
-          filter: "recipient_id=is.null",
-        },
-        handleNewNotification
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(personalChannel);
-      supabase.removeChannel(broadcastChannel);
-    };
-  }, [queryClient, user?.id, queryKey]);
-
-  // Helper function to get an icon based on notification type
   const getNotificationIcon = (type: Notification["type"]) => {
     switch (type) {
       case "success":
@@ -194,32 +97,33 @@ const NotificationsPage = () => {
     }
   };
 
-  const unreadCount = notifications.filter(
-    (n) => !n.is_read && n.recipient_id === user?.id
-  ).length;
+  const userIdStr = user?.id != null ? String(user.id) : "";
+  const isOwnNotification = (n: Notification) => n.recipient_id === userIdStr;
 
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Bell className="h-8 w-8 text-primary" />
-            Notifications
-            {unreadCount > 0 && (
-              <Badge className="bg-red-500 text-white">{unreadCount} new</Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Stay updated with the latest platform notifications.
-          </p>
-        </div> */}
-
         <Card>
           <CardContent className="p-0">
             <div className="divide-y divide-gray-200">
               {isLoading ? (
                 <div className="text-center py-12 text-muted-foreground">
                   {t.common.loading}
+                </div>
+              ) : isError ? (
+                <div className="text-center py-12 space-y-3">
+                  <p className="text-sm text-destructive">
+                    {error instanceof Error
+                      ? error.message
+                      : "Could not load notifications."}
+                  </p>
+                  <button
+                    type="button"
+                    className="text-sm text-breneo-blue hover:underline"
+                    onClick={() => void refetch()}
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
@@ -235,8 +139,7 @@ const NotificationsPage = () => {
                   <div
                     key={notification.id}
                     className={`flex items-start gap-4 p-4 transition-colors ${
-                      !notification.is_read &&
-                      notification.recipient_id === user?.id
+                      !notification.is_read && isOwnNotification(notification)
                         ? "bg-blue-50"
                         : "hover:bg-gray-50"
                     }`}
@@ -249,15 +152,15 @@ const NotificationsPage = () => {
                         </h4>
                         <span className="text-xs text-muted-foreground">
                           {new Date(
-                            notification.created_at
+                            notification.created_at,
                           ).toLocaleDateString()}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {notification.message}
+                        {formatNotificationMessage(notification.message)}
                       </p>
                       {!notification.is_read &&
-                        notification.recipient_id === user?.id && (
+                        isOwnNotification(notification) && (
                           <button
                             onClick={() =>
                               markAsReadMutation.mutate(notification.id)

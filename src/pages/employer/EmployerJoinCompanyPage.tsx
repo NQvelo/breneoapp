@@ -1,189 +1,97 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Building2, ChevronDown, LogOut } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Building2 } from "lucide-react";
-import { toast } from "sonner";
-import { EmployerCompanySearchField } from "@/components/employer/EmployerCompanySearchField";
-import {
-  parseAggregatorCompanyPk,
-  type AggregatorCompany,
-} from "@/api/employer/aggregatorBffApi";
-import {
-  createEmployerJoinRequest,
-  fetchEmployerAccessState,
-} from "@/api/employer/employerJoinRequests";
-import { getLocalizedPath } from "@/utils/localeUtils";
-import { useLanguage } from "@/contexts/LanguageContext";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 
 export default function EmployerJoinCompanyPage() {
-  const navigate = useNavigate();
-  const { language } = useLanguage();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selected, setSelected] = useState<AggregatorCompany | null>(null);
-  const [companyName, setCompanyName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [checkingAccess, setCheckingAccess] = useState(true);
-  const [accountError, setAccountError] = useState<string | null>(null);
+  const { user, employerDisplay, loading: authLoading, logout } = useAuth();
 
-  const resetModal = useCallback(() => {
-    setSelected(null);
-    setCompanyName("");
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setCheckingAccess(true);
-      setAccountError(null);
-      try {
-        const access = await fetchEmployerAccessState();
-        if (cancelled) return;
-        if (access.state === "active") {
-          navigate(getLocalizedPath("/employer/home", language), {
-            replace: true,
-          });
-          return;
-        }
-        if (access.state === "pending") {
-          navigate(getLocalizedPath("/employer/pending-approval", language), {
-            replace: true,
-          });
-        }
-      } catch {
-        if (!cancelled) {
-          setAccountError("Could not load your account. Try signing in again.");
-        }
-      } finally {
-        if (!cancelled) setCheckingAccess(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [navigate, language]);
-
-  const handleSubmit = async () => {
-    if (!selected?.id) {
-      toast.error("Select a company from the directory first.");
-      return;
-    }
-    const pk = parseAggregatorCompanyPk(selected.id);
-    if (pk == null) {
-      toast.error("Invalid company. Try another listing.");
-      return;
-    }
-    const name =
-      String(selected.name ?? companyName).trim() || `Company ${pk}`;
-    setSubmitting(true);
-    try {
-      await createEmployerJoinRequest({ companyId: pk, companyName: name });
-      toast.success(
-        "Join request sent. Waiting for a company admin to approve.",
-      );
-      setModalOpen(false);
-      resetModal();
-      navigate(getLocalizedPath("/employer/pending-approval", language), {
-        replace: true,
-      });
-    } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Could not submit join request.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
+  const accountName =
+    [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+    user?.username ||
+    employerDisplay?.name ||
+    user?.email ||
+    "";
+  const accountEmail = user?.email || employerDisplay?.email || "";
+  const accountAvatar =
+    (typeof user?.profile_image === "string" && user.profile_image.trim()) ||
+    employerDisplay?.logo_url ||
+    null;
+  const avatarFallback = (accountName.charAt(0) || "U").toUpperCase();
   return (
-    <DashboardLayout>
-      <div className="flex min-h-[calc(100dvh-8rem)] items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-md border-0 rounded-3xl shadow-sm">
-          <CardContent className="pt-10 pb-10 px-6 text-center space-y-5">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-950/50">
-              <Building2 className="h-8 w-8 text-breneo-blue" />
-            </div>
-            <div className="space-y-2">
-              <h1 className="text-xl font-bold text-foreground">
-                Join your company
-              </h1>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Search for your company on the job directory or create a new one
-                to start posting jobs.
-              </p>
-            </div>
-            <Button
-              type="button"
-              className="w-full max-w-xs mx-auto"
-              disabled={checkingAccess || Boolean(accountError)}
-              onClick={() => setModalOpen(true)}
-            >
-              Join company
-            </Button>
-            {accountError ? (
-              <p className="text-sm text-destructive">{accountError}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+    <DashboardLayout showSidebar={false} showHeader={false}>
+      <div className="flex min-h-screen flex-col px-4 py-10">
+        <div className="flex flex-1 items-center justify-center">
+          <Card className="w-full max-w-md border-0 rounded-3xl shadow-sm">
+            <CardContent className="pt-10 pb-10 px-6 text-center space-y-5">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-950/50">
+                <Building2 className="h-8 w-8 text-breneo-blue" />
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-xl font-bold text-foreground">
+                  Company access required
+                </h1>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You should be joined to the company.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      <Dialog
-        open={modalOpen}
-        onOpenChange={(open) => {
-          setModalOpen(open);
-          if (!open) resetModal();
-        }}
-      >
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Find your company</DialogTitle>
-            <DialogDescription>
-              Search the job directory and select your employer. A company admin
-              must approve your request before you can post jobs.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <EmployerCompanySearchField
-              existingCompaniesOnly
-              disabled={submitting}
-              selected={selected}
-              onSelectExisting={(c) => {
-                setSelected(c);
-                if (c?.name) setCompanyName(String(c.name));
-                else setCompanyName("");
-              }}
-              companyName={companyName}
-              onCompanyNameChange={setCompanyName}
-            />
+        <div className="mt-10 flex items-center justify-center">
+          <div className="w-full max-w-md">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={authLoading || !accountName}
+                  className="w-full flex items-center gap-3 rounded-2xl bg-white dark:bg-card border border-border/60 px-4 py-3 shadow-sm hover:bg-muted/20 transition-colors"
+                  aria-label="Account menu"
+                >
+                  <div className="h-10 w-10 shrink-0">
+                    <OptimizedAvatar
+                      src={accountAvatar}
+                      fallback={avatarFallback}
+                      size="md"
+                      className="h-10 w-10"
+                    />
+                  </div>
+                  {accountName || accountEmail ? (
+                    <div className="min-w-0 flex-1 text-left">
+                      {accountName ? (
+                        <div className="truncate text-sm font-semibold text-foreground">
+                          {accountName}
+                        </div>
+                      ) : null}
+                      {accountEmail ? (
+                        <div className="truncate text-sm text-muted-foreground">
+                          {accountEmail}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={logout} className="cursor-pointer">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={submitting}
-              onClick={() => setModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={submitting || !selected}
-              onClick={() => void handleSubmit()}
-            >
-              {submitting ? "Sending request…" : "Request to join"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
     </DashboardLayout>
   );
 }

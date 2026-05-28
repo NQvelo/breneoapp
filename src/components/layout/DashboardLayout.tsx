@@ -114,6 +114,7 @@ export function DashboardLayout({
         <DashboardHeader
           sidebarCollapsed={sidebarCollapsed}
           isVisible={isHeaderVisible}
+          showSidebar={showSidebar}
         />
       )}
 

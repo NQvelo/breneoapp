@@ -78,7 +78,9 @@ function employerBffOrigin(): string {
 }
 
 function employerCompaniesCollectionSearchUrl(search: string): string {
-  const u = new URL(EMPLOYER_COMPANIES_COLLECTION, `${employerBffOrigin()}/`);
+  // Company search should hit the job aggregator origin directly.
+  const base = JOB_AGGREGATOR_BASE_URL.replace(/\/$/, "");
+  const u = new URL(EMPLOYER_COMPANIES_COLLECTION, `${base}/`);
   u.searchParams.set("search", search);
   return u.toString();
 }
@@ -412,8 +414,6 @@ export async function searchAggregatorCompanies(
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
   }
-
-  assertEmployerJobsProxyConfigured("GET");
 
   const res = await fetch(employerCompaniesCollectionSearchUrl(q), {
     headers: {
