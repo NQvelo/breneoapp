@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   fetchEmployerStaffMemberships,
+  isStaffMembershipActive,
 } from "@/api/employer/aggregatorBffApi";
 import {
   fetchEmployerAccessState,
@@ -39,7 +40,7 @@ function isAllowed(path: string, allowed: string[]): boolean {
   );
 }
 
-async function userHasStaffMembership(): Promise<boolean> {
+async function userHasActiveStaffMembership(): Promise<boolean> {
   const staffUserId = resolveEmployerStaffUserId({
     accessToken: TokenManager.getAccessToken(),
   });
@@ -48,7 +49,9 @@ async function userHasStaffMembership(): Promise<boolean> {
     const rows = await fetchEmployerStaffMemberships({
       externalUserId: staffUserId,
     });
-    return rows.some((m) => m.external_user_id === staffUserId);
+    return rows.some(
+      (m) => m.external_user_id === staffUserId && isStaffMembershipActive(m),
+    );
   } catch {
     return false;
   }
@@ -57,12 +60,12 @@ async function userHasStaffMembership(): Promise<boolean> {
 async function loadEmployerAccessState(): Promise<EmployerAccessState> {
   try {
     const state = await fetchEmployerAccessState();
-    if (state.state === "needs_company" && (await userHasStaffMembership())) {
+    if (state.state === "needs_company" && (await userHasActiveStaffMembership())) {
       return { state: "active" };
     }
     return state;
   } catch {
-    if (await userHasStaffMembership()) {
+    if (await userHasActiveStaffMembership()) {
       return { state: "active" };
     }
     return { state: "needs_company" };

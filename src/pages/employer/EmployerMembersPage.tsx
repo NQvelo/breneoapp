@@ -5,16 +5,19 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
 import {
+  approveEmployerStaffMembership,
   countAdmins,
   deleteEmployerStaffMembership,
   fetchEmployerCompanyStaff,
   isCurrentUserAdmin,
+  isStaffMembershipPending,
   patchEmployerStaffMembershipAdmin,
   resolveEmployerLinkedCompany,
   staffDisplayName,
   staffFirstName,
   staffSurname,
   staffEmail,
+  staffMembershipStatus,
   type CompanyStaffMembership,
 } from "@/api/employer/aggregatorBffApi";
 import { resolveEmployerStaffUserId } from "@/api/employer/profile";
@@ -23,7 +26,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -41,14 +49,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { UserPlus } from "lucide-react";
+import { MoreVertical, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+
+function statusBadgeLabel(m: CompanyStaffMembership): string {
+  const s = staffMembershipStatus(m);
+  if (s === "pending") return "Pending";
+  if (s === "admin") return "Admin";
+  return "Member";
+}
 
 export default function EmployerMembersPage() {
   const { user, loading: authLoading } = useAuth();
@@ -78,6 +87,11 @@ export default function EmployerMembersPage() {
       });
     }
   }, [user?.id]);
+
+  const reloadTeam = useCallback(async (cid: number) => {
+    const rows = await fetchEmployerCompanyStaff(cid);
+    setMemberships(rows);
+  }, []);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -129,6 +143,16 @@ export default function EmployerMembersPage() {
     };
   }, [authLoading, user, resolveBreneoUserId]);
 
+  const pendingMembers = useMemo(
+    () => memberships.filter(isStaffMembershipPending),
+    [memberships],
+  );
+
+  const activeMembers = useMemo(
+    () => memberships.filter((m) => !isStaffMembershipPending(m)),
+    [memberships],
+  );
+
   const currentUserIsAdmin = useMemo(
     () =>
       breneoUserId ? isCurrentUserAdmin(memberships, breneoUserId) : false,
@@ -136,6 +160,22 @@ export default function EmployerMembersPage() {
   );
 
   const adminCount = useMemo(() => countAdmins(memberships), [memberships]);
+
+  const handleAcceptPending = async (member: CompanyStaffMembership) => {
+    if (!currentUserIsAdmin) return;
+    setActionId(member.id);
+    try {
+      await approveEmployerStaffMembership(member.id);
+      toast.success(`${staffDisplayName(member)} was added to your company.`);
+      if (companyId != null) await reloadTeam(companyId);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not approve team member.",
+      );
+    } finally {
+      setActionId(null);
+    }
+  };
 
   const handleToggleAdmin = async (
     member: CompanyStaffMembership,
@@ -216,20 +256,111 @@ export default function EmployerMembersPage() {
     }
   };
 
-  const adminToggleDisabledReason = (
-    member: CompanyStaffMembership,
-  ): string => {
-    if (member.external_user_id !== breneoUserId) return "";
-    if (adminCount <= 1) {
-      return "You are the only admin. Promote another member before removing your admin role.";
-    }
-    return "";
+  const renderMemberRow = (m: CompanyStaffMembership, pending: boolean) => {
+    const isSelf = m.external_user_id === breneoUserId;
+    const busy = actionId === m.id;
+    const status = staffMembershipStatus(m);
+    const canPromote =
+      !pending && currentUserIsAdmin && status === "member" && !isSelf;
+    const canDemote =
+      !pending &&
+      currentUserIsAdmin &&
+      status === "admin" &&
+      canToggleAdminOnRow(m);
+    const canRemove = currentUserIsAdmin && !isSelf;
+    const showMenu =
+      currentUserIsAdmin && (pending || canPromote || canDemote || canRemove);
+
+    return (
+      <TableRow key={m.id}>
+        <TableCell className="font-medium">
+          {staffFirstName(m) || "—"}
+          {isSelf ? (
+            <span className="text-muted-foreground font-normal text-xs ml-1">
+              (you)
+            </span>
+          ) : null}
+        </TableCell>
+        <TableCell className="font-medium">{staffSurname(m) || "—"}</TableCell>
+        <TableCell className="text-muted-foreground">
+          {staffEmail(m) || "—"}
+        </TableCell>
+        <TableCell>
+          <Badge
+            variant={pending ? "secondary" : "outline"}
+            className={
+              pending
+                ? "text-xs font-normal"
+                : status === "admin"
+                  ? "text-xs font-normal"
+                  : "text-xs font-normal text-green-700 border-green-200 bg-green-50 dark:text-green-400 dark:border-green-900 dark:bg-green-950/40"
+            }
+          >
+            {statusBadgeLabel(m)}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-right w-12">
+          {showMenu ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={busy}
+                  className="h-8 w-8"
+                  aria-label={`Actions for ${staffDisplayName(m)}`}
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {pending ? (
+                  <DropdownMenuItem
+                    disabled={busy}
+                    onClick={() => void handleAcceptPending(m)}
+                  >
+                    {busy ? "Accepting…" : "Accept"}
+                  </DropdownMenuItem>
+                ) : null}
+                {canPromote ? (
+                  <DropdownMenuItem
+                    disabled={busy}
+                    onClick={() => void handleToggleAdmin(m, true)}
+                  >
+                    Make admin
+                  </DropdownMenuItem>
+                ) : null}
+                {canDemote ? (
+                  <DropdownMenuItem
+                    disabled={busy}
+                    onClick={() => void handleToggleAdmin(m, false)}
+                  >
+                    Remove admin
+                  </DropdownMenuItem>
+                ) : null}
+                {canRemove ? (
+                  <DropdownMenuItem
+                    disabled={busy}
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => void handleRemove(m)}
+                  >
+                    Remove member
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          )}
+        </TableCell>
+      </TableRow>
+    );
   };
 
   return (
     <DashboardLayout>
-      <TooltipProvider>
-        <div className="space-y-6 md:px-6 lg:px-8 pb-24 md:pb-8">
+      <div className="space-y-6 md:px-6 lg:px-8 pb-24 md:pb-8">
           <Card>
             <CardHeader className="p-6 pb-4">
               <div className="flex items-start justify-between gap-4">
@@ -238,8 +369,8 @@ export default function EmployerMembersPage() {
                     Company team
                   </h1>
                   <p className="text-sm text-muted-foreground font-normal mt-1">
-                    Manage admins and members for your company. Only admins can
-                    change roles or remove others.
+                    Manage your company team. New sign-ups who pick your company
+                    appear as Pending until you accept them.
                   </p>
                 </div>
                 {currentUserIsAdmin && companyId != null ? (
@@ -267,8 +398,7 @@ export default function EmployerMembersPage() {
                 </p>
               ) : memberships.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  No team members yet. Members appear here after they join your
-                  company during employer onboarding.
+                  No team members yet.
                 </p>
               ) : (
                 <Table>
@@ -277,120 +407,18 @@ export default function EmployerMembersPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Surname</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead className="w-[100px]">Admin</TableHead>
-                      <TableHead className="w-[100px] text-right">
-                        Actions
-                      </TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {memberships.map((m) => {
-                      const isSelf = m.external_user_id === breneoUserId;
-                      const showRemove = currentUserIsAdmin && !isSelf;
-                      const canToggle = canToggleAdminOnRow(m);
-                      const toggleReason = adminToggleDisabledReason(m);
-                      const busy = actionId === m.id;
-
-                      return (
-                        <TableRow key={m.id}>
-                          <TableCell className="font-medium">
-                            {staffFirstName(m) || "—"}
-                            {isSelf ? (
-                              <span className="text-muted-foreground font-normal text-xs ml-1">
-                                (you)
-                              </span>
-                            ) : null}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {staffSurname(m) || "—"}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {staffEmail(m) || "—"}
-                          </TableCell>
-                          <TableCell>
-                            {currentUserIsAdmin ? (
-                              canToggle ? (
-                                <div className="flex items-center gap-2">
-                                  <Switch
-                                    checked={m.is_admin}
-                                    disabled={busy}
-                                    onCheckedChange={(checked) =>
-                                      void handleToggleAdmin(m, checked)
-                                    }
-                                    aria-label={`Admin for ${staffDisplayName(m)}`}
-                                  />
-                                  {m.is_admin ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      Admin
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                              ) : (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-2 opacity-70">
-                                      <Switch
-                                        checked={m.is_admin}
-                                        disabled
-                                        aria-label="Admin (locked)"
-                                      />
-                                      {m.is_admin ? (
-                                        <Badge
-                                          variant="outline"
-                                          className="text-xs"
-                                        >
-                                          Admin
-                                        </Badge>
-                                      ) : null}
-                                    </div>
-                                  </TooltipTrigger>
-                                  {toggleReason ? (
-                                    <TooltipContent>
-                                      {toggleReason}
-                                    </TooltipContent>
-                                  ) : null}
-                                </Tooltip>
-                              )
-                            ) : m.is_admin ? (
-                              <Badge variant="outline" className="text-xs">
-                                Admin
-                              </Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">
-                                —
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {showRemove ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive"
-                                disabled={busy}
-                                onClick={() => void handleRemove(m)}
-                              >
-                                Remove
-                              </Button>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">
-                                —
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {pendingMembers.map((m) => renderMemberRow(m, true))}
+                    {activeMembers.map((m) => renderMemberRow(m, false))}
                   </TableBody>
                 </Table>
               )}
             </CardContent>
           </Card>
-        </div>
 
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
           <DialogContent className="max-w-md">
@@ -433,7 +461,7 @@ export default function EmployerMembersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </TooltipProvider>
+      </div>
     </DashboardLayout>
   );
 }

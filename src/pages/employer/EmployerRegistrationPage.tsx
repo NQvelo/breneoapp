@@ -32,7 +32,7 @@ import {
   extractBreneoUserIdFromEmployerProfileRaw,
   extractBreneoUserIdFromJwt,
 } from "@/api/employer/profile";
-import { createEmployerJoinRequest } from "@/api/employer/employerJoinRequests";
+import { createPendingEmployerStaffMembership } from "@/api/employer/aggregatorBffApi";
 import {
   fetchEmployerCompanyFromAggregator,
   uploadEmployerCompanyLogoToAggregator,
@@ -680,10 +680,7 @@ const EmployerRegistrationPage = () => {
           const joinName =
             String(selectedDirectoryCompany.name ?? breneoCompanyName).trim() ||
             `Company ${pk}`;
-          await createEmployerJoinRequest({
-            companyId: pk,
-            companyName: joinName,
-          });
+          await createPendingEmployerStaffMembership(pk);
           pendingJoinApproval = true;
           aggregatorCompanyOk = true;
         } else {

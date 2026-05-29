@@ -52,6 +52,7 @@ import express from "express";
 import cors from "cors";
 
 import { extractJobSectionsFromDescription } from "./geminiJobParser.mjs";
+import { createDjangoNotification } from "./djangoNotifications.mjs";
 import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
 import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
 
@@ -634,8 +635,36 @@ async function requireEmployerAuth(req, res) {
  * @param {{ userId: string; email?: string; firstName?: string; lastName?: string }} ctx
  * @param {Record<string, unknown>} [extra]
  */
+function normalizeStaffMembershipStatus(raw) {
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (s === "panding" || s === "pending") return "pending";
+  if (s === "admin") return "admin";
+  if (s === "member") return "member";
+  return "";
+}
+
+function membershipStatusFromRow(row) {
+  if (!row || typeof row !== "object") return "";
+  const r = row;
+  const fromStatus = normalizeStaffMembershipStatus(r.status);
+  if (fromStatus) return fromStatus;
+  if (Boolean(r.is_admin)) return "admin";
+  return "member";
+}
+
+function isActiveStaffMembershipRow(row) {
+  const status = membershipStatusFromRow(row);
+  return status === "member" || status === "admin";
+}
+
+function isPendingStaffMembershipRow(row) {
+  return membershipStatusFromRow(row) === "pending";
+}
+
 function buildStaffMembershipBody(companyId, ctx, extra = {}) {
-  return {
+  const body = {
     company_id: companyId,
     external_user_id: String(ctx.userId),
     external_user_email: ctx.email ?? "",
@@ -644,6 +673,13 @@ function buildStaffMembershipBody(companyId, ctx, extra = {}) {
     is_admin: false,
     ...extra,
   };
+  const status = normalizeStaffMembershipStatus(body.status);
+  if (status) {
+    body.status = status;
+    if (status === "admin") body.is_admin = true;
+    if (status === "pending") body.is_admin = false;
+  }
+  return body;
 }
 
 /**
@@ -1145,7 +1181,7 @@ async function handleStaffMembershipsCreate(req, res) {
         detail: "company_id is required and must be a number",
       });
     }
-    const payload = buildStaffMembershipBody(n, ctx);
+    const payload = buildStaffMembershipBody(n, ctx, raw);
     const url = AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "");
     const upstream = await fetch(url, {
       method: "POST",
@@ -1171,9 +1207,17 @@ async function handleStaffMembershipsCreate(req, res) {
     }
     const okStatus =
       upstream.status >= 200 && upstream.status < 300 ? upstream.status : 201;
-    return res
-      .status(okStatus)
-      .json(typeof data === "object" && data !== null ? data : {});
+    const responseBody = typeof data === "object" && data !== null ? data : {};
+    if (payload.status === "pending") {
+      const membershipId =
+        responseBody && typeof responseBody === "object" && responseBody.id != null
+          ? responseBody.id
+          : null;
+      if (membershipId != null) {
+        void notifyCompanyAdminsPendingMember(n, ctx, membershipId);
+      }
+    }
+    return res.status(okStatus).json(responseBody);
   } catch (e) {
     console.error(e);
     return res.status(500).json({ detail: "Internal server error" });
@@ -1359,8 +1403,26 @@ async function handleStaffMembershipPatch(req, res) {
       req.body && typeof req.body === "object" && !Array.isArray(req.body)
         ? /** @type {Record<string, unknown>} */ ({ ...req.body })
         : {};
-    if (!Object.prototype.hasOwnProperty.call(raw, "is_admin")) {
-      return res.status(400).json({ detail: "is_admin is required in body" });
+    const patchBody = {};
+    if (Object.prototype.hasOwnProperty.call(raw, "is_admin")) {
+      patchBody.is_admin = Boolean(raw.is_admin);
+    }
+    if (Object.prototype.hasOwnProperty.call(raw, "status")) {
+      const status = normalizeStaffMembershipStatus(raw.status);
+      if (!status) {
+        return res.status(400).json({
+          detail: "status must be pending, member, or admin.",
+        });
+      }
+      patchBody.status = status;
+      if (status === "admin") patchBody.is_admin = true;
+      if (status === "member") patchBody.is_admin = false;
+      if (status === "pending") patchBody.is_admin = false;
+    }
+    if (Object.keys(patchBody).length === 0) {
+      return res
+        .status(400)
+        .json({ detail: "Provide is_admin and/or status in body." });
     }
     const url = new URL(
       `${AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "")}/${encodeURIComponent(membershipId)}`,
@@ -1373,7 +1435,7 @@ async function handleStaffMembershipPatch(req, res) {
         "Content-Type": "application/json",
         "X-Employer-Key": AGGREGATOR_KEY,
       },
-      body: JSON.stringify({ is_admin: Boolean(raw.is_admin) }),
+      body: JSON.stringify(patchBody),
     });
     const text = await upstream.text();
     const data = parseUpstreamJson(text);
@@ -2685,7 +2747,75 @@ async function fetchStaffForCompany(companyId) {
  * @param {string | number} companyIdRaw
  * @param {{ userId: string; email?: string; firstName?: string; lastName?: string }} userCtx
  */
-async function postStaffMembershipForUser(companyIdRaw, userCtx) {
+/**
+ * @param {string | number} membershipId
+ * @param {string} actingUserId
+ * @param {"pending"|"member"|"admin"} status
+ */
+async function patchStaffMembershipStatus(membershipId, actingUserId, status) {
+  const normalized = normalizeStaffMembershipStatus(status);
+  if (!normalized) {
+    return {
+      ok: false,
+      status: 400,
+      data: { detail: "Invalid membership status." },
+    };
+  }
+  const patchBody = { status: normalized };
+  if (normalized === "admin") patchBody.is_admin = true;
+  if (normalized === "member" || normalized === "pending") {
+    patchBody.is_admin = false;
+  }
+  const url = new URL(
+    `${AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "")}/${encodeURIComponent(String(membershipId))}`,
+  );
+  url.searchParams.set("external_user_id", String(actingUserId));
+  const res = await fetch(url.toString(), {
+    method: "PATCH",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY || "",
+    },
+    body: JSON.stringify(patchBody),
+  });
+  const text = await res.text();
+  const data = parseUpstreamJson(text);
+  return { ok: res.ok, status: res.status, data, text };
+}
+
+async function notifyCompanyAdminsPendingMember(companyId, requester, membershipId) {
+  const staff = await fetchStaffForCompany(companyId).catch(() => []);
+  const adminIds = new Set();
+  for (const row of staff) {
+    if (!row || typeof row !== "object") continue;
+    if (membershipStatusFromRow(row) !== "admin") continue;
+    const adminId = String(row.external_user_id ?? "").trim();
+    if (adminId && adminId !== String(requester.userId)) adminIds.add(adminId);
+  }
+  const name = [requester.firstName, requester.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  await Promise.all(
+    Array.from(adminIds).map((adminId) =>
+      createDjangoNotification({
+        recipientId: adminId,
+        title: "Company join request",
+        message: `employer_join_request:${membershipId}|${name || "A user"} wants to join your company. Open Members to approve.`,
+        type: "info",
+        metadata: {
+          kind: "employer_join_request",
+          request_id: String(membershipId),
+          company_id: companyId,
+          staff_membership_id: membershipId,
+        },
+      }),
+    ),
+  );
+}
+
+async function postStaffMembershipForUser(companyIdRaw, userCtx, options = {}) {
   const n = Number(companyIdRaw);
   if (!Number.isFinite(n)) {
     return {
@@ -2695,20 +2825,18 @@ async function postStaffMembershipForUser(companyIdRaw, userCtx) {
     };
   }
   const url = AGGREGATOR_STAFF_MEMBERSHIPS_ROOT.replace(/\/$/, "");
+  const extra = {};
+  const status = normalizeStaffMembershipStatus(options.status);
+  if (status) extra.status = status;
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Employer-Key": AGGREGATOR_KEY || "",
     },
-    body: JSON.stringify({
-      company_id: n,
-      external_user_id: String(userCtx.userId),
-      external_user_email: userCtx.email ?? "",
-      external_user_name: userCtx.firstName ?? "",
-      external_user_surname: userCtx.lastName ?? "",
-      is_admin: false,
-    }),
+    body: JSON.stringify(
+      buildStaffMembershipBody(n, userCtx, extra),
+    ),
   });
   const text = await res.text();
   const data = parseUpstreamJson(text);
@@ -2735,6 +2863,7 @@ const employerMembershipRouteDeps = {
   aggregatorStaffRoot: AGGREGATOR_STAFF_MEMBERSHIPS_ROOT,
   aggregatorKey: AGGREGATOR_KEY,
   postStaffMembershipForUser,
+  patchStaffMembershipStatus,
   fetchStaffForCompany,
   fetchMembershipsForUser,
 };

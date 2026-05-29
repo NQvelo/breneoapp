@@ -33,6 +33,50 @@ function sanitizeRequestRow(row) {
  * @param {unknown[]} memberships
  * @param {string} userId
  */
+function membershipStatusFromRow(row) {
+  if (!row || typeof row !== "object") return "member";
+  const r = row;
+  const raw = String(r.status ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw === "panding" || raw === "pending") return "pending";
+  if (raw === "admin") return "admin";
+  if (raw === "member") return "member";
+  if (Boolean(r.is_admin)) return "admin";
+  return "member";
+}
+
+function isActiveMembershipRow(row) {
+  const s = membershipStatusFromRow(row);
+  return s === "member" || s === "admin";
+}
+
+function isPendingMembershipRow(row) {
+  return membershipStatusFromRow(row) === "pending";
+}
+
+function joinRequestShapeFromMembership(row, companyName = "") {
+  if (!row || typeof row !== "object") return null;
+  const r = row;
+  const id = r.id != null ? String(r.id) : "";
+  if (!id) return null;
+  const company_id = Number(r.company_id) || 0;
+  return {
+    id,
+    company_id,
+    company_name:
+      companyName ||
+      String(r.company_name ?? "").trim() ||
+      (company_id ? `Company ${company_id}` : "Company"),
+    requester_user_id: String(r.external_user_id ?? ""),
+    requester_email: String(r.external_user_email ?? ""),
+    requester_name: String(r.external_user_name ?? ""),
+    requester_surname: String(r.external_user_surname ?? ""),
+    status: "pending",
+    created_at: String(r.created_at ?? new Date().toISOString()),
+  };
+}
+
 function adminCompanyIdsFromMemberships(memberships, userId) {
   const uid = String(userId).trim();
   const ids = new Set();
@@ -40,9 +84,13 @@ function adminCompanyIdsFromMemberships(memberships, userId) {
     if (!row || typeof row !== "object") continue;
     const r = row;
     const memberUserId = String(r.external_user_id ?? "").trim();
-    const isAdmin = Boolean(r.is_admin);
     const companyId = Number(r.company_id);
-    if (memberUserId && memberUserId === uid && isAdmin && Number.isFinite(companyId)) {
+    if (
+      memberUserId &&
+      memberUserId === uid &&
+      membershipStatusFromRow(r) === "admin" &&
+      Number.isFinite(companyId)
+    ) {
       ids.add(companyId);
     }
   }
@@ -80,26 +128,31 @@ export function registerEmployerJoinRequestRoutes(app, deps) {
   }
 
   const handleAccessState = async (req, res) => {
-    if (!hasSupabaseServiceRole()) {
-      return res
-        .status(500)
-        .json({ detail: "Join requests require SUPABASE_SERVICE_ROLE_KEY on the BFF." });
-    }
     const auth = await deps.requireEmployerAuth(req, res);
     if (!auth) return;
     const memberships = await fetchMembershipsForUser(auth.userId);
-    if (memberships.length > 0) {
+    const active = memberships.filter(isActiveMembershipRow);
+    if (active.length > 0) {
       return res.json({
         state: "active",
-        membership: memberships[0],
+        membership: active[0],
       });
     }
-    const mine = await supabaseRest(
-      `employer_join_requests?requester_user_id=eq.${encodeURIComponent(String(auth.userId))}&status=eq.pending&order=created_at.desc&limit=1`,
-      { method: "GET" },
-    );
-    const request = sanitizeRequestRow(toArray(mine.data)[0]);
-    if (request) return res.json({ state: "pending", request });
+    const pendingMembership = memberships.find(isPendingMembershipRow);
+    if (pendingMembership) {
+      const request = joinRequestShapeFromMembership(pendingMembership);
+      if (request) {
+        return res.json({ state: "pending", request, membership: pendingMembership });
+      }
+    }
+    if (hasSupabaseServiceRole()) {
+      const mine = await supabaseRest(
+        `employer_join_requests?requester_user_id=eq.${encodeURIComponent(String(auth.userId))}&status=eq.pending&order=created_at.desc&limit=1`,
+        { method: "GET" },
+      );
+      const request = sanitizeRequestRow(toArray(mine.data)[0]);
+      if (request) return res.json({ state: "pending", request });
+    }
     return res.json({ state: "needs_company", request: null });
   };
   app.get("/api/employer/access-state", handleAccessState);
@@ -108,6 +161,16 @@ export function registerEmployerJoinRequestRoutes(app, deps) {
   const handleMyRequest = async (req, res) => {
     const auth = await deps.requireEmployerAuth(req, res);
     if (!auth) return;
+    const memberships = await fetchMembershipsForUser(auth.userId);
+    const pendingMembership = memberships.find(isPendingMembershipRow);
+    if (pendingMembership) {
+      return res.json({
+        request: joinRequestShapeFromMembership(pendingMembership),
+      });
+    }
+    if (!hasSupabaseServiceRole()) {
+      return res.json({ request: null });
+    }
     const mine = await supabaseRest(
       `employer_join_requests?requester_user_id=eq.${encodeURIComponent(String(auth.userId))}&status=eq.pending&order=created_at.desc&limit=1`,
       { method: "GET" },
@@ -205,16 +268,45 @@ export function registerEmployerJoinRequestRoutes(app, deps) {
     if (request.status !== "pending") {
       return res.status(400).json({ detail: "Join request is not pending." });
     }
-    const membership = await deps.postStaffMembershipForUser(request.company_id, {
-      userId: request.requester_user_id,
-      email: request.requester_email,
-      firstName: request.requester_name,
-      lastName: request.requester_surname,
-    });
-    if (!membership.ok) {
-      return res.status(membership.status || 400).json(
-        membership.data || { detail: "Could not add requester to company members." },
+    const staff = await deps.fetchStaffForCompany(request.company_id).catch(() => []);
+    const pendingRow = toArray(staff).find(
+      (row) =>
+        row &&
+        typeof row === "object" &&
+        String(row.external_user_id ?? "").trim() ===
+          String(request.requester_user_id).trim() &&
+        isPendingMembershipRow(row),
+    );
+    let membershipOk = false;
+    if (pendingRow && pendingRow.id != null && deps.patchStaffMembershipStatus) {
+      const patched = await deps.patchStaffMembershipStatus(
+        pendingRow.id,
+        auth.userId,
+        "member",
       );
+      membershipOk = patched.ok;
+      if (!membershipOk) {
+        return res.status(patched.status || 400).json(
+          patched.data || { detail: "Could not approve pending team member." },
+        );
+      }
+    } else {
+      const membership = await deps.postStaffMembershipForUser(
+        request.company_id,
+        {
+          userId: request.requester_user_id,
+          email: request.requester_email,
+          firstName: request.requester_name,
+          lastName: request.requester_surname,
+        },
+        { status: "member" },
+      );
+      membershipOk = membership.ok;
+      if (!membershipOk) {
+        return res.status(membership.status || 400).json(
+          membership.data || { detail: "Could not add requester to company members." },
+        );
+      }
     }
     const upd = await supabaseRest(`employer_join_requests?id=eq.${encodeURIComponent(request.id)}`, {
       method: "PATCH",

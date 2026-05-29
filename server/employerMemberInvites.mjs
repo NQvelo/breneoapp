@@ -4,6 +4,7 @@
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { readAppPublicUrl, sendResendEmail } from "./resendEmail.mjs";
+import { buildEmployerMemberInviteEmail } from "./emailTemplates.mjs";
 import { createDjangoNotification } from "./djangoNotifications.mjs";
 
 function normalizeEmail(email) {
@@ -222,16 +223,17 @@ export function registerEmployerMemberInviteRoutes(app, deps) {
       .join(" ")
       .trim();
 
+    const inviteEmail = buildEmployerMemberInviteEmail({
+      companyName,
+      inviterName: inviterName || "A company administrator",
+      joinUrl,
+      inviteeEmail,
+    });
     const emailResult = await sendResendEmail({
       to: inviteeEmail,
-      subject: `Join ${companyName} on Breneo`,
-      html: `
-        <p>Hello,</p>
-        <p>${inviterName || "A company admin"} invited you to join <strong>${companyName}</strong> on Breneo.</p>
-        <p><a href="${joinUrl}">Join company</a></p>
-        <p>This link expires in 7 days. If you did not expect this email, you can ignore it.</p>
-      `,
-      text: `${inviterName || "A company admin"} invited you to join ${companyName} on Breneo. Open this link to join: ${joinUrl}`,
+      subject: inviteEmail.subject,
+      html: inviteEmail.html,
+      text: inviteEmail.text,
     });
 
     if (!emailResult.ok) {
@@ -321,6 +323,7 @@ export function registerEmployerMemberInviteRoutes(app, deps) {
         firstName: auth.firstName,
         lastName: auth.lastName,
       },
+      { status: "member" },
     );
     if (!membership.ok) {
       return res.status(membership.status || 400).json(

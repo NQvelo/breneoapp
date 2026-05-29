@@ -2,6 +2,8 @@
  * Company staff membership types and helpers (job aggregator employer API).
  */
 
+export type StaffMembershipStatus = "pending" | "member" | "admin";
+
 export interface CompanyStaffMembership {
   id: number;
   company_id: number;
@@ -13,8 +15,39 @@ export interface CompanyStaffMembership {
   user_email: string;
   user_name: string;
   user_surname: string;
+  /** Aggregator `status` field (pending | member | admin). */
+  status: StaffMembershipStatus;
   is_admin: boolean;
   created_at: string;
+}
+
+function normalizeStaffMembershipStatus(
+  raw: unknown,
+  isAdmin: boolean,
+): StaffMembershipStatus {
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (s === "panding" || s === "pending") return "pending";
+  if (s === "admin") return "admin";
+  if (s === "member") return "member";
+  if (isAdmin) return "admin";
+  return "member";
+}
+
+export function staffMembershipStatus(
+  m: CompanyStaffMembership,
+): StaffMembershipStatus {
+  return m.status;
+}
+
+export function isStaffMembershipPending(m: CompanyStaffMembership): boolean {
+  return staffMembershipStatus(m) === "pending";
+}
+
+export function isStaffMembershipActive(m: CompanyStaffMembership): boolean {
+  const s = staffMembershipStatus(m);
+  return s === "member" || s === "admin";
 }
 
 /** @deprecated Use CompanyStaffMembership */
@@ -42,11 +75,18 @@ export function isCurrentUserAdmin(
   memberships: CompanyStaffMembership[],
   userId: string,
 ): boolean {
-  return memberships.some((m) => m.external_user_id === userId && m.is_admin);
+  return memberships.some(
+    (m) =>
+      m.external_user_id === userId &&
+      isStaffMembershipActive(m) &&
+      staffMembershipStatus(m) === "admin",
+  );
 }
 
 export function countAdmins(memberships: CompanyStaffMembership[]): number {
-  return memberships.filter((m) => m.is_admin).length;
+  return memberships.filter(
+    (m) => isStaffMembershipActive(m) && staffMembershipStatus(m) === "admin",
+  ).length;
 }
 
 /** Map aggregator 403 error bodies to user-facing toast copy. */
@@ -92,6 +132,8 @@ export function normalizeStaffMembership(raw: unknown): CompanyStaffMembership |
   const external_user_surname = String(
     o.external_user_surname ?? o.user_surname ?? "",
   ).trim();
+  const is_admin = Boolean(o.is_admin);
+  const status = normalizeStaffMembershipStatus(o.status, is_admin);
   return {
     id,
     company_id,
@@ -103,7 +145,8 @@ export function normalizeStaffMembership(raw: unknown): CompanyStaffMembership |
     user_email: String(o.user_email ?? external_user_email).trim(),
     user_name: String(o.user_name ?? external_user_name).trim(),
     user_surname: String(o.user_surname ?? external_user_surname).trim(),
-    is_admin: Boolean(o.is_admin),
+    status,
+    is_admin: status === "admin" ? true : is_admin,
     created_at: String(o.created_at ?? ""),
   };
 }

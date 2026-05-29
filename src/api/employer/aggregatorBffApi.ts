@@ -27,6 +27,8 @@ import {
 import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 import {
   type CompanyStaffMembership,
+  type StaffMembershipStatus,
+  isStaffMembershipPending,
   normalizeStaffMembership,
   staffMembershipActionErrorMessage,
   unwrapStaffMemberships,
@@ -40,7 +42,11 @@ export {
   staffEmail,
   isCurrentUserAdmin,
   countAdmins,
+  isStaffMembershipPending,
+  isStaffMembershipActive,
+  staffMembershipStatus,
 } from "@/api/employer/staffMembership";
+export type { StaffMembershipStatus } from "@/api/employer/staffMembership";
 
 export type AggregatorIndustry = { id: number; name: string };
 
@@ -78,8 +84,9 @@ function employerBffOrigin(): string {
 }
 
 function employerCompaniesCollectionSearchUrl(search: string): string {
-  // Company search should hit the job aggregator origin directly.
-  const base = JOB_AGGREGATOR_BASE_URL.replace(/\/$/, "");
+  // Company search must go through the employer BFF so X-Employer-Key
+  // remains server-side and browser requests do not 403 on raw aggregator.
+  const base = employerBffOrigin();
   const u = new URL(EMPLOYER_COMPANIES_COLLECTION, `${base}/`);
   u.searchParams.set("search", search);
   return u.toString();
@@ -359,15 +366,21 @@ export async function deleteEmployerStaffMembership(
   }
 }
 
-export async function patchEmployerStaffMembershipAdmin(
+export async function patchEmployerStaffMembership(
   membershipId: number | string,
-  isAdmin: boolean,
+  patch: { is_admin?: boolean; status?: StaffMembershipStatus },
 ): Promise<CompanyStaffMembership> {
   const token = TokenManager.getAccessToken();
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
   }
   assertEmployerJobsProxyConfigured("PATCH");
+  const bodyPatch: Record<string, unknown> = {};
+  if (patch.is_admin !== undefined) bodyPatch.is_admin = patch.is_admin;
+  if (patch.status !== undefined) bodyPatch.status = patch.status;
+  if (Object.keys(bodyPatch).length === 0) {
+    throw new Error("Nothing to update on staff membership.");
+  }
   const url = new URL(
     `/api/employer/staff-memberships/${encodeURIComponent(String(membershipId))}`,
     `${employerBffOrigin()}/`,
@@ -379,14 +392,14 @@ export async function patchEmployerStaffMembershipAdmin(
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ is_admin: isAdmin }),
+    body: JSON.stringify(bodyPatch),
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
       extractAggregatorErrorMessage(
         body,
-        "Could not update admin status.",
+        "Could not update team member.",
       ),
     ) as Error & { status?: number };
     err.status = res.status;
@@ -397,6 +410,67 @@ export async function patchEmployerStaffMembershipAdmin(
     throw new Error("Invalid staff membership response.");
   }
   return row;
+}
+
+export async function patchEmployerStaffMembershipAdmin(
+  membershipId: number | string,
+  isAdmin: boolean,
+): Promise<CompanyStaffMembership> {
+  return patchEmployerStaffMembership(membershipId, {
+    is_admin: isAdmin,
+    status: isAdmin ? "admin" : "member",
+  });
+}
+
+/** Request to join an existing company (awaiting admin approval). */
+export async function createPendingEmployerStaffMembership(
+  companyId: number | string,
+): Promise<CompanyStaffMembership> {
+  const token = TokenManager.getAccessToken();
+  if (!token || typeof window === "undefined") {
+    throw new Error("Not authenticated");
+  }
+  const n = requireAggregatorCompanyPk(companyId, "companyId");
+  assertEmployerJobsProxyConfigured("POST");
+  const res = await fetch(
+    new URL(
+      "/api/employer/staff-memberships",
+      `${employerBffOrigin()}/`,
+    ).toString(),
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ company_id: n, status: "pending" }),
+    },
+  );
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok && !isDuplicateStaffMembershipError(res.status, body)) {
+    const err = new Error(
+      extractAggregatorErrorMessage(
+        body,
+        "Could not submit your join request.",
+      ),
+    ) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  const row = normalizeStaffMembership(body);
+  if (row) return row;
+  const existing = await fetchEmployerStaffMemberships({ companyId: n });
+  const pending = existing.find((m) => isStaffMembershipPending(m));
+  if (pending) return pending;
+  throw new Error("Could not read staff membership after join request.");
+}
+
+/** Admin accepts a pending staff membership. */
+export async function approveEmployerStaffMembership(
+  membershipId: number | string,
+): Promise<CompanyStaffMembership> {
+  return patchEmployerStaffMembership(membershipId, { status: "member" });
 }
 
 /**
@@ -414,6 +488,7 @@ export async function searchAggregatorCompanies(
   if (!token || typeof window === "undefined") {
     throw new Error("Not authenticated");
   }
+  assertEmployerJobsProxyConfigured("GET");
 
   const res = await fetch(employerCompaniesCollectionSearchUrl(q), {
     headers: {

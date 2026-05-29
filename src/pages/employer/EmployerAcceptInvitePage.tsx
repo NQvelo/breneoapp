@@ -3,7 +3,9 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+
+const INVITE_ILLUSTRATION = "/lovable-uploads/link.png";
 import { toast } from "sonner";
 import {
   acceptEmployerMemberInvite,
@@ -34,7 +36,9 @@ export default function EmployerAcceptInvitePage() {
 
   const returnPath = useMemo(() => {
     const path = `${location.pathname}${location.search}`;
-    return path.startsWith("/") ? path : `/employer/accept-invite?token=${token}`;
+    return path.startsWith("/")
+      ? path
+      : `/employer/accept-invite?token=${token}`;
   }, [location.pathname, location.search, token]);
 
   useEffect(() => {
@@ -81,17 +85,18 @@ export default function EmployerAcceptInvitePage() {
     setAccepting(true);
     try {
       const result = await acceptEmployerMemberInvite(token);
-      const name = result.company_name?.trim() || preview?.company_name || "your company";
+      const name =
+        result.company_name?.trim() || preview?.company_name || "your company";
       setJoinedCompanyName(name);
       toast.success(`You joined ${name}.`);
       sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY);
       window.setTimeout(() => {
-        navigate(getLocalizedPath("/employer/home", language), { replace: true });
+        navigate(getLocalizedPath("/employer/home", language), {
+          replace: true,
+        });
       }, 1800);
     } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Could not accept invite.",
-      );
+      toast.error(e instanceof Error ? e.message : "Could not accept invite.");
     } finally {
       setAccepting(false);
     }
@@ -100,8 +105,7 @@ export default function EmployerAcceptInvitePage() {
   const expired = preview?.expired || preview?.status === "expired";
   const accepted = preview?.status === "accepted";
   const companyLabel = preview?.company_name?.trim() || "your company";
-  const userRole =
-    user?.user_type || localStorage.getItem("userRole") || "";
+  const userRole = user?.user_type || localStorage.getItem("userRole") || "";
   const isEmployerAccount = userRole === "employer";
   const canAccept =
     Boolean(preview) &&
@@ -118,13 +122,19 @@ export default function EmployerAcceptInvitePage() {
       <div className="flex min-h-screen items-center justify-center px-4 py-10">
         <Card className="w-full max-w-md border-0 rounded-3xl shadow-sm">
           <CardContent className="pt-10 pb-10 px-6 text-center space-y-5">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-950/50">
-              {joinedCompanyName ? (
+            {joinedCompanyName ? (
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-950/40">
                 <CheckCircle2 className="h-8 w-8 text-green-600" />
-              ) : (
-                <Building2 className="h-8 w-8 text-breneo-blue" />
-              )}
-            </div>
+              </div>
+            ) : (
+              <img
+                src={INVITE_ILLUSTRATION}
+                alt=""
+                className="mx-auto h-20 w-20 object-contain"
+                width={112}
+                height={112}
+              />
+            )}
 
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading invite…</p>

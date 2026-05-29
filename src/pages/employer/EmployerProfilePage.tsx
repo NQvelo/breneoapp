@@ -60,7 +60,7 @@ import {
   type AggregatorCompany,
   type AggregatorIndustry,
 } from "@/api/employer/aggregatorBffApi";
-import { createEmployerJoinRequest } from "@/api/employer/employerJoinRequests";
+import { createPendingEmployerStaffMembership } from "@/api/employer/aggregatorBffApi";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getLocalizedPath } from "@/utils/localeUtils";
 
@@ -342,10 +342,7 @@ export default function EmployerProfilePage() {
         const joinName =
           String(pickerSelected.name ?? breneoCompanyName).trim() ||
           `Company ${pk}`;
-        await createEmployerJoinRequest({
-          companyId: pk,
-          companyName: joinName,
-        });
+        await createPendingEmployerStaffMembership(pk);
         toast.success(
           "Join request sent. A company admin will review your request.",
         );
