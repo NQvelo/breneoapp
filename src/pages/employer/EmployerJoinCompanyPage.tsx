@@ -1,4 +1,12 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  EMPLOYER_ACCESS_POLL_MS,
+  EMPLOYER_ACTIVE_LANDING_PATH,
+  resolveEmployerDashboardAccess,
+} from "@/api/employer/employerAccessResolver";
+import { getLocalizedPath } from "@/utils/localeUtils";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Building2, ChevronDown, LogOut } from "lucide-react";
@@ -12,7 +20,38 @@ import { useAuth } from "@/contexts/AuthContext";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 
 export default function EmployerJoinCompanyPage() {
+  const navigate = useNavigate();
+  const { language } = useLanguage();
   const { user, employerDisplay, loading: authLoading, logout } = useAuth();
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const access = await resolveEmployerDashboardAccess();
+        if (cancelled) return;
+        if (access.state === "active") {
+          window.location.assign(
+            getLocalizedPath(EMPLOYER_ACTIVE_LANDING_PATH, language),
+          );
+          return;
+        }
+        if (access.state === "pending") {
+          navigate(getLocalizedPath("/employer/pending-approval", language), {
+            replace: true,
+          });
+        }
+      } catch {
+        /* stay on join-company */
+      }
+    };
+    void check();
+    const id = window.setInterval(check, EMPLOYER_ACCESS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [language, navigate]);
 
   const accountName =
     [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||

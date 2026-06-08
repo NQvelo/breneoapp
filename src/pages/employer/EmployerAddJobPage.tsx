@@ -6,7 +6,6 @@ import React, {
   useRef,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,11 +60,21 @@ import {
 import type { ICity, ICountry } from "country-state-city";
 import {
   applyResolvedCountryToForm,
-  normalizeJobCityForApi,
-  normalizeJobCountryForApi,
+  JOB_LOCATION_MIN_SEARCH_CHARS,
+  resolveCommittedJobLocation,
   resolveCountryFromStoredValue,
 } from "@/utils/jobLocationFields";
 import { EmployerJobFormPreview } from "@/components/employer/EmployerJobFormPreview";
+import { EmployerJobSkillsPicker } from "@/components/employer/EmployerJobSkillsPicker";
+import { EmployerLocationSelectDropdown } from "@/components/employer/EmployerLocationSelectDropdown";
+import {
+  previewParseEmployerJob,
+  type EmployerJobPreviewParseResult,
+} from "@/api/employer/previewParseJob";
+import {
+  hasDistinctStructuredSections,
+  resolveJobSectionsAfterAi,
+} from "@/utils/jobSectionsDedup";
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -103,6 +112,14 @@ function linesToBulletArray(text: string, max = 6): string[] {
     .slice(0, max);
 }
 
+function normalizeSkillsKey(skills: string[]): string {
+  return skills
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join("\n");
+}
+
 export default function EmployerAddJobPage() {
   const { jobId } = useParams<{ jobId?: string }>();
   const locationState = useLocation();
@@ -121,12 +138,15 @@ export default function EmployerAddJobPage() {
   const [deleting, setDeleting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [headerCompanyName, setHeaderCompanyName] = useState("");
-  const [headerCompanyLogo, setHeaderCompanyLogo] = useState<string | null>(null);
+  const [headerCompanyLogo, setHeaderCompanyLogo] = useState<string | null>(
+    null,
+  );
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [responsibilitiesText, setResponsibilitiesText] = useState("");
   const [qualificationsText, setQualificationsText] = useState("");
+  const [jobDescriptionSummary, setJobDescriptionSummary] = useState("");
   const [locationCountry, setLocationCountry] = useState("");
   const [location, setLocation] = useState("");
   const [countryQuery, setCountryQuery] = useState("");
@@ -146,6 +166,7 @@ export default function EmployerAddJobPage() {
     full_description: string;
     responsibilities_key: string;
     qualifications_key: string;
+    skills_key: string;
     work_mode: AggregatorWorkMode;
     location_country: string;
     location: string;
@@ -155,10 +176,19 @@ export default function EmployerAddJobPage() {
   } | null>(null);
 
   const [showJobPreview, setShowJobPreview] = useState(false);
+  const [previewExtracting, setPreviewExtracting] = useState(false);
+  const [previewExtraction, setPreviewExtraction] =
+    useState<EmployerJobPreviewParseResult | null>(null);
+  const [extractionSourceDescription, setExtractionSourceDescription] =
+    useState("");
+  const [selectedJobSkills, setSelectedJobSkills] = useState<string[]>([]);
+  const [skillsRequireManual, setSkillsRequireManual] = useState(false);
   const [worldCountries, setWorldCountries] = useState<ICountry[]>([]);
   const resolveCitiesRef = useRef<(countryIsoCode: string) => ICity[]>(
     () => [],
   );
+  /** Edit load: resolve stored country name once after country-state-city data loads. */
+  const pendingCountrySyncRef = useRef<string | null>(null);
 
   const initPage = useCallback(async () => {
     if (!user) return;
@@ -184,13 +214,12 @@ export default function EmployerAddJobPage() {
         companyId: resolvedCompanyId,
         companyName: resolvedCompanyName,
         linkedDirectoryCompanyName,
-      } =
-        await resolveEmployerJobsCompanyFilter({
-          breneoUserId: user?.id,
-          employerProfileRaw: res.data,
-          profileCompanyId: companyId,
-          profileCompanyName: companyName,
-        });
+      } = await resolveEmployerJobsCompanyFilter({
+        breneoUserId: user?.id,
+        employerProfileRaw: res.data,
+        profileCompanyId: companyId,
+        profileCompanyName: companyName,
+      });
       setHeaderCompanyName(
         linkedDirectoryCompanyName?.trim() ||
           resolvedCompanyName?.trim() ||
@@ -243,9 +272,26 @@ export default function EmployerAddJobPage() {
         }
         setTitle(job.title);
         setDescription(job.description);
+        setJobDescriptionSummary(job.job_description_summary ?? "");
         setResponsibilitiesText((job.responsibilities ?? []).join("\n"));
         setQualificationsText((job.qualifications ?? []).join("\n"));
-        const jobCountry = String(job.location_country ?? job.country ?? "").trim();
+        const loadedSkills = job.required_skills ?? [];
+        setSelectedJobSkills(loadedSkills);
+        setSkillsRequireManual(loadedSkills.length === 0);
+        const loadedSections = resolveJobSectionsAfterAi({
+          description: job.job_description_summary ?? "",
+          responsibilities: job.responsibilities ?? [],
+          qualifications: job.qualifications ?? [],
+        });
+        setPreviewExtraction({
+          ...loadedSections,
+          skills: loadedSkills,
+          aiAvailable: true,
+        });
+        setExtractionSourceDescription(String(job.description ?? "").trim());
+        const jobCountry = String(
+          job.location_country ?? job.country ?? "",
+        ).trim();
         const jobCity = String(job.location ?? job.city ?? "").trim();
         const resolvedCountry = resolveCountryFromStoredValue(
           worldCountries,
@@ -261,6 +307,7 @@ export default function EmployerAddJobPage() {
           setLocationCountry(jobCountry);
           setCountryQuery(jobCountry);
           setSelectedCountryIsoCode("");
+          if (jobCountry) pendingCountrySyncRef.current = jobCountry;
         }
         setLocation(jobCity);
         setCityQuery(jobCity);
@@ -288,7 +335,8 @@ export default function EmployerAddJobPage() {
             job.employment_type.toLowerCase(),
           )
         ) {
-          resolvedWorkMode = job.employment_type.toLowerCase() as AggregatorWorkMode;
+          resolvedWorkMode =
+            job.employment_type.toLowerCase() as AggregatorWorkMode;
           setWorkMode(resolvedWorkMode);
         } else if (job.remote) {
           resolvedWorkMode = "remote";
@@ -304,6 +352,7 @@ export default function EmployerAddJobPage() {
           full_description: String(job.description ?? "").trim(),
           responsibilities_key: normalizeBulletLinesKey(respJoined),
           qualifications_key: normalizeBulletLinesKey(qualJoined),
+          skills_key: normalizeSkillsKey(loadedSkills),
           work_mode: resolvedWorkMode,
           location_country: resolvedCountry?.name ?? jobCountry,
           location: jobCity,
@@ -343,20 +392,14 @@ export default function EmployerAddJobPage() {
     };
   }, []);
 
-  /** When country-state-city loads after the job, resolve ISO codes / aliases into form state. */
+  /** One-time sync after edit load when country dataset arrives (never while user types). */
   useEffect(() => {
     if (worldCountries.length === 0) return;
-    const raw = locationCountry.trim() || countryQuery.trim();
-    if (!raw) return;
-    const resolved = resolveCountryFromStoredValue(worldCountries, raw);
+    const pending = pendingCountrySyncRef.current?.trim();
+    if (!pending) return;
+    pendingCountrySyncRef.current = null;
+    const resolved = resolveCountryFromStoredValue(worldCountries, pending);
     if (!resolved) return;
-    if (
-      selectedCountryIsoCode === resolved.isoCode &&
-      locationCountry === resolved.name &&
-      countryQuery === resolved.name
-    ) {
-      return;
-    }
     applyResolvedCountryToForm(resolved, {
       setLocationCountry,
       setCountryQuery,
@@ -372,23 +415,20 @@ export default function EmployerAddJobPage() {
       if (snap.location_country === resolved.name) return snap;
       return { ...snap, location_country: resolved.name };
     });
-  }, [
-    worldCountries,
-    locationCountry,
-    countryQuery,
-    selectedCountryIsoCode,
-  ]);
+  }, [worldCountries]);
 
-  /** Gemini runs on the server only when publishing a new job (not on edit — structured fields are manual). */
-  const willExtractDescriptionOnSave = useMemo(() => !isEdit, [isEdit]);
+  /** Server re-runs Gemini only when publish happens without a prior preview extraction. */
+  const willExtractDescriptionOnSave = useMemo(
+    () => !isEdit && !previewExtraction,
+    [isEdit, previewExtraction],
+  );
 
   const filteredCountries = useMemo(() => {
     const q = countryQuery.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return worldCountries.filter((c) => c.name.toLowerCase().includes(q)).slice(
-      0,
-      20,
-    );
+    if (q.length < JOB_LOCATION_MIN_SEARCH_CHARS) return [];
+    return worldCountries
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .slice(0, 20);
   }, [countryQuery, worldCountries]);
 
   const cityOptions = useMemo(() => {
@@ -398,7 +438,9 @@ export default function EmployerAddJobPage() {
 
   const filteredCities = useMemo(() => {
     const q = cityQuery.trim().toLowerCase();
-    if (!selectedCountryIsoCode || q.length < 2) return [];
+    if (!selectedCountryIsoCode || q.length < JOB_LOCATION_MIN_SEARCH_CHARS) {
+      return [];
+    }
     return cityOptions
       .filter((c) => c.name.toLowerCase().includes(q))
       .slice(0, 30);
@@ -435,13 +477,38 @@ export default function EmployerAddJobPage() {
     return true;
   };
 
+  const applyCommittedLocationToForm = useCallback(
+    (committed: ReturnType<typeof resolveCommittedJobLocation>) => {
+      if (committed.resolvedCountry) {
+        applyResolvedCountryToForm(committed.resolvedCountry, {
+          setLocationCountry,
+          setCountryQuery,
+          setSelectedCountryIsoCode,
+        });
+      } else if (committed.normalizedCountry) {
+        setLocationCountry(committed.normalizedCountry);
+        setCountryQuery(committed.normalizedCountry);
+      }
+      if (committed.normalizedCity) {
+        setLocation(committed.normalizedCity);
+        setCityQuery(committed.normalizedCity);
+      }
+    },
+    [],
+  );
+
   const tryResolveCityFromQuery = (rawQuery: string): boolean => {
     const q = rawQuery.trim().toLowerCase();
-    if (!q || !selectedCountryIsoCode) return false;
+    if (
+      !q ||
+      !selectedCountryIsoCode ||
+      q.length < JOB_LOCATION_MIN_SEARCH_CHARS
+    ) {
+      return false;
+    }
     const exact = cityOptions.find((c) => c.name.toLowerCase() === q);
     if (!exact) return false;
-    setLocation(exact.name);
-    setCityQuery(exact.name);
+    selectCity(exact.name);
     return true;
   };
 
@@ -481,13 +548,15 @@ export default function EmployerAddJobPage() {
       };
     }
 
-    const normalizedCountry = normalizeJobCountryForApi(
-      worldCountries,
+    const committed = resolveCommittedJobLocation({
+      countries: worldCountries,
       locationCountry,
       countryQuery,
       selectedCountryIsoCode,
-    );
-    const normalizedCity = normalizeJobCityForApi(location, cityQuery);
+      location,
+      cityQuery,
+    });
+    const { normalizedCountry, normalizedCity } = committed;
     if (normalizedCity && !normalizedCountry) {
       return {
         ok: false,
@@ -515,17 +584,22 @@ export default function EmployerAddJobPage() {
           message: "Select a valid country from the list.",
         };
       }
-      const validCity = resolveCitiesRef.current(countryObj.isoCode).some(
-        (c) => c.name.toLowerCase() === normalizedCity.toLowerCase(),
-      );
-      if (!validCity) {
-        return {
-          ok: false,
-          fieldErrors: {
-            location: ["Select a city that belongs to the selected country."],
-          },
-          message: "Selected city does not belong to the selected country.",
-        };
+      const cityOptionsForCountry = resolveCitiesRef.current(countryObj.isoCode);
+      if (cityOptionsForCountry.length > 0) {
+        const validCity = cityOptionsForCountry.some(
+          (c) => c.name.toLowerCase() === normalizedCity.toLowerCase(),
+        );
+        if (!validCity) {
+          return {
+            ok: false,
+            fieldErrors: {
+              location: [
+                "Select a city that belongs to the selected country.",
+              ],
+            },
+            message: "Selected city does not belong to the selected country.",
+          };
+        }
       }
     }
 
@@ -547,6 +621,57 @@ export default function EmployerAddJobPage() {
     worldCountries,
   ]);
 
+  const applyPreviewExtraction = useCallback(
+    (result: EmployerJobPreviewParseResult, sourceDesc: string) => {
+      setPreviewExtraction(result);
+      setExtractionSourceDescription(sourceDesc);
+      if (hasDistinctStructuredSections(result)) {
+        setResponsibilitiesText(result.responsibilities.join("\n"));
+        setQualificationsText(result.qualifications.join("\n"));
+        setJobDescriptionSummary(result.description);
+      } else {
+        setResponsibilitiesText("");
+        setQualificationsText("");
+        setJobDescriptionSummary("");
+      }
+      if (result.skills.length > 0) {
+        setSelectedJobSkills(result.skills);
+        setSkillsRequireManual(false);
+      } else {
+        setSelectedJobSkills([]);
+        // Only block publish when AI succeeded but found no skills (not when AI is down).
+        setSkillsRequireManual(
+          result.aiAvailable === true && result.skills.length === 0,
+        );
+      }
+    },
+    [],
+  );
+
+  const buildPublishParsedSections = useCallback(() => {
+    const extraction =
+      previewExtraction ??
+      resolveJobSectionsAfterAi({
+        description: jobDescriptionSummary,
+        responsibilities: responsibilitiesText,
+        qualifications: qualificationsText,
+      });
+    const structured = hasDistinctStructuredSections(extraction);
+    return {
+      client_parsed_sections: true as const,
+      description: structured ? extraction.description : undefined,
+      responsibilities: structured ? extraction.responsibilities : [],
+      qualifications: structured ? extraction.qualifications : [],
+      required_skills: selectedJobSkills,
+    };
+  }, [
+    previewExtraction,
+    jobDescriptionSummary,
+    responsibilitiesText,
+    qualificationsText,
+    selectedJobSkills,
+  ]);
+
   const handleSubmit = async () => {
     const validated = validateFormForSave();
     if ("fieldErrors" in validated) {
@@ -555,8 +680,25 @@ export default function EmployerAddJobPage() {
       return;
     }
 
-    const { normalizedCountry, normalizedCity, applyUrl: applyUrlNorm } =
-      validated;
+    if (skillsRequireManual && selectedJobSkills.length === 0) {
+      toast.error("Select at least one skill for this job.");
+      return;
+    }
+
+    const trimmedDescription = description.trim();
+    if (
+      previewExtraction &&
+      extractionSourceDescription !== trimmedDescription
+    ) {
+      toast.error("Job description changed. Open preview again to refresh.");
+      return;
+    }
+
+    const {
+      normalizedCountry,
+      normalizedCity,
+      applyUrl: applyUrlNorm,
+    } = validated;
     const applyCheck = { ok: true as const, url: applyUrlNorm };
 
     setFieldErrors({});
@@ -581,6 +723,7 @@ export default function EmployerAddJobPage() {
         const patch: Partial<{
           title: string;
           full_description: string;
+          description?: string;
           work_mode: AggregatorWorkMode;
           country: string;
           city: string;
@@ -592,6 +735,8 @@ export default function EmployerAddJobPage() {
           employment_type_note: string;
           responsibilities: string[];
           qualifications: string[];
+          required_skills: string[];
+          client_parsed_sections: boolean;
         }> = {};
 
         const snap = initialSnapshot;
@@ -624,10 +769,17 @@ export default function EmployerAddJobPage() {
         if (!snap || nextState.is_active !== snap.is_active) {
           patch.is_active = nextState.is_active;
         }
+        const nextSkillsKey = normalizeSkillsKey(selectedJobSkills);
+        if (!snap || nextSkillsKey !== snap.skills_key) {
+          patch.required_skills = selectedJobSkills;
+        }
         if (patch.full_description != null) {
           patch.employment_type_note = employmentType;
-          patch.responsibilities = linesToBulletArray(responsibilitiesText);
-          patch.qualifications = linesToBulletArray(qualificationsText);
+          const parsed = buildPublishParsedSections();
+          patch.description = parsed.description;
+          patch.responsibilities = parsed.responsibilities;
+          patch.qualifications = parsed.qualifications;
+          patch.client_parsed_sections = true;
         } else {
           const nextRespKey = normalizeBulletLinesKey(responsibilitiesText);
           const nextQualKey = normalizeBulletLinesKey(qualificationsText);
@@ -660,20 +812,30 @@ export default function EmployerAddJobPage() {
         await updatePublishedEmployerJob(jobId, patch);
         toast.success(showJobPreview ? "Job published." : "Job updated.");
       } else {
+        const parsed = buildPublishParsedSections();
+        applyCommittedLocationToForm(
+          resolveCommittedJobLocation({
+            countries: worldCountries,
+            locationCountry: normalizedCountry,
+            countryQuery: normalizedCountry,
+            selectedCountryIsoCode,
+            location: normalizedCity,
+            cityQuery: normalizedCity,
+          }),
+        );
         const data = await publishEmployerJob({
           title: title.trim(),
           full_description: description.trim(),
           work_mode: workMode,
-          country: normalizedCountry || undefined,
-          city: normalizedCity || undefined,
-          location_country: normalizedCountry || undefined,
-          location: normalizedCity || undefined,
+          country: normalizedCountry,
+          city: normalizedCity,
+          location_country: normalizedCountry,
+          location: normalizedCity,
           salary: salary.trim() || undefined,
           apply_url: applyCheck.url || null,
           is_active: listingShouldBeActive,
           employment_type_note: employmentType,
-          responsibilities: linesToBulletArray(responsibilitiesText),
-          qualifications: linesToBulletArray(qualificationsText),
+          ...parsed,
         });
         const id = data.id ?? data.pk ?? data.job_id;
         toast.success(
@@ -733,22 +895,59 @@ export default function EmployerAddJobPage() {
       return;
     }
     const { normalizedCountry, normalizedCity } = validated;
-
-    setLocationCountry(normalizedCountry);
-    setCountryQuery(normalizedCountry);
-    setLocation(normalizedCity);
-    setCityQuery(normalizedCity);
-    const resolved = resolveCountryFromStoredValue(
-      worldCountries,
-      normalizedCountry,
+    applyCommittedLocationToForm(
+      resolveCommittedJobLocation({
+        countries: worldCountries,
+        locationCountry: normalizedCountry,
+        countryQuery: normalizedCountry,
+        selectedCountryIsoCode,
+        location: normalizedCity,
+        cityQuery: normalizedCity,
+      }),
     );
-    if (resolved) {
-      setSelectedCountryIsoCode(resolved.isoCode);
-    }
 
     setShowJobPreview(true);
     navigate({ hash: "preview" }, { replace: true });
-  }, [validateFormForSave, navigate, worldCountries]);
+
+    const sourceDesc = description.trim();
+    const needsExtraction = extractionSourceDescription !== sourceDesc;
+    if (!needsExtraction && previewExtraction) {
+      return;
+    }
+
+    setPreviewExtracting(true);
+    try {
+      const result = await previewParseEmployerJob(sourceDesc);
+      applyPreviewExtraction(result, sourceDesc);
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : "Could not analyze job description.";
+      toast.error(message);
+      applyPreviewExtraction(
+        {
+          description: "",
+          responsibilities: [],
+          qualifications: [],
+          skills: [],
+          useDescriptionOnly: true,
+          aiAvailable: false,
+        },
+        sourceDesc,
+      );
+    } finally {
+      setPreviewExtracting(false);
+    }
+  }, [
+    validateFormForSave,
+    applyCommittedLocationToForm,
+    worldCountries,
+    selectedCountryIsoCode,
+    navigate,
+    description,
+    extractionSourceDescription,
+    previewExtraction,
+    applyPreviewExtraction,
+  ]);
 
   /** When hash loses #preview (e.g. DashboardHeader Back), leave preview mode */
   const prevEmployerJobHashRef = useRef<string>("");
@@ -796,13 +995,28 @@ export default function EmployerAddJobPage() {
   );
 
   const previewLocationLine = useMemo(() => {
-    const c = locationCountry.trim();
-    const city = location.trim();
-    if (city && c) return `${city}, ${c}`;
-    if (city) return city;
-    if (c) return c;
+    const { normalizedCountry, normalizedCity } = resolveCommittedJobLocation({
+      countries: worldCountries,
+      locationCountry,
+      countryQuery,
+      selectedCountryIsoCode,
+      location,
+      cityQuery,
+    });
+    if (normalizedCity && normalizedCountry) {
+      return `${normalizedCity}, ${normalizedCountry}`;
+    }
+    if (normalizedCity) return normalizedCity;
+    if (normalizedCountry) return normalizedCountry;
     return "Location not specified";
-  }, [locationCountry, location]);
+  }, [
+    worldCountries,
+    locationCountry,
+    countryQuery,
+    selectedCountryIsoCode,
+    location,
+    cityQuery,
+  ]);
 
   const previewSalaryLine = salary.trim() ? salary.trim() : "By agreement";
 
@@ -814,16 +1028,14 @@ export default function EmployerAddJobPage() {
 
   if (loading) {
     return (
-      <DashboardLayout containMainScroll={false}>
-        <div className="flex justify-center py-24 text-muted-foreground">
-          Loading…
-        </div>
-      </DashboardLayout>
+      <div className="flex justify-center py-24 text-muted-foreground">
+        Loading…
+      </div>
     );
   }
 
   return (
-    <DashboardLayout containMainScroll={false}>
+    <>
       {saving ? (
         <div
           className="fixed inset-0 z-[90] flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center backdrop-blur-sm dark:bg-background/90"
@@ -850,8 +1062,20 @@ export default function EmployerAddJobPage() {
           companyLogo={headerCompanyLogo || profile?.logo_url || null}
           companyWebsite={profile?.website?.trim() || null}
           title={title}
-          responsibilitiesText={responsibilitiesText}
-          qualificationsText={qualificationsText}
+          manualDescription={description}
+          responsibilities={
+            previewExtraction?.responsibilities ??
+            linesToBulletArray(responsibilitiesText)
+          }
+          qualifications={
+            previewExtraction?.qualifications ??
+            linesToBulletArray(qualificationsText)
+          }
+          useDescriptionOnly={previewExtraction?.useDescriptionOnly ?? true}
+          selectedSkills={selectedJobSkills}
+          onSelectedSkillsChange={setSelectedJobSkills}
+          skillsRequireManual={skillsRequireManual}
+          previewExtracting={previewExtracting}
           workModeLabel={workModeLabel}
           employmentType={employmentType}
           applyUrl={applyUrl}
@@ -860,6 +1084,12 @@ export default function EmployerAddJobPage() {
           isEdit={isEdit}
           responsibilitiesLabel={t.employerJobForm.responsibilitiesLabel}
           qualificationsLabel={t.employerJobForm.qualificationsLabel}
+          skillsLabel={t.employerJobForm.skillsLabel}
+          skillsHint={
+            skillsRequireManual
+              ? t.employerJobForm.skillsManualHint
+              : t.employerJobForm.skillsEditHint
+          }
           onExitPreview={handleExitPreview}
           onPublish={handleSubmit}
           publishing={saving}
@@ -870,433 +1100,470 @@ export default function EmployerAddJobPage() {
           }
         />
       ) : (
-      <div className="max-w-4xl mx-auto pb-24 space-y-6">
-        <Card className="relative rounded-3xl border-0 shadow-none bg-white dark:bg-card overflow-hidden">
-          <CardContent className="p-6 sm:p-8 space-y-6">
-            <div className="flex items-center gap-3 pb-2 border-b border-border/60">
-              <OptimizedAvatar
-                src={headerCompanyLogo || profile?.logo_url || undefined}
-                alt={companyName}
-                fallback={companyName.charAt(0).toUpperCase()}
-                size="sm"
-                className="flex-shrink-0 !h-10 !w-10 !rounded-sm"
-              />
-              <span className="text-muted-foreground text-base font-medium">
-                {companyName}
-              </span>
-            </div>
+        <div className="max-w-4xl mx-auto pb-24 space-y-6">
+          <Card className="relative rounded-3xl border-0 shadow-none bg-white dark:bg-card overflow-hidden">
+            <CardContent className="p-6 sm:p-8 space-y-6">
+              <div className="flex items-center gap-3 pb-2 border-b border-border/60">
+                <OptimizedAvatar
+                  src={headerCompanyLogo || profile?.logo_url || undefined}
+                  alt={companyName}
+                  fallback={companyName.charAt(0).toUpperCase()}
+                  size="sm"
+                  className="flex-shrink-0 !h-10 !w-10 !rounded-sm"
+                />
+                <span className="text-muted-foreground text-base font-medium">
+                  {companyName}
+                </span>
+              </div>
 
-            <div className={cn(dashedShell)}>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="h-auto min-h-[4rem] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-2xl md:text-2xl font-bold leading-tight shadow-none outline-none focus-visible:ring-0 placeholder:text-xl md:placeholder:text-3xl dark:text-white"
-                placeholder="Job title"
-              />
-            </div>
-            {fieldErrors.title?.[0] ? (
-              <p className="text-sm text-destructive">{fieldErrors.title[0]}</p>
-            ) : null}
-
-            <div className="space-y-2">
-              {isEdit ? (
-                <Label
-                  htmlFor="employer-job-full-description"
-                  className="text-sm font-medium text-foreground"
-                >
-                  {t.employerJobForm.fullDescriptionLabel}
-                </Label>
-              ) : null}
               <div className={cn(dashedShell)}>
-                <Textarea
-                  id="employer-job-full-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[200px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                  placeholder="Describe the role, requirements, and benefits…"
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="h-auto min-h-[4rem] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-2xl md:text-2xl font-bold leading-tight shadow-none outline-none focus-visible:ring-0 placeholder:text-xl md:placeholder:text-3xl dark:text-white"
+                  placeholder="Job title"
                 />
               </div>
-              {fieldErrors.full_description?.[0] ? (
+              {fieldErrors.title?.[0] ? (
                 <p className="text-sm text-destructive">
-                  {fieldErrors.full_description[0]}
+                  {fieldErrors.title[0]}
                 </p>
               ) : null}
-            </div>
 
-            {isEdit ? (
-              <div className="space-y-6 pt-2 border-t border-border/50">
-                <div className="space-y-2">
+              <div className="space-y-2">
+                {isEdit ? (
                   <Label
-                    htmlFor="employer-job-responsibilities"
+                    htmlFor="employer-job-full-description"
                     className="text-sm font-medium text-foreground"
                   >
-                    {t.employerJobForm.responsibilitiesLabel}
+                    {t.employerJobForm.fullDescriptionLabel}
                   </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t.employerJobForm.responsibilitiesHint}
-                  </p>
-                  <div className={cn(dashedShell)}>
-                    <Textarea
-                      id="employer-job-responsibilities"
-                      value={responsibilitiesText}
-                      onChange={(e) => setResponsibilitiesText(e.target.value)}
-                      className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                      placeholder="One bullet per line"
-                    />
-                  </div>
+                ) : null}
+                <div className={cn(dashedShell)}>
+                  <Textarea
+                    id="employer-job-full-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="min-h-[200px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
+                    placeholder="Describe the role, requirements, and benefits…"
+                  />
                 </div>
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="employer-job-qualifications"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {t.employerJobForm.qualificationsLabel}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t.employerJobForm.qualificationsHint}
+                {fieldErrors.full_description?.[0] ? (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.full_description[0]}
                   </p>
-                  <div className={cn(dashedShell)}>
-                    <Textarea
-                      id="employer-job-qualifications"
-                      value={qualificationsText}
-                      onChange={(e) => setQualificationsText(e.target.value)}
-                      className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                      placeholder="One bullet per line"
-                    />
-                  </div>
-                </div>
+                ) : null}
               </div>
-            ) : null}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2 sm:col-span-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 text-breneo-blue" />
-                  Location
+              {isEdit &&
+              (responsibilitiesText.trim() || qualificationsText.trim()) ? (
+                <div className="space-y-6 pt-2 border-t border-border/50">
+                  {responsibilitiesText.trim() ? (
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="employer-job-responsibilities"
+                        className="text-sm font-medium text-foreground"
+                      >
+                        {t.employerJobForm.responsibilitiesLabel}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t.employerJobForm.responsibilitiesHint}
+                      </p>
+                      <div className={cn(dashedShell)}>
+                        <Textarea
+                          id="employer-job-responsibilities"
+                          value={responsibilitiesText}
+                          onChange={(e) =>
+                            setResponsibilitiesText(e.target.value)
+                          }
+                          className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
+                          placeholder="One bullet per line"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  {qualificationsText.trim() ? (
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="employer-job-qualifications"
+                        className="text-sm font-medium text-foreground"
+                      >
+                        {t.employerJobForm.qualificationsLabel}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {t.employerJobForm.qualificationsHint}
+                      </p>
+                      <div className={cn(dashedShell)}>
+                        <Textarea
+                          id="employer-job-qualifications"
+                          value={qualificationsText}
+                          onChange={(e) =>
+                            setQualificationsText(e.target.value)
+                          }
+                          className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
+                          placeholder="One bullet per line"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="job-location-country"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Country
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="job-location-country"
-                        value={countryQuery}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setCountryQuery(next);
-                          setLocationCountry(next);
-                          setCountryOpen(true);
-                          const resolved = resolveCountryFromStoredValue(
-                            worldCountries,
-                            next,
-                          );
-                          if (resolved) {
-                            if (selectedCountryIsoCode !== resolved.isoCode) {
-                              setSelectedCountryIsoCode(resolved.isoCode);
-                              setLocationCountry(resolved.name);
-                              setCountryQuery(resolved.name);
+              ) : null}
+
+              {isEdit ? (
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className={cn(dashedShell, "p-4")}>
+                    <EmployerJobSkillsPicker
+                      selectedSkills={selectedJobSkills}
+                      onSelectedSkillsChange={setSelectedJobSkills}
+                      label={t.employerJobForm.skillsLabel}
+                      hint={t.employerJobForm.skillsEditHint}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2 sm:col-span-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4 text-breneo-blue" />
+                    Location
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="job-location-country"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Country
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="job-location-country"
+                          name="employer-job-country-picker"
+                          value={countryQuery}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          data-1p-ignore
+                          data-lpignore="true"
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setCountryQuery(next);
+                            setCountryOpen(true);
+                            const selected = selectedCountryIsoCode
+                              ? worldCountries.find(
+                                  (c) => c.isoCode === selectedCountryIsoCode,
+                                )
+                              : null;
+                            const stillMatchesSelected =
+                              selected &&
+                              next.trim().toLowerCase() ===
+                                selected.name.toLowerCase();
+                            if (stillMatchesSelected) {
+                              setLocationCountry(selected.name);
+                              return;
+                            }
+                            setLocationCountry("");
+                            if (selectedCountryIsoCode) {
+                              setSelectedCountryIsoCode("");
                               setLocation("");
                               setCityQuery("");
                             }
-                          } else {
-                            setSelectedCountryIsoCode("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (
+                                countryQuery.trim().length <
+                                JOB_LOCATION_MIN_SEARCH_CHARS
+                              ) {
+                                return;
+                              }
+                              if (!tryResolveCountryFromQuery(countryQuery)) {
+                                const first = filteredCountries[0];
+                                if (first)
+                                  selectCountry(first.name, first.isoCode);
+                              }
+                              setCountryOpen(false);
+                            }
+                          }}
+                          onFocus={() => setCountryOpen(true)}
+                          onBlur={() => {
+                            setTimeout(() => setCountryOpen(false), 120);
+                          }}
+                          placeholder="Select country"
+                          className="bg-white dark:bg-background"
+                        />
+                        {countryOpen ? (
+                          <EmployerLocationSelectDropdown
+                            minSearchChars={JOB_LOCATION_MIN_SEARCH_CHARS}
+                            queryLength={countryQuery.trim().length}
+                            items={filteredCountries.map((country) => ({
+                              key: country.isoCode,
+                              label: country.name,
+                            }))}
+                            onSelect={(name) => {
+                              const country = filteredCountries.find(
+                                (c) => c.name === name,
+                              );
+                              if (country) {
+                                selectCountry(country.name, country.isoCode);
+                              }
+                            }}
+                            minCharsMessage={`Type at least ${JOB_LOCATION_MIN_SEARCH_CHARS} characters`}
+                          />
+                        ) : null}
+                      </div>
+                      {fieldErrors.location_country?.[0] ? (
+                        <p className="text-sm text-destructive">
+                          {fieldErrors.location_country[0]}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="job-location-city"
+                        className="text-xs text-muted-foreground"
+                      >
+                        City
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="job-location-city"
+                          name="employer-job-city-picker"
+                          value={cityQuery}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          data-1p-ignore
+                          data-lpignore="true"
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setCityQuery(next);
+                            setCityOpen(true);
+                            const committed = location.trim();
+                            if (
+                              committed &&
+                              next.trim().toLowerCase() ===
+                                committed.toLowerCase()
+                            ) {
+                              return;
+                            }
                             setLocation("");
-                            setCityQuery("");
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            if (!tryResolveCountryFromQuery(countryQuery)) {
-                              const first = filteredCountries[0];
-                              if (first) selectCountry(first.name, first.isoCode);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (
+                                cityQuery.trim().length <
+                                JOB_LOCATION_MIN_SEARCH_CHARS
+                              ) {
+                                return;
+                              }
+                              if (!tryResolveCityFromQuery(cityQuery)) {
+                                const first = filteredCities[0];
+                                if (first) selectCity(first.name);
+                              }
+                              setCityOpen(false);
                             }
-                            setCountryOpen(false);
+                          }}
+                          onFocus={() =>
+                            selectedCountryIsoCode && setCityOpen(true)
                           }
-                        }}
-                        onFocus={() => setCountryOpen(true)}
-                        onBlur={() => {
-                          tryResolveCountryFromQuery(countryQuery);
-                          setTimeout(() => setCountryOpen(false), 120);
-                        }}
-                        placeholder="Select country"
-                        className="bg-white dark:bg-background"
-                        autoComplete="off"
-                      />
-                      {countryOpen ? (
-                        <div className="absolute z-40 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                          {countryQuery.trim().length < 2 ? (
-                            <p className="px-3 py-2 text-sm text-muted-foreground">
-                              Type at least 2 characters
-                            </p>
-                          ) : filteredCountries.length === 0 ? (
-                            <p className="px-3 py-2 text-sm text-muted-foreground">
-                              No matches found
-                            </p>
-                          ) : (
-                            filteredCountries.map((country) => (
-                              <button
-                                key={country.isoCode}
-                                type="button"
-                                className="block w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() =>
-                                  selectCountry(country.name, country.isoCode)
-                                }
-                              >
-                                {country.name}
-                              </button>
-                            ))
-                          )}
-                        </div>
+                          onBlur={() => {
+                            setTimeout(() => setCityOpen(false), 120);
+                          }}
+                          placeholder="Select city"
+                          className="bg-white dark:bg-background"
+                          disabled={!selectedCountryIsoCode}
+                        />
+                        {cityOpen && selectedCountryIsoCode ? (
+                          <EmployerLocationSelectDropdown
+                            minSearchChars={JOB_LOCATION_MIN_SEARCH_CHARS}
+                            queryLength={cityQuery.trim().length}
+                            items={filteredCities.map((city) => ({
+                              key: `${city.countryCode}-${city.name}-${city.latitude}-${city.longitude}`,
+                              label: city.name,
+                            }))}
+                            onSelect={selectCity}
+                            minCharsMessage={`Type at least ${JOB_LOCATION_MIN_SEARCH_CHARS} characters`}
+                          />
+                        ) : null}
+                      </div>
+                      {!selectedCountryIsoCode ? (
+                        <p className="text-xs text-muted-foreground">
+                          Select a country first
+                        </p>
+                      ) : null}
+                      {fieldErrors.location?.[0] ? (
+                        <p className="text-sm text-destructive">
+                          {fieldErrors.location[0]}
+                        </p>
                       ) : null}
                     </div>
-                    {fieldErrors.location_country?.[0] ? (
-                      <p className="text-sm text-destructive">
-                        {fieldErrors.location_country[0]}
-                      </p>
-                    ) : null}
                   </div>
+                </div>
 
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="job-location-city"
-                      className="text-xs text-muted-foreground"
+                <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Briefcase className="h-4 w-4 text-breneo-blue" />
+                    Work mode
+                  </div>
+                  <Select
+                    value={workMode}
+                    onValueChange={(v) => setWorkMode(v as AggregatorWorkMode)}
+                  >
+                    <SelectTrigger className="bg-white dark:bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {WORK_MODE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Briefcase className="h-4 w-4 text-breneo-blue" />
+                    Employment type
+                  </div>
+                  <Select
+                    value={employmentType}
+                    onValueChange={setEmploymentType}
+                  >
+                    <SelectTrigger className="bg-white dark:bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EMPLOYMENT_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2 sm:col-span-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Link2 className="h-4 w-4 text-breneo-blue" />
+                    Application URL
+                  </div>
+                  <Input
+                    value={applyUrl}
+                    onChange={(e) => setApplyUrl(e.target.value)}
+                    placeholder="https://…"
+                    className="bg-white dark:bg-background"
+                  />
+                  {fieldErrors.apply_url?.[0] ? (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.apply_url[0]}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Banknote className="h-4 w-4 text-breneo-blue" />
+                    Salary (optional)
+                  </div>
+                  <Input
+                    value={salary}
+                    onChange={(e) => setSalary(e.target.value)}
+                    placeholder="e.g. 3000–5000 GEL"
+                    className="bg-white dark:bg-background"
+                  />
+                </div>
+              </div>
+
+              {isEdit ? (
+                <div className="flex items-center space-x-3 pt-2">
+                  <Checkbox
+                    id="active"
+                    checked={isActive}
+                    onCheckedChange={(c) => setIsActive(c === true)}
+                  />
+                  <Label htmlFor="active" className="cursor-pointer">
+                    Listing is active (visible to candidates)
+                  </Label>
+                </div>
+              ) : null}
+
+              <div className="pt-4 flex items-center justify-between gap-3">
+                <div>
+                  {isEdit ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleDelete}
+                      disabled={saving || deleting}
+                      className="h-10 w-10 p-0 border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/70 dark:text-red-400 dark:hover:bg-red-950/20"
                     >
-                      City
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="job-location-city"
-                        value={cityQuery}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setCityQuery(next);
-                          setLocation(next);
-                          setCityOpen(true);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            if (!tryResolveCityFromQuery(cityQuery)) {
-                              const first = filteredCities[0];
-                              if (first) selectCity(first.name);
-                            }
-                            setCityOpen(false);
-                          }
-                        }}
-                        onFocus={() => selectedCountryIsoCode && setCityOpen(true)}
-                        onBlur={() => {
-                          tryResolveCityFromQuery(cityQuery);
-                          setTimeout(() => setCityOpen(false), 120);
-                        }}
-                        placeholder="Select city"
-                        className="bg-white dark:bg-background"
-                        autoComplete="off"
-                        disabled={!selectedCountryIsoCode}
-                      />
-                      {cityOpen && selectedCountryIsoCode ? (
-                        <div className="absolute z-40 mt-1 max-h-52 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                          {cityQuery.trim().length < 2 ? (
-                            <p className="px-3 py-2 text-sm text-muted-foreground">
-                              Type at least 2 characters
-                            </p>
-                          ) : filteredCities.length === 0 ? (
-                            <p className="px-3 py-2 text-sm text-muted-foreground">
-                              No matches found
-                            </p>
-                          ) : (
-                            filteredCities.map((city) => (
-                              <button
-                                key={`${city.countryCode}-${city.name}-${city.latitude}-${city.longitude}`}
-                                type="button"
-                                className="block w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => selectCity(city.name)}
-                              >
-                                {city.name}
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                    {!selectedCountryIsoCode ? (
-                      <p className="text-xs text-muted-foreground">
-                        Select a country first
-                      </p>
-                    ) : null}
-                    {fieldErrors.location?.[0] ? (
-                      <p className="text-sm text-destructive">
-                        {fieldErrors.location[0]}
-                      </p>
-                    ) : null}
-                  </div>
+                      {deleting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete job</span>
+                        </>
+                      )}
+                    </Button>
+                  ) : null}
                 </div>
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Briefcase className="h-4 w-4 text-breneo-blue" />
-                  Work mode
-                </div>
-                <Select
-                  value={workMode}
-                  onValueChange={(v) => setWorkMode(v as AggregatorWorkMode)}
-                >
-                  <SelectTrigger className="bg-white dark:bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WORK_MODE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Briefcase className="h-4 w-4 text-breneo-blue" />
-                  Employment type
-                </div>
-                <Select
-                  value={employmentType}
-                  onValueChange={setEmploymentType}
-                >
-                  <SelectTrigger className="bg-white dark:bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EMPLOYMENT_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2 sm:col-span-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Link2 className="h-4 w-4 text-breneo-blue" />
-                  Application URL
-                </div>
-                <Input
-                  value={applyUrl}
-                  onChange={(e) => setApplyUrl(e.target.value)}
-                  placeholder="https://…"
-                  className="bg-white dark:bg-background"
-                />
-                {fieldErrors.apply_url?.[0] ? (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.apply_url[0]}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Banknote className="h-4 w-4 text-breneo-blue" />
-                  Salary (optional)
-                </div>
-                <Input
-                  value={salary}
-                  onChange={(e) => setSalary(e.target.value)}
-                  placeholder="e.g. 3000–5000 GEL"
-                  className="bg-white dark:bg-background"
-                />
-              </div>
-            </div>
-
-            {isEdit ? (
-              <div className="flex items-center space-x-3 pt-2">
-                <Checkbox
-                  id="active"
-                  checked={isActive}
-                  onCheckedChange={(c) => setIsActive(c === true)}
-                />
-                <Label htmlFor="active" className="cursor-pointer">
-                  Listing is active (visible to candidates)
-                </Label>
-              </div>
-            ) : null}
-
-            <div className="pt-4 flex items-center justify-between gap-3">
-              <div>
-                {isEdit ? (
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
-                    onClick={handleDelete}
-                    disabled={saving || deleting}
-                    className="h-10 w-10 p-0 border-red-500 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-500/70 dark:text-red-400 dark:hover:bg-red-950/20"
+                    onClick={() =>
+                      navigate(getLocalizedPath("/employer/jobs", language))
+                    }
                   >
-                    {deleting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Delete job</span>
-                      </>
-                    )}
+                    Cancel
                   </Button>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    navigate(getLocalizedPath("/employer/jobs", language))
-                  }
-                >
-                  Cancel
-                </Button>
-                {isEdit ? (
-                  <>
+                  {isEdit ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={openJobPreview}
+                        disabled={saving || deleting}
+                      >
+                        View preview
+                      </Button>
+                      <Button
+                        onClick={handleSubmit}
+                        disabled={saving || deleting}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            {willExtractDescriptionOnSave
+                              ? t.employerJobForm.buttonExtractingSaving
+                              : t.employerJobForm.buttonSaving}
+                          </>
+                        ) : (
+                          "Save changes"
+                        )}
+                      </Button>
+                    </>
+                  ) : (
                     <Button
                       type="button"
-                      variant="outline"
                       onClick={openJobPreview}
                       disabled={saving || deleting}
                     >
-                      View preview
+                      View job preview
                     </Button>
-                    <Button onClick={handleSubmit} disabled={saving || deleting}>
-                      {saving ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {willExtractDescriptionOnSave
-                            ? t.employerJobForm.buttonExtractingSaving
-                            : t.employerJobForm.buttonSaving}
-                        </>
-                      ) : (
-                        "Save changes"
-                      )}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={openJobPreview}
-                    disabled={saving || deleting}
-                  >
-                    View job preview
-                  </Button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-      </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

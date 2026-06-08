@@ -4,6 +4,7 @@ import {
   assertEmployerJobsProxyConfigured,
   getEmployerJobsApiBaseUrl,
 } from "@/api/employer/employerJobsApiBase";
+import { resolveJobSectionsAfterAi } from "@/utils/jobSectionsDedup";
 
 export type EmployerJobSource = "breneo" | "aggregator";
 
@@ -31,6 +32,7 @@ export type EmployerJob = {
   qualifications?: string[];
   /** Short AI summary (2–3 sentences) when API returns it separately from full_description */
   job_description_summary?: string;
+  required_skills?: string[];
 };
 
 export type EmployerJobsFilter = {
@@ -272,17 +274,32 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
     company_id: companyId,
     company_name: companyName,
     source: src,
-    responsibilities: pickAggregatorListField(raw, [
-      "Responsibilities",
-      "responsibilities",
-      "job_responsibilities",
-    ]),
-    qualifications: pickAggregatorListField(raw, [
-      "qualifications",
-      "Qualifications",
-      "job_qualifications",
-    ]),
+    ...(() => {
+      const resolved = resolveJobSectionsAfterAi({
+        description: job_description_summary ?? descField,
+        responsibilities: pickAggregatorListField(raw, [
+          "Responsibilities",
+          "responsibilities",
+          "job_responsibilities",
+        ]),
+        qualifications: pickAggregatorListField(raw, [
+          "qualifications",
+          "Qualifications",
+          "job_qualifications",
+        ]),
+      });
+      return {
+        responsibilities: resolved.responsibilities,
+        qualifications: resolved.qualifications,
+      };
+    })(),
     job_description_summary,
+    required_skills: pickAggregatorListField(raw, [
+      "skills_required",
+      "required_skills",
+      "skills",
+      "job_skills",
+    ]),
   };
 }
 

@@ -30,6 +30,12 @@ export type PublishEmployerJobBody = {
   /** Sent on PATCH from employer edit form; max 6 items each. BFF maps to API keys Responsibilities + qualifications. */
   responsibilities?: string[];
   qualifications?: string[];
+  /** Short AI summary when preview extraction ran before publish. */
+  description?: string;
+  /** Skills for candidate matching; required when AI finds none. */
+  required_skills?: string[];
+  /** When true, BFF uses client description / sections instead of re-running Gemini. */
+  client_parsed_sections?: boolean;
 };
 
 export type EmployerJobsApiError = Error & {
@@ -63,9 +69,7 @@ export async function updatePublishedEmployerJob(
   );
 }
 
-export async function deletePublishedEmployerJob(
-  jobId: string,
-): Promise<void> {
+export async function deletePublishedEmployerJob(jobId: string): Promise<void> {
   await sendEmployerJobsRequest(
     "DELETE",
     `/api/employer/jobs/${encodeURIComponent(jobId)}`,
@@ -164,7 +168,9 @@ async function parseJsonBody(res: Response): Promise<Record<string, unknown>> {
   if (!text.trim()) return {};
   try {
     const parsed = JSON.parse(text) as unknown;
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    return typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : {};
   } catch {

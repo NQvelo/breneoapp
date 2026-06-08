@@ -11,6 +11,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { validateHttpUrl } from "@/api/employer/publishJob";
+import { hasDistinctStructuredSections } from "@/utils/jobSectionsDedup";
+import {
+  JobDescriptionParagraphs,
+  JobSectionBulletList,
+} from "@/components/jobs/JobSectionContent";
+import { EmployerJobSkillsPicker } from "@/components/employer/EmployerJobSkillsPicker";
 
 export interface EmployerJobFormPreviewProps {
   companyName: string;
@@ -18,8 +24,18 @@ export interface EmployerJobFormPreviewProps {
   companyWebsite?: string | null;
 
   title: string;
-  responsibilitiesText: string;
-  qualificationsText: string;
+  /** Full text the employer wrote — shown when AI has no distinct sections. */
+  manualDescription: string;
+  responsibilities: string[];
+  qualifications: string[];
+  useDescriptionOnly: boolean;
+
+  selectedSkills: string[];
+  onSelectedSkillsChange: (skills: string[]) => void;
+  skillsRequireManual: boolean;
+
+  previewExtracting?: boolean;
+
   workModeLabel: string;
   employmentType: string;
   applyUrl: string;
@@ -30,6 +46,8 @@ export interface EmployerJobFormPreviewProps {
   isEdit: boolean;
   responsibilitiesLabel: string;
   qualificationsLabel: string;
+  skillsLabel?: string;
+  skillsHint?: string;
 
   onExitPreview: () => void;
   onPublish: () => void;
@@ -41,6 +59,12 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
   const applyValid = validateHttpUrl(p.applyUrl);
   const canOpenApply =
     applyValid.ok === true && Boolean(applyValid.url?.trim());
+
+  const showStructuredSections = hasDistinctStructuredSections({
+    useDescriptionOnly: p.useDescriptionOnly,
+    responsibilities: p.responsibilities,
+    qualifications: p.qualifications,
+  });
 
   return (
     <div
@@ -126,26 +150,53 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
           </div>
 
           <div className="bg-white dark:bg-card rounded-3xl p-6 shadow-none border-0 mt-6 space-y-[4.5rem]">
-            <div>
-              <h2 className="text-lg font-semibold mb-4">
-                {p.responsibilitiesLabel}
-              </h2>
-              <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                  {p.responsibilitiesText.trim() || "—"}
+            {p.previewExtracting ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-breneo-blue" />
+                <p className="text-sm font-medium text-foreground">
+                  Analyzing job description…
+                </p>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Extracting responsibilities, qualifications, and skills for
+                  preview and candidate matching.
                 </p>
               </div>
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold mb-4">
-                {p.qualificationsLabel}
-              </h2>
-              <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                  {p.qualificationsText.trim() || "—"}
-                </p>
+            ) : showStructuredSections ? (
+              <>
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">
+                    {p.responsibilitiesLabel}
+                  </h2>
+                  <JobSectionBulletList items={p.responsibilities} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">
+                    {p.qualificationsLabel}
+                  </h2>
+                  <JobSectionBulletList items={p.qualifications} />
+                </div>
+              </>
+            ) : p.manualDescription.trim() ? (
+              <div>
+                <h2 className="text-lg font-semibold mb-4">Description</h2>
+                <JobDescriptionParagraphs text={p.manualDescription} />
               </div>
-            </div>
+            ) : null}
+
+            {!p.previewExtracting ? (
+              <div className="rounded-xl border border-dashed border-gray-300 dark:border-[#444444] p-4">
+                <EmployerJobSkillsPicker
+                  selectedSkills={p.selectedSkills}
+                  onSelectedSkillsChange={p.onSelectedSkillsChange}
+                  required={p.skillsRequireManual}
+                  label={p.skillsLabel ?? "Required skills"}
+                  hint={
+                    p.skillsHint ??
+                    "Search and add skills for candidate matching. Pre-filled skills can be edited."
+                  }
+                />
+              </div>
+            ) : null}
           </div>
 
           <Card className="rounded-3xl border border-border/80 mt-8 bg-muted/30">
@@ -162,7 +213,7 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
               </div>
               <Button
                 type="button"
-                disabled={p.publishing}
+                disabled={p.publishing || p.previewExtracting}
                 onClick={p.onPublish}
               >
                 {p.publishing ? (

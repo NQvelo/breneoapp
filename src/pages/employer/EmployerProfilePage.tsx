@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
 import { patchEmployerProfileFormData } from "@/api/employer/employerProfileApi";
@@ -484,19 +483,17 @@ export default function EmployerProfilePage() {
 
   if (authLoading || loading) {
     return (
-      <DashboardLayout>
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center text-muted-foreground">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto mb-2" />
-            Loading profile…
-          </div>
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center text-muted-foreground">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-breneo-blue mx-auto mb-2" />
+          Loading profile…
         </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
         <Card className="border-0 rounded-3xl">
           <CardHeader className="p-4 pb-3 border-b-0">
@@ -782,6 +779,6 @@ export default function EmployerProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

@@ -3,6 +3,12 @@
  */
 import { createDjangoNotification } from "./djangoNotifications.mjs";
 import { hasSupabaseServiceRole, supabaseRest } from "./supabaseAdmin.mjs";
+import {
+  adminCompanyIdsFromMemberships,
+  isActiveMembershipRow,
+  isPendingMembershipRow,
+  membershipStatusFromRow,
+} from "./staffMembershipStatus.mjs";
 
 function toArray(data) {
   return Array.isArray(data) ? data : [];
@@ -33,28 +39,6 @@ function sanitizeRequestRow(row) {
  * @param {unknown[]} memberships
  * @param {string} userId
  */
-function membershipStatusFromRow(row) {
-  if (!row || typeof row !== "object") return "member";
-  const r = row;
-  const raw = String(r.status ?? "")
-    .trim()
-    .toLowerCase();
-  if (raw === "panding" || raw === "pending") return "pending";
-  if (raw === "admin") return "admin";
-  if (raw === "member") return "member";
-  if (Boolean(r.is_admin)) return "admin";
-  return "member";
-}
-
-function isActiveMembershipRow(row) {
-  const s = membershipStatusFromRow(row);
-  return s === "member" || s === "admin";
-}
-
-function isPendingMembershipRow(row) {
-  return membershipStatusFromRow(row) === "pending";
-}
-
 function joinRequestShapeFromMembership(row, companyName = "") {
   if (!row || typeof row !== "object") return null;
   const r = row;
@@ -75,26 +59,6 @@ function joinRequestShapeFromMembership(row, companyName = "") {
     status: "pending",
     created_at: String(r.created_at ?? new Date().toISOString()),
   };
-}
-
-function adminCompanyIdsFromMemberships(memberships, userId) {
-  const uid = String(userId).trim();
-  const ids = new Set();
-  for (const row of memberships) {
-    if (!row || typeof row !== "object") continue;
-    const r = row;
-    const memberUserId = String(r.external_user_id ?? "").trim();
-    const companyId = Number(r.company_id);
-    if (
-      memberUserId &&
-      memberUserId === uid &&
-      membershipStatusFromRow(r) === "admin" &&
-      Number.isFinite(companyId)
-    ) {
-      ids.add(companyId);
-    }
-  }
-  return Array.from(ids);
 }
 
 /**
@@ -224,7 +188,9 @@ export function registerEmployerJoinRequestRoutes(app, deps) {
       const staff = await deps.fetchStaffForCompany(companyId).catch(() => []);
       const adminIds = new Set();
       for (const row of toArray(staff)) {
-        if (!row || typeof row !== "object" || !row.is_admin) continue;
+        if (!row || typeof row !== "object" || membershipStatusFromRow(row) !== "admin") {
+          continue;
+        }
         const adminId = String(row.external_user_id ?? "").trim();
         if (adminId) adminIds.add(adminId);
       }

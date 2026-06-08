@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -97,7 +96,7 @@ export default function EmployerJobStatsPage() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6 px-4 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
@@ -176,6 +175,6 @@ export default function EmployerJobStatsPage() {
           </>
         ) : null}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

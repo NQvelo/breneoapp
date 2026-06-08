@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ICountry } from "country-state-city";
 import {
+  JOB_LOCATION_MIN_SEARCH_CHARS,
   normalizeJobCountryForApi,
+  resolveCommittedJobCity,
+  resolveCommittedJobLocation,
   resolveCountryFromStoredValue,
 } from "@/utils/jobLocationFields";
 
@@ -45,6 +48,53 @@ describe("resolveCountryFromStoredValue", () => {
     expect(resolveCountryFromStoredValue(sampleCountries, "USA")?.isoCode).toBe(
       "US",
     );
+  });
+});
+
+describe("JOB_LOCATION_MIN_SEARCH_CHARS", () => {
+  it("requires three characters before search", () => {
+    expect(JOB_LOCATION_MIN_SEARCH_CHARS).toBe(3);
+  });
+});
+
+describe("resolveCommittedJobCity", () => {
+  it("returns city only when query matches committed selection", () => {
+    expect(resolveCommittedJobCity("Tbilisi", "Tbilisi")).toBe("Tbilisi");
+    expect(resolveCommittedJobCity("Tbilisi", "Tbi")).toBe("");
+    expect(resolveCommittedJobCity("", "Tbilisi")).toBe("");
+  });
+});
+
+describe("resolveCommittedJobLocation", () => {
+  it("uses selected ISO without fuzzy matching partial query", () => {
+    expect(
+      resolveCommittedJobLocation({
+        countries: sampleCountries,
+        locationCountry: "",
+        countryQuery: "Geo",
+        selectedCountryIsoCode: "GE",
+        location: "Tbilisi",
+        cityQuery: "Tbilisi",
+      }),
+    ).toEqual({
+      normalizedCountry: "Georgia",
+      normalizedCity: "Tbilisi",
+      resolvedCountryIso: "GE",
+      resolvedCountry: { name: "Georgia", isoCode: "GE" },
+    });
+  });
+
+  it("does not guess country from partial text without selection", () => {
+    expect(
+      resolveCommittedJobLocation({
+        countries: sampleCountries,
+        locationCountry: "",
+        countryQuery: "Geo",
+        selectedCountryIsoCode: "",
+        location: "",
+        cityQuery: "",
+      }).normalizedCountry,
+    ).toBe("");
   });
 });
 

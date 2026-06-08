@@ -34,15 +34,20 @@ export function DashboardLayout({
   const [searchParams, setSearchParams] = useSearchParams();
   const mainContentRef = useRef<HTMLElement>(null);
   const location = useLocation();
+  const pathWithoutLang = removeLanguagePrefix(location.pathname);
   const { user, employerDisplay } = useAuth();
 
+  const resolvedContainMainScroll =
+    containMainScroll &&
+    !pathWithoutLang.startsWith("/employer/jobs/add") &&
+    !pathWithoutLang.includes("/employer/jobs/edit/");
+
   useEffect(() => {
-    const path = removeLanguagePrefix(location.pathname);
-    if (!path.startsWith("/employer/") || path === "/employer/register") {
+    if (!pathWithoutLang.startsWith("/employer/") || pathWithoutLang === "/employer/register") {
       return;
     }
     console.log("[employer auth]", {
-      path,
+      path: pathWithoutLang,
       userRole:
         typeof window !== "undefined"
           ? localStorage.getItem("userRole")
@@ -74,7 +79,7 @@ export function DashboardLayout({
 
   useEffect(() => {
     const handleScroll = () => {
-      const scrollTop = containMainScroll
+      const scrollTop = resolvedContainMainScroll
         ? mainContentRef.current?.scrollTop ?? 0
         : window.scrollY || document.documentElement.scrollTop;
       if (scrollTop > 50) {
@@ -84,7 +89,7 @@ export function DashboardLayout({
       }
     };
 
-    if (containMainScroll) {
+    if (resolvedContainMainScroll) {
       const mainEl = mainContentRef.current;
       if (!mainEl) return;
       mainEl.addEventListener("scroll", handleScroll);
@@ -94,12 +99,12 @@ export function DashboardLayout({
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [containMainScroll]);
+  }, [resolvedContainMainScroll]);
 
   return (
     <div
       className={cn(
-        containMainScroll ? "h-screen overflow-hidden" : "min-h-screen overflow-x-hidden",
+        resolvedContainMainScroll ? "h-screen overflow-hidden" : "min-h-screen overflow-x-hidden",
         background === "white" ? "bg-white" : "bg-breneo-lightgray"
       )}
     >
@@ -122,7 +127,7 @@ export function DashboardLayout({
         ref={mainContentRef}
         className={cn(
           "transition-all duration-300",
-          containMainScroll
+          resolvedContainMainScroll
             ? "h-full overflow-y-auto"
             : "h-auto min-h-[calc(100dvh-6rem)] overflow-visible md:min-h-[calc(100vh-6rem)]",
           showSidebar && (sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]"),
@@ -131,7 +136,7 @@ export function DashboardLayout({
           (showSidebar || showHeader) && "px-2 md:px-6"
         )}
       >
-        <div className={cn(containMainScroll && "h-full")}>{children}</div>
+        <div className={cn(resolvedContainMainScroll && "h-full")}>{children}</div>
       </main>
       <AcademyVerifiedCongratsModal />
       <SubscriptionModal 

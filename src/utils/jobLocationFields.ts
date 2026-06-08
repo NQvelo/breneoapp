@@ -1,5 +1,8 @@
 import type { ICountry } from "country-state-city";
 
+/** Min typed characters before country/city suggestion dropdowns appear. */
+export const JOB_LOCATION_MIN_SEARCH_CHARS = 3;
+
 export type ResolvedJobCountry = {
   name: string;
   isoCode: string;
@@ -53,11 +56,55 @@ export function normalizeJobCountryForApi(
   return "";
 }
 
-export function normalizeJobCityForApi(
-  location: string,
-  cityQuery = "",
+/** Committed city only when query matches the last explicit selection. */
+export function resolveCommittedJobCity(
+  committedCity: string,
+  cityQuery: string,
 ): string {
-  return (location.trim() || cityQuery.trim()).trim();
+  const committed = committedCity.trim();
+  const query = cityQuery.trim();
+  if (!committed || !query) return "";
+  if (committed.toLowerCase() === query.toLowerCase()) return committed;
+  return "";
+}
+
+export function resolveCommittedJobLocation(args: {
+  countries: ICountry[];
+  locationCountry: string;
+  countryQuery: string;
+  selectedCountryIsoCode: string;
+  location: string;
+  cityQuery: string;
+}): {
+  normalizedCountry: string;
+  normalizedCity: string;
+  resolvedCountryIso: string;
+  resolvedCountry: ResolvedJobCountry | null;
+} {
+  const iso = args.selectedCountryIsoCode.trim();
+  if (iso && args.countries.length > 0) {
+    const byIso = args.countries.find((c) => c.isoCode === iso);
+    if (byIso) {
+      return {
+        normalizedCountry: byIso.name,
+        normalizedCity: resolveCommittedJobCity(args.location, args.cityQuery),
+        resolvedCountryIso: byIso.isoCode,
+        resolvedCountry: { name: byIso.name, isoCode: byIso.isoCode },
+      };
+    }
+  }
+
+  const raw = (args.countryQuery.trim() || args.locationCountry.trim()).trim();
+  const exact = raw
+    ? resolveCountryFromStoredValue(args.countries, raw)
+    : null;
+
+  return {
+    normalizedCountry: exact?.name ?? "",
+    normalizedCity: resolveCommittedJobCity(args.location, args.cityQuery),
+    resolvedCountryIso: exact?.isoCode ?? "",
+    resolvedCountry: exact,
+  };
 }
 
 export function applyResolvedCountryToForm(

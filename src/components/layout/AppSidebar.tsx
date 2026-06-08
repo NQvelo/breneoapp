@@ -89,6 +89,7 @@ export function AppSidebar({
   const [employerProfileEmail, setEmployerProfileEmail] = React.useState(() => {
     return readEmployerCache()?.email ?? "";
   });
+  const employerProfileLoadedForRef = React.useRef<string | null>(null);
 
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
@@ -119,9 +120,18 @@ export function AppSidebar({
     let cancelled = false;
     const loadEmployerProfile = async () => {
       if (!isEmployer) {
+        employerProfileLoadedForRef.current = null;
         setEmployerMemberName("");
         setEmployerProfileLogo(null);
         setEmployerProfileEmail("");
+        return;
+      }
+      const userKey = user?.id != null ? String(user.id) : "";
+      if (
+        userKey &&
+        employerProfileLoadedForRef.current === userKey &&
+        readEmployerCache()
+      ) {
         return;
       }
       try {
@@ -160,6 +170,10 @@ export function AppSidebar({
 
         setEmployerProfileLogo(resolvedLogo);
 
+        if (userKey) {
+          employerProfileLoadedForRef.current = userKey;
+        }
+
         if (typeof window !== "undefined") {
           if (n) {
             window.sessionStorage.setItem(
@@ -184,9 +198,12 @@ export function AppSidebar({
         }
       } catch {
         if (cancelled) return;
-        setEmployerMemberName("");
-        setEmployerProfileLogo(null);
-        setEmployerProfileEmail("");
+        const cached = readEmployerCache();
+        if (!cached) {
+          setEmployerMemberName("");
+          setEmployerProfileLogo(null);
+          setEmployerProfileEmail("");
+        }
       }
     };
     void loadEmployerProfile();
@@ -195,9 +212,9 @@ export function AppSidebar({
     };
   }, [isEmployer, user?.id, user?.email, readEmployerCache]);
 
-  // ⛔ Removed old useState and useEffect for localStorage
+  const hasEmployerSidebarCache = Boolean(readEmployerCache()?.memberName || readEmployerCache()?.logo);
 
-  if (loading) return null;
+  if (loading && !user && !(isEmployer && hasEmployerSidebarCache)) return null;
 
   // Helper: Get display name (academy name from context for academy users, else user name – no refetch on nav)
   const getDisplayName = () => {

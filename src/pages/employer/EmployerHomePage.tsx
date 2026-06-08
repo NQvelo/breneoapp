@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -117,18 +116,15 @@ const EmployerHomePage = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-full min-h-[40vh]">
-          <div className="text-lg text-muted-foreground">Loading...</div>
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center h-full min-h-[40vh]">
+        <div className="text-lg text-muted-foreground">Loading...</div>
+      </div>
     );
   }
 
   if (!profile) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[50vh] px-4">
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
           <Card className="max-w-md w-full border-dashed">
             <CardContent className="pt-10 pb-10 text-center space-y-4">
               <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -146,8 +142,7 @@ const EmployerHomePage = () => {
               </Button>
             </CardContent>
           </Card>
-        </div>
-      </DashboardLayout>
+      </div>
     );
   }
 
@@ -155,8 +150,7 @@ const EmployerHomePage = () => {
     profile.company_name?.trim() || user?.email || "Your company";
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <Card className="border-0 shadow-none bg-white dark:bg-card rounded-3xl">
           <CardContent className="p-4 md:p-6 space-y-4">
             <div className="flex items-center justify-between">
@@ -389,8 +383,7 @@ const EmployerHomePage = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 };
 

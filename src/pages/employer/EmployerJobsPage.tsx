@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -202,8 +201,7 @@ export default function EmployerJobsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 md:px-6 lg:px-8">
+    <div className="space-y-6 md:px-6 lg:px-8">
         <div className="flex flex-row items-center gap-2 sm:gap-4">
           <div className="flex min-w-0 flex-1 justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <motion.div
@@ -390,6 +388,5 @@ export default function EmployerJobsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
   );
 }

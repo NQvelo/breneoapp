@@ -94,20 +94,21 @@ export function JobApplyButton({
 
   const externalUrl = (externalApplyUrl ?? "").trim();
 
-  if (!supportsInAppApply) {
-    if (!externalUrl) {
-      return (
-        <Button size={size} disabled className={className}>
-          {t.jobs.apply}
-        </Button>
-      );
-    }
+  if (externalUrl) {
     return (
       <Button size={size} className={className} asChild>
         <a href={externalUrl} target="_blank" rel="noopener noreferrer">
           {t.jobs.apply}
           <ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden />
         </a>
+      </Button>
+    );
+  }
+
+  if (!supportsInAppApply) {
+    return (
+      <Button size={size} disabled className={className}>
+        {t.jobs.apply}
       </Button>
     );
   }

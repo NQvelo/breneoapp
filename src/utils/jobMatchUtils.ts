@@ -88,6 +88,7 @@ export const extractJobSkills = (job: any): string[] => {
     job.job_description,
     job.job_required_experience,
     job.required_experience,
+    ...(Array.isArray(job.skills_required) ? job.skills_required : []),
     ...(Array.isArray(job.required_skills) ? job.required_skills : []),
     ...(Array.isArray(job.skills) ? job.skills : []),
     ...(Array.isArray(job.job_skills) ? job.job_skills : []),
@@ -110,6 +111,7 @@ export const extractJobSkills = (job: any): string[] => {
 
   // Also include any skills already listed in arrays but not caught by keywords
   const explicitSkills = [
+    ...(Array.isArray(job.skills_required) ? job.skills_required : []),
     ...(Array.isArray(job.required_skills) ? job.required_skills : []),
     ...(Array.isArray(job.skills) ? job.skills : []),
     ...(Array.isArray(job.job_skills) ? job.job_skills : []),

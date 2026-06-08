@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,8 +63,7 @@ export default function EmployerNotificationsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 md:px-6 lg:px-8 pb-24 md:pb-8">
+    <div className="space-y-6 md:px-6 lg:px-8 pb-24 md:pb-8">
         <Card>
           <CardHeader className="p-6 pb-4">
             <div className="flex items-start gap-3">
@@ -126,7 +124,6 @@ export default function EmployerNotificationsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }

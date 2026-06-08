@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Clock } from "lucide-react";
 import {
-  fetchEmployerAccessState,
+  EMPLOYER_ACCESS_POLL_MS,
+  EMPLOYER_ACTIVE_LANDING_PATH,
+  resolveEmployerDashboardAccess,
+} from "@/api/employer/employerAccessResolver";
+import {
   fetchMyEmployerJoinRequest,
   type EmployerJoinRequest,
 } from "@/api/employer/employerJoinRequests";
@@ -13,47 +16,58 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 
 export default function EmployerPendingApprovalPage() {
-  const navigate = useNavigate();
   const { language } = useLanguage();
   const [request, setRequest] = useState<EmployerJoinRequest | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+
+    const goToJobs = () => {
+      toast.success("Your company access was approved.");
+      window.location.assign(
+        getLocalizedPath(EMPLOYER_ACTIVE_LANDING_PATH, language),
+      );
+    };
+
     const poll = async () => {
       try {
-        const access = await fetchEmployerAccessState();
+        const access = await resolveEmployerDashboardAccess();
         if (cancelled) return;
+
         if (access.state === "active") {
-          toast.success("Your company access was approved.");
-          navigate(getLocalizedPath("/employer/home", language), {
-            replace: true,
-          });
+          goToJobs();
           return;
         }
+
         if (access.state === "pending" && access.request) {
           setRequest(access.request);
           return;
         }
+
         const row = await fetchMyEmployerJoinRequest();
         if (cancelled) return;
         setRequest(row);
         if (row?.status === "approved") {
-          toast.success("Your company access was approved.");
-          navigate(getLocalizedPath("/employer/home", language), {
-            replace: true,
-          });
+          goToJobs();
         }
       } catch {
         /* keep waiting UI */
       }
     };
+
     void poll();
-    const id = window.setInterval(poll, 8000);
+    const id = window.setInterval(poll, EMPLOYER_ACCESS_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [navigate, language]);
+  }, [language]);
 
   const companyLabel = request?.company_name?.trim() || "your selected company";
 

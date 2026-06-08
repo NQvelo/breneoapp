@@ -126,8 +126,7 @@ export const en = {
     enrolledStudentsBox: "Enrolled students",
     enrolledStudentsListTitle: "Students enrolled in this course",
     viewEnrolledStudents: "View students",
-    enrolledStudentsModalEmpty:
-      "No students have enrolled in this course yet.",
+    enrolledStudentsModalEmpty: "No students have enrolled in this course yet.",
     save: "Save",
     saved: "Saved",
     duration: "Duration",
@@ -273,7 +272,12 @@ export const en = {
       "What the hire will do — one bullet per line (max 6). Pre-filled from AI; you can edit.",
     qualificationsLabel: "Qualifications",
     qualificationsHint:
-      "Requirements and skills — one bullet per line (max 6). Pre-filled from AI; you can edit.",
+      "Requirements and experience — one bullet per line (max 6). Pre-filled from AI; you can edit.",
+    skillsLabel: "Required skills",
+    skillsEditHint:
+      "Skills used for candidate matching. Search and add the abilities this role requires.",
+    skillsManualHint:
+      "AI could not detect skills. Add the skills required for candidate matching.",
   },
   // Beta Version
   beta: {

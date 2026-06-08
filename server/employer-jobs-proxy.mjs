@@ -52,6 +52,7 @@ import express from "express";
 import cors from "cors";
 
 import { extractJobSectionsFromDescription } from "./geminiJobParser.mjs";
+import { resolveJobSectionsAfterAi } from "./jobSectionsDedup.mjs";
 import { createDjangoNotification } from "./djangoNotifications.mjs";
 import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
 import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
@@ -225,6 +226,8 @@ const ALLOWED_WORK_MODES = new Set([
 /** Job-aggregator JSON keys for list fields (must match backend API). */
 const AGG_FIELD_RESPONSIBILITIES = "Responsibilities";
 const AGG_FIELD_QUALIFICATIONS = "qualifications";
+/** Aggregator job-details + search use `skills_required` (not `required_skills`). */
+const AGG_FIELD_SKILLS_REQUIRED = "skills_required";
 
 /**
  * @param {Record<string, unknown> | null | undefined} body
@@ -244,6 +247,41 @@ function hasBodyQualifications(body) {
     Object.prototype.hasOwnProperty.call(body || {}, "qualifications") ||
     Object.prototype.hasOwnProperty.call(body || {}, "Qualifications")
   );
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} body
+ */
+function hasBodyRequiredSkills(body) {
+  return (
+    Object.prototype.hasOwnProperty.call(body || {}, "required_skills") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "skills_required") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "skills")
+  );
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} body
+ */
+function getBodyRequiredSkills(body) {
+  if (Object.prototype.hasOwnProperty.call(body || {}, "required_skills")) {
+    return /** @type {unknown} */ (body.required_skills);
+  }
+  if (Object.prototype.hasOwnProperty.call(body || {}, "skills_required")) {
+    return /** @type {unknown} */ (body.skills_required);
+  }
+  if (Object.prototype.hasOwnProperty.call(body || {}, "skills")) {
+    return /** @type {unknown} */ (body.skills);
+  }
+  return [];
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {string[]} skills
+ */
+function setAggregatorSkillsRequired(payload, skills) {
+  payload[AGG_FIELD_SKILLS_REQUIRED] = skills;
 }
 
 /**
@@ -496,7 +534,7 @@ async function requireEmployerCompany(req, res) {
   if (userId) {
     const agg = await fetchAggregatorFirstCompanyForUser(userId);
     if (agg) {
-      if (!company && agg.name) company = agg.name;
+      if (agg.name) company = agg.name;
       if (agg.id) companyId = agg.id;
     }
   }
@@ -971,6 +1009,84 @@ async function forwardAppJobApplication(req, res, opts) {
  * @param {import("express").Request} req
  * @param {{ companyId?: string }} ctx
  */
+/**
+ * @param {{ companyId?: string; company?: string }} ctx
+ * @param {{ query?: Record<string, unknown> }} [req]
+ */
+function employerJobsCollectionUpstreamUrl(ctx, req = { query: {} }) {
+  const url = new URL(AGGREGATOR_EMPLOYER_JOBS_URL);
+  const ctxId = ctx.companyId ? String(ctx.companyId).trim() : "";
+  const fromQuery = String(req.query?.company_id || "").trim();
+  if (ctxId) {
+    url.searchParams.set("company_id", ctxId);
+  } else if (fromQuery) {
+    url.searchParams.set("company_id", fromQuery);
+  } else if (ctx.company) {
+    url.searchParams.set("company", ctx.company);
+  }
+  return url.toString();
+}
+
+/**
+ * @param {unknown} data
+ * @returns {string | null}
+ */
+function extractAggregatorJobId(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const row = /** @type {Record<string, unknown>} */ (data);
+  const id = row.id ?? row.pk ?? row.job_id;
+  return id != null && String(id).trim() !== "" ? String(id).trim() : null;
+}
+
+/**
+ * @param {unknown} data
+ * @returns {string | null}
+ */
+function extractAggregatorCompanyIdFromJob(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const row = /** @type {Record<string, unknown>} */ (data);
+  const company = row.company;
+  if (company != null && typeof company === "object" && !Array.isArray(company)) {
+    const id = /** @type {Record<string, unknown>} */ (company).id;
+    return id != null && String(id).trim() !== "" ? String(id).trim() : null;
+  }
+  return null;
+}
+
+/**
+ * Aggregator POST create persists city but drops country; follow-up PATCH fixes it.
+ * @param {string} jobId
+ * @param {{ companyId?: string }} ctx
+ * @param {string} country
+ */
+async function patchAggregatorJobCountryAfterCreate(jobId, ctx, country) {
+  const trimmed = String(country || "").trim();
+  if (!trimmed) return { ok: true, data: null };
+
+  const upstreamUrl = jobDetailUpstreamUrl(jobId, { query: {} }, ctx);
+  const patchBody = { country: trimmed, location_country: trimmed };
+  const upstream = await fetch(upstreamUrl, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY,
+    },
+    body: JSON.stringify(patchBody),
+  });
+
+  const text = await upstream.text();
+  const data = parseUpstreamJson(text);
+  if (!upstream.ok) {
+    console.warn(
+      "[employer-jobs-proxy] post-create country PATCH failed:",
+      upstream.status,
+      text.slice(0, 200),
+    );
+    return { ok: false, data };
+  }
+  return { ok: true, data };
+}
+
 function jobDetailUpstreamUrl(jobId, req, ctx) {
   const id = encodeURIComponent(String(jobId || "").trim());
   const base = aggregatorJobDetailUrl(id);
@@ -2085,6 +2201,49 @@ app.post("/api/employer/companies/", handleEmployerCompaniesCreate);
 app.get("/api/employer/jobs", handleEmployerJobsList);
 app.get("/api/employer/jobs/", handleEmployerJobsList);
 
+async function handleEmployerJobPreviewParse(req, res) {
+  try {
+    const ctx = await requireEmployerCompany(req, res);
+    if (!ctx) return;
+
+    const fullDescription = String(req.body?.full_description ?? "").trim();
+    if (!fullDescription) {
+      return res.status(400).json({ detail: "full_description is required" });
+    }
+
+    const gemini = await extractJobSectionsFromDescription(fullDescription);
+    if (!gemini.ok) {
+      const { extractSkillsFromTextFallback } = await import(
+        "./jobSkillsFallback.mjs"
+      );
+      const fallbackSkills = extractSkillsFromTextFallback(fullDescription);
+      return res.status(200).json({
+        description: "",
+        responsibilities: [],
+        qualifications: [],
+        skills: fallbackSkills,
+        useDescriptionOnly: true,
+        aiAvailable: false,
+      });
+    }
+
+    return res.status(200).json({
+      description: gemini.description,
+      responsibilities: gemini.responsibilities,
+      qualifications: gemini.qualifications,
+      skills: gemini.skills ?? [],
+      useDescriptionOnly: gemini.useDescriptionOnly,
+      aiAvailable: true,
+    });
+  } catch (e) {
+    console.error("[employer-jobs-proxy] preview-parse:", e);
+    return res.status(500).json({ detail: "Internal server error" });
+  }
+}
+
+app.post("/api/employer/jobs/preview-parse", handleEmployerJobPreviewParse);
+app.post("/api/employer/jobs/preview-parse/", handleEmployerJobPreviewParse);
+
 /** Register detail mutations before collection POST so `POST /api/employer/jobs` never shadows `/:jobId`. */
 app.patch("/api/employer/jobs/:jobId", handleEmployerJobUpdate);
 app.patch("/api/employer/jobs/:jobId/", handleEmployerJobUpdate);
@@ -2370,6 +2529,41 @@ async function attachParsedJobSectionsForCreate(payload, rawDescription) {
   }
   payload[AGG_FIELD_RESPONSIBILITIES] = gemini.responsibilities;
   payload[AGG_FIELD_QUALIFICATIONS] = gemini.qualifications;
+  if (gemini.skills?.length) {
+    setAggregatorSkillsRequired(payload, gemini.skills);
+  }
+}
+
+/**
+ * Apply employer preview / publish payload that already ran Gemini on the client path.
+ * @param {Record<string, unknown>} payload
+ * @param {Record<string, unknown>} body
+ */
+function applyClientParsedSections(payload, body) {
+  if (Object.prototype.hasOwnProperty.call(body, "description")) {
+    payload.description = String(body.description ?? "").trim();
+  }
+  if (hasBodyResponsibilities(body)) {
+    payload[AGG_FIELD_RESPONSIBILITIES] = normalizeBodyStringArrayInput(
+      getBodyResponsibilities(body),
+      6,
+    );
+  }
+  if (hasBodyQualifications(body)) {
+    payload[AGG_FIELD_QUALIFICATIONS] = normalizeBodyStringArrayInput(
+      getBodyQualifications(body),
+      6,
+    );
+  }
+  const resolved = resolveJobSectionsAfterAi({
+    description:
+      typeof payload.description === "string" ? payload.description : "",
+    responsibilities: payload[AGG_FIELD_RESPONSIBILITIES] ?? [],
+    qualifications: payload[AGG_FIELD_QUALIFICATIONS] ?? [],
+  });
+  payload.description = resolved.description;
+  payload[AGG_FIELD_RESPONSIBILITIES] = resolved.responsibilities;
+  payload[AGG_FIELD_QUALIFICATIONS] = resolved.qualifications;
 }
 
 /**
@@ -2422,9 +2616,13 @@ function buildAggregatorPayload(body, company, isPatch = false) {
     payload.work_mode = normalizeWorkMode(body.work_mode);
   }
 
-  // Keep ownership/company coherent on create.
+  // Aggregator POST expects company *name* in JSON; scope via ?company_id= on the URL.
   if (!isPatch) {
-    payload.company = company;
+    const companyName = String(company || "").trim();
+    if (!companyName) {
+      return { ok: false, error: "company is required" };
+    }
+    payload.company = companyName;
   }
 
   if (has("location")) {
@@ -2528,6 +2726,13 @@ function buildAggregatorPayload(body, company, isPatch = false) {
       typeof body.is_active === "boolean" ? body.is_active : true;
   }
 
+  if (has("required_skills") || has("skills_required") || has("skills")) {
+    setAggregatorSkillsRequired(
+      payload,
+      normalizeBodyStringArrayInput(getBodyRequiredSkills(body), 12),
+    );
+  }
+
   if (isPatch) {
     if (hasBodyResponsibilities(body)) {
       payload[AGG_FIELD_RESPONSIBILITIES] = normalizeBodyStringArrayInput(
@@ -2541,6 +2746,22 @@ function buildAggregatorPayload(body, company, isPatch = false) {
         6,
       );
     }
+    if (
+      Object.prototype.hasOwnProperty.call(
+        payload,
+        AGG_FIELD_RESPONSIBILITIES,
+      ) &&
+      Object.prototype.hasOwnProperty.call(payload, AGG_FIELD_QUALIFICATIONS)
+    ) {
+      const resolved = resolveJobSectionsAfterAi({
+        description:
+          typeof payload.description === "string" ? payload.description : "",
+        responsibilities: payload[AGG_FIELD_RESPONSIBILITIES],
+        qualifications: payload[AGG_FIELD_QUALIFICATIONS],
+      });
+      payload[AGG_FIELD_RESPONSIBILITIES] = resolved.responsibilities;
+      payload[AGG_FIELD_QUALIFICATIONS] = resolved.qualifications;
+    }
   }
 
   return { ok: true, payload };
@@ -2550,7 +2771,7 @@ app.post("/api/employer/jobs", async (req, res) => {
   try {
     const ctx = await requireEmployerCompany(req, res);
     if (!ctx) return;
-    const { company } = ctx;
+    const { company, companyId } = ctx;
 
     if (!AGGREGATOR_KEY) {
       console.error("JOB_AGGREGATOR_EMPLOYER_KEY is not set");
@@ -2566,8 +2787,13 @@ app.post("/api/employer/jobs", async (req, res) => {
 
     const bodyObj = /** @type {Record<string, unknown>} */ (req.body || {});
     const rawDesc = getRawJobDescriptionForParsing(bodyObj);
+    const clientParsed = bodyObj.client_parsed_sections === true;
     try {
-      await attachParsedJobSectionsForCreate(payload, rawDesc);
+      if (clientParsed) {
+        applyClientParsedSections(payload, bodyObj);
+      } else {
+        await attachParsedJobSectionsForCreate(payload, rawDesc);
+      }
     } catch (e) {
       console.error(
         "[employer-jobs-proxy] unexpected job-section parser error (create):",
@@ -2575,7 +2801,7 @@ app.post("/api/employer/jobs", async (req, res) => {
       );
     }
 
-    const upstream = await fetch(AGGREGATOR_EMPLOYER_JOBS_URL, {
+    const upstream = await fetch(employerJobsCollectionUpstreamUrl(ctx, req), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2595,6 +2821,25 @@ app.post("/api/employer/jobs", async (req, res) => {
             ? data
             : { detail: text || "Aggregator error" },
         );
+    }
+
+    const createdJobId = extractAggregatorJobId(data);
+    const countryForPatch = String(
+      payload.country || payload.location_country || "",
+    ).trim();
+    if (createdJobId && countryForPatch) {
+      const aggregatorCompanyId = extractAggregatorCompanyIdFromJob(data);
+      const patchCtx = aggregatorCompanyId
+        ? { ...ctx, companyId: aggregatorCompanyId }
+        : ctx;
+      const patched = await patchAggregatorJobCountryAfterCreate(
+        createdJobId,
+        patchCtx,
+        countryForPatch,
+      );
+      if (patched.ok && patched.data) {
+        return res.status(upstream.status).json(patched.data);
+      }
     }
 
     return res.status(upstream.status).json(data);

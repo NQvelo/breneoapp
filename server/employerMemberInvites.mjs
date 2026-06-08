@@ -6,6 +6,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readAppPublicUrl, sendResendEmail } from "./resendEmail.mjs";
 import { buildEmployerMemberInviteEmail } from "./emailTemplates.mjs";
 import { createDjangoNotification } from "./djangoNotifications.mjs";
+import { adminCompanyIdsFromMemberships } from "./staffMembershipStatus.mjs";
 
 function normalizeEmail(email) {
   return String(email ?? "")
@@ -112,27 +113,6 @@ function isMemberEmail(staffRow, email) {
 
 function createInviteExpiresAtSeconds() {
   return Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-}
-
-/**
- * @param {unknown[]} memberships
- * @param {string} userId
- */
-function adminCompanyIdsFromMemberships(memberships, userId) {
-  const uid = String(userId).trim();
-  const ids = new Set();
-  for (const row of memberships) {
-    if (!row || typeof row !== "object") continue;
-    const r = row;
-    if (
-      String(r.external_user_id ?? "").trim() === uid &&
-      Boolean(r.is_admin) &&
-      Number.isFinite(Number(r.company_id))
-    ) {
-      ids.add(Number(r.company_id));
-    }
-  }
-  return Array.from(ids);
 }
 
 /**

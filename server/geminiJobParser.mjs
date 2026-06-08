@@ -1,3 +1,6 @@
+import { resolveJobSectionsAfterAi } from "./jobSectionsDedup.mjs";
+import { extractSkillsFromTextFallback } from "./jobSkillsFallback.mjs";
+
 /**
  * Server-only Gemini helper: extracts short description summary, responsibilities, and
  * qualifications from raw employer job text. Invoked only from employer-jobs-proxy on
@@ -13,6 +16,7 @@ const GEMINI_MODEL =
   process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
 
 const MAX_ITEMS_PER_ARRAY = 6;
+const MAX_SKILLS = 12;
 /** Cap AI summary length (2–3 sentences; UTF-8 safe) */
 const MAX_DESCRIPTION_CHARS = 900;
 
@@ -31,7 +35,8 @@ Return ONLY valid JSON in this exact format:
 {
   "description": "...",
   "responsibilities": ["..."],
-  "qualifications": ["..."]
+  "qualifications": ["..."],
+  "skills": ["..."]
 }
 
 STRICT RULES:
@@ -92,6 +97,16 @@ QUALIFICATIONS RULES:
 
 ----------------------------------------
 
+SKILLS RULES:
+
+- Extract required technical and professional skills explicitly mentioned or clearly implied
+- Use short canonical names (e.g. "React", "Python", "Sales")
+- Max 12 items
+- If no skills are mentioned, return an empty array []
+- Do NOT invent skills not supported by the posting
+
+----------------------------------------
+
 FILTERING RULES (VERY IMPORTANT):
 
 Exclude:
@@ -129,7 +144,8 @@ Output:
     "3+ years backend development experience",
     "Strong knowledge of Node.js",
     "Experience with databases"
-  ]
+  ],
+  "skills": ["Node.js", "API development", "Databases"]
 }
 
 ----------------------------------------
@@ -149,7 +165,7 @@ ${jobDescription}`;
 
   return `${base}
 
-CRITICAL: Output one raw JSON object only. Keys must be exactly "description" (string), "responsibilities" (array of strings), "qualifications" (array of strings). No markdown fences, no backticks, no text before or after the JSON.`;
+CRITICAL: Output one raw JSON object only. Keys must be exactly "description" (string), "responsibilities" (array of strings), "qualifications" (array of strings), "skills" (array of strings). No markdown fences, no backticks, no text before or after the JSON.`;
 }
 
 /**
@@ -205,16 +221,49 @@ function sanitizeDescriptionSummary(value) {
  * @param {unknown} parsed
  * @returns {{ description: string, responsibilities: string[], qualifications: string[] }}
  */
-function normalizeGeminiPayload(parsed) {
+function sanitizeSkillsArray(value, max = MAX_SKILLS) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of value) {
+    const s =
+      typeof item === "string"
+        ? item.trim()
+        : String(item ?? "").trim();
+    if (!s) continue;
+    const dedupeKey = s.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    out.push(s);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/**
+ * @param {unknown} parsed
+ * @param {string} sourceText
+ */
+function normalizeGeminiPayload(parsed, sourceText) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Gemini JSON root must be an object");
   }
   const o = /** @type {Record<string, unknown>} */ (parsed);
-  return {
+  const sections = resolveJobSectionsAfterAi({
     description: sanitizeDescriptionSummary(o.description),
     responsibilities: sanitizeStringArray(o.responsibilities),
     qualifications: sanitizeStringArray(o.qualifications),
-  };
+  });
+  let skills = sanitizeSkillsArray(o.skills);
+  if (skills.length === 0) {
+    const fallbackSource = [
+      sourceText,
+      ...sections.qualifications,
+      ...sections.responsibilities,
+    ].join("\n");
+    skills = extractSkillsFromTextFallback(fallbackSource);
+  }
+  return { ...sections, skills };
 }
 
 /**
@@ -277,7 +326,7 @@ async function callGeminiGenerateJson(prompt) {
  * Never throws — failures return { ok: false }.
  *
  * @param {string} rawJobDescription — user-submitted description only (no server-only suffixes).
- * @returns {Promise<{ ok: true, description: string, responsibilities: string[], qualifications: string[] } | { ok: false }>}
+ * @returns {Promise<{ ok: true, description: string, responsibilities: string[], qualifications: string[], skills: string[], useDescriptionOnly: boolean } | { ok: false }>}
  */
 export async function extractJobSectionsFromDescription(rawJobDescription) {
   const trimmed = String(rawJobDescription ?? "").trim();
@@ -291,7 +340,7 @@ export async function extractJobSectionsFromDescription(rawJobDescription) {
   const run = async (strictRetry) => {
     const prompt = buildPrompt(trimmed, strictRetry);
     const text = await callGeminiGenerateJson(prompt);
-    return normalizeGeminiPayload(parseJsonLoose(text));
+    return normalizeGeminiPayload(parseJsonLoose(text), trimmed);
   };
 
   try {

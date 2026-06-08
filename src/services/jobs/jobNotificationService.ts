@@ -51,9 +51,13 @@ const extractJobSkills = (job: ApiJob): string[] => {
     job.job_title || job.title || "",
     job.description || job.job_description || "",
     job.job_required_experience || job.required_experience || "",
+    ...(Array.isArray(job.skills_required) ? job.skills_required : []),
     ...(Array.isArray(job.required_skills) ? job.required_skills : []),
     ...(Array.isArray(job.skills) ? job.skills : []),
     ...(Array.isArray(job.job_skills) ? job.job_skills : []),
+    ...(typeof job.skills_required === "string"
+      ? job.skills_required.split(",").map((s) => s.trim())
+      : []),
     ...(typeof job.required_skills === "string"
       ? job.required_skills.split(",").map((s) => s.trim())
       : []),

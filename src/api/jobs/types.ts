@@ -83,6 +83,8 @@ export interface JobDetail {
   job_required_experience?: string;
   experience?: string;
   required_skills?: string | string[];
+  /** Job-aggregator field for employer-posted jobs */
+  skills_required?: string | string[];
   skills?: string | string[];
   job_skills?: string | string[];
   education?: string;

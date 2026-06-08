@@ -79,7 +79,15 @@ import {
 } from "@/utils/industryMatch";
 import { JobApplyButton } from "@/components/jobs/JobApplyButton";
 import { useMyApplications } from "@/hooks/useMyApplications";
-import { jobSupportsInAppApply } from "@/api/jobs/applicationAuth";
+import {
+  getExplicitEmployerApplyUrl,
+  jobSupportsInAppApply,
+} from "@/api/jobs/applicationAuth";
+import { resolveJobSectionsAfterAi } from "@/utils/jobSectionsDedup";
+import {
+  JobDescriptionParagraphs,
+  JobSectionBulletList,
+} from "@/components/jobs/JobSectionContent";
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
@@ -207,8 +215,7 @@ const JobDetailPage = () => {
 
   const { data: myApplications } = useMyApplications(!!user);
   const appliedJobIds = myApplications?.appliedJobIds;
-  const applicationJobId =
-    jobDetail?.id ?? jobDetail?.job_id ?? jobId ?? "";
+  const applicationJobId = jobDetail?.id ?? jobDetail?.job_id ?? jobId ?? "";
 
   // Handle scroll detection for fixed bottom bar
   useEffect(() => {
@@ -437,6 +444,10 @@ const JobDetailPage = () => {
   const getApplyUrl = (): string => {
     if (!jobDetail) return "";
     const jobDetailAny = jobDetail as Record<string, unknown>;
+
+    if (jobSupportsInAppApply(jobDetailAny)) {
+      return getExplicitEmployerApplyUrl(jobDetailAny);
+    }
 
     // Check new API structure - apply_url is primary field
     if (jobDetail.apply_url && typeof jobDetail.apply_url === "string") {
@@ -1121,32 +1132,6 @@ const JobDetailPage = () => {
     return "On-site";
   };
 
-  // Get description
-  const getDescription = () => {
-    if (!jobDetail) return "No description available.";
-    const jobDetailAny = jobDetail as Record<string, unknown>;
-    // Check all possible description fields including JSearch format
-    const description =
-      jobDetail.description ||
-      jobDetail.job_description ||
-      (jobDetailAny.job_description as string | undefined) ||
-      undefined;
-
-    // Handle different data types
-    if (!description) return "No description available.";
-    if (typeof description === "string") return description;
-    if (Array.isArray(description)) {
-      // Convert array to string (join with newlines)
-      return (description as unknown[]).map((d) => String(d)).join("\n");
-    }
-    if (typeof description === "object") {
-      // Convert object to string representation
-      return JSON.stringify(description, null, 2);
-    }
-    // Convert to string as fallback
-    return String(description);
-  };
-
   // Get requirements/qualifications
   const getRequirements = () => {
     if (!jobDetail) return undefined;
@@ -1182,28 +1167,6 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get required skills
-  const getRequiredSkills = (): string[] => {
-    if (!jobDetail) return [];
-    const skills =
-      jobDetail.required_skills ||
-      jobDetail.skills ||
-      jobDetail.job_skills ||
-      undefined;
-
-    if (typeof skills === "string") {
-      // Try to parse comma-separated or newline-separated skills
-      return skills
-        .split(/[,\n]/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-    }
-    if (Array.isArray(skills)) {
-      return skills.filter(Boolean);
-    }
-    return [];
-  };
-
   // Required skills for this job (canonical names), for chips and match
   const requiredSkillsList = useMemo(() => {
     if (!jobDetail) return [];
@@ -1211,8 +1174,13 @@ const JobDetailPage = () => {
     if (structured.skillsRequired.length > 0) {
       return [...new Set(structured.skillsRequired)];
     }
+    const jobAny = jobDetail as Record<string, unknown>;
     const raw =
-      jobDetail.required_skills ?? jobDetail.skills ?? jobDetail.job_skills;
+      jobDetail.skills_required ??
+      jobDetail.required_skills ??
+      jobDetail.skills ??
+      jobDetail.job_skills ??
+      jobAny.skills_required;
     const arr: string[] = Array.isArray(raw)
       ? raw.filter(Boolean)
       : typeof raw === "string"
@@ -1227,6 +1195,51 @@ const JobDetailPage = () => {
   const jobDetailId = jobDetail
     ? String(jobDetail.id ?? jobDetail.job_id ?? "")
     : "";
+
+  const resolvedJobSections = useMemo(() => {
+    if (!jobDetail) {
+      return {
+        description: "",
+        responsibilities: [] as string[],
+        qualifications: [] as string[],
+        useDescriptionOnly: false,
+      };
+    }
+    const jobAny = jobDetail as Record<string, unknown>;
+    const descriptionText = String(
+      jobDetail.description ||
+        jobDetail.job_description ||
+        (jobAny.job_description as string | undefined) ||
+        "",
+    ).trim();
+    const responsibilitiesRaw =
+      jobDetail.responsibilities ??
+      jobAny.Responsibilities ??
+      jobAny.responsibilities;
+    const qualificationsRaw =
+      jobDetail.qualifications ??
+      jobAny.qualifications ??
+      jobAny.Qualifications;
+    const resolved = resolveJobSectionsAfterAi({
+      description: descriptionText,
+      responsibilities:
+        typeof responsibilitiesRaw === "string" ||
+        Array.isArray(responsibilitiesRaw)
+          ? responsibilitiesRaw
+          : undefined,
+      qualifications:
+        typeof qualificationsRaw === "string" ||
+        Array.isArray(qualificationsRaw)
+          ? qualificationsRaw
+          : undefined,
+    });
+    return {
+      description: resolved.description,
+      responsibilities: resolved.responsibilities,
+      qualifications: resolved.qualifications,
+      useDescriptionOnly: resolved.useDescriptionOnly,
+    };
+  }, [jobDetail]);
 
   // When job changes, allow re-init of selected skills for the new job
   useEffect(() => {
@@ -1594,7 +1607,8 @@ const JobDetailPage = () => {
   }, [jobDetail]);
 
   const supportsInAppApply = useMemo(
-    () => jobSupportsInAppApply(jobDetail as Record<string, unknown> | undefined),
+    () =>
+      jobSupportsInAppApply(jobDetail as Record<string, unknown> | undefined),
     [jobDetail],
   );
 
@@ -1925,27 +1939,39 @@ const JobDetailPage = () => {
               )}
 
               {/* Job Details Section - Combined */}
-              {(jobDetail.responsibilities ||
-                jobDetail.qualifications ||
-                jobDetail.team_description ||
-                jobDetail.benefits) && (
+              {(resolvedJobSections.useDescriptionOnly &&
+                resolvedJobSections.description) ||
+              resolvedJobSections.responsibilities.length > 0 ||
+              resolvedJobSections.qualifications.length > 0 ||
+              jobDetail.team_description ||
+              jobDetail.benefits ? (
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6 space-y-[4.5rem]">
+                  {resolvedJobSections.useDescriptionOnly &&
+                  resolvedJobSections.description ? (
+                    <div>
+                      <h2 className="text-lg font-semibold mb-4">
+                        Description
+                      </h2>
+                      <JobDescriptionParagraphs
+                        text={resolvedJobSections.description}
+                      />
+                    </div>
+                  ) : null}
+
                   {/* Responsibilities */}
-                  {jobDetail.responsibilities && (
+                  {resolvedJobSections.responsibilities.length > 0 ? (
                     <div>
                       <h2 className="text-lg font-semibold mb-4">
                         Responsibilities
                       </h2>
-                      <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                        <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                          {jobDetail.responsibilities}
-                        </p>
-                      </div>
+                      <JobSectionBulletList
+                        items={resolvedJobSections.responsibilities}
+                      />
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Qualifications */}
-                  {(jobDetail.qualifications ||
+                  {(resolvedJobSections.qualifications.length > 0 ||
                     requiredSkillsList.length > 0) && (
                     <div>
                       <h2 className="text-lg font-semibold mb-4">
@@ -1990,13 +2016,11 @@ const JobDetailPage = () => {
                           </div>
                         </div>
                       )}
-                      {jobDetail.qualifications && (
-                        <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-line">
-                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                            {jobDetail.qualifications}
-                          </p>
-                        </div>
-                      )}
+                      {resolvedJobSections.qualifications.length > 0 ? (
+                        <JobSectionBulletList
+                          items={resolvedJobSections.qualifications}
+                        />
+                      ) : null}
                     </div>
                   )}
 
@@ -2030,12 +2054,11 @@ const JobDetailPage = () => {
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
 
               {/* Job Details Grid */}
               {(getRequiredExperience() ||
                 getEducationRequired() ||
-                getRequiredSkills().length > 0 ||
                 getJobCategory() ||
                 getApplicationDeadline()) && (
                 <div className="rounded-3xl p-6 shadow-none border-0 mt-6">
@@ -2101,27 +2124,6 @@ const JobDetailPage = () => {
                       </div>
                     )}
                   </div>
-
-                  {/* Required Skills */}
-                  {getRequiredSkills().length > 0 && (
-                    <div className="mt-6 pt-6">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                        Required Skills
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {getRequiredSkills().map((skill, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="flex items-center gap-1"
-                          >
-                            <Award className="h-3 w-3" />
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 

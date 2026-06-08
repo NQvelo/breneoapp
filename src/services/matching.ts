@@ -172,7 +172,11 @@ function inferIndustryTags(
 export function getStructuredJobFromDetail(job: JobDetail): StructuredJob {
   const raw = job as Record<string, unknown>;
   const skillsFromApi = (
-    raw.required_skills ?? raw.skills ?? raw.job_skills ?? []
+    raw.skills_required ??
+      raw.required_skills ??
+      raw.skills ??
+      raw.job_skills ??
+      []
   ) as string[] | string;
   const requiredArr = Array.isArray(skillsFromApi)
     ? skillsFromApi.filter((x): x is string => typeof x === "string")

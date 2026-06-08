@@ -1293,443 +1293,447 @@ const JobsPage = () => {
       try {
         return (apiJobs || [])
           .map((job: ApiJob): Job | null => {
-          // Handle nested company object if it exists
-          const companyObj =
-            job.company && typeof job.company === "object"
-              ? (job.company as Record<string, unknown>)
-              : null;
+            // Handle nested company object if it exists
+            const companyObj =
+              job.company && typeof job.company === "object"
+                ? (job.company as Record<string, unknown>)
+                : null;
 
-          // Extract fields with fallbacks for different API formats
-          // Ensure jobId is always a string - accept id or job_id (APIs vary)
-          const jobId = String(job.id || job.job_id || "");
+            // Extract fields with fallbacks for different API formats
+            // Ensure jobId is always a string - accept id or job_id (APIs vary)
+            const jobId = String(job.id || job.job_id || "");
 
-          // Skip jobs without valid IDs - they can't be opened
-          if (!jobId || jobId.trim() === "") {
-            console.warn("Skipping job without valid ID:", job);
-            return null;
-          }
-
-          const jobTitle = String(
-            job.title || job.job_title || job.position || "Untitled Position",
-          );
-          const companyName = String(
-            job.company_name ||
-              (companyObj?.company_name &&
-              typeof companyObj.company_name === "string"
-                ? companyObj.company_name
-                : null) ||
-              (companyObj?.name && typeof companyObj.name === "string"
-                ? companyObj.name
-                : null) ||
-              (job.companyName && typeof job.companyName === "string"
-                ? job.companyName
-                : null) ||
-              (job.employer_name && typeof job.employer_name === "string"
-                ? job.employer_name
-                : null) ||
-              (typeof job.company === "string" ? job.company : null) ||
-              "Unknown Company",
-          );
-          const jobCity =
-            job.job_city || job.city || (companyObj?.city as string) || "";
-          const jobState =
-            job.job_state || job.state || (companyObj?.state as string) || "";
-          const jobCountry =
-            job.job_country ||
-            job.country ||
-            (companyObj?.country as string) ||
-            "";
-
-          // Robust location extraction: handle strings, objects, arrays, and nested fields
-          const getLocationStringFromJob = (
-            j: Record<string, any>,
-            co: Record<string, any> | null,
-          ): string => {
-            // Remote override
-            if (j?.job_is_remote || j?.is_remote || j?.remote === true) {
-              return "Remote";
-            }
-
-            const tryString = (v: any) =>
-              v && typeof v === "string" && v.trim() ? v.trim() : null;
-
-            const tryObjectName = (obj: any) => {
-              if (!obj || typeof obj !== "object") return null;
-              if (tryString(obj.display_name)) return obj.display_name;
-              if (tryString(obj.name)) return obj.name;
-              if (tryString(obj.location)) return obj.location;
-              if (tryString(obj.address)) return obj.address;
-              // Try common city/state/country combination
-              const parts = [
-                obj.city || obj.town || obj.region || obj.state,
-                obj.country,
-              ]
-                .filter(Boolean)
-                .map((s) => String(s));
-              if (parts.length) return parts.join(", ");
+            // Skip jobs without valid IDs - they can't be opened
+            if (!jobId || jobId.trim() === "") {
+              console.warn("Skipping job without valid ID:", job);
               return null;
-            };
+            }
 
-            // locations array (some APIs return multiple locations)
-            if (Array.isArray(j.locations) && j.locations.length > 0) {
-              for (const loc of j.locations) {
-                const s = tryString(loc) || tryObjectName(loc);
-                if (s) return s;
+            const jobTitle = String(
+              job.title || job.job_title || job.position || "Untitled Position",
+            );
+            const companyName = String(
+              job.company_name ||
+                (companyObj?.company_name &&
+                typeof companyObj.company_name === "string"
+                  ? companyObj.company_name
+                  : null) ||
+                (companyObj?.name && typeof companyObj.name === "string"
+                  ? companyObj.name
+                  : null) ||
+                (job.companyName && typeof job.companyName === "string"
+                  ? job.companyName
+                  : null) ||
+                (job.employer_name && typeof job.employer_name === "string"
+                  ? job.employer_name
+                  : null) ||
+                (typeof job.company === "string" ? job.company : null) ||
+                "Unknown Company",
+            );
+            const jobCity =
+              job.job_city || job.city || (companyObj?.city as string) || "";
+            const jobState =
+              job.job_state || job.state || (companyObj?.state as string) || "";
+            const jobCountry =
+              job.job_country ||
+              job.country ||
+              (companyObj?.country as string) ||
+              "";
+
+            // Robust location extraction: handle strings, objects, arrays, and nested fields
+            const getLocationStringFromJob = (
+              j: Record<string, any>,
+              co: Record<string, any> | null,
+            ): string => {
+              // Remote override
+              if (j?.job_is_remote || j?.is_remote || j?.remote === true) {
+                return "Remote";
               }
-            }
 
-            // Try common string fields first
-            const candidates = [
-              j.jobLocation,
-              j.location,
-              j.location_name,
-              j.job_location,
-              j.work_location,
-              j.address,
-            ];
-            for (const c of candidates) {
-              const s = tryString(c);
-              if (s) return s;
-            }
+              const tryString = (v: any) =>
+                v && typeof v === "string" && v.trim() ? v.trim() : null;
 
-            // Try location object shapes
-            const objLocation =
-              tryObjectName(j.location) ||
-              tryObjectName(j.locationData) ||
-              tryObjectName(j.job_location) ||
-              null;
-            if (objLocation) return objLocation;
+              const tryObjectName = (obj: any) => {
+                if (!obj || typeof obj !== "object") return null;
+                if (tryString(obj.display_name)) return obj.display_name;
+                if (tryString(obj.name)) return obj.name;
+                if (tryString(obj.location)) return obj.location;
+                if (tryString(obj.address)) return obj.address;
+                // Try common city/state/country combination
+                const parts = [
+                  obj.city || obj.town || obj.region || obj.state,
+                  obj.country,
+                ]
+                  .filter(Boolean)
+                  .map((s) => String(s));
+                if (parts.length) return parts.join(", ");
+                return null;
+              };
 
-            // Company object location
-            if (co) {
-              const compLoc =
-                tryString(co.location) ||
-                tryString(co.address) ||
-                tryObjectName(co.location) ||
-                null;
-              if (compLoc) return compLoc;
-            }
-
-            // Fallback to city/state/country fields
-            const fallback = [jobCity, jobState, jobCountry]
-              .filter(Boolean)
-              .map((s) => String(s))
-              .join(", ");
-            if (fallback) return fallback;
-
-            return "Location not specified";
-          };
-
-          const locationString = String(
-            getLocationStringFromJob(job as Record<string, any>, companyObj),
-          );
-          const applyLink =
-            job.apply_url ||
-            job.job_apply_link ||
-            job.apply_link ||
-            job.url ||
-            job.applyUrl ||
-            job.jobUrl ||
-            job.company_url ||
-            (companyObj?.url as string) ||
-            "";
-          // Extract company logo - check all possible fields
-          let companyLogo: string | undefined = undefined;
-
-          // Prefer top-level `company_logo` if present (many APIs provide this)
-          if (
-            !companyLogo &&
-            typeof job.company_logo === "string" &&
-            job.company_logo.trim()
-          ) {
-            companyLogo = job.company_logo.trim();
-          }
-
-          // Helper function to validate and set logo URL
-          const setLogoIfValid = (logoValue: unknown): boolean => {
-            if (!logoValue) return false;
-
-            // If array, try each item
-            if (Array.isArray(logoValue)) {
-              for (const v of logoValue) {
-                if (setLogoIfValid(v)) return true;
+              // locations array (some APIs return multiple locations)
+              if (Array.isArray(j.locations) && j.locations.length > 0) {
+                for (const loc of j.locations) {
+                  const s = tryString(loc) || tryObjectName(loc);
+                  if (s) return s;
+                }
               }
-              return false;
-            }
 
-            // If object, probe common fields
-            if (typeof logoValue === "object") {
-              const obj = logoValue as Record<string, any>;
+              // Try common string fields first
               const candidates = [
-                obj.url,
-                obj.src,
-                obj.href,
-                obj.logo,
-                obj.image,
-                obj.path,
-                obj.file,
-                obj.thumbnail,
+                j.jobLocation,
+                j.location,
+                j.location_name,
+                j.job_location,
+                j.work_location,
+                j.address,
               ];
               for (const c of candidates) {
-                if (setLogoIfValid(c)) return true;
+                const s = tryString(c);
+                if (s) return s;
               }
-              return false;
+
+              // Try location object shapes
+              const objLocation =
+                tryObjectName(j.location) ||
+                tryObjectName(j.locationData) ||
+                tryObjectName(j.job_location) ||
+                null;
+              if (objLocation) return objLocation;
+
+              // Company object location
+              if (co) {
+                const compLoc =
+                  tryString(co.location) ||
+                  tryString(co.address) ||
+                  tryObjectName(co.location) ||
+                  null;
+                if (compLoc) return compLoc;
+              }
+
+              // Fallback to city/state/country fields
+              const fallback = [jobCity, jobState, jobCountry]
+                .filter(Boolean)
+                .map((s) => String(s))
+                .join(", ");
+              if (fallback) return fallback;
+
+              return "Location not specified";
+            };
+
+            const locationString = String(
+              getLocationStringFromJob(job as Record<string, any>, companyObj),
+            );
+            const applyLink =
+              job.apply_url ||
+              job.job_apply_link ||
+              job.apply_link ||
+              job.url ||
+              job.applyUrl ||
+              job.jobUrl ||
+              job.company_url ||
+              (companyObj?.url as string) ||
+              "";
+            // Extract company logo - check all possible fields
+            let companyLogo: string | undefined = undefined;
+
+            // Prefer top-level `company_logo` if present (many APIs provide this)
+            if (
+              !companyLogo &&
+              typeof job.company_logo === "string" &&
+              job.company_logo.trim()
+            ) {
+              companyLogo = job.company_logo.trim();
             }
 
-            // Treat as string
-            const logoUrl = String(logoValue).trim();
-            if (!logoUrl) {
+            // Helper function to validate and set logo URL
+            const setLogoIfValid = (logoValue: unknown): boolean => {
+              if (!logoValue) return false;
+
+              // If array, try each item
+              if (Array.isArray(logoValue)) {
+                for (const v of logoValue) {
+                  if (setLogoIfValid(v)) return true;
+                }
+                return false;
+              }
+
+              // If object, probe common fields
+              if (typeof logoValue === "object") {
+                const obj = logoValue as Record<string, any>;
+                const candidates = [
+                  obj.url,
+                  obj.src,
+                  obj.href,
+                  obj.logo,
+                  obj.image,
+                  obj.path,
+                  obj.file,
+                  obj.thumbnail,
+                ];
+                for (const c of candidates) {
+                  if (setLogoIfValid(c)) return true;
+                }
+                return false;
+              }
+
+              // Treat as string
+              const logoUrl = String(logoValue).trim();
+              if (!logoUrl) {
+                if (process.env.NODE_ENV === "development")
+                  console.debug("Logo candidate empty string, skipping");
+                return false;
+              }
+
               if (process.env.NODE_ENV === "development")
-                console.debug("Logo candidate empty string, skipping");
-              return false;
-            }
+                console.debug("Trying logo candidate:", logoUrl);
 
-            if (process.env.NODE_ENV === "development")
-              console.debug("Trying logo candidate:", logoUrl);
+              // Accept data URIs and blob URLs
+              if (logoUrl.startsWith("data:") || logoUrl.startsWith("blob:")) {
+                companyLogo = logoUrl;
+                if (process.env.NODE_ENV === "development")
+                  console.debug("Accepted data/blob logo for job", jobId);
+                return true;
+              }
 
-            // Accept data URIs and blob URLs
-            if (logoUrl.startsWith("data:") || logoUrl.startsWith("blob:")) {
-              companyLogo = logoUrl;
-              if (process.env.NODE_ENV === "development")
-                console.debug("Accepted data/blob logo for job", jobId);
-              return true;
-            }
+              // Protocol-relative URLs
+              if (logoUrl.startsWith("//")) {
+                companyLogo = `https:${logoUrl}`;
+                if (process.env.NODE_ENV === "development")
+                  console.debug(
+                    "Accepted protocol-relative logo for job",
+                    jobId,
+                    logoUrl,
+                  );
+                return true;
+              }
 
-            // Protocol-relative URLs
-            if (logoUrl.startsWith("//")) {
-              companyLogo = `https:${logoUrl}`;
+              // Absolute http(s)
+              if (
+                logoUrl.startsWith("http://") ||
+                logoUrl.startsWith("https://")
+              ) {
+                companyLogo = logoUrl;
+                if (process.env.NODE_ENV === "development")
+                  console.debug(
+                    "Accepted http(s) logo for job",
+                    jobId,
+                    logoUrl,
+                  );
+                return true;
+              }
+
+              // Relative path - accept and leave resolution to browser/app
+              if (
+                logoUrl.startsWith("/") ||
+                logoUrl.startsWith("./") ||
+                logoUrl.startsWith("../")
+              ) {
+                companyLogo = logoUrl;
+                if (process.env.NODE_ENV === "development")
+                  console.debug(
+                    "Accepted relative-path logo for job",
+                    jobId,
+                    logoUrl,
+                  );
+                return true;
+              }
+
               if (process.env.NODE_ENV === "development")
                 console.debug(
-                  "Accepted protocol-relative logo for job",
-                  jobId,
+                  "Rejected logo candidate (unsupported format)",
                   logoUrl,
                 );
-              return true;
-            }
 
-            // Absolute http(s)
-            if (
-              logoUrl.startsWith("http://") ||
-              logoUrl.startsWith("https://")
-            ) {
-              companyLogo = logoUrl;
-              if (process.env.NODE_ENV === "development")
-                console.debug("Accepted http(s) logo for job", jobId, logoUrl);
-              return true;
-            }
+              return false;
+            };
 
-            // Relative path - accept and leave resolution to browser/app
-            if (
-              logoUrl.startsWith("/") ||
-              logoUrl.startsWith("./") ||
-              logoUrl.startsWith("../")
-            ) {
-              companyLogo = logoUrl;
-              if (process.env.NODE_ENV === "development")
-                console.debug(
-                  "Accepted relative-path logo for job",
+            // Check root level fields first - prioritize company_logo field
+            // Use Record type to access fields that might not be in the type definition
+            const jobAny = job as Record<string, unknown>;
+
+            // Debug: Log available logo fields in development
+            if (process.env.NODE_ENV === "development" && !companyLogo) {
+              const logoFields = Object.keys(jobAny).filter(
+                (key) =>
+                  key.toLowerCase().includes("logo") ||
+                  key.toLowerCase().includes("company"),
+              );
+              if (logoFields.length > 0) {
+                console.log(
+                  "🔍 Checking logo fields for job:",
                   jobId,
-                  logoUrl,
+                  logoFields,
                 );
-              return true;
+                logoFields.forEach((field) => {
+                  console.log(`  - ${field}:`, jobAny[field]);
+                });
+              }
             }
 
-            if (process.env.NODE_ENV === "development")
-              console.debug(
-                "Rejected logo candidate (unsupported format)",
-                logoUrl,
+            // Check company_logo first (most common field name)
+            if (!companyLogo && jobAny.company_logo) {
+              setLogoIfValid(jobAny.company_logo);
+            }
+            if (!companyLogo && job.company_logo) {
+              setLogoIfValid(job.company_logo);
+            }
+            if (!companyLogo && jobAny.companyLogo) {
+              setLogoIfValid(jobAny.companyLogo);
+            }
+            if (!companyLogo && job.companyLogo) {
+              setLogoIfValid(job.companyLogo);
+            }
+            if (!companyLogo && jobAny.employer_logo) {
+              setLogoIfValid(jobAny.employer_logo);
+            }
+            if (!companyLogo && job.employer_logo) {
+              setLogoIfValid(job.employer_logo);
+            }
+            if (!companyLogo && jobAny.logo) {
+              setLogoIfValid(jobAny.logo);
+            }
+            if (!companyLogo && job.logo) {
+              setLogoIfValid(job.logo);
+            }
+            if (!companyLogo && jobAny.logo_url) {
+              setLogoIfValid(jobAny.logo_url);
+            }
+            if (!companyLogo && job.logo_url) {
+              setLogoIfValid(job.logo_url);
+            }
+            // Check additional possible field variations
+            if (!companyLogo && jobAny.employerLogo) {
+              setLogoIfValid(jobAny.employerLogo);
+            }
+            if (!companyLogo && jobAny.companyLogoUrl) {
+              setLogoIfValid(jobAny.companyLogoUrl);
+            }
+            if (!companyLogo && jobAny.logoUrl) {
+              setLogoIfValid(jobAny.logoUrl);
+            }
+
+            // Check nested company object
+            if (!companyLogo && companyObj) {
+              if (companyObj.logo) setLogoIfValid(companyObj.logo);
+              if (!companyLogo && companyObj.logo_url)
+                setLogoIfValid(companyObj.logo_url);
+              if (!companyLogo && companyObj.company_logo)
+                setLogoIfValid(companyObj.company_logo);
+              if (!companyLogo && companyObj.employer_logo)
+                setLogoIfValid(companyObj.employer_logo);
+            }
+
+            // Check employer object if it exists separately
+            if (
+              !companyLogo &&
+              job.employer &&
+              typeof job.employer === "object"
+            ) {
+              const employerObj = job.employer as Record<string, unknown>;
+              if (employerObj.logo) setLogoIfValid(employerObj.logo);
+              if (!companyLogo && employerObj.logo_url)
+                setLogoIfValid(employerObj.logo_url);
+              if (!companyLogo && employerObj.company_logo)
+                setLogoIfValid(employerObj.company_logo);
+              if (!companyLogo && employerObj.employer_logo)
+                setLogoIfValid(employerObj.employer_logo);
+            }
+
+            // Format salary - handle both numeric and string formats
+            let salary = "By agreement";
+            const minSalary = job.job_min_salary || job.min_salary;
+            const maxSalary = job.job_max_salary || job.max_salary;
+            const salaryCurrency =
+              job.job_salary_currency || job.salary_currency || "$";
+            const salaryPeriod =
+              job.job_salary_period || job.salary_period || "yearly";
+
+            if (
+              minSalary &&
+              maxSalary &&
+              typeof minSalary === "number" &&
+              typeof maxSalary === "number"
+            ) {
+              const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
+              const minSalaryFormatted = minSalary.toLocaleString();
+              const maxSalaryFormatted = maxSalary.toLocaleString();
+              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+              const isCurrencyBefore = currencySymbols.some((sym) =>
+                salaryCurrency.includes(sym),
               );
-
-            return false;
-          };
-
-          // Check root level fields first - prioritize company_logo field
-          // Use Record type to access fields that might not be in the type definition
-          const jobAny = job as Record<string, unknown>;
-
-          // Debug: Log available logo fields in development
-          if (process.env.NODE_ENV === "development" && !companyLogo) {
-            const logoFields = Object.keys(jobAny).filter(
-              (key) =>
-                key.toLowerCase().includes("logo") ||
-                key.toLowerCase().includes("company"),
-            );
-            if (logoFields.length > 0) {
-              console.log(
-                "🔍 Checking logo fields for job:",
-                jobId,
-                logoFields,
+              if (isCurrencyBefore) {
+                salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
+                  periodLabel ? `/${periodLabel}` : ""
+                }`;
+              } else {
+                salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
+                  periodLabel ? `/${periodLabel}` : ""
+                }`;
+              }
+            } else if (minSalary && typeof minSalary === "number") {
+              const minSalaryFormatted = minSalary.toLocaleString();
+              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
+              const isCurrencyBefore = currencySymbols.some((sym) =>
+                salaryCurrency.includes(sym),
               );
-              logoFields.forEach((field) => {
-                console.log(`  - ${field}:`, jobAny[field]);
-              });
+              salary = isCurrencyBefore
+                ? `${salaryCurrency}${minSalaryFormatted}+`
+                : `${minSalaryFormatted}+ ${salaryCurrency}`;
+            } else if (job.salary && typeof job.salary === "string") {
+              salary = job.salary;
             }
-          }
 
-          // Check company_logo first (most common field name)
-          if (!companyLogo && jobAny.company_logo) {
-            setLogoIfValid(jobAny.company_logo);
-          }
-          if (!companyLogo && job.company_logo) {
-            setLogoIfValid(job.company_logo);
-          }
-          if (!companyLogo && jobAny.companyLogo) {
-            setLogoIfValid(jobAny.companyLogo);
-          }
-          if (!companyLogo && job.companyLogo) {
-            setLogoIfValid(job.companyLogo);
-          }
-          if (!companyLogo && jobAny.employer_logo) {
-            setLogoIfValid(jobAny.employer_logo);
-          }
-          if (!companyLogo && job.employer_logo) {
-            setLogoIfValid(job.employer_logo);
-          }
-          if (!companyLogo && jobAny.logo) {
-            setLogoIfValid(jobAny.logo);
-          }
-          if (!companyLogo && job.logo) {
-            setLogoIfValid(job.logo);
-          }
-          if (!companyLogo && jobAny.logo_url) {
-            setLogoIfValid(jobAny.logo_url);
-          }
-          if (!companyLogo && job.logo_url) {
-            setLogoIfValid(job.logo_url);
-          }
-          // Check additional possible field variations
-          if (!companyLogo && jobAny.employerLogo) {
-            setLogoIfValid(jobAny.employerLogo);
-          }
-          if (!companyLogo && jobAny.companyLogoUrl) {
-            setLogoIfValid(jobAny.companyLogoUrl);
-          }
-          if (!companyLogo && jobAny.logoUrl) {
-            setLogoIfValid(jobAny.logoUrl);
-          }
+            // Format employment type
+            const employmentTypeRaw =
+              job.job_employment_type ||
+              job.employment_type ||
+              job.type ||
+              "FULLTIME";
+            // Handle case-insensitive matching
+            const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
+            const employmentType =
+              jobTypeLabels[employmentTypeRawUpper] ||
+              jobTypeLabels[employmentTypeRaw] ||
+              employmentTypeRaw ||
+              "Full time";
 
-          // Check nested company object
-          if (!companyLogo && companyObj) {
-            if (companyObj.logo) setLogoIfValid(companyObj.logo);
-            if (!companyLogo && companyObj.logo_url)
-              setLogoIfValid(companyObj.logo_url);
-            if (!companyLogo && companyObj.company_logo)
-              setLogoIfValid(companyObj.company_logo);
-            if (!companyLogo && companyObj.employer_logo)
-              setLogoIfValid(companyObj.employer_logo);
-          }
-
-          // Check employer object if it exists separately
-          if (
-            !companyLogo &&
-            job.employer &&
-            typeof job.employer === "object"
-          ) {
-            const employerObj = job.employer as Record<string, unknown>;
-            if (employerObj.logo) setLogoIfValid(employerObj.logo);
-            if (!companyLogo && employerObj.logo_url)
-              setLogoIfValid(employerObj.logo_url);
-            if (!companyLogo && employerObj.company_logo)
-              setLogoIfValid(employerObj.company_logo);
-            if (!companyLogo && employerObj.employer_logo)
-              setLogoIfValid(employerObj.employer_logo);
-          }
-
-          // Format salary - handle both numeric and string formats
-          let salary = "By agreement";
-          const minSalary = job.job_min_salary || job.min_salary;
-          const maxSalary = job.job_max_salary || job.max_salary;
-          const salaryCurrency =
-            job.job_salary_currency || job.salary_currency || "$";
-          const salaryPeriod =
-            job.job_salary_period || job.salary_period || "yearly";
-
-          if (
-            minSalary &&
-            maxSalary &&
-            typeof minSalary === "number" &&
-            typeof maxSalary === "number"
-          ) {
-            const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-            const minSalaryFormatted = minSalary.toLocaleString();
-            const maxSalaryFormatted = maxSalary.toLocaleString();
-            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-            const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym),
-            );
-            if (isCurrencyBefore) {
-              salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-                periodLabel ? `/${periodLabel}` : ""
-              }`;
-            } else {
-              salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-                periodLabel ? `/${periodLabel}` : ""
-              }`;
+            // Determine work arrangement
+            let workArrangement = "On-site";
+            const isRemote =
+              job.job_is_remote || job.is_remote || job.remote === true;
+            if (isRemote) {
+              workArrangement = "Remote";
+            } else if (jobTitle?.toLowerCase().includes("hybrid")) {
+              workArrangement = "Hybrid";
             }
-          } else if (minSalary && typeof minSalary === "number") {
-            const minSalaryFormatted = minSalary.toLocaleString();
-            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-            const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym),
-            );
-            salary = isCurrencyBefore
-              ? `${salaryCurrency}${minSalaryFormatted}+`
-              : `${minSalaryFormatted}+ ${salaryCurrency}`;
-          } else if (job.salary && typeof job.salary === "string") {
-            salary = job.salary;
-          }
 
-          // Format employment type
-          const employmentTypeRaw =
-            job.job_employment_type ||
-            job.employment_type ||
-            job.type ||
-            "FULLTIME";
-          // Handle case-insensitive matching
-          const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-          const employmentType =
-            jobTypeLabels[employmentTypeRawUpper] ||
-            jobTypeLabels[employmentTypeRaw] ||
-            employmentTypeRaw ||
-            "Full time";
+            // Total match % (same logic as job detail page)
+            const matchPercentage =
+              user && userSkillsForMatch.length >= 0
+                ? matchJobDetailToUser(
+                    job as unknown as JobDetail,
+                    buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                  ).overallPercent
+                : undefined;
 
-          // Determine work arrangement
-          let workArrangement = "On-site";
-          const isRemote =
-            job.job_is_remote || job.is_remote || job.remote === true;
-          if (isRemote) {
-            workArrangement = "Remote";
-          } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-            workArrangement = "Hybrid";
-          }
-
-          // Total match % (same logic as job detail page)
-          const matchPercentage =
-            user && userSkillsForMatch.length >= 0
-              ? matchJobDetailToUser(
-                  job as unknown as JobDetail,
-                  buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-                ).overallPercent
-              : undefined;
-
-          return {
-            id: jobId,
-            title: jobTitle,
-            company: companyName,
-            company_name:
-              (job as Record<string, any>).company_name ||
-              (job as Record<string, any>).employer_name ||
-              (typeof job.company === "string" ? job.company : undefined),
-            location: locationString,
-            url: applyLink,
-            company_logo: companyLogo,
-            is_saved: savedJobs?.includes(String(jobId)),
-            salary,
-            employment_type: employmentType,
-            work_arrangement: workArrangement,
-            matchPercentage,
-          };
-        })
+            return {
+              id: jobId,
+              title: jobTitle,
+              company: companyName,
+              company_name:
+                (job as Record<string, any>).company_name ||
+                (job as Record<string, any>).employer_name ||
+                (typeof job.company === "string" ? job.company : undefined),
+              location: locationString,
+              url: applyLink,
+              company_logo: companyLogo,
+              is_saved: savedJobs?.includes(String(jobId)),
+              salary,
+              employment_type: employmentType,
+              work_arrangement: workArrangement,
+              matchPercentage,
+            };
+          })
           .filter((job): job is Job => job !== null);
       } catch (error) {
         console.error("Error transforming jobs:", error);
@@ -1746,11 +1750,7 @@ const JobsPage = () => {
 
   // Helper: job must satisfy every active filter dimension (AND across skills, country, type, etc.)
   const jobMatchesActiveFilters = useCallback(
-    (
-      job: Job,
-      rawJob: ApiJob | undefined,
-      filters: JobFilters,
-    ): boolean => {
+    (job: Job, rawJob: ApiJob | undefined, filters: JobFilters): boolean => {
       const raw =
         rawJob ||
         allRegularJobs.find((j) => String(j.id || j.job_id) === job.id);
@@ -1871,8 +1871,14 @@ const JobsPage = () => {
       [...list].sort((a, b) => {
         const jobA = allRegularJobs.find((j) => (j.id || j.job_id) === a.id);
         const jobB = allRegularJobs.find((j) => (j.id || j.job_id) === b.id);
-        const dateA = (jobA?.posted_at || jobA?.fetched_at || jobA?.date_posted || "") as string;
-        const dateB = (jobB?.posted_at || jobB?.fetched_at || jobB?.date_posted || "") as string;
+        const dateA = (jobA?.posted_at ||
+          jobA?.fetched_at ||
+          jobA?.date_posted ||
+          "") as string;
+        const dateB = (jobB?.posted_at ||
+          jobB?.fetched_at ||
+          jobB?.date_posted ||
+          "") as string;
         if (dateA && dateB) {
           try {
             return new Date(dateB).getTime() - new Date(dateA).getTime();
@@ -2953,7 +2959,6 @@ const JobsPage = () => {
         {!isLoading && topMatchedJobs.length > 0 && (
           <section className="mb-10">
             <div className="flex items-center gap-3 mb-4">
-              <Target className="h-6 w-6 text-breneo-blue" />
               <h2 className="text-lg font-bold">Top Matched Jobs</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

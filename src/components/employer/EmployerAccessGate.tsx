@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  fetchEmployerStaffMemberships,
-  isStaffMembershipActive,
-} from "@/api/employer/aggregatorBffApi";
-import {
-  fetchEmployerAccessState,
-  type EmployerAccessState,
-} from "@/api/employer/employerJoinRequests";
-import { resolveEmployerStaffUserId } from "@/api/employer/profile";
-import { TokenManager } from "@/api/auth/tokenManager";
+  EMPLOYER_ACCESS_POLL_MS,
+  EMPLOYER_ACTIVE_LANDING_PATH,
+  resolveEmployerDashboardAccess,
+} from "@/api/employer/employerAccessResolver";
+import type { EmployerAccessState } from "@/api/employer/employerJoinRequests";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -40,38 +36,6 @@ function isAllowed(path: string, allowed: string[]): boolean {
   );
 }
 
-async function userHasActiveStaffMembership(): Promise<boolean> {
-  const staffUserId = resolveEmployerStaffUserId({
-    accessToken: TokenManager.getAccessToken(),
-  });
-  if (!staffUserId) return false;
-  try {
-    const rows = await fetchEmployerStaffMemberships({
-      externalUserId: staffUserId,
-    });
-    return rows.some(
-      (m) => m.external_user_id === staffUserId && isStaffMembershipActive(m),
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function loadEmployerAccessState(): Promise<EmployerAccessState> {
-  try {
-    const state = await fetchEmployerAccessState();
-    if (state.state === "needs_company" && (await userHasActiveStaffMembership())) {
-      return { state: "active" };
-    }
-    return state;
-  } catch {
-    if (await userHasActiveStaffMembership()) {
-      return { state: "active" };
-    }
-    return { state: "needs_company" };
-  }
-}
-
 export function EmployerAccessGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,10 +45,23 @@ export function EmployerAccessGate({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     let cancelled = false;
+    const path = pathWithoutLocale(location.pathname);
+    const skipReload =
+      access?.state === "active" &&
+      path !== "/employer/pending-approval" &&
+      !path.startsWith("/employer/join-company");
+
+    if (skipReload) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     (async () => {
       setLoading(true);
       try {
-        const state = await loadEmployerAccessState();
+        const state = await resolveEmployerDashboardAccess();
         if (cancelled) return;
         setAccess(state);
       } finally {
@@ -94,15 +71,34 @@ export function EmployerAccessGate({ children }: { children: React.ReactNode }) 
     return () => {
       cancelled = true;
     };
-  }, [location.pathname]);
+  }, [location.pathname, access?.state]);
+
+  useEffect(() => {
+    if (access?.state !== "pending") return;
+    let cancelled = false;
+    const poll = async () => {
+      const state = await resolveEmployerDashboardAccess();
+      if (cancelled) return;
+      setAccess(state);
+    };
+    const id = window.setInterval(() => void poll(), EMPLOYER_ACCESS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [access?.state]);
 
   useEffect(() => {
     if (loading || !access) return;
     const path = pathWithoutLocale(location.pathname);
+    const jobsPath = getLocalizedPath(EMPLOYER_ACTIVE_LANDING_PATH, language);
 
     if (access.state === "active") {
-      if (path === "/employer/pending-approval") {
-        navigate(getLocalizedPath("/employer/home", language), { replace: true });
+      if (
+        path === "/employer/pending-approval" ||
+        path === "/employer/join-company"
+      ) {
+        navigate(jobsPath, { replace: true });
       }
       return;
     }

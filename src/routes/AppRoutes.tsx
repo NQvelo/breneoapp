@@ -14,7 +14,7 @@
 import React, { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { EmployerAccessGate } from "@/components/employer/EmployerAccessGate";
+import { EmployerDashboardShell } from "@/layouts/employer/EmployerDashboardShell";
 
 // Auth pages (Public)
 const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
@@ -96,14 +96,6 @@ const preloadAcademyChunks = [
   () => import("@/pages/academy/AcademyProfilePage"),
 ];
 
-function EmployerGatedRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <ProtectedRoute requiredRole="employer">
-      <EmployerAccessGate>{children}</EmployerAccessGate>
-    </ProtectedRoute>
-  );
-}
-
 const RouteLoadingFallback = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
     <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -131,6 +123,27 @@ const createLocalizedRoute = (
     <Route key={`ka${path}`} path={`/ka${path}`} element={element} />,
     <Route key={path} path={path} element={element} />,
   ];
+};
+
+/** Employer dashboard pages share one layout so AppSidebar does not remount on nav. */
+const createEmployerDashboardRoutes = (
+  routes: Array<{ path: string; element: React.ReactElement }>,
+): React.ReactElement[] => {
+  const prefixes = ["", "/en", "/ka"] as const;
+  return prefixes.map((prefix) => (
+    <Route
+      key={`employer-shell${prefix || "root"}`}
+      element={<EmployerDashboardShell />}
+    >
+      {routes.map(({ path, element }) => (
+        <Route
+          key={`${prefix}${path}`}
+          path={`${prefix}${path}`}
+          element={element}
+        />
+      ))}
+    </Route>
+  ));
 };
 
 /**
@@ -309,66 +322,27 @@ export const AppRoutes = () => {
           <EmployerPendingApprovalPage />
         </ProtectedRoute>,
       )}
-      {createLocalizedRoute(
-        "/employer/notifications",
-        <EmployerGatedRoute>
-          <EmployerNotificationsPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/dashboard",
-        <EmployerGatedRoute>
-          <EmployerDashboardPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/home",
-        <EmployerGatedRoute>
-          <EmployerDashboardPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/jobs",
-        <EmployerGatedRoute>
-          <EmployerJobsPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/jobs/add",
-        <EmployerGatedRoute>
-          <EmployerAddJobPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/jobs/edit/:jobId",
-        <EmployerGatedRoute>
-          <EmployerAddJobPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/jobs/:jobId",
-        <EmployerGatedRoute>
-          <EmployerJobStatsPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/profile",
-        <EmployerGatedRoute>
-          <EmployerProfilePage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/members",
-        <EmployerGatedRoute>
-          <EmployerMembersPage />
-        </EmployerGatedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/settings",
-        <EmployerGatedRoute>
-          <UserSettings />
-        </EmployerGatedRoute>,
-      )}
+      {createEmployerDashboardRoutes([
+        {
+          path: "/employer/notifications",
+          element: <EmployerNotificationsPage />,
+        },
+        {
+          path: "/employer/dashboard",
+          element: <EmployerDashboardPage />,
+        },
+        { path: "/employer/home", element: <EmployerDashboardPage /> },
+        { path: "/employer/jobs", element: <EmployerJobsPage /> },
+        { path: "/employer/jobs/add", element: <EmployerAddJobPage /> },
+        {
+          path: "/employer/jobs/edit/:jobId",
+          element: <EmployerAddJobPage />,
+        },
+        { path: "/employer/jobs/:jobId", element: <EmployerJobStatsPage /> },
+        { path: "/employer/profile", element: <EmployerProfilePage /> },
+        { path: "/employer/members", element: <EmployerMembersPage /> },
+        { path: "/employer/settings", element: <UserSettings /> },
+      ])}
       {createLocalizedRoute(
         "/academy/home",
         <ProtectedRoute requiredRole="academy">
