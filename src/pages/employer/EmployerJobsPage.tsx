@@ -31,7 +31,7 @@ import {
 export default function EmployerJobsPage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +44,7 @@ export default function EmployerJobsPage() {
   })();
 
   const load = useCallback(async () => {
+    if (authLoading || !user) return;
     setLoading(true);
     try {
       const prof = await apiClient
@@ -102,11 +103,12 @@ export default function EmployerJobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.email, user?.id]);
+  }, [authLoading, user, user?.email, user?.id]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     load();
-  }, [load]);
+  }, [load, authLoading, user]);
 
   const activeJobs = useMemo(
     () => jobs.filter((job) => job.is_active !== false),

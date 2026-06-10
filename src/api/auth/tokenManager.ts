@@ -11,6 +11,9 @@ import { BRENEO_API_BASE_URL } from "./config";
 // ✅ Session restoration flag to prevent token clearing during session restoration
 let isSessionRestoration = false;
 
+/** Deduplicate concurrent refresh attempts (employer BFF + apiClient). */
+let validAccessTokenRefresh: Promise<string | null> | null = null;
+
 /**
  * Token Manager - Handles all token operations
  */
@@ -48,9 +51,22 @@ export const TokenManager = {
   },
 
   /**
-   * Get access token from localStorage
-   * @returns Access token or null
+   * Returns a non-expired access token, refreshing first when needed.
+   * Use for raw `fetch` calls (employer BFF) that bypass apiClient interceptors.
    */
+  getValidAccessToken: async (): Promise<string | null> => {
+    const token = TokenManager.getAccessToken();
+    if (!token) return null;
+    if (!TokenManager.isTokenExpired(token)) return token;
+
+    if (!validAccessTokenRefresh) {
+      validAccessTokenRefresh = TokenManager.refreshAccessToken().finally(() => {
+        validAccessTokenRefresh = null;
+      });
+    }
+    return validAccessTokenRefresh;
+  },
+
   getAccessToken: (): string | null => {
     const token = localStorage.getItem("authToken");
     if (token) {

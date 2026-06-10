@@ -256,6 +256,53 @@ export function getStructuredJobFromDetail(job: JobDetail): StructuredJob {
   };
 }
 
+/**
+ * Canonical required-skills list for job detail UIs (candidate + employer).
+ * Merges API skill fields with description/title keyword extraction.
+ */
+export function resolveRequiredSkillsList(job: JobDetail): string[] {
+  const structured = getStructuredJobFromDetail(job);
+  if (structured.skillsRequired.length > 0) {
+    return [...new Set(structured.skillsRequired)];
+  }
+  const jobAny = job as Record<string, unknown>;
+  const raw =
+    job.skills_required ??
+    job.required_skills ??
+    job.skills ??
+    job.job_skills ??
+    jobAny.skills_required;
+  const arr: string[] = Array.isArray(raw)
+    ? raw.filter((s): s is string => typeof s === "string" && Boolean(s))
+    : typeof raw === "string"
+      ? raw
+          .split(/[,\n]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+  return [...new Set(arr.map(normalizeSkillName).filter(Boolean))];
+}
+
+/**
+ * Structured job for chip-based skill matching on job detail.
+ * Uses the same required skills shown in the UI (not description-inferred extras).
+ */
+export function buildStructuredJobForDisplayedSkills(
+  job: JobDetail,
+  displayedRequiredSkills: string[],
+): StructuredJob {
+  const structured = getStructuredJobFromDetail(job);
+  if (displayedRequiredSkills.length === 0) return structured;
+  return {
+    ...structured,
+    skillsRequired: [
+      ...new Set(displayedRequiredSkills.map(normalizeSkillName).filter(Boolean)),
+    ],
+    skillsPreferred: [],
+    techStack: [],
+  };
+}
+
 // ---------- Skill matching ----------
 const SKILL_WEIGHTS = { required: 0.7, preferred: 0.2, stack: 0.1 };
 const MAX_REASONS = 6;

@@ -1,25 +1,31 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { motion } from "framer-motion";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Edit, BookOpen, Clock } from "lucide-react";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  MoreVertical,
+  BookOpen,
+  MapPin,
+  Clock,
+  GraduationCap,
+  Users,
+} from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeAcademyProfileApiResponse } from "@/api/academy";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-// Interfaces
 interface Course {
   id: string;
   title: string;
@@ -27,13 +33,10 @@ interface Course {
   category: string;
   level: string;
   duration: string;
-  provider: string;
-  required_skills: string[];
-  topics: string[];
+  location: string;
+  price: number;
+  enrolledCount: number;
   image: string;
-  enrolled: boolean;
-  popular: boolean;
-  is_academy_course: boolean;
   created_at?: string;
 }
 
@@ -56,60 +59,82 @@ type ApiCourseFull = {
   location?: string | null;
   level?: string | null;
   total_duration?: string | null;
+  price?: string | number | null;
   academy_name?: string | null;
   required_skills?: unknown;
+  skills_taught?: unknown;
   cover_image_url?: string | null;
   lecturer_photo_url?: string | null;
-  is_enrolled?: boolean | null;
-  academy_id?: string | number | null;
+  enrolled_users?: unknown;
   created_at?: string | null;
 };
 
+function normalizeCourseImage(value: string | null | undefined): string {
+  if (!value) return "/lovable-uploads/no_photo.png";
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (value.startsWith("/")) return value;
+  return `/${value}`;
+}
+
+function parseCoursePrice(raw: string | number | null | undefined): number {
+  const n = Number(raw ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseEnrolledCount(raw: unknown): number {
+  return Array.isArray(raw) ? raw.length : 0;
+}
+
 const AcademyCoursesPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateAcademyDisplay } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
 
-  const handleEditClick = (course: Course) => {
-    navigate(`/academy/courses/edit/${course.id}`);
-  };
+  const priceFilter = (() => {
+    const p = searchParams.get("price");
+    if (p === "free") return "free";
+    if (p === "paid") return "paid";
+    return "all";
+  })();
 
-  const fetchAcademyData = useCallback(async () => {
-    if (!user) return;
+  const fetchAcademyProfile = useCallback(async () => {
+    if (!user) return null;
+    setProfileLoading(true);
     try {
-      // Fetch academy profile from API endpoint to get the academy_id
       const response = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+      if (!response.data) return null;
 
-      if (response.data) {
-        const data = response.data;
-        const normalized = normalizeAcademyProfileApiResponse(
-          data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
-          user?.id != null ? String(user.id) : undefined
-        );
-        const academyProfile: AcademyProfile = {
-          ...normalized,
-          first_name:
-            normalized.first_name ||
-            user?.first_name ||
-            normalized.academy_name ||
-            "",
-          is_verified: data.is_verified ?? false,
-        };
-        setAcademyProfile(academyProfile);
-        updateAcademyDisplay({
-          name: academyProfile.academy_name,
-          email: academyProfile.contact_email,
-          is_verified: academyProfile.is_verified,
-          profile_image: academyProfile.logo_url ?? null,
-        });
-      }
+      const data = response.data;
+      const normalized = normalizeAcademyProfileApiResponse(
+        data as Parameters<typeof normalizeAcademyProfileApiResponse>[0],
+        user?.id != null ? String(user.id) : undefined,
+      );
+      const profile: AcademyProfile = {
+        ...normalized,
+        first_name:
+          normalized.first_name ||
+          user?.first_name ||
+          normalized.academy_name ||
+          "",
+        is_verified: data.is_verified ?? false,
+      };
+      setAcademyProfile(profile);
+      updateAcademyDisplay({
+        name: profile.academy_name,
+        email: profile.contact_email,
+        is_verified: profile.is_verified,
+        profile_image: profile.logo_url ?? null,
+      });
+      return profile;
     } catch (error) {
       console.error("Failed to load academy profile:", error);
-      // If 404, academy profile doesn't exist yet
       if (error && typeof error === "object" && "response" in error) {
         const axiosError = error as { response?: { status?: number } };
         if (axiosError.response?.status === 404) {
@@ -120,43 +145,26 @@ const AcademyCoursesPage = () => {
       } else {
         toast.error("Failed to load academy profile");
       }
+      return null;
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   }, [user, updateAcademyDisplay]);
 
-  const fetchCourses = useCallback(async () => {
-    if (!academyProfile) return;
-
+  const loadCourses = useCallback(async (profile: AcademyProfile) => {
+    setLoading(true);
     try {
-      const url = new URL(
-        "https://web-production-80ed8.up.railway.app/api/courses/",
+      const response = await apiClient.get<ApiCourseFull[]>(
+        API_ENDPOINTS.COURSES,
+        { params: { academy_name: profile.academy_name } },
       );
-      url.searchParams.set("academy_name", academyProfile.academy_name);
-
-      const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(response.statusText);
-      }
-
-      const data: unknown = await response.json();
-      const coursesFromApi = Array.isArray(data) ? (data as ApiCourseFull[]) : [];
+      const coursesFromApi = Array.isArray(response.data) ? response.data : [];
 
       setCourses(
         coursesFromApi.map((course) => {
           const id = course.id != null ? String(course.id) : "";
           const imageCandidate =
             course.cover_image_url || course.lecturer_photo_url || "";
-          const image =
-            imageCandidate &&
-            !imageCandidate.startsWith("/") &&
-            !imageCandidate.startsWith("http")
-              ? `/${imageCandidate}`
-              : imageCandidate || "/lovable-uploads/no_photo.png";
-
-          const requiredSkills = Array.isArray(course.required_skills)
-            ? course.required_skills.map((s) => String(s))
-            : [];
 
           return {
             id,
@@ -165,41 +173,94 @@ const AcademyCoursesPage = () => {
             category: String(course.language ?? course.location ?? ""),
             level: String(course.level ?? ""),
             duration: String(course.total_duration ?? ""),
-            provider: String(course.academy_name ?? ""),
-            required_skills: requiredSkills,
-            topics: [],
-            image,
-            enrolled: Boolean(course.is_enrolled),
-            popular: false,
-            is_academy_course: true,
+            location: String(course.location ?? course.language ?? ""),
+            price: parseCoursePrice(course.price),
+            enrolledCount: parseEnrolledCount(course.enrolled_users),
+            image: normalizeCourseImage(imageCandidate),
             created_at:
               course.created_at != null ? String(course.created_at) : undefined,
           } satisfies Course;
         }),
       );
+      setLoadError(null);
     } catch (error: unknown) {
-      console.error("Error fetching courses:", error);
-      const errorMessage =
+      const msg =
         error instanceof Error ? error.message : "Failed to load courses";
-      toast.error(errorMessage);
+      setLoadError(msg);
+      toast.error(msg, {
+        action: {
+          label: "Retry",
+          onClick: () => {
+            void loadCourses(profile);
+          },
+        },
+      });
+      setCourses([]);
+    } finally {
+      setLoading(false);
     }
-  }, [academyProfile]);
+  }, []);
 
   useEffect(() => {
-    fetchAcademyData();
-  }, [fetchAcademyData]);
+    void (async () => {
+      const profile = await fetchAcademyProfile();
+      if (profile?.is_verified) {
+        await loadCourses(profile);
+      } else {
+        setLoading(false);
+      }
+    })();
+  }, [fetchAcademyProfile, loadCourses]);
 
-  useEffect(() => {
-    if (academyProfile && academyProfile.id && academyProfile.is_verified) {
-      fetchCourses();
+  const freeCourses = useMemo(
+    () => courses.filter((c) => c.price <= 0),
+    [courses],
+  );
+  const paidCourses = useMemo(
+    () => courses.filter((c) => c.price > 0),
+    [courses],
+  );
+
+  const filteredCourses = useMemo(() => {
+    if (priceFilter === "free") return freeCourses;
+    if (priceFilter === "paid") return paidCourses;
+    return courses;
+  }, [priceFilter, freeCourses, paidCourses, courses]);
+
+  const relativeAdded = (value?: string) => {
+    if (!value) return "Added recently";
+    const ms = Date.now() - new Date(value).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return "Added recently";
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    if (hours < 1) return "Added just now";
+    if (hours < 24) return `Added ${hours} hour${hours === 1 ? "" : "s"} ago`;
+    const days = Math.floor(hours / 24);
+    return `Added ${days} day${days === 1 ? "" : "s"} ago`;
+  };
+
+  const handleOpenCourse = (course: Course) => {
+    if (!course.id) return;
+    navigate(`/academy/courses/${course.id}`);
+  };
+
+  const handleDeleteCourse = async (course: Course) => {
+    if (!course.id) return;
+    try {
+      await apiClient.delete(`${API_ENDPOINTS.COURSES}${course.id}/`);
+      setCourses((prev) => prev.filter((row) => row.id !== course.id));
+      toast.success("Course deleted.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete course.";
+      toast.error(message);
     }
-  }, [academyProfile, fetchCourses]);
+  };
 
-  if (loading) {
+  if (profileLoading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="text-lg">Loading...</div>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-lg text-muted-foreground">Loading…</div>
         </div>
       </DashboardLayout>
     );
@@ -208,7 +269,7 @@ const AcademyCoursesPage = () => {
   if (!academyProfile) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center min-h-[50vh]">
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-4">
               Academy Profile Not Found
@@ -259,75 +320,199 @@ const AcademyCoursesPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="bg-white rounded-3xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <span className="text-md font-semibold">
-              You have {courses.length} Courses
-            </span>
-            <Button onClick={() => navigate("/academy/courses/add")}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Course
+      <div className="space-y-6 md:px-6 lg:px-8">
+        <div className="flex flex-row items-center gap-2 sm:gap-4">
+          <div className="flex min-w-0 flex-1 justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <motion.div
+              layout
+              transition={{
+                type: "spring",
+                stiffness: 500,
+                damping: 40,
+                mass: 1,
+              }}
+              className="relative inline-flex h-12 w-max min-w-0 max-w-full flex-nowrap items-stretch justify-center gap-1 bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
+            >
+              {(
+                [
+                  {
+                    value: "all" as const,
+                    label: `All (${courses.length})`,
+                  },
+                  {
+                    value: "free" as const,
+                    label: `Free (${freeCourses.length})`,
+                  },
+                  {
+                    value: "paid" as const,
+                    label: `Paid (${paidCourses.length})`,
+                  },
+                ] as const
+              ).map((tab) => {
+                const isActive = priceFilter === tab.value;
+                const pillRadius = "rounded-3xl";
+                return (
+                  <motion.button
+                    key={tab.value}
+                    type="button"
+                    layout
+                    onClick={() =>
+                      setSearchParams(
+                        (prev) => {
+                          const next = new URLSearchParams(prev);
+                          if (tab.value === "all") next.delete("price");
+                          else next.set("price", tab.value);
+                          return next;
+                        },
+                        { replace: true },
+                      )
+                    }
+                    className={cn(
+                      "relative inline-flex h-full min-h-0 shrink-0 items-center justify-center px-3 text-sm transition-colors duration-200 outline-none sm:px-6",
+                      pillRadius,
+                      isActive
+                        ? "text-sky-950 dark:text-gray-100 font-bold"
+                        : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200",
+                    )}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="academy-courses-price-pill"
+                        className={cn(
+                          "absolute inset-0 bg-sky-100 dark:bg-gray-700",
+                          pillRadius,
+                        )}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 40,
+                          mass: 1,
+                        }}
+                      />
+                    )}
+                    <span className="relative z-10 whitespace-nowrap">
+                      {tab.label}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          </div>
+          <div className="relative flex shrink-0">
+            <Button
+              onClick={() => navigate("/academy/courses/add")}
+              className="h-12 w-12 shrink-0 rounded-full p-0"
+              aria-label="Add new course"
+            >
+              <Plus className="h-5 w-5" />
             </Button>
           </div>
+        </div>
 
-          <div>
-            {courses.length === 0 ? (
-              <div className="text-center py-8">
-                <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No courses yet</h3>
-                <p className="text-muted-foreground">
-                  Add your first course to get started
+        <Card>
+          <CardContent className="space-y-0 p-0">
+            {loadError ? (
+              <p className="text-xs text-destructive px-4 pt-3 md:px-6">
+                {loadError}
+              </p>
+            ) : null}
+            {loading ? (
+              <div className="p-12 text-center text-muted-foreground">
+                Loading…
+              </div>
+            ) : filteredCourses.length === 0 ? (
+              <div className="p-12 text-center">
+                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground mb-4">
+                  {courses.length === 0
+                    ? "No courses yet"
+                    : "No courses match this filter"}
                 </p>
+                {courses.length === 0 ? (
+                  <Button onClick={() => navigate("/academy/courses/add")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add a course
+                  </Button>
+                ) : null}
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Level</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {courses.map((course) => (
-                    <TableRow key={course.id}>
-                      <TableCell>
-                        <img
-                          src={course.image}
-                          alt={course.title}
-                          className="h-16 w-auto rounded-md object-contain"
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {course.title}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{course.category}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{course.level}</Badge>
-                      </TableCell>
-                      <TableCell>{course.duration}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditClick(course)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="divide-y divide-border">
+                {filteredCourses.map((course) => (
+                  <div
+                    key={course.id}
+                    className="group cursor-pointer transition-colors hover:bg-muted/30"
+                    onClick={() => handleOpenCourse(course)}
+                  >
+                    <div className="grid grid-cols-[minmax(0,11rem)_1fr_auto] sm:grid-cols-[minmax(0,14rem)_1fr_auto] gap-x-4 gap-y-2 items-center px-4 md:px-6 py-4">
+                      <h4 className="font-bold text-base md:text-lg line-clamp-2 min-w-0">
+                        {course.title || "Untitled"}
+                      </h4>
+                      <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 min-w-0">
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4 shrink-0" />
+                          <span>{course.location || "N/A"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4 shrink-0" />
+                          <span>{course.duration || "Duration N/A"}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <GraduationCap className="h-4 w-4 shrink-0" />
+                          <span className="capitalize">
+                            {course.level || "Level N/A"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <Users className="h-4 w-4 shrink-0" />
+                          <span>
+                            {course.enrolledCount} enrolled
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <BookOpen className="h-4 w-4 shrink-0" />
+                          <span>{relativeAdded(course.created_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center justify-self-end">
+                        {course.id ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-8 w-8 bg-[#EDEDEE] hover:bg-[#EDEDEE]/90 dark:bg-[#2D2D30] dark:hover:bg-[#3A3A3E] text-foreground"
+                                aria-label="Course actions"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DropdownMenuItem
+                                onClick={() => handleOpenCourse(course)}
+                              >
+                                Edit course
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteCourse(course)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                Delete course
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

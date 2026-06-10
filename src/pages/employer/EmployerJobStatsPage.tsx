@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +16,12 @@ import {
   type EmployerJob,
   type EmployerJobSource,
 } from "@/api/employer/jobsApi";
+import { Badge } from "@/components/ui/badge";
+import { resolveEmployerJobRequiredSkills } from "@/utils/employerJobToJobDetail";
 import { EmployerJobApplicantsPanel } from "@/components/employer/EmployerJobApplicantsPanel";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 function relativePosted(value?: string): string {
   if (!value) return "Posted recently";
@@ -49,6 +52,7 @@ export default function EmployerJobStatsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const source = (searchParams.get("source") || "aggregator") as EmployerJobSource;
 
   const [job, setJob] = useState<EmployerJob | null>(null);
@@ -56,6 +60,7 @@ export default function EmployerJobStatsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (authLoading || !user) return;
     const id = String(jobId ?? "").trim();
     if (!id) {
       setLoadError("Missing job id.");
@@ -78,11 +83,17 @@ export default function EmployerJobStatsPage() {
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
+  }, [authLoading, jobId, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     void load();
-  }, [load]);
+  }, [load, authLoading, user]);
+
+  const requiredSkills = useMemo(
+    () => (job ? resolveEmployerJobRequiredSkills(job) : []),
+    [job],
+  );
 
   const handleEdit = () => {
     const id = String(jobId ?? "").trim();
@@ -165,6 +176,24 @@ export default function EmployerJobStatsPage() {
                     <span className="text-muted-foreground">Employment: </span>
                     {job.employment_type}
                   </p>
+                ) : null}
+                {requiredSkills.length > 0 ? (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Required skills
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {requiredSkills.map((skill) => (
+                        <Badge
+                          key={skill}
+                          variant="outline"
+                          className="capitalize px-3 py-1.5 text-xs rounded-[10px] bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
+                        >
+                          {skill}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
                 ) : null}
               </CardContent>
             </Card>

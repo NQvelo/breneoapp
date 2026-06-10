@@ -60,6 +60,14 @@ const isEmployerJobStatsPath = (pathname: string): boolean => {
   );
 };
 
+const isAcademyCourseStatsPath = (pathname: string): boolean => {
+  return (
+    /^\/academy\/courses\/[^/]+$/.test(pathname) &&
+    pathname !== "/academy/courses/add" &&
+    !pathname.startsWith("/academy/courses/edit/")
+  );
+};
+
 // Helper function to get the page title from the pathname
 const getPageTitle = (
   pathname: string,
@@ -93,6 +101,7 @@ const getPageTitle = (
   if (pathname.startsWith("/employer/jobs/add")) return "Add job";
   if (pathname.startsWith("/employer/jobs/edit/")) return "Edit job";
   if (isEmployerJobStatsPath(pathname)) return "Job statistics";
+  if (isAcademyCourseStatsPath(pathname)) return "Course statistics";
   if (pathname.startsWith("/employer/jobs")) return "Job Postings";
   if (pathname.startsWith("/employer/members")) return "Members";
   if (pathname.startsWith("/jobs")) return t.jobs.title;
@@ -140,6 +149,7 @@ export function DashboardHeader({
   const isEmployerJobPreview =
     isEmployerJobFormPreviewPath(currentPath) && location.hash === "#preview";
   const isEmployerJobStats = isEmployerJobStatsPath(currentPath);
+  const isAcademyCourseStats = isAcademyCourseStatsPath(currentPath);
   const pageTitle = isEmployerJobPreview
     ? null
     : getPageTitle(currentPath, username, t);
@@ -188,7 +198,8 @@ export function DashboardHeader({
           isSkillPath ||
           isCourseAddEdit ||
           isEmployerJobPreview ||
-          isEmployerJobStats ? (
+          isEmployerJobStats ||
+          isAcademyCourseStats ? (
             <>
               <Button
                 variant="ghost"

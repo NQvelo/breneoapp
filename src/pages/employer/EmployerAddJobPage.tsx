@@ -8,7 +8,7 @@ import React, {
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea, type TextareaProps } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -27,6 +27,8 @@ import {
   Banknote,
   Briefcase,
   Trash2,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import apiClient from "@/api/auth/apiClient";
@@ -40,8 +42,11 @@ import {
 } from "@/api/employer/profile";
 import {
   fetchEmployerJobForEdit,
+  getEmployerJobStoredSkills,
   type EmployerJobSource,
 } from "@/api/employer/jobsApi";
+import { resolveEmployerJobRequiredSkills } from "@/utils/employerJobToJobDetail";
+import { scheduleSkillsCatalogSync } from "@/api/profile/skillsCatalogApi";
 import {
   deletePublishedEmployerJob,
   type EmployerJobsApiError,
@@ -75,6 +80,37 @@ import {
   hasDistinctStructuredSections,
   resolveJobSectionsAfterAi,
 } from "@/utils/jobSectionsDedup";
+import { JobSectionBulletList } from "@/components/jobs/JobSectionContent";
+
+const jobFormReadOnlyTextClass =
+  "text-gray-600 dark:text-gray-300 leading-relaxed text-base whitespace-pre-wrap break-words";
+
+function JobFormReadOnlyText({
+  value,
+  emptyLabel,
+}: {
+  value: string;
+  emptyLabel: string;
+}) {
+  if (!value.trim()) {
+    return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
+  }
+  return <div className={jobFormReadOnlyTextClass}>{value}</div>;
+}
+
+function JobFormReadOnlyBulletList({
+  text,
+  emptyLabel,
+}: {
+  text: string;
+  emptyLabel: string;
+}) {
+  const items = linesToDisplayList(text);
+  if (items.length === 0) {
+    return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
+  }
+  return <JobSectionBulletList items={items} />;
+}
 
 const dashedShell =
   "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
@@ -112,6 +148,14 @@ function linesToBulletArray(text: string, max = 6): string[] {
     .slice(0, max);
 }
 
+/** All non-empty lines for read-only bullet display (no API cap). */
+function linesToDisplayList(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 function normalizeSkillsKey(skills: string[]): string {
   return skills
     .map((s) => s.trim().toLowerCase())
@@ -120,12 +164,98 @@ function normalizeSkillsKey(skills: string[]): string {
     .join("\n");
 }
 
+function normalizeSelectedJobSkills(skills: string[]): string[] {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const skill of skills) {
+    const trimmed = skill.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(trimmed);
+  }
+  return next;
+}
+
+function AutoSizeTextarea({
+  minHeightPx = 80,
+  className,
+  onChange,
+  value,
+  ...props
+}: TextareaProps & { minHeightPx?: number }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const syncHeight = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.overflow = "hidden";
+    el.style.height = `${Math.max(minHeightPx, el.scrollHeight)}px`;
+  }, [minHeightPx]);
+
+  useEffect(() => {
+    syncHeight();
+  }, [value, syncHeight]);
+
+  return (
+    <Textarea
+      {...props}
+      ref={ref}
+      value={value}
+      rows={1}
+      onChange={(e) => {
+        onChange?.(e);
+        requestAnimationFrame(syncHeight);
+      }}
+      className={cn("resize-none overflow-hidden", className)}
+    />
+  );
+}
+
+function SectionEditToggle({
+  isEditing,
+  onEdit,
+  onDone,
+  editLabel,
+  doneLabel,
+}: {
+  isEditing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+  editLabel: string;
+  doneLabel: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className={cn(
+        "h-9 w-9 shrink-0 rounded-full",
+        "bg-muted/80 text-muted-foreground",
+        "hover:bg-muted hover:text-foreground",
+        "dark:bg-white/10 dark:hover:bg-white/15",
+      )}
+      onClick={isEditing ? onDone : onEdit}
+      aria-label={isEditing ? doneLabel : editLabel}
+    >
+      {isEditing ? (
+        <Check className="h-5 w-5" />
+      ) : (
+        <Pencil className="h-5 w-5" />
+      )}
+    </Button>
+  );
+}
+
 export default function EmployerAddJobPage() {
   const { jobId } = useParams<{ jobId?: string }>();
   const locationState = useLocation();
   const navigate = useNavigate();
   const { language, t } = useLanguage();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isEdit = Boolean(jobId);
   const editSource = (new URLSearchParams(locationState.search).get("source") ||
     "breneo") as EmployerJobSource;
@@ -183,6 +313,9 @@ export default function EmployerAddJobPage() {
     useState("");
   const [selectedJobSkills, setSelectedJobSkills] = useState<string[]>([]);
   const [skillsRequireManual, setSkillsRequireManual] = useState(false);
+  const [editingJobDescription, setEditingJobDescription] = useState(false);
+  const [editingResponsibilities, setEditingResponsibilities] = useState(false);
+  const [editingQualifications, setEditingQualifications] = useState(false);
   const [worldCountries, setWorldCountries] = useState<ICountry[]>([]);
   const resolveCitiesRef = useRef<(countryIsoCode: string) => ICity[]>(
     () => [],
@@ -191,7 +324,7 @@ export default function EmployerAddJobPage() {
   const pendingCountrySyncRef = useRef<string | null>(null);
 
   const initPage = useCallback(async () => {
-    if (!user) return;
+    if (authLoading || !user) return;
     setLoading(true);
     try {
       const res = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
@@ -275,9 +408,13 @@ export default function EmployerAddJobPage() {
         setJobDescriptionSummary(job.job_description_summary ?? "");
         setResponsibilitiesText((job.responsibilities ?? []).join("\n"));
         setQualificationsText((job.qualifications ?? []).join("\n"));
-        const loadedSkills = job.required_skills ?? [];
-        setSelectedJobSkills(loadedSkills);
-        setSkillsRequireManual(loadedSkills.length === 0);
+        const storedSkills = getEmployerJobStoredSkills(job);
+        const pickerSkills =
+          storedSkills.length > 0
+            ? storedSkills
+            : resolveEmployerJobRequiredSkills(job);
+        setSelectedJobSkills(pickerSkills);
+        setSkillsRequireManual(pickerSkills.length === 0);
         const loadedSections = resolveJobSectionsAfterAi({
           description: job.job_description_summary ?? "",
           responsibilities: job.responsibilities ?? [],
@@ -285,7 +422,7 @@ export default function EmployerAddJobPage() {
         });
         setPreviewExtraction({
           ...loadedSections,
-          skills: loadedSkills,
+          skills: pickerSkills,
           aiAvailable: true,
         });
         setExtractionSourceDescription(String(job.description ?? "").trim());
@@ -352,7 +489,7 @@ export default function EmployerAddJobPage() {
           full_description: String(job.description ?? "").trim(),
           responsibilities_key: normalizeBulletLinesKey(respJoined),
           qualifications_key: normalizeBulletLinesKey(qualJoined),
-          skills_key: normalizeSkillsKey(loadedSkills),
+          skills_key: normalizeSkillsKey(pickerSkills),
           work_mode: resolvedWorkMode,
           location_country: resolvedCountry?.name ?? jobCountry,
           location: jobCity,
@@ -360,17 +497,21 @@ export default function EmployerAddJobPage() {
           apply_url: String(job.apply_url ?? "").trim(),
           is_active: job.is_active !== false,
         });
+        setEditingJobDescription(false);
+        setEditingResponsibilities(false);
+        setEditingQualifications(false);
       }
     } catch {
       toast.error("Could not load company profile.");
     } finally {
       setLoading(false);
     }
-  }, [user, isEdit, jobId, navigate, language, editSource]);
+  }, [authLoading, user, isEdit, jobId, navigate, language, editSource]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     initPage();
-  }, [initPage]);
+  }, [initPage, authLoading, user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -584,7 +725,9 @@ export default function EmployerAddJobPage() {
           message: "Select a valid country from the list.",
         };
       }
-      const cityOptionsForCountry = resolveCitiesRef.current(countryObj.isoCode);
+      const cityOptionsForCountry = resolveCitiesRef.current(
+        countryObj.isoCode,
+      );
       if (cityOptionsForCountry.length > 0) {
         const validCity = cityOptionsForCountry.some(
           (c) => c.name.toLowerCase() === normalizedCity.toLowerCase(),
@@ -593,9 +736,7 @@ export default function EmployerAddJobPage() {
           return {
             ok: false,
             fieldErrors: {
-              location: [
-                "Select a city that belongs to the selected country.",
-              ],
+              location: ["Select a city that belongs to the selected country."],
             },
             message: "Selected city does not belong to the selected country.",
           };
@@ -634,16 +775,37 @@ export default function EmployerAddJobPage() {
         setQualificationsText("");
         setJobDescriptionSummary("");
       }
-      if (result.skills.length > 0) {
-        setSelectedJobSkills(result.skills);
-        setSkillsRequireManual(false);
-      } else {
-        setSelectedJobSkills([]);
-        // Only block publish when AI succeeded but found no skills (not when AI is down).
+      setSelectedJobSkills((prev) => {
+        const merged =
+          result.skills.length > 0
+            ? (() => {
+                const next = [...prev];
+                for (const skill of result.skills) {
+                  const trimmed = skill.trim();
+                  if (!trimmed) continue;
+                  if (
+                    !next.some(
+                      (existing) =>
+                        existing.toLowerCase() === trimmed.toLowerCase(),
+                    )
+                  ) {
+                    next.push(trimmed);
+                  }
+                }
+                return next.length > 0 ? next : result.skills;
+              })()
+            : prev;
         setSkillsRequireManual(
-          result.aiAvailable === true && result.skills.length === 0,
+          merged.length === 0 &&
+            result.aiAvailable === true &&
+            result.skills.length === 0,
         );
-      }
+        return merged;
+      });
+      scheduleSkillsCatalogSync(
+        [...result.skills, ...(result.skills_preferred ?? [])],
+        "employer-preview-extraction",
+      );
     },
     [],
   );
@@ -663,6 +825,7 @@ export default function EmployerAddJobPage() {
       responsibilities: structured ? extraction.responsibilities : [],
       qualifications: structured ? extraction.qualifications : [],
       required_skills: selectedJobSkills,
+      skills_preferred: previewExtraction?.skills_preferred ?? [],
     };
   }, [
     previewExtraction,
@@ -766,12 +929,14 @@ export default function EmployerAddJobPage() {
         if (!snap || nextState.apply_url !== snap.apply_url) {
           patch.apply_url = nextState.apply_url || null;
         }
+        const normalizedSelectedSkills = normalizeSelectedJobSkills(
+          selectedJobSkills,
+        );
+        const skillsChanged =
+          !snap ||
+          normalizeSkillsKey(normalizedSelectedSkills) !== snap.skills_key;
         if (!snap || nextState.is_active !== snap.is_active) {
           patch.is_active = nextState.is_active;
-        }
-        const nextSkillsKey = normalizeSkillsKey(selectedJobSkills);
-        if (!snap || nextSkillsKey !== snap.skills_key) {
-          patch.required_skills = selectedJobSkills;
         }
         if (patch.full_description != null) {
           patch.employment_type_note = employmentType;
@@ -790,6 +955,8 @@ export default function EmployerAddJobPage() {
             patch.qualifications = linesToBulletArray(qualificationsText);
           }
         }
+        // Always include current skill chips so PATCH reliably persists them.
+        patch.required_skills = normalizedSelectedSkills;
         if (showJobPreview) {
           patch.is_active = true;
         }
@@ -804,12 +971,23 @@ export default function EmployerAddJobPage() {
           patch.city = normalizedCity;
           patch.location = normalizedCity;
         }
-        if (Object.keys(patch).length === 0) {
+        const hasNonSkillPatch = Object.keys(patch).some(
+          (key) => key !== "required_skills",
+        );
+        if (!skillsChanged && !hasNonSkillPatch) {
           toast.info("No changes to save.");
           return;
         }
 
         await updatePublishedEmployerJob(jobId, patch);
+        setInitialSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                skills_key: normalizeSkillsKey(normalizedSelectedSkills),
+              }
+            : prev,
+        );
         toast.success(showJobPreview ? "Job published." : "Job updated.");
       } else {
         const parsed = buildPublishParsedSections();
@@ -837,6 +1015,13 @@ export default function EmployerAddJobPage() {
           employment_type_note: employmentType,
           ...parsed,
         });
+        scheduleSkillsCatalogSync(
+          [
+            ...selectedJobSkills,
+            ...(parsed.skills_preferred ?? []),
+          ],
+          "employer-job-publish",
+        );
         const id = data.id ?? data.pk ?? data.job_id;
         toast.success(
           id != null
@@ -929,6 +1114,7 @@ export default function EmployerAddJobPage() {
           responsibilities: [],
           qualifications: [],
           skills: [],
+          skills_preferred: [],
           useDescriptionOnly: true,
           aiAvailable: false,
         },
@@ -1100,7 +1286,7 @@ export default function EmployerAddJobPage() {
           }
         />
       ) : (
-        <div className="max-w-4xl mx-auto pb-24 space-y-6">
+        <div className="space-y-6 md:px-6 lg:px-8 pb-24">
           <Card className="relative rounded-3xl border-0 shadow-none bg-white dark:bg-card overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="flex items-center gap-3 pb-2 border-b border-border/60">
@@ -1132,22 +1318,41 @@ export default function EmployerAddJobPage() {
 
               <div className="space-y-2">
                 {isEdit ? (
-                  <Label
-                    htmlFor="employer-job-full-description"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {t.employerJobForm.fullDescriptionLabel}
-                  </Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label
+                      htmlFor="employer-job-full-description"
+                      className="text-sm font-medium text-foreground"
+                    >
+                      {t.employerJobForm.fullDescriptionLabel}
+                    </Label>
+                    <SectionEditToggle
+                      isEditing={editingJobDescription}
+                      onEdit={() => setEditingJobDescription(true)}
+                      onDone={() => setEditingJobDescription(false)}
+                      editLabel="Edit description"
+                      doneLabel="Done editing description"
+                    />
+                  </div>
                 ) : null}
-                <div className={cn(dashedShell)}>
-                  <Textarea
-                    id="employer-job-full-description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-[200px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                    placeholder="Describe the role, requirements, and benefits…"
-                  />
-                </div>
+                {isEdit && !editingJobDescription ? (
+                  <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
+                    <JobFormReadOnlyText
+                      value={description}
+                      emptyLabel="No description yet."
+                    />
+                  </div>
+                ) : (
+                  <div className={cn(dashedShell)}>
+                    <AutoSizeTextarea
+                      id="employer-job-full-description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      minHeightPx={200}
+                      className="min-h-[200px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none focus-visible:ring-0 dark:text-white"
+                      placeholder="Describe the role, requirements, and benefits…"
+                    />
+                  </div>
+                )}
                 {fieldErrors.full_description?.[0] ? (
                   <p className="text-sm text-destructive">
                     {fieldErrors.full_description[0]}
@@ -1155,69 +1360,111 @@ export default function EmployerAddJobPage() {
                 ) : null}
               </div>
 
-              {isEdit &&
-              (responsibilitiesText.trim() || qualificationsText.trim()) ? (
+              {isEdit ? (
                 <div className="space-y-6 pt-2 border-t border-border/50">
                   {responsibilitiesText.trim() ? (
                     <div className="space-y-2">
-                      <Label
-                        htmlFor="employer-job-responsibilities"
-                        className="text-sm font-medium text-foreground"
-                      >
-                        {t.employerJobForm.responsibilitiesLabel}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {t.employerJobForm.responsibilitiesHint}
-                      </p>
-                      <div className={cn(dashedShell)}>
-                        <Textarea
-                          id="employer-job-responsibilities"
-                          value={responsibilitiesText}
-                          onChange={(e) =>
-                            setResponsibilitiesText(e.target.value)
-                          }
-                          className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                          placeholder="One bullet per line"
+                      <div className="flex items-center justify-between gap-2">
+                        <Label
+                          htmlFor="employer-job-responsibilities"
+                          className="text-sm font-medium text-foreground"
+                        >
+                          {t.employerJobForm.responsibilitiesLabel}
+                        </Label>
+                        <SectionEditToggle
+                          isEditing={editingResponsibilities}
+                          onEdit={() => setEditingResponsibilities(true)}
+                          onDone={() => setEditingResponsibilities(false)}
+                          editLabel="Edit responsibilities"
+                          doneLabel="Done editing responsibilities"
                         />
                       </div>
+                      {editingResponsibilities ? (
+                        <>
+                          <p className="text-xs text-muted-foreground">
+                            {t.employerJobForm.responsibilitiesHint}
+                          </p>
+                          <div className={cn(dashedShell)}>
+                            <AutoSizeTextarea
+                              id="employer-job-responsibilities"
+                              value={responsibilitiesText}
+                              onChange={(e) =>
+                                setResponsibilitiesText(e.target.value)
+                              }
+                              minHeightPx={140}
+                              className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none focus-visible:ring-0 dark:text-white"
+                              placeholder="One bullet per line"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
+                          <JobFormReadOnlyBulletList
+                            text={responsibilitiesText}
+                            emptyLabel="No responsibilities listed."
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : null}
-                  {qualificationsText.trim() ? (
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="employer-job-qualifications"
-                        className="text-sm font-medium text-foreground"
-                      >
+                  <div className="space-y-2">
+                    {qualificationsText.trim() ? (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <Label
+                            htmlFor="employer-job-qualifications"
+                            className="text-sm font-medium text-foreground"
+                          >
+                            {t.employerJobForm.qualificationsLabel}
+                          </Label>
+                          <SectionEditToggle
+                            isEditing={editingQualifications}
+                            onEdit={() => setEditingQualifications(true)}
+                            onDone={() => setEditingQualifications(false)}
+                            editLabel="Edit qualifications"
+                            doneLabel="Done editing qualifications"
+                          />
+                        </div>
+                        {editingQualifications ? (
+                          <>
+                            <p className="text-xs text-muted-foreground">
+                              {t.employerJobForm.qualificationsHint}
+                            </p>
+                            <div className={cn(dashedShell)}>
+                              <AutoSizeTextarea
+                                id="employer-job-qualifications"
+                                value={qualificationsText}
+                                onChange={(e) =>
+                                  setQualificationsText(e.target.value)
+                                }
+                                minHeightPx={140}
+                                className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none focus-visible:ring-0 dark:text-white"
+                                placeholder="One bullet per line"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
+                            <JobFormReadOnlyBulletList
+                              text={qualificationsText}
+                              emptyLabel="No qualifications listed."
+                            />
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <Label className="text-sm font-medium text-foreground">
                         {t.employerJobForm.qualificationsLabel}
                       </Label>
-                      <p className="text-xs text-muted-foreground">
-                        {t.employerJobForm.qualificationsHint}
-                      </p>
-                      <div className={cn(dashedShell)}>
-                        <Textarea
-                          id="employer-job-qualifications"
-                          value={qualificationsText}
-                          onChange={(e) =>
-                            setQualificationsText(e.target.value)
-                          }
-                          className="min-h-[140px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none resize-y focus-visible:ring-0 dark:text-white"
-                          placeholder="One bullet per line"
-                        />
-                      </div>
+                    )}
+                    <div className={cn(dashedShell, "p-4 mt-4")}>
+                      <EmployerJobSkillsPicker
+                        selectedSkills={selectedJobSkills}
+                        onSelectedSkillsChange={setSelectedJobSkills}
+                        label={t.employerJobForm.skillsLabel}
+                        hint={t.employerJobForm.skillsEditHint}
+                      />
                     </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {isEdit ? (
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className={cn(dashedShell, "p-4")}>
-                    <EmployerJobSkillsPicker
-                      selectedSkills={selectedJobSkills}
-                      onSelectedSkillsChange={setSelectedJobSkills}
-                      label={t.employerJobForm.skillsLabel}
-                      hint={t.employerJobForm.skillsEditHint}
-                    />
                   </div>
                 </div>
               ) : null}

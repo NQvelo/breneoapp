@@ -67,7 +67,11 @@ import {
   getStructuredJobFromDetail,
   normalizeSkillName,
   matchJobToUser,
+  buildStructuredJobForDisplayedSkills,
 } from "@/services/matching";
+import { resolveJobDisplayRequiredSkills } from "@/utils/jobSkillsResolve";
+import { getMissingJobSkills } from "@/utils/courseSkillMatch";
+import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
@@ -253,34 +257,6 @@ const JobDetailPage = () => {
         const shouldShow = scrollTop > 100;
         setShowFixedBar(shouldShow);
 
-        // On mobile, hide navbar when scrolling
-        if (isMobile) {
-          // Find mobile navbar by its structure: div with md:hidden, fixed, bottom-0, z-50
-          const allFixedBottom = Array.from(
-            document.querySelectorAll(".fixed.bottom-0"),
-          );
-          const mobileNav = allFixedBottom.find((el) => {
-            const htmlEl = el as HTMLElement;
-            return (
-              htmlEl.classList.contains("md:hidden") &&
-              htmlEl.classList.contains("z-50") &&
-              htmlEl.querySelector("nav.flex.justify-around") !== null
-            );
-          }) as HTMLElement;
-
-          if (mobileNav) {
-            if (shouldShow) {
-              mobileNav.style.transform = "translateY(100%)";
-              mobileNav.style.opacity = "0";
-            } else {
-              mobileNav.style.transform = "translateY(0)";
-              mobileNav.style.opacity = "1";
-            }
-            mobileNav.style.transition =
-              "transform 0.3s ease-in-out, opacity 0.3s ease-in-out";
-          }
-        }
-
         // Detect sidebar state by checking main element's margin-left
         const mainEl = scrollContainer.closest("main") as HTMLElement;
         if (mainEl) {
@@ -335,28 +311,8 @@ const JobDetailPage = () => {
       if (cleanup) {
         cleanup();
       }
-      // Reset mobile navbar visibility on cleanup
-      if (isMobile) {
-        const allFixedBottom = Array.from(
-          document.querySelectorAll(".fixed.bottom-0"),
-        );
-        const mobileNav = allFixedBottom.find((el) => {
-          const htmlEl = el as HTMLElement;
-          return (
-            htmlEl.classList.contains("md:hidden") &&
-            htmlEl.classList.contains("z-50") &&
-            htmlEl.querySelector("nav.flex.justify-around") !== null
-          );
-        }) as HTMLElement;
-
-        if (mobileNav) {
-          mobileNav.style.transform = "";
-          mobileNav.style.opacity = "";
-          mobileNav.style.transition = "";
-        }
-      }
     };
-  }, [jobDetail, isMobile]); // Re-attach when job detail loads or mobile state changes
+  }, [jobDetail]);
 
   // Save/unsave job mutation
   const saveJobMutation = useMutation({
@@ -1167,30 +1123,20 @@ const JobDetailPage = () => {
     );
   };
 
-  // Required skills for this job (canonical names), for chips and match
+  // Required skills — same list as employer posting (stored API skills first)
   const requiredSkillsList = useMemo(() => {
     if (!jobDetail) return [];
-    const structured = getStructuredJobFromDetail(jobDetail);
-    if (structured.skillsRequired.length > 0) {
-      return [...new Set(structured.skillsRequired)];
-    }
-    const jobAny = jobDetail as Record<string, unknown>;
-    const raw =
-      jobDetail.skills_required ??
-      jobDetail.required_skills ??
-      jobDetail.skills ??
-      jobDetail.job_skills ??
-      jobAny.skills_required;
-    const arr: string[] = Array.isArray(raw)
-      ? raw.filter(Boolean)
-      : typeof raw === "string"
-        ? raw
-            .split(/[,\n]/)
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-    return [...new Set(arr.map((s) => normalizeSkillName(s)).filter(Boolean))];
+    return resolveJobDisplayRequiredSkills(jobDetail);
   }, [jobDetail]);
+
+  const ownedSkillNames = useMemo(() => {
+    const fromSelection = Array.from(selectedRequiredSkills);
+    return [...new Set([...userSkills, ...fromSelection])];
+  }, [userSkills, selectedRequiredSkills]);
+
+  const missingJobSkills = useMemo(() => {
+    return getMissingJobSkills(requiredSkillsList, ownedSkillNames);
+  }, [requiredSkillsList, ownedSkillNames]);
 
   const jobDetailId = jobDetail
     ? String(jobDetail.id ?? jobDetail.job_id ?? "")
@@ -1256,7 +1202,9 @@ const JobDetailPage = () => {
     selectedSkillsInitedForJobRef.current = jobKey;
     const userSet = new Set(userSkills);
     setSelectedRequiredSkills(
-      new Set(requiredSkillsList.filter((r) => userSet.has(r))),
+      new Set(
+        requiredSkillsList.filter((r) => userSet.has(normalizeSkillName(r))),
+      ),
     );
   }, [jobDetail, requiredSkillsList, userSkills, isLoadingUserSkills]);
 
@@ -1564,15 +1512,21 @@ const JobDetailPage = () => {
   // Match recalculated from selected skills (chips); skill % reflects user's selection
   const displayMatchResult: MatchResult | null = useMemo(() => {
     if (!user || !jobDetail) return null;
-    const structured = getStructuredJobFromDetail(jobDetail);
     const baseProfile = buildUserMatchProfileFromSkillTest(userSkills);
+    const selectedNormalized = Array.from(selectedRequiredSkills).map(
+      normalizeSkillName,
+    );
     const profileWithSelection = {
       ...baseProfile,
-      userSkills: Array.from(selectedRequiredSkills),
-      techStackExperience: Array.from(selectedRequiredSkills),
+      userSkills: selectedNormalized,
+      techStackExperience: selectedNormalized,
     };
+    const structured =
+      requiredSkillsList.length > 0
+        ? buildStructuredJobForDisplayedSkills(jobDetail, requiredSkillsList)
+        : getStructuredJobFromDetail(jobDetail);
     return matchJobToUser(structured, profileWithSelection);
-  }, [jobDetail, user, userSkills, selectedRequiredSkills]);
+  }, [jobDetail, user, userSkills, selectedRequiredSkills, requiredSkillsList]);
 
   const effectiveMatchResult = displayMatchResult ?? matchResult;
 
@@ -1977,11 +1931,22 @@ const JobDetailPage = () => {
                       <h2 className="text-lg font-semibold mb-4">
                         Qualifications
                       </h2>
+                      {resolvedJobSections.qualifications.length > 0 ? (
+                        <JobSectionBulletList
+                          items={resolvedJobSections.qualifications}
+                        />
+                      ) : null}
                       {requiredSkillsList.length > 0 && (
-                        <div className="mb-7">
-                          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
-                            Skills required — tap to mark as known
-                          </p>
+                        <div
+                          className={
+                            resolvedJobSections.qualifications.length > 0
+                              ? "mt-7"
+                              : undefined
+                          }
+                        >
+                          <h2 className="text-lg font-semibold mb-4">
+                            Required Skills
+                          </h2>
                           <div className="flex flex-wrap gap-3">
                             {requiredSkillsList.map((skill) => {
                               const selected =
@@ -2014,13 +1979,11 @@ const JobDetailPage = () => {
                               );
                             })}
                           </div>
+                          <JobMissingSkillsCoursesSlider
+                            missingSkills={missingJobSkills}
+                          />
                         </div>
                       )}
-                      {resolvedJobSections.qualifications.length > 0 ? (
-                        <JobSectionBulletList
-                          items={resolvedJobSections.qualifications}
-                        />
-                      ) : null}
                     </div>
                   )}
 
@@ -2255,18 +2218,23 @@ const JobDetailPage = () => {
       {jobDetail && (
         <div
           className={cn(
-            "fixed bottom-0 right-0 z-[60]",
-            // Match DashboardLayout main background (light: breneo-lightgray; dark: --background via index.css)
-            "bg-breneo-lightgray border-0 shadow-none",
-            "transition-all duration-300 ease-in-out",
-            sidebarCollapsed ? "md:left-24" : "md:left-[17rem]",
-            "left-0",
+            "fixed z-[60] left-4 right-4 transition-all duration-300 ease-in-out",
+            "max-md:bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:bottom-4",
+            sidebarCollapsed ? "md:left-28" : "md:left-[18rem]",
             showFixedBar
               ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-full pointer-events-none",
+              : "opacity-0 translate-y-4 pointer-events-none",
           )}
         >
-          <div className="px-5 sm:px-9 md:px-12 lg:px-14 py-4">
+          <div
+            className={cn(
+              "rounded-3xl px-5 sm:px-6 py-4",
+              "bg-[#FFFFFF]/90 dark:bg-card/90",
+              "backdrop-blur-xl backdrop-saturate-150",
+              "shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]",
+              "border border-black/[0.04] dark:border-white/[0.06]",
+            )}
+          >
             <div className="flex items-center justify-between gap-4">
               {/* Company + job title */}
               <div className="flex-1 min-w-0 flex flex-col gap-0.5">

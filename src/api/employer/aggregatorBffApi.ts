@@ -8,6 +8,7 @@
  */
 
 import { TokenManager } from "@/api/auth/tokenManager";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 import {
   assertEmployerJobsProxyConfigured,
   getEmployerJobsApiBaseUrl,
@@ -240,8 +241,8 @@ export async function fetchAggregatorIndustries(): Promise<
 export async function fetchEmployerAggregatorCompanies(
   externalUserId: string,
 ): Promise<AggregatorCompany[]> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") return [];
+  if (typeof window === "undefined") return [];
+  if (!(await TokenManager.getValidAccessToken())) return [];
 
   assertEmployerJobsProxyConfigured("GET");
 
@@ -252,12 +253,7 @@ export async function fetchEmployerAggregatorCompanies(
     `${employerBffOrigin()}/`,
   );
   url.searchParams.set("external_user_id", staffUserId);
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url.toString());
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
@@ -273,8 +269,8 @@ export async function fetchEmployerStaffMemberships(params: {
   companyId?: number | string;
   externalUserId?: string;
 }): Promise<CompanyStaffMembership[]> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") return [];
+  if (typeof window === "undefined") return [];
+  if (!(await TokenManager.getValidAccessToken())) return [];
   assertEmployerJobsProxyConfigured("GET");
   const url = new URL(
     "/api/employer/staff-memberships",
@@ -286,12 +282,7 @@ export async function fetchEmployerStaffMemberships(params: {
   }
   const ext = params.externalUserId?.trim();
   if (ext) url.searchParams.set("external_user_id", ext);
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url.toString());
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
@@ -307,20 +298,15 @@ export async function fetchEmployerStaffMemberships(params: {
 export async function fetchEmployerCompanyStaff(
   companyId: number | string,
 ): Promise<CompanyStaffMembership[]> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") return [];
+  if (typeof window === "undefined") return [];
+  if (!(await TokenManager.getValidAccessToken())) return [];
   assertEmployerJobsProxyConfigured("GET");
   const id = requireAggregatorCompanyPk(companyId, "companyId");
   const url = new URL(
     `/api/employer/companies/${id}/staff`,
     `${employerBffOrigin()}/`,
   );
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url.toString());
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
@@ -335,22 +321,12 @@ export async function fetchEmployerCompanyStaff(
 export async function deleteEmployerStaffMembership(
   membershipId: number | string,
 ): Promise<void> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   assertEmployerJobsProxyConfigured("DELETE");
   const url = new URL(
     `/api/employer/staff-memberships/${encodeURIComponent(String(membershipId))}`,
     `${employerBffOrigin()}/`,
   );
-  const res = await fetch(url.toString(), {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url.toString(), { method: "DELETE" });
   if (res.status === 204) return;
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
@@ -370,10 +346,6 @@ export async function patchEmployerStaffMembership(
   membershipId: number | string,
   patch: { is_admin?: boolean; status?: StaffMembershipStatus },
 ): Promise<CompanyStaffMembership> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   assertEmployerJobsProxyConfigured("PATCH");
   const bodyPatch: Record<string, unknown> = {};
   if (patch.is_admin !== undefined) bodyPatch.is_admin = patch.is_admin;
@@ -385,11 +357,9 @@ export async function patchEmployerStaffMembership(
     `/api/employer/staff-memberships/${encodeURIComponent(String(membershipId))}`,
     `${employerBffOrigin()}/`,
   );
-  const res = await fetch(url.toString(), {
+  const res = await employerBffFetch(url.toString(), {
     method: "PATCH",
     headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
       "Content-Type": "application/json",
     },
     body: JSON.stringify(bodyPatch),
@@ -426,13 +396,9 @@ export async function patchEmployerStaffMembershipAdmin(
 export async function createPendingEmployerStaffMembership(
   companyId: number | string,
 ): Promise<CompanyStaffMembership> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   const n = requireAggregatorCompanyPk(companyId, "companyId");
   assertEmployerJobsProxyConfigured("POST");
-  const res = await fetch(
+  const res = await employerBffFetch(
     new URL(
       "/api/employer/staff-memberships",
       `${employerBffOrigin()}/`,
@@ -440,8 +406,6 @@ export async function createPendingEmployerStaffMembership(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ company_id: n, status: "pending" }),
@@ -484,18 +448,9 @@ export async function searchAggregatorCompanies(
   const q = query.trim();
   if (q.length < 3) return [];
 
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   assertEmployerJobsProxyConfigured("GET");
 
-  const res = await fetch(employerCompaniesCollectionSearchUrl(q), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(employerCompaniesCollectionSearchUrl(q));
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
@@ -511,10 +466,6 @@ export async function fetchAggregatorCompanyDetail(
   companyId: number | string,
   externalUserId?: string,
 ): Promise<AggregatorCompany> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   assertEmployerJobsProxyConfigured("GET");
   const id = requireAggregatorCompanyPk(companyId, "companyId");
   const url = new URL(
@@ -525,12 +476,7 @@ export async function fetchAggregatorCompanyDetail(
   if (staffUserId) {
     url.searchParams.set("external_user_id", staffUserId);
   }
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url.toString());
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const err = new Error(
@@ -574,20 +520,14 @@ export async function patchEmployerAggregatorCompany(
   body: PatchAggregatorCompanyBody,
 ): Promise<AggregatorCompany> {
   const id = requireAggregatorCompanyPk(companyId, "companyId");
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   assertEmployerJobsProxyConfigured("PATCH");
   const url = new URL(
     `${EMPLOYER_COMPANIES_COLLECTION}/${id}`,
     `${employerBffOrigin()}/`,
   );
-  const res = await fetch(url.toString(), {
+  const res = await employerBffFetch(url.toString(), {
     method: "PATCH",
     headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -620,10 +560,6 @@ export async function uploadEmployerAggregatorCompanyLogo(
   file: File,
   externalUserId?: string,
 ): Promise<AggregatorCompany> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   requireAggregatorCompanyPk(companyId, "companyId");
   const ext = externalUserId?.trim();
   if (!ext) {
@@ -790,10 +726,6 @@ export async function createEmployerAggregatorCompany(
   payload: CreateAggregatorCompanyBody,
   options?: CreateEmployerAggregatorCompanyOptions,
 ): Promise<AggregatorCompany> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
 
   const idOpt =
     options?.aggregatorCompanyId != null
@@ -819,11 +751,9 @@ export async function createEmployerAggregatorCompany(
     }
   }
 
-  const res = await fetch(url.toString(), {
+  const res = await employerBffFetch(url.toString(), {
     method,
     headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -852,10 +782,6 @@ export async function linkEmployerToAggregatorCompany(
   companyId: string,
   externalUserId: string,
 ): Promise<CompanyStaffMembership> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
-    throw new Error("Not authenticated");
-  }
   const userId = externalUserId.trim();
   if (!userId) {
     throw new Error("external_user_id is required for membership create.");
@@ -865,7 +791,7 @@ export async function linkEmployerToAggregatorCompany(
     throw new Error("Company id must be numeric for staff membership.");
   }
   assertEmployerJobsProxyConfigured("POST");
-  const res = await fetch(
+  const res = await employerBffFetch(
     new URL(
       "/api/employer/staff-memberships",
       `${employerBffOrigin()}/`,
@@ -873,8 +799,6 @@ export async function linkEmployerToAggregatorCompany(
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ company_id: n, external_user_id: userId }),

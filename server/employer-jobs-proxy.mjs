@@ -55,7 +55,12 @@ import { extractJobSectionsFromDescription } from "./geminiJobParser.mjs";
 import { resolveJobSectionsAfterAi } from "./jobSectionsDedup.mjs";
 import { createDjangoNotification } from "./djangoNotifications.mjs";
 import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
+import { registerCourseAnalyticsRoutes } from "./courseAnalytics.mjs";
 import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
+import {
+  dedupeSkillNames,
+  scheduleSkillsCatalogSync,
+} from "./skillsCatalogSync.mjs";
 
 const hasPlatformPort = Boolean(
   process.env.PORT && String(process.env.PORT).trim() !== "",
@@ -228,6 +233,7 @@ const AGG_FIELD_RESPONSIBILITIES = "Responsibilities";
 const AGG_FIELD_QUALIFICATIONS = "qualifications";
 /** Aggregator job-details + search use `skills_required` (not `required_skills`). */
 const AGG_FIELD_SKILLS_REQUIRED = "skills_required";
+const AGG_FIELD_SKILLS_PREFERRED = "skills_preferred";
 
 /**
  * @param {Record<string, unknown> | null | undefined} body
@@ -263,6 +269,17 @@ function hasBodyRequiredSkills(body) {
 /**
  * @param {Record<string, unknown> | null | undefined} body
  */
+function hasBodyPreferredSkills(body) {
+  return (
+    Object.prototype.hasOwnProperty.call(body || {}, "skills_preferred") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "skillsPreferred") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "preferred_skills")
+  );
+}
+
+/**
+ * @param {Record<string, unknown> | null | undefined} body
+ */
 function getBodyRequiredSkills(body) {
   if (Object.prototype.hasOwnProperty.call(body || {}, "required_skills")) {
     return /** @type {unknown} */ (body.required_skills);
@@ -277,11 +294,51 @@ function getBodyRequiredSkills(body) {
 }
 
 /**
+ * @param {Record<string, unknown> | null | undefined} body
+ */
+function getBodyPreferredSkills(body) {
+  if (Object.prototype.hasOwnProperty.call(body || {}, "skills_preferred")) {
+    return /** @type {unknown} */ (body.skills_preferred);
+  }
+  if (Object.prototype.hasOwnProperty.call(body || {}, "skillsPreferred")) {
+    return /** @type {unknown} */ (body.skillsPreferred);
+  }
+  if (Object.prototype.hasOwnProperty.call(body || {}, "preferred_skills")) {
+    return /** @type {unknown} */ (body.preferred_skills);
+  }
+  return [];
+}
+
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {string[]} skills
+ */
+function setAggregatorSkillsPreferred(payload, skills) {
+  payload[AGG_FIELD_SKILLS_PREFERRED] = skills;
+  payload.skillsPreferred = skills;
+}
+
+/**
  * @param {Record<string, unknown>} payload
  * @param {string[]} skills
  */
 function setAggregatorSkillsRequired(payload, skills) {
   payload[AGG_FIELD_SKILLS_REQUIRED] = skills;
+  // Some aggregator handlers accept either key on PATCH.
+  payload.required_skills = skills;
+}
+
+/**
+ * Apply employer skill chips without touching description / bullet sections.
+ * @param {Record<string, unknown>} payload
+ * @param {Record<string, unknown>} body
+ */
+function applyClientRequiredSkills(payload, body) {
+  if (!hasBodyRequiredSkills(body)) return;
+  setAggregatorSkillsRequired(
+    payload,
+    normalizeBodyStringArrayInput(getBodyRequiredSkills(body), 12),
+  );
 }
 
 /**
@@ -2201,6 +2258,41 @@ app.post("/api/employer/companies/", handleEmployerCompaniesCreate);
 app.get("/api/employer/jobs", handleEmployerJobsList);
 app.get("/api/employer/jobs/", handleEmployerJobsList);
 
+/**
+ * @param {Record<string, unknown>} body
+ * @param {Record<string, unknown>} [payload]
+ */
+function collectJobSkillNamesForCatalog(body, payload = {}) {
+  const names = [];
+  if (hasBodyRequiredSkills(body)) {
+    names.push(
+      ...normalizeBodyStringArrayInput(getBodyRequiredSkills(body), 12),
+    );
+  }
+  if (hasBodyPreferredSkills(body)) {
+    names.push(
+      ...normalizeBodyStringArrayInput(getBodyPreferredSkills(body), 8),
+    );
+  }
+  const req = payload[AGG_FIELD_SKILLS_REQUIRED];
+  if (Array.isArray(req)) {
+    names.push(
+      ...req
+        .map((x) => String(x ?? "").trim())
+        .filter(Boolean),
+    );
+  }
+  const pref = payload[AGG_FIELD_SKILLS_PREFERRED];
+  if (Array.isArray(pref)) {
+    names.push(
+      ...pref
+        .map((x) => String(x ?? "").trim())
+        .filter(Boolean),
+    );
+  }
+  return dedupeSkillNames(names);
+}
+
 async function handleEmployerJobPreviewParse(req, res) {
   try {
     const ctx = await requireEmployerCompany(req, res);
@@ -2217,21 +2309,38 @@ async function handleEmployerJobPreviewParse(req, res) {
         "./jobSkillsFallback.mjs"
       );
       const fallbackSkills = extractSkillsFromTextFallback(fullDescription);
+      scheduleSkillsCatalogSync({
+        mainApiBase: MAIN_API_BASE,
+        authHeader: req.headers.authorization,
+        skillNames: fallbackSkills,
+        context: "preview-parse-fallback",
+      });
       return res.status(200).json({
         description: "",
         responsibilities: [],
         qualifications: [],
         skills: fallbackSkills,
+        skills_preferred: [],
         useDescriptionOnly: true,
         aiAvailable: false,
       });
     }
 
+    const requiredSkills = gemini.skills ?? [];
+    const preferredSkills = gemini.skills_preferred ?? [];
+    scheduleSkillsCatalogSync({
+      mainApiBase: MAIN_API_BASE,
+      authHeader: req.headers.authorization,
+      skillNames: [...requiredSkills, ...preferredSkills],
+      context: "preview-parse",
+    });
+
     return res.status(200).json({
       description: gemini.description,
       responsibilities: gemini.responsibilities,
       qualifications: gemini.qualifications,
-      skills: gemini.skills ?? [],
+      skills: requiredSkills,
+      skills_preferred: preferredSkills,
       useDescriptionOnly: gemini.useDescriptionOnly,
       aiAvailable: true,
     });
@@ -2529,8 +2638,19 @@ async function attachParsedJobSectionsForCreate(payload, rawDescription) {
   }
   payload[AGG_FIELD_RESPONSIBILITIES] = gemini.responsibilities;
   payload[AGG_FIELD_QUALIFICATIONS] = gemini.qualifications;
-  if (gemini.skills?.length) {
+  const existingSkills = payload[AGG_FIELD_SKILLS_REQUIRED];
+  if (
+    gemini.skills?.length &&
+    (!Array.isArray(existingSkills) || existingSkills.length === 0)
+  ) {
     setAggregatorSkillsRequired(payload, gemini.skills);
+  }
+  const existingPreferred = payload[AGG_FIELD_SKILLS_PREFERRED];
+  if (
+    gemini.skills_preferred?.length &&
+    (!Array.isArray(existingPreferred) || existingPreferred.length === 0)
+  ) {
+    setAggregatorSkillsPreferred(payload, gemini.skills_preferred);
   }
 }
 
@@ -2564,6 +2684,18 @@ function applyClientParsedSections(payload, body) {
   payload.description = resolved.description;
   payload[AGG_FIELD_RESPONSIBILITIES] = resolved.responsibilities;
   payload[AGG_FIELD_QUALIFICATIONS] = resolved.qualifications;
+  if (hasBodyRequiredSkills(body)) {
+    setAggregatorSkillsRequired(
+      payload,
+      normalizeBodyStringArrayInput(getBodyRequiredSkills(body), 12),
+    );
+  }
+  if (hasBodyPreferredSkills(body)) {
+    setAggregatorSkillsPreferred(
+      payload,
+      normalizeBodyStringArrayInput(getBodyPreferredSkills(body), 8),
+    );
+  }
 }
 
 /**
@@ -2733,6 +2865,17 @@ function buildAggregatorPayload(body, company, isPatch = false) {
     );
   }
 
+  if (
+    has("skills_preferred") ||
+    has("skillsPreferred") ||
+    has("preferred_skills")
+  ) {
+    setAggregatorSkillsPreferred(
+      payload,
+      normalizeBodyStringArrayInput(getBodyPreferredSkills(body), 8),
+    );
+  }
+
   if (isPatch) {
     if (hasBodyResponsibilities(body)) {
       payload[AGG_FIELD_RESPONSIBILITIES] = normalizeBodyStringArrayInput(
@@ -2800,6 +2943,13 @@ app.post("/api/employer/jobs", async (req, res) => {
         e,
       );
     }
+
+    scheduleSkillsCatalogSync({
+      mainApiBase: MAIN_API_BASE,
+      authHeader: req.headers.authorization,
+      skillNames: collectJobSkillNamesForCatalog(bodyObj, payload),
+      context: "job-create",
+    });
 
     const upstream = await fetch(employerJobsCollectionUpstreamUrl(ctx, req), {
       method: "POST",
@@ -2882,7 +3032,11 @@ async function handleEmployerJobUpdate(req, res) {
     const patchIncludesClientStructured =
       hasBodyResponsibilities(bodyObj) || hasBodyQualifications(bodyObj);
 
-    if (patchIncludesDescription && !patchIncludesClientStructured) {
+    if (
+      patchIncludesDescription &&
+      !patchIncludesClientStructured &&
+      bodyObj.client_parsed_sections !== true
+    ) {
       const rawDesc = getRawJobDescriptionForParsing(bodyObj);
       if (rawDesc) {
         try {
@@ -2897,6 +3051,19 @@ async function handleEmployerJobUpdate(req, res) {
           payload[AGG_FIELD_QUALIFICATIONS] = [];
         }
       }
+    } else if (bodyObj.client_parsed_sections === true) {
+      applyClientParsedSections(payload, bodyObj);
+    } else {
+      applyClientRequiredSkills(payload, bodyObj);
+    }
+
+    if (String(process.env.EMPLOYER_PROXY_DEBUG || "").trim() === "1") {
+      console.info("[employer-jobs-proxy] PATCH job payload skills:", {
+        jobId,
+        skills_required: payload[AGG_FIELD_SKILLS_REQUIRED],
+        required_skills: payload.required_skills,
+        client_parsed_sections: bodyObj.client_parsed_sections === true,
+      });
     }
 
     const upstreamUrl = jobDetailUpstreamUrl(jobId, req, ctx);
@@ -3115,6 +3282,13 @@ const employerMembershipRouteDeps = {
 
 registerEmployerJoinRequestRoutes(app, employerMembershipRouteDeps);
 registerEmployerMemberInviteRoutes(app, employerMembershipRouteDeps);
+registerCourseAnalyticsRoutes(app, {
+  mainApiBase: MAIN_API_BASE,
+  extractUserIdFromBearerJwt: (authHeader) => {
+    if (!authHeader?.startsWith("Bearer ")) return null;
+    return extractUserIdFromBearerJwt(authHeader);
+  },
+});
 
 export { app };
 

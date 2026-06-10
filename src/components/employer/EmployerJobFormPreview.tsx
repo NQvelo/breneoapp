@@ -69,7 +69,7 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
   return (
     <div
       id="preview"
-      className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 sm:px-4 md:px-6 space-y-4 scroll-mt-4"
+      className="w-full max-w-7xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 md:px-6 lg:px-8 space-y-4 scroll-mt-4"
     >
       <Card className="bg-transparent border-0 shadow-none h-full">
         <CardContent className="p-1 sm:p-6 space-y-2">
@@ -174,6 +174,20 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
                     {p.qualificationsLabel}
                   </h2>
                   <JobSectionBulletList items={p.qualifications} />
+                  {!p.previewExtracting ? (
+                    <div className="mt-7 rounded-xl border border-dashed border-gray-300 dark:border-[#444444] p-4">
+                      <EmployerJobSkillsPicker
+                        selectedSkills={p.selectedSkills}
+                        onSelectedSkillsChange={p.onSelectedSkillsChange}
+                        required={p.skillsRequireManual}
+                        label={p.skillsLabel ?? "Required skills"}
+                        hint={
+                          p.skillsHint ??
+                          "Search and add skills for candidate matching. Pre-filled skills can be edited."
+                        }
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : p.manualDescription.trim() ? (
@@ -183,7 +197,7 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
               </div>
             ) : null}
 
-            {!p.previewExtracting ? (
+            {!p.previewExtracting && !showStructuredSections ? (
               <div className="rounded-xl border border-dashed border-gray-300 dark:border-[#444444] p-4">
                 <EmployerJobSkillsPicker
                   selectedSkills={p.selectedSkills}

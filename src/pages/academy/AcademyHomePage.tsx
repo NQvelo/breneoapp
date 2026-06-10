@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +13,17 @@ import {
   Building2,
   CheckCircle2,
   Clock,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { normalizeAcademyProfileApiResponse } from "@/api/academy";
+import {
+  fetchAcademyVisitorOverview,
+  normalizeAcademyProfileApiResponse,
+  type VisitorPeriod,
+} from "@/api/academy";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -83,6 +91,19 @@ const AcademyHomePage = () => {
   );
   const [courses, setCourses] = useState<AcademyCourseHome[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visitorPeriod, setVisitorPeriod] =
+    useState<VisitorPeriod>("last_7_days");
+  const [visitorTotal, setVisitorTotal] = useState(0);
+  const [visitorBuckets, setVisitorBuckets] = useState<
+    { label: string; count: number }[]
+  >([]);
+  const [visitorLoading, setVisitorLoading] = useState(false);
+
+  const visitorPeriodTabs: { value: VisitorPeriod; label: string }[] = [
+    { value: "today", label: "Today" },
+    { value: "yesterday", label: "Yesterday" },
+    { value: "last_7_days", label: "Last 7 days" },
+  ];
 
   const fetchAcademyData = useCallback(async () => {
     if (!user) return;
@@ -172,6 +193,49 @@ const AcademyHomePage = () => {
       fetchCourses();
     }
   }, [academyProfile, fetchCourses]);
+
+  const loadVisitorOverview = useCallback(async () => {
+    if (!academyProfile?.is_verified) return;
+    setVisitorLoading(true);
+    try {
+      const overview = await fetchAcademyVisitorOverview(visitorPeriod);
+      setVisitorTotal(overview.total_views);
+      setVisitorBuckets(overview.buckets);
+    } catch (error) {
+      console.error("Failed to load visitor overview:", error);
+      setVisitorTotal(0);
+      setVisitorBuckets([]);
+    } finally {
+      setVisitorLoading(false);
+    }
+  }, [academyProfile?.is_verified, visitorPeriod]);
+
+  useEffect(() => {
+    void loadVisitorOverview();
+  }, [loadVisitorOverview]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadVisitorOverview();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, [loadVisitorOverview]);
+
+  const visitorChartMax = useMemo(
+    () => Math.max(1, ...visitorBuckets.map((b) => b.count)),
+    [visitorBuckets],
+  );
+
+  const visitorDisplayBuckets = useMemo(
+    () =>
+      visitorBuckets.length > 0
+        ? visitorBuckets
+        : Array.from({ length: 7 }, () => ({ label: "—", count: 0 })),
+    [visitorBuckets],
+  );
+
+  const visitorBarEase = [0.22, 1, 0.36, 1] as const;
 
   const studentAggregates = useMemo(() => {
     const byKey = new Map<
@@ -360,75 +424,100 @@ const AcademyHomePage = () => {
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Visitor statistics (UI placeholder for future real analytics) */}
           <Card>
             <CardHeader className="border-b-0">
               <CardTitle className="flex items-center gap-2">
-
+                <Eye className="h-5 w-5" />
                 Visitor statistics
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="flex items-center justify-between gap-3">
                 <div className="inline-flex items-center rounded-2xl border border-border bg-muted/40 p-1">
-                  <button
-                    type="button"
-                    className="rounded-xl px-3 py-1.5 text-xs text-muted-foreground"
-                    disabled
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl px-3 py-1.5 text-xs text-muted-foreground"
-                    disabled
-                  >
-                    Yesterday
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-xl bg-background px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm"
-                    disabled
-                  >
-                    Last 7 days
-                  </button>
+                  {visitorPeriodTabs.map((tab) => {
+                    const isActive = visitorPeriod === tab.value;
+                    return (
+                      <button
+                        key={tab.value}
+                        type="button"
+                        onClick={() => setVisitorPeriod(tab.value)}
+                        className={cn(
+                          "rounded-xl px-3 py-1.5 text-xs transition-colors",
+                          isActive
+                            ? "bg-background font-semibold text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 rounded-xl"
-                  disabled
-                  aria-label="Visitors details"
-                >
-                  ↗
-                </Button>
+                {visitorLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : null}
               </div>
 
               <div className="rounded-2xl bg-muted/40 p-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-3xl font-bold text-foreground">0</p>
+                  <motion.p
+                    key={`${visitorPeriod}-${visitorTotal}`}
+                    className="text-3xl font-bold text-foreground"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: visitorLoading ? 0.45 : 1, y: 0 }}
+                    transition={{ duration: 0.45, ease: visitorBarEase }}
+                  >
+                    {visitorLoading ? "—" : visitorTotal.toLocaleString()}
+                  </motion.p>
                   <p className="text-sm text-muted-foreground">
-                    visitors in the selected period
+                    course page views across all your courses
                   </p>
                 </div>
 
                 <div className="mt-5 grid h-28 grid-cols-7 items-end gap-2">
-                  {[24, 36, 18, 44, 29, 52, 34].map((h, idx) => (
-                    <div
-                      key={idx}
-                      className="w-full rounded-md bg-sky-500/85"
-                      style={{ height: `${h}px` }}
-                    />
-                  ))}
+                  {visitorDisplayBuckets.map((bucket, idx) => {
+                    const heightPx = Math.max(
+                      4,
+                      Math.round((bucket.count / visitorChartMax) * 112),
+                    );
+                    return (
+                      <motion.div
+                        key={`${visitorPeriod}-${idx}`}
+                        className="w-full origin-bottom rounded-md bg-sky-500/85"
+                        initial={{ height: 4, opacity: 0.5 }}
+                        animate={{
+                          height: heightPx,
+                          opacity: visitorLoading ? 0.4 : 1,
+                        }}
+                        transition={{
+                          height: {
+                            duration: 0.7,
+                            delay: idx * 0.06,
+                            ease: visitorBarEase,
+                          },
+                          opacity: { duration: 0.3, ease: "easeOut" },
+                        }}
+                        title={`${bucket.count} views`}
+                      />
+                    );
+                  })}
                 </div>
                 <div className="mt-2 grid grid-cols-7 text-[10px] text-muted-foreground">
-                  {["04/02", "04/03", "04/04", "04/05", "04/06", "04/07", "04/08"].map(
-                    (d) => (
-                      <span key={d} className="text-center">
-                        {d}
-                      </span>
-                    ),
-                  )}
+                  {visitorDisplayBuckets.map((bucket, idx) => (
+                    <motion.span
+                      key={`${visitorPeriod}-label-${idx}`}
+                      className="text-center truncate"
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.4,
+                        delay: 0.15 + idx * 0.04,
+                        ease: visitorBarEase,
+                      }}
+                    >
+                      {bucket.label || "—"}
+                    </motion.span>
+                  ))}
                 </div>
               </div>
             </CardContent>

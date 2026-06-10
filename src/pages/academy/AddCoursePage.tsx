@@ -30,12 +30,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   UploadCloud,
   X,
   Trash2,
@@ -54,40 +48,19 @@ import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { cn } from "@/lib/utils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { normalizeAcademyProfileApiResponse } from "@/api/academy";
+import {
+  appendCourseFieldsToFormData,
+  buildCourseJsonPayload,
+  formatCourseApiError,
+  normalizeAcademyProfileApiResponse,
+  parseSkillIdsFromCourseApi,
+} from "@/api/academy";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { profileApi } from "@/api/profile/profileApi";
 import type { SkillSuggestion } from "@/api/profile/types";
-import { useTranslation } from "@/contexts/LanguageContext";
-
 const MIN_CHARS_FOR_SKILL_SUGGESTIONS = 3;
 const SKILL_SUGGESTIONS_DEBOUNCE_MS = 250;
-
-type EnrolledUserRef = {
-  id: number | string;
-  email?: string | null;
-  first_name?: string | null;
-  last_name?: string | null;
-};
-
-const parseEnrolledUsersFromApi = (raw: unknown): EnrolledUserRef[] => {
-  if (!Array.isArray(raw)) return [];
-  const out: EnrolledUserRef[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const o = item as Record<string, unknown>;
-    const id = o.id;
-    if (id === null || id === undefined) continue;
-    out.push({
-      id: typeof id === "number" || typeof id === "string" ? id : String(id),
-      email: o.email != null ? String(o.email) : null,
-      first_name: o.first_name != null ? String(o.first_name) : null,
-      last_name: o.last_name != null ? String(o.last_name) : null,
-    });
-  }
-  return out;
-};
 
 type ApiCourse = {
   id?: string | number | null;
@@ -103,11 +76,11 @@ type ApiCourse = {
   lessons_count?: number | null;
   total_duration?: string | null;
   required_skills?: unknown;
+  skills_taught?: unknown;
   registration_link?: string | null;
   lecturer_name?: string | null;
   lecturer_photo_url?: string | null;
   is_enrolled?: boolean | null;
-  enrolled_users?: unknown;
 };
 
 interface AcademyProfile {
@@ -147,7 +120,6 @@ const AddCoursePage = () => {
   const { courseId } = useParams<{ courseId?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const t = useTranslation();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
@@ -180,10 +152,6 @@ const AddCoursePage = () => {
   >({});
   const isEditMode = !!courseId;
   const [editingSection, setEditingSection] = useState<EditingSection>(null);
-  const [enrolledUsers, setEnrolledUsers] = useState<EnrolledUserRef[]>([]);
-  const [enrolledStudentsModalOpen, setEnrolledStudentsModalOpen] =
-    useState(false);
-
   const captureBaseline = (section: Exclude<EditingSection, null>) => {
     switch (section) {
       case "price":
@@ -411,25 +379,26 @@ const AddCoursePage = () => {
   const fetchCourse = useCallback(
     async (id: string) => {
       try {
-        // No course detail endpoint available; fetch list and pick by id.
-        const response = await fetch(
-          "https://web-production-80ed8.up.railway.app/api/courses/",
+        const response = await apiClient.get<ApiCourse>(
+          `${API_ENDPOINTS.COURSES}${id}/`,
         );
-        if (!response.ok) {
-          throw new Error(response.statusText);
-        }
-        const json: unknown = await response.json();
-        const allCourses: ApiCourse[] = Array.isArray(json)
-          ? (json as ApiCourse[])
-          : [];
-        const data = allCourses.find((c) => String(c?.id) === String(id));
+        const data = response.data;
 
         if (data) {
-          const requiredSkills = Array.isArray(data.required_skills)
-            ? (data.required_skills as unknown[]).map((s) => String(s))
-            : [];
-
-          setSkillChipLabels({});
+          const skillIds = parseSkillIdsFromCourseApi(data);
+          const labels: Record<number, string> = {};
+          if (Array.isArray(data.skills_taught)) {
+            for (const item of data.skills_taught) {
+              if (!item || typeof item !== "object") continue;
+              const o = item as Record<string, unknown>;
+              const skillId = Number(o.id);
+              const name = String(o.name ?? "").trim();
+              if (Number.isInteger(skillId) && skillId > 0 && name) {
+                labels[skillId] = name;
+              }
+            }
+          }
+          setSkillChipLabels(labels);
 
           setCourseForm({
             title: String(data.title ?? ""),
@@ -443,7 +412,7 @@ const AddCoursePage = () => {
                 ? String(data.lessons_count)
                 : "0",
             total_duration: String(data.total_duration ?? ""),
-            required_skills: requiredSkills.join(", "),
+            required_skills: skillIds.join(", "),
             lecturer_name: String(data.lecturer_name ?? ""),
             lecturer_photo_url: String(data.lecturer_photo_url ?? ""),
           });
@@ -455,7 +424,6 @@ const AddCoursePage = () => {
           initialCoverSnapshotRef.current = coverUrl;
           setLecturerPhotoFile(null);
           setLecturerPhotoPreview(null);
-          setEnrolledUsers(parseEnrolledUsersFromApi(data.enrolled_users));
         }
       } catch (error: unknown) {
         console.error("Error fetching course:", error);
@@ -475,7 +443,6 @@ const AddCoursePage = () => {
   useEffect(() => {
     if (!courseId) {
       initialCoverSnapshotRef.current = null;
-      setEnrolledUsers([]);
     }
   }, [courseId]);
 
@@ -588,7 +555,7 @@ const AddCoursePage = () => {
         return;
       }
 
-      const payload = {
+      const writeFields = {
         title: courseForm.title,
         description: courseForm.description,
         level: courseForm.level,
@@ -597,8 +564,7 @@ const AddCoursePage = () => {
         price: Number(courseForm.price || 0),
         lessons_count: Number.parseInt(courseForm.lessons_count || "0", 10),
         total_duration: courseForm.total_duration,
-        required_skills: requiredSkills,
-        registration_link: null,
+        skillIds: requiredSkills,
         lecturer_name: courseForm.lecturer_name || "",
         lecturer_photo_url: courseForm.lecturer_photo_url || null,
         academy_name: academyProfile.academy_name,
@@ -609,21 +575,7 @@ const AddCoursePage = () => {
 
       if (needsMultipart) {
         const formData = new FormData();
-        formData.append("title", payload.title);
-        formData.append("description", payload.description);
-        formData.append("level", payload.level);
-        formData.append("language", payload.language);
-        formData.append("location", payload.location);
-        formData.append("price", String(payload.price));
-        formData.append("lessons_count", String(payload.lessons_count));
-        formData.append("total_duration", payload.total_duration);
-        formData.append("registration_link", "");
-        formData.append("lecturer_name", payload.lecturer_name);
-        formData.append("lecturer_photo_url", payload.lecturer_photo_url || "");
-        formData.append("academy_name", payload.academy_name || "");
-        requiredSkills.forEach((id) =>
-          formData.append("required_skills", String(id)),
-        );
+        appendCourseFieldsToFormData(formData, writeFields);
         if (coverImageFile) {
           formData.append("cover_image", coverImageFile);
         }
@@ -631,20 +583,19 @@ const AddCoursePage = () => {
           formData.append("lecturer_photo", lecturerPhotoFile);
         }
 
-        await apiClient.post(API_ENDPOINTS.COURSES, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await apiClient.post(API_ENDPOINTS.COURSES, formData);
       } else {
-        await apiClient.post(API_ENDPOINTS.COURSES, payload);
+        await apiClient.post(
+          API_ENDPOINTS.COURSES,
+          buildCourseJsonPayload(writeFields),
+        );
       }
 
       toast.success("Course added successfully");
       navigate("/academy/courses");
     } catch (error: unknown) {
       console.error("Error adding course:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to add course",
-      );
+      toast.error(formatCourseApiError(error, "Failed to add course"));
     } finally {
       setIsSubmitting(false);
     }
@@ -665,7 +616,7 @@ const AddCoursePage = () => {
         return;
       }
 
-      const payload = {
+      const writeFields = {
         title: courseForm.title,
         description: courseForm.description,
         level: courseForm.level,
@@ -674,11 +625,9 @@ const AddCoursePage = () => {
         price: Number(courseForm.price || 0),
         lessons_count: Number.parseInt(courseForm.lessons_count || "0", 10),
         total_duration: courseForm.total_duration,
-        required_skills: requiredSkills,
-        registration_link: null,
+        skillIds: requiredSkills,
         lecturer_name: courseForm.lecturer_name || "",
         lecturer_photo_url: courseForm.lecturer_photo_url || null,
-        enrolled_users: enrolledUsers,
       };
 
       const needsMultipart =
@@ -686,20 +635,7 @@ const AddCoursePage = () => {
 
       if (needsMultipart) {
         const formData = new FormData();
-        formData.append("title", payload.title);
-        formData.append("description", payload.description);
-        formData.append("level", payload.level);
-        formData.append("language", payload.language);
-        formData.append("location", payload.location);
-        formData.append("price", String(payload.price));
-        formData.append("lessons_count", String(payload.lessons_count));
-        formData.append("total_duration", payload.total_duration);
-        formData.append("registration_link", "");
-        formData.append("lecturer_name", payload.lecturer_name);
-        formData.append("lecturer_photo_url", payload.lecturer_photo_url || "");
-        requiredSkills.forEach((id) =>
-          formData.append("required_skills", String(id)),
-        );
+        appendCourseFieldsToFormData(formData, writeFields);
         if (coverImageFile) {
           formData.append("cover_image", coverImageFile);
         }
@@ -707,27 +643,19 @@ const AddCoursePage = () => {
           formData.append("lecturer_photo", lecturerPhotoFile);
         }
 
+        await apiClient.patch(`${API_ENDPOINTS.COURSES}${courseId}/`, formData);
+      } else {
         await apiClient.patch(
           `${API_ENDPOINTS.COURSES}${courseId}/`,
-          formData,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-          },
+          buildCourseJsonPayload(writeFields),
         );
-        await apiClient.patch(`${API_ENDPOINTS.COURSES}${courseId}/`, {
-          enrolled_users: enrolledUsers,
-        });
-      } else {
-        await apiClient.patch(`${API_ENDPOINTS.COURSES}${courseId}/`, payload);
       }
 
       toast.success("Course updated successfully");
       navigate("/academy/courses");
     } catch (error: unknown) {
       console.error("Error updating course:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update course",
-      );
+      toast.error(formatCourseApiError(error, "Failed to update course"));
     } finally {
       setIsSubmitting(false);
     }
@@ -789,77 +717,6 @@ const AddCoursePage = () => {
       />
       <div className="px-4 py-4 sm:px-6 sm:py-6 pb-40 sm:pb-44 mb-16 sm:mb-20">
         <div className="max-w-7xl mx-auto pb-20">
-          {isEditMode && (
-            <>
-              <div className="mb-6 w-full rounded-2xl bg-white p-4 ">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <Users className="h-4 w-4 shrink-0 text-breneo-blue" />
-                    <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                      {t.courses.enrolledStudentsBox}
-                    </span>
-                    <span className="text-sm font-medium tabular-nums tracking-wide text-gray-900 dark:text-gray-100">
-                      {enrolledUsers.length}
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full shrink-0 sm:w-auto"
-                    onClick={() => setEnrolledStudentsModalOpen(true)}
-                  >
-                    {t.courses.viewEnrolledStudents}
-                  </Button>
-                </div>
-              </div>
-
-              <Dialog
-                open={enrolledStudentsModalOpen}
-                onOpenChange={setEnrolledStudentsModalOpen}
-              >
-                <DialogContent className="max-h-[85vh] max-w-lg gap-0 overflow-hidden p-0 sm:rounded-[36px]">
-                  <DialogHeader className="border-b border-border px-6 py-4 text-left">
-                    <DialogTitle>
-                      {t.courses.enrolledStudentsListTitle}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="max-h-[min(60vh,480px)] overflow-y-auto px-6 py-4">
-                    {enrolledUsers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        {t.courses.enrolledStudentsModalEmpty}
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {enrolledUsers.map((u) => {
-                          const displayName = [u.first_name, u.last_name]
-                            .filter(Boolean)
-                            .join(" ")
-                            .trim();
-                          return (
-                            <li
-                              key={String(u.id)}
-                              className="flex flex-col gap-0.5 rounded-lg bg-gray-50 px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2 dark:bg-white/5"
-                            >
-                              <span className="truncate font-medium text-gray-900 dark:text-gray-100">
-                                {displayName || u.email || `User ${u.id}`}
-                              </span>
-                              {u.email ? (
-                                <span className="truncate text-xs text-gray-500">
-                                  {u.email}
-                                </span>
-                              ) : null}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
-
           {/* Cover hero */}
           <div className="relative isolate mb-6 w-full overflow-hidden rounded-2xl sm:rounded-3xl h-44 sm:h-80">
             {imagePreview ? (

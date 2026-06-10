@@ -12,7 +12,7 @@ import type { AxiosResponse } from "axios";
 import type { RawAxiosRequestHeaders } from "axios";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { TokenManager } from "@/api/auth/tokenManager";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 import {
   extractAggregatorErrorMessage,
@@ -78,11 +78,6 @@ export async function uploadEmployerCompanyLogoToAggregator(
   if (!extUserId) {
     throw new Error("Missing external user id for scoped company logo upload.");
   }
-  const token = TokenManager.getAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
   const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   const url = new URL(`/api/employer/companies/${id}`, `${base}/`);
   url.searchParams.set("external_user_id", extUserId);
@@ -98,12 +93,8 @@ export async function uploadEmployerCompanyLogoToAggregator(
     }
   }
 
-  const res = await fetch(url.toString(), {
+  const res = await employerBffFetch(url.toString(), {
     method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
     body: formData,
   });
 
@@ -131,19 +122,10 @@ export async function fetchEmployerCompanyFromAggregator(
   if (!extUserId) {
     throw new Error("Missing external user id for scoped company detail.");
   }
-  const token = TokenManager.getAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
   const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   const url = new URL(`/api/employer/companies/${id}`, `${base}/`);
   url.searchParams.set("external_user_id", extUserId);
-  const res = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url.toString());
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const detail = extractAggregatorErrorMessage(

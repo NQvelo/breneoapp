@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { recordCoursePageView } from "@/api/academy/courseAnalyticsApi";
 
 interface AcademyProfile {
   id: string;
@@ -178,6 +179,15 @@ const CoursePage = () => {
     },
     enabled: !!courseId,
   });
+
+  const recordedViewForCourseRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = courseId ? String(courseId).trim() : "";
+    if (!id) return;
+    if (recordedViewForCourseRef.current === id) return;
+    recordedViewForCourseRef.current = id;
+    void recordCoursePageView(id);
+  }, [courseId]);
 
   // Fetch saved courses
   const { data: savedCourses = [] } = useQuery({

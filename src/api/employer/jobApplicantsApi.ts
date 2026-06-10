@@ -1,5 +1,5 @@
-import { TokenManager } from "@/api/auth/tokenManager";
 import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 import type { AppBffEnvelope } from "@/api/jobs/jobApplicationsApi";
 import type { JobApplicationUserFields } from "@/api/jobs/applicationUserFields";
 
@@ -8,17 +8,6 @@ export interface JobApplicant extends JobApplicationUserFields {
   applied_at?: string;
   status?: string;
   [key: string]: unknown;
-}
-
-function authHeaders(): HeadersInit {
-  const token = TokenManager.getAccessToken();
-  if (!token) {
-    throw new Error("Sign in to view applicants.");
-  }
-  return {
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  };
 }
 
 function extractApplicants(data: unknown): JobApplicant[] {
@@ -36,7 +25,7 @@ export async function fetchEmployerJobApplicants(
 ): Promise<JobApplicant[]> {
   const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   const url = `${base}/api/app/jobs/${encodeURIComponent(jobId)}/applicants`;
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await employerBffFetch(url);
   const body = (await res.json().catch(() => ({}))) as AppBffEnvelope;
 
   if (res.status === 401) {

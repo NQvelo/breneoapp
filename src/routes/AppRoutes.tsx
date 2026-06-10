@@ -53,6 +53,9 @@ const EmployerDashboardPage = lazy(() => import("@/pages/employer/EmployerDashbo
 const EmployerJobsPage = lazy(() => import("@/pages/employer/EmployerJobsPage"));
 const EmployerAddJobPage = lazy(() => import("@/pages/employer/EmployerAddJobPage"));
 const EmployerJobStatsPage = lazy(() => import("@/pages/employer/EmployerJobStatsPage"));
+const AcademyCourseStatsPage = lazy(
+  () => import("@/pages/academy/AcademyCourseStatsPage"),
+);
 const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfilePage"));
 const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
 const EmployerJoinCompanyPage = lazy(
@@ -93,6 +96,7 @@ const preloadEmployerChunks = [
 const preloadAcademyChunks = [
   () => import("@/pages/academy/AcademyHomePage"),
   () => import("@/pages/academy/AcademyCoursesPage"),
+  () => import("@/pages/academy/AcademyCourseStatsPage"),
   () => import("@/pages/academy/AcademyProfilePage"),
 ];
 
@@ -383,6 +387,12 @@ export const AppRoutes = () => {
         "/academy/courses/edit/:courseId",
         <ProtectedRoute requiredRole="academy">
           <AddCoursePage />
+        </ProtectedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/academy/courses/:courseId",
+        <ProtectedRoute requiredRole="academy">
+          <AcademyCourseStatsPage />
         </ProtectedRoute>,
       )}
 

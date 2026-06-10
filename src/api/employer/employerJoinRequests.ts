@@ -2,7 +2,7 @@
  * Employer company join requests — BFF API (not Django notifications API).
  */
 
-import { TokenManager } from "@/api/auth/tokenManager";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 
 export type EmployerJoinRequestStatus = "pending" | "approved" | "rejected";
@@ -30,16 +30,6 @@ function resolveEmployerBffUrl(path: string): string {
   const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}${cleanPath}`;
-}
-
-function authHeaders(): HeadersInit {
-  const token = TokenManager.getAccessToken();
-  if (!token) throw new Error("Authentication required.");
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  };
 }
 
 async function parseJsonSafe(res: Response): Promise<unknown> {
@@ -71,10 +61,10 @@ async function bffRequest<T = unknown>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(resolveEmployerBffUrl(path), {
+  const res = await employerBffFetch(resolveEmployerBffUrl(path), {
     ...init,
     headers: {
-      ...authHeaders(),
+      "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
   });

@@ -36,7 +36,8 @@ Return ONLY valid JSON in this exact format:
   "description": "...",
   "responsibilities": ["..."],
   "qualifications": ["..."],
-  "skills": ["..."]
+  "skills": ["..."],
+  "skills_preferred": ["..."]
 }
 
 STRICT RULES:
@@ -97,13 +98,20 @@ QUALIFICATIONS RULES:
 
 ----------------------------------------
 
-SKILLS RULES:
+SKILLS RULES (skills = required):
 
 - Extract required technical and professional skills explicitly mentioned or clearly implied
 - Use short canonical names (e.g. "React", "Python", "Sales")
 - Max 12 items
 - If no skills are mentioned, return an empty array []
 - Do NOT invent skills not supported by the posting
+
+SKILLS_PREFERRED RULES (nice-to-have / preferred):
+
+- Extract skills explicitly labeled preferred, nice-to-have, bonus, or plus
+- Do NOT duplicate items already listed in "skills"
+- Max 8 items
+- If none are mentioned, return an empty array []
 
 ----------------------------------------
 
@@ -145,7 +153,8 @@ Output:
     "Strong knowledge of Node.js",
     "Experience with databases"
   ],
-  "skills": ["Node.js", "API development", "Databases"]
+  "skills": ["Node.js", "API development", "Databases"],
+  "skills_preferred": []
 }
 
 ----------------------------------------
@@ -165,7 +174,7 @@ ${jobDescription}`;
 
   return `${base}
 
-CRITICAL: Output one raw JSON object only. Keys must be exactly "description" (string), "responsibilities" (array of strings), "qualifications" (array of strings), "skills" (array of strings). No markdown fences, no backticks, no text before or after the JSON.`;
+CRITICAL: Output one raw JSON object only. Keys must be exactly "description" (string), "responsibilities" (array of strings), "qualifications" (array of strings), "skills" (array of strings), "skills_preferred" (array of strings). No markdown fences, no backticks, no text before or after the JSON.`;
 }
 
 /**
@@ -263,7 +272,13 @@ function normalizeGeminiPayload(parsed, sourceText) {
     ].join("\n");
     skills = extractSkillsFromTextFallback(fallbackSource);
   }
-  return { ...sections, skills };
+  const requiredKeys = new Set(
+    skills.map((s) => s.toLowerCase().replace(/\s+/g, " ")),
+  );
+  const skills_preferred = sanitizeSkillsArray(o.skills_preferred, 8).filter(
+    (s) => !requiredKeys.has(s.toLowerCase().replace(/\s+/g, " ")),
+  );
+  return { ...sections, skills, skills_preferred };
 }
 
 /**

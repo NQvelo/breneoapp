@@ -15,6 +15,7 @@ export * from './auth/authService';
 export {
   normalizeSkillName,
   getStructuredJobFromDetail,
+  resolveRequiredSkillsList,
   matchJobToUser,
   matchJobDetailToUser,
   getDefaultUserMatchProfile,

@@ -14,12 +14,13 @@ import { markJoinRequestNotificationsRead } from "@/api/notifications/notificati
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function EmployerNotificationsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<EmployerJoinRequest[]>([]);
   const [actingId, setActingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (authLoading || !user) return;
     setLoading(true);
     try {
       const rows = await fetchEmployerJoinRequestInbox();
@@ -32,11 +33,12 @@ export default function EmployerNotificationsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     void load();
-  }, [load]);
+  }, [load, authLoading, user]);
 
   const handleApprove = async (row: EmployerJoinRequest) => {
     setActingId(row.id);

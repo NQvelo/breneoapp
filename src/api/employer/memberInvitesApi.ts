@@ -2,7 +2,7 @@
  * Employer member invites — BFF (email via Resend, accept via token).
  */
 
-import { TokenManager } from "@/api/auth/tokenManager";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 
 export type EmployerMemberInvite = {
@@ -28,16 +28,6 @@ function bffUrl(path: string): string {
   const base = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   const clean = path.startsWith("/") ? path : `/${path}`;
   return `${base}${clean}`;
-}
-
-function authHeaders(): HeadersInit {
-  const token = TokenManager.getAccessToken();
-  if (!token) throw new Error("Authentication required.");
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  };
 }
 
 async function parseJson(res: Response): Promise<unknown> {
@@ -66,11 +56,13 @@ export async function createEmployerMemberInvite(params: {
   companyName: string;
   email: string;
 }): Promise<{ invite: EmployerMemberInvite; email_sent: boolean }> {
-  const res = await fetch(
+  const res = await employerBffFetch(
     bffUrl(`/api/employer/companies/${params.companyId}/member-invites/`),
     {
       method: "POST",
-      headers: authHeaders(),
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         email: params.email.trim(),
         company_name: params.companyName.trim(),
@@ -123,9 +115,11 @@ export async function fetchMemberInvitePreview(
 export async function acceptEmployerMemberInvite(
   token: string,
 ): Promise<{ company_id: number; company_name: string }> {
-  const res = await fetch(bffUrl("/api/employer/member-invites/accept/"), {
+  const res = await employerBffFetch(bffUrl("/api/employer/member-invites/accept/"), {
     method: "POST",
-    headers: authHeaders(),
+    headers: {
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ token: token.trim() }),
   });
   const data = await parseJson(res);

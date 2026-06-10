@@ -1,4 +1,4 @@
-import { TokenManager } from "@/api/auth/tokenManager";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 import {
   assertEmployerJobsProxyConfigured,
   getEmployerJobsApiBaseUrl,
@@ -9,6 +9,7 @@ export type EmployerJobPreviewParseResult = {
   responsibilities: string[];
   qualifications: string[];
   skills: string[];
+  skills_preferred?: string[];
   useDescriptionOnly: boolean;
   aiAvailable: boolean;
 };
@@ -16,11 +17,6 @@ export type EmployerJobPreviewParseResult = {
 export async function previewParseEmployerJob(
   fullDescription: string,
 ): Promise<EmployerJobPreviewParseResult> {
-  const token = TokenManager.getAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
   assertEmployerJobsProxyConfigured("POST");
 
   const url = new URL(
@@ -28,11 +24,10 @@ export async function previewParseEmployerJob(
     getEmployerJobsApiBaseUrl(),
   ).toString();
 
-  const res = await fetch(url, {
+  const res = await employerBffFetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({ full_description: fullDescription.trim() }),
   });
@@ -56,6 +51,9 @@ export async function previewParseEmployerJob(
       : [],
     skills: Array.isArray(data.skills)
       ? data.skills.map((x) => String(x).trim()).filter(Boolean)
+      : [],
+    skills_preferred: Array.isArray(data.skills_preferred)
+      ? data.skills_preferred.map((x) => String(x).trim()).filter(Boolean)
       : [],
     useDescriptionOnly: data.useDescriptionOnly === true,
     aiAvailable: data.aiAvailable !== false,

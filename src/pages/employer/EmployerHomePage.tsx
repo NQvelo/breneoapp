@@ -31,7 +31,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 const EmployerHomePage = () => {
   const navigate = useNavigate();
-  const { user, updateEmployerDisplay } = useAuth();
+  const { user, updateEmployerDisplay, loading: authLoading } = useAuth();
   const { language } = useLanguage();
   const [profile, setProfile] = useState<NormalizedEmployerProfile | null>(
     null,
@@ -41,7 +41,7 @@ const EmployerHomePage = () => {
   const [jobsError, setJobsError] = useState(false);
 
   const loadProfile = useCallback(async () => {
-    if (!user) return;
+    if (authLoading || !user) return;
     try {
       const response = await apiClient.get(API_ENDPOINTS.EMPLOYER.PROFILE);
       const normalized = normalizeEmployerProfile(response.data, user.email);
@@ -59,9 +59,10 @@ const EmployerHomePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, updateEmployerDisplay]);
+  }, [authLoading, user, updateEmployerDisplay]);
 
   const loadJobs = useCallback(async () => {
+    if (authLoading || !user) return;
     setJobsError(false);
     try {
       const prof = await apiClient
@@ -98,11 +99,12 @@ const EmployerHomePage = () => {
       setJobsError(true);
       setJobs([]);
     }
-  }, [user?.id]);
+  }, [authLoading, user, user?.id]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     loadProfile();
-  }, [loadProfile]);
+  }, [loadProfile, authLoading, user]);
 
   useEffect(() => {
     if (profile) loadJobs();

@@ -52,5 +52,41 @@ export async function supabaseRest(path, options = {}) {
   } catch {
     data = text;
   }
-  return { ok: res.ok, status: res.status, data, text };
+  return {
+    ok: res.ok,
+    status: res.status,
+    data,
+    text,
+    headers: res.headers,
+  };
+}
+
+/**
+ * @param {string} path Filtered table path (no leading slash).
+ */
+export async function supabaseExactCount(path) {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!key) {
+    return { ok: false, status: 500, count: 0 };
+  }
+  const base = readSupabaseUrl();
+  const res = await fetch(`${base}/rest/v1/${path}`, {
+    method: "HEAD",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      Prefer: "count=exact",
+    },
+  });
+  if (!res.ok) {
+    return { ok: false, status: res.status, count: 0 };
+  }
+  const range = res.headers.get("content-range") || "";
+  const match = range.match(/\/(\d+)\s*$/);
+  const count = match ? Number.parseInt(match[1], 10) : 0;
+  return {
+    ok: true,
+    status: res.status,
+    count: Number.isFinite(count) ? count : 0,
+  };
 }

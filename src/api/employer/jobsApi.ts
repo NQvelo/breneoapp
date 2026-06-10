@@ -1,9 +1,9 @@
-import { TokenManager } from "@/api/auth/tokenManager";
-
 import {
   assertEmployerJobsProxyConfigured,
   getEmployerJobsApiBaseUrl,
 } from "@/api/employer/employerJobsApiBase";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
+import { TokenManager } from "@/api/auth/tokenManager";
 import { resolveJobSectionsAfterAi } from "@/utils/jobSectionsDedup";
 
 export type EmployerJobSource = "breneo" | "aggregator";
@@ -129,6 +129,31 @@ function pickAggregatorListField(
     if (coerced.length > 0) return coerced;
   }
   return [];
+}
+
+const REQUIRED_SKILLS_FIELD_KEYS = [
+  "skills_required",
+  "required_skills",
+  "skills",
+  "job_skills",
+] as const;
+
+function pickRequiredSkillsFromSources(
+  ...sources: Array<Record<string, unknown> | null | undefined>
+): string[] {
+  for (const src of sources) {
+    if (!src || typeof src !== "object" || Array.isArray(src)) continue;
+    const skills = pickAggregatorListField(src, REQUIRED_SKILLS_FIELD_KEYS);
+    if (skills.length > 0) return skills;
+  }
+  return [];
+}
+
+/** Skills explicitly stored on the job record (no description inference). */
+export function getEmployerJobStoredSkills(job: EmployerJob): string[] {
+  return (job.required_skills ?? [])
+    .map((s) => String(s).trim())
+    .filter(Boolean);
 }
 
 function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
@@ -294,12 +319,19 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
       };
     })(),
     job_description_summary,
-    required_skills: pickAggregatorListField(raw, [
-      "skills_required",
-      "required_skills",
-      "skills",
-      "job_skills",
-    ]),
+    required_skills: pickRequiredSkillsFromSources(
+      employerSubmitted,
+      rawEnvelope &&
+        typeof rawEnvelope.employer_submitted === "object" &&
+        !Array.isArray(rawEnvelope.employer_submitted)
+        ? (rawEnvelope.employer_submitted as Record<string, unknown>)
+        : null,
+      raw,
+      rawEnvelope,
+      raw.raw && typeof raw.raw === "object" && !Array.isArray(raw.raw)
+        ? (raw.raw as Record<string, unknown>)
+        : null,
+    ),
   };
 }
 
@@ -351,19 +383,14 @@ function buildEmployerJobsUrl(
 export async function fetchEmployerJobsFiltered(
   filter?: EmployerJobsFilter,
 ): Promise<EmployerJob[]> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") return [];
+  if (typeof window === "undefined") return [];
+  if (!(await TokenManager.getValidAccessToken())) return [];
 
   // Prevent accidental direct browser calls to Railway (requires X-Employer-Key server-side).
   assertEmployerJobsProxyConfigured("GET");
 
   const base = getEmployerJobsApiBaseUrl();
-  const res = await fetch(buildEmployerJobsUrl(base, filter), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(buildEmployerJobsUrl(base, filter));
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     const detail = extractAggregatorErrorMessage(body, "Could not load jobs.");
@@ -389,8 +416,7 @@ export async function fetchEmployerJobsFiltered(
  * `AGGREGATOR_JOB_DETAIL_COMPANY_QUERY=1` on the BFF): `…/api/employer/jobs/{id}?company_id=…` with `X-Employer-Key`.
  */
 export async function fetchEmployerJobById(id: string): Promise<EmployerJob> {
-  const token = TokenManager.getAccessToken();
-  if (!token || typeof window === "undefined") {
+  if (typeof window === "undefined") {
     throw new Error("Not authenticated");
   }
   assertEmployerJobsProxyConfigured("GET");
@@ -398,12 +424,7 @@ export async function fetchEmployerJobById(id: string): Promise<EmployerJob> {
   const baseRoot = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
   const url = `${baseRoot}/api/employer/jobs/${encodeURIComponent(id)}`;
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  const res = await employerBffFetch(url);
 
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 

@@ -1,4 +1,4 @@
-import { TokenManager } from "@/api/auth/tokenManager";
+import { employerBffFetch } from "@/api/employer/employerBffClient";
 
 import {
   assertEmployerJobsProxyConfigured,
@@ -34,6 +34,8 @@ export type PublishEmployerJobBody = {
   description?: string;
   /** Skills for candidate matching; required when AI finds none. */
   required_skills?: string[];
+  /** Nice-to-have skills extracted from the posting or chosen by employer. */
+  skills_preferred?: string[];
   /** When true, BFF uses client description / sections instead of re-running Gemini. */
   client_parsed_sections?: boolean;
 };
@@ -81,20 +83,14 @@ async function sendEmployerJobsRequest(
   path: string,
   body?: unknown,
 ): Promise<Record<string, unknown>> {
-  const token = TokenManager.getAccessToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
   // Prevent accidental direct browser calls to Railway (requires X-Employer-Key server-side).
   assertEmployerJobsProxyConfigured(method);
 
   const url = new URL(path, getEmployerJobsApiBaseUrl()).toString();
-  const res = await fetch(url, {
+  const res = await employerBffFetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
     body: body == null ? undefined : JSON.stringify(body),
   });
