@@ -41,6 +41,12 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # Switches the repo's Pages build type to "GitHub Actions" so the
+      # deploy step doesn't fall back to the legacy git/Jekyll builder
+      # (cause of "Deployment failed... while building in git").
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Install dependencies
         run: npm ci
 
