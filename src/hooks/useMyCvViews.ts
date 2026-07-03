@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { TokenManager } from "@/api/auth/tokenManager";
+import { AppBffAuthError } from "@/api/jobs/jobApplicationsApi";
 import {
-  AppBffAuthError,
   fetchMyCvViews,
   MY_CV_VIEWS_QUERY_KEY,
   type ApplicantCvView,
