@@ -12,8 +12,7 @@
     "test:watch": "vitest",
     "copy404": "node -e \"require('fs').copyFileSync('dist/index.html', 'dist/404.html')\"",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "npm run build && gh-pages -d dist",
+    "deploy": "npm run build && gh workflow run deploy-github-pages.yml --ref main",
     "start": "node server/production.mjs",
     "start:bff": "node server/employer-jobs-proxy.mjs",
     "security-test": "npx tsx scripts/security-test.ts"
@@ -102,7 +101,6 @@
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
-    "gh-pages": "^6.3.0",
     "globals": "^15.9.0",
     "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.47",
