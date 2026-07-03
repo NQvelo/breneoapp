@@ -7,12 +7,15 @@ import { toast } from "sonner";
 import { Bell, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
+import { useMyCvViews } from "@/hooks/useMyCvViews";
+import { CvViewNotificationsSection } from "@/components/notifications/CvViewNotificationsSection";
 import {
   fetchMyNotifications,
   formatNotificationMessage,
   markNotificationRead,
   type Notification,
 } from "@/api/notifications/notificationsApi";
+import { cvViewIsUnacknowledged } from "@/api/jobs/cvViewsApi";
 
 const NotificationsPage = () => {
   const { user } = useAuth();
@@ -25,6 +28,10 @@ const NotificationsPage = () => {
     enabled: isRegularUser && !!user?.id,
     checkInterval: 30 * 60 * 1000,
   });
+
+  const { data: cvViews = [], isLoading: cvViewsLoading } = useMyCvViews(
+    isRegularUser && !!user?.id,
+  );
 
   const {
     data: notifications = [],
@@ -106,6 +113,10 @@ const NotificationsPage = () => {
         <Card>
           <CardContent className="p-0">
             <div className="divide-y divide-gray-200">
+              <CvViewNotificationsSection
+                cvViews={cvViews}
+                isLoading={cvViewsLoading}
+              />
               {isLoading ? (
                 <div className="text-center py-12 text-muted-foreground">
                   {t.common.loading}
@@ -125,7 +136,8 @@ const NotificationsPage = () => {
                     Try again
                   </button>
                 </div>
-              ) : notifications.length === 0 ? (
+              ) : notifications.length === 0 &&
+                !cvViews.some(cvViewIsUnacknowledged) ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <img
                     src="/lovable-uploads/3dicons-bell-dynamic-color.png"

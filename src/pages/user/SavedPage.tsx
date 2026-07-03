@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   GraduationCap,
   Briefcase,
-  Heart,
+  Bookmark,
   ExternalLink,
   MapPin,
   Loader2,
@@ -20,6 +20,12 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { fetchJobDetail } from "@/api/jobs/jobService";
+import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 
 interface SavedCourse {
   id: string;
@@ -302,82 +308,10 @@ const SavedPage = () => {
                   (jobDetail.company as { company_logo?: string }).company_logo
                 : undefined);
 
-            // Format salary
-            let salary = "By agreement";
-            const minSalary = jobDetail.job_min_salary || jobDetail.min_salary;
-            const maxSalary = jobDetail.job_max_salary || jobDetail.max_salary;
-            const salaryCurrency = (jobDetail.job_salary_currency ||
-              jobDetail.salary_currency ||
-              "$") as string;
-            const salaryPeriod = (jobDetail.job_salary_period ||
-              jobDetail.salary_period ||
-              "yearly") as string;
+            const salary = formatJobSalaryDisplay(jobDetail);
 
-            if (
-              minSalary &&
-              maxSalary &&
-              typeof minSalary === "number" &&
-              typeof maxSalary === "number"
-            ) {
-              const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-              const minSalaryFormatted = minSalary.toLocaleString();
-              const maxSalaryFormatted = maxSalary.toLocaleString();
-              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-              const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym),
-              );
-              if (isCurrencyBefore) {
-                salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-                  periodLabel ? `/${periodLabel}` : ""
-                }`;
-              } else {
-                salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-                  periodLabel ? `/${periodLabel}` : ""
-                }`;
-              }
-            } else if (minSalary && typeof minSalary === "number") {
-              const minSalaryFormatted = minSalary.toLocaleString();
-              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-              const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym),
-              );
-              salary = isCurrencyBefore
-                ? `${salaryCurrency}${minSalaryFormatted}+`
-                : `${minSalaryFormatted}+ ${salaryCurrency}`;
-            } else if (
-              jobDetail.salary &&
-              typeof jobDetail.salary === "string"
-            ) {
-              salary = jobDetail.salary;
-            }
-
-            // Format employment type
-            const employmentTypeRaw = (jobDetail.job_employment_type ||
-              jobDetail.employment_type ||
-              jobDetail.type ||
-              "FULLTIME") as string;
-            const jobTypeLabels: Record<string, string> = {
-              FULLTIME: "Full time",
-              PARTTIME: "Part time",
-              CONTRACTOR: "Contract",
-              INTERN: "Internship",
-            };
-            const employmentType =
-              jobTypeLabels[employmentTypeRaw] ||
-              employmentTypeRaw ||
-              "Full time";
-
-            // Determine work arrangement
-            let workArrangement = "On-site";
-            const isRemote =
-              jobDetail.job_is_remote ||
-              jobDetail.is_remote ||
-              jobDetail.remote === true;
-            if (isRemote) {
-              workArrangement = "Remote";
-            } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-              workArrangement = "Hybrid";
-            }
+            const employmentType = resolveJobEmploymentType(jobDetail);
+            const workArrangement = resolveJobWorkArrangement(jobDetail);
 
             return {
               id: jobId,
@@ -592,18 +526,18 @@ const SavedPage = () => {
                                 className={cn(
                                   "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
                                   isCourseSaved
-                                    ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                    ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                                     : "text-black dark:text-white",
                                 )}
                               >
                                 {saveCourseMutation.isPending ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
-                                  <Heart
+                                  <Bookmark
                                     className={cn(
                                       "h-4 w-4 transition-colors",
                                       isCourseSaved
-                                        ? "text-red-500 fill-red-500"
+                                        ? "text-breneo-blue fill-breneo-blue"
                                         : "text-black dark:text-white",
                                     )}
                                   />
@@ -694,23 +628,11 @@ const SavedPage = () => {
                               </span>
                             </div>
                           )}
-                          {job.salary && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              {job.salary}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {job.employment_type && (
-                              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                                {job.employment_type}
-                              </Badge>
-                            )}
-                            {job.work_arrangement && (
-                              <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                                {job.work_arrangement}
-                              </Badge>
-                            )}
-                          </div>
+                          <JobListingMetaBadges
+                            employmentType={job.employment_type}
+                            workArrangement={job.work_arrangement}
+                            salary={job.salary}
+                          />
                         </div>
 
                         <div className="flex items-center gap-2 mt-4">
@@ -742,18 +664,18 @@ const SavedPage = () => {
                             className={cn(
                               "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-9 w-9",
                               isJobSaved
-                                ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                                 : "text-black dark:text-white",
                             )}
                           >
                             {saveJobMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Heart
+                              <Bookmark
                                 className={cn(
                                   "h-4 w-4 transition-colors",
                                   isJobSaved
-                                    ? "text-red-500 fill-red-500"
+                                    ? "text-breneo-blue fill-breneo-blue"
                                     : "text-black dark:text-white",
                                 )}
                               />

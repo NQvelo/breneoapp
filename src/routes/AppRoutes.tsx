@@ -39,6 +39,7 @@ const SkillPathPage = lazy(() => import("@/pages/user/SkillPathPage"));
 const SkillPathDetailPage = lazy(() => import("@/pages/user/SkillPathDetailPage"));
 const InterestsPage = lazy(() => import("@/pages/user/InterestsPage"));
 const UserNotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
+const CvViewsPage = lazy(() => import("@/pages/user/CvViewsPage"));
 
 // Academy pages (Academy-only)
 const AcademyHomePage = lazy(() => import("@/pages/academy/AcademyHomePage"));
@@ -236,6 +237,12 @@ export const AppRoutes = () => {
         "/notifications",
         <ProtectedRoute requiredRole="user">
           <UserNotificationsPage />
+        </ProtectedRoute>,
+      )}
+      {createLocalizedRoute(
+        "/cv-views",
+        <ProtectedRoute requiredRole="user">
+          <CvViewsPage />
         </ProtectedRoute>,
       )}
       {createLocalizedRoute(

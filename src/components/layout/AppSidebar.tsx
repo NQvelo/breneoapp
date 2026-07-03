@@ -14,14 +14,14 @@ import {
   LibraryBig,
   Video,
   ArrowRight,
-  Globe,
+  Zap,
   Sparkles,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
-import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -55,8 +55,9 @@ export function AppSidebar({
   const { loading, user, academyDisplay, employerDisplay } = useAuth();
   const { subscriptionInfo } = useSubscription();
   const { theme, setTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
   const t = useTranslation();
+  // TODO: wire up to real gamification XP source once available
+  const xp = 0;
   const [mounted, setMounted] = React.useState(false);
   const readEmployerCache = React.useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -93,7 +94,6 @@ export function AppSidebar({
 
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
-  const currentLanguageText = language === "ka" ? "GEO" : "EN";
   const rawPathname = location.pathname;
 
   // Determine if user is an academy (same as AuthContext)
@@ -338,13 +338,12 @@ export function AppSidebar({
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
-              onClick={() => setLanguage(language === "en" ? "ka" : "en")}
               className="relative h-10 px-3 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 
                          bg-black/[0.06] dark:bg-white/[0.03] hover:!bg-black/[0.08] dark:hover:!bg-white/[0.05] transition-colors
                          text-sm font-medium flex items-center gap-2"
             >
-              <Globe className="h-4 w-4" />
-              <span>{currentLanguageText}</span>
+              <Zap className="h-4 w-4" />
+              <span>{xp} XP</span>
             </Button>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

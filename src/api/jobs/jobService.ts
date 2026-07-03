@@ -13,7 +13,7 @@ import {
   JobDetail,
   CompanyInfo,
 } from "./types";
-import { countries } from "@/data/countries";
+import { georgianCityApiName } from "@/data/georgian-cities";
 import { JOB_AGGREGATOR_BASE_URL } from "@/api/auth/config";
 
 // Primary: multi-value filters (comma-separated), recommended for full filtering
@@ -21,22 +21,6 @@ const JOB_SEARCH_API = `${JOB_AGGREGATOR_BASE_URL}/api/search`;
 
 // Fallback: single-value filters only
 const JOB_API_BASE = `${JOB_AGGREGATOR_BASE_URL}/api/v1/jobs/`;
-
-/**
- * Map country code (e.g. "DE", "US") to lowercase for /api/search country param.
- * API expects: us, uk, de, fr, ca, au, in, nl, etc.
- */
-const getCountryCodeForApi = (code: string): string =>
-  code.trim().toLowerCase();
-
-/**
- * Map country code to country name (for v1/jobs location param fallback).
- */
-const getCountryNameFromCode = (code: string): string => {
-  const normalized = code.trim().toUpperCase();
-  const country = countries.find((c) => c.code.toUpperCase() === normalized);
-  return country?.name ?? code;
-};
 
 // Rate limiter: ensures only 1 request per second
 let lastRequestTime = 0;
@@ -223,12 +207,15 @@ const fetchJobsFromSearchAPI = async (
     searchParams.set("query", query.trim());
   }
 
-  // Multi-value: comma-separated, no spaces
+  // Location: Georgian city ids stored in filters.countries → API `city` param
   if (filters.countries.length > 0) {
-    searchParams.set(
-      "country",
-      filters.countries.map(getCountryCodeForApi).join(",")
-    );
+    const cityNames = filters.countries
+      .map((id) => georgianCityApiName(id))
+      .filter(Boolean);
+    if (cityNames.length > 0) {
+      searchParams.set("city", cityNames.join(","));
+      searchParams.set("location_country", "Georgia");
+    }
   }
   if (filters.skills.length > 0) {
     searchParams.set("title", filters.skills.join(","));
@@ -380,9 +367,9 @@ const fetchJobsFromBreneoAPI = async (
   // For example: location=London AND work_mode=remote AND seniority=senior
   // This means jobs must match ALL specified filters to be returned
 
-  // Add location filter - API expects country/city names, not ISO codes
+  // Add location filter — Georgian city ids → English city name for v1 API
   if (filters.countries.length > 0) {
-    const locationValue = getCountryNameFromCode(filters.countries[0]);
+    const locationValue = georgianCityApiName(filters.countries[0]);
     queryParams.set("location", locationValue);
   }
 

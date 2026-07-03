@@ -6,7 +6,6 @@ import {
   Link2,
   Briefcase,
   Pencil,
-  PiggyBank,
   Clock,
   Loader2,
 } from "lucide-react";
@@ -17,6 +16,7 @@ import {
   JobSectionBulletList,
 } from "@/components/jobs/JobSectionContent";
 import { EmployerJobSkillsPicker } from "@/components/employer/EmployerJobSkillsPicker";
+import { stripTrailingLari } from "@/utils/jobSalaryFormat";
 
 export interface EmployerJobFormPreviewProps {
   companyName: string;
@@ -111,8 +111,14 @@ export function EmployerJobFormPreview(p: EmployerJobFormPreviewProps) {
 
                 <div className="flex flex-col gap-2 md:gap-3 mb-2 text-sm md:text-base font-medium text-gray-700 dark:text-gray-200">
                   <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
-                    <PiggyBank className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                    <span className="break-words">{p.previewSalaryLine}</span>
+                    {p.previewSalaryLine !== "By agreement" ? (
+                      <span className="shrink-0 text-sm font-semibold">₾</span>
+                    ) : null}
+                    <span className="break-words">
+                      {p.previewSalaryLine === "By agreement"
+                        ? p.previewSalaryLine
+                        : stripTrailingLari(p.previewSalaryLine)}
+                    </span>
                   </div>
                   <div className="flex min-w-0 items-center gap-1.5 md:gap-2">
                     <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />

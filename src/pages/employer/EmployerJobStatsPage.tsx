@@ -1,23 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Briefcase,
-  Loader2,
-  MapPin,
-  Pencil,
-  Clock,
-  Banknote,
-} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, MapPin, Pencil, Clock } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchEmployerJobById,
   type EmployerJob,
   type EmployerJobSource,
 } from "@/api/employer/jobsApi";
-import { Badge } from "@/components/ui/badge";
+import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { resolveEmployerJobRequiredSkills } from "@/utils/employerJobToJobDetail";
+import { formatJobSalaryWithLari } from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 import { EmployerJobApplicantsPanel } from "@/components/employer/EmployerJobApplicantsPanel";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -34,26 +32,14 @@ function relativePosted(value?: string): string {
   return `Posted ${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-function workModeLabel(job: EmployerJob): string {
-  if (job.remote) return "Remote";
-  if (job.work_mode?.trim()) {
-    const m = job.work_mode.toLowerCase();
-    if (m === "remote") return "Remote";
-    if (m === "hybrid") return "Hybrid";
-    if (m === "on-site" || m === "onsite") return "On-site";
-    return job.work_mode;
-  }
-  if (!job.employment_type || job.employment_type === "—") return "On-site";
-  return job.employment_type;
-}
-
 export default function EmployerJobStatsPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { user, loading: authLoading } = useAuth();
-  const source = (searchParams.get("source") || "aggregator") as EmployerJobSource;
+  const source = (searchParams.get("source") ||
+    "aggregator") as EmployerJobSource;
 
   const [job, setJob] = useState<EmployerJob | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,10 +85,7 @@ export default function EmployerJobStatsPage() {
     const id = String(jobId ?? "").trim();
     if (!id) return;
     navigate(
-      getLocalizedPath(
-        `/employer/jobs/edit/${id}?source=${source}`,
-        language,
-      ),
+      getLocalizedPath(`/employer/jobs/edit/${id}?source=${source}`, language),
     );
   };
 
@@ -123,7 +106,7 @@ export default function EmployerJobStatsPage() {
         ) : job ? (
           <>
             <Card>
-              <CardHeader className="pb-3">
+              <CardContent className="space-y-3 p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1">
                     <p
@@ -135,9 +118,9 @@ export default function EmployerJobStatsPage() {
                     >
                       {job.is_active !== false ? "Active" : "Inactive"}
                     </p>
-                    <CardTitle className="text-xl md:text-2xl font-bold">
+                    <h1 className="text-xl md:text-2xl font-bold tracking-tight">
                       {job.title || "Untitled"}
-                    </CardTitle>
+                    </h1>
                   </div>
                   <Button
                     onClick={handleEdit}
@@ -149,52 +132,22 @@ export default function EmployerJobStatsPage() {
                     Edit job
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin className="h-4 w-4 shrink-0" />
                     {job.location || "Location not specified"}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <Briefcase className="h-4 w-4 shrink-0" />
-                    {workModeLabel(job)}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
                     <Clock className="h-4 w-4 shrink-0" />
                     {relativePosted(job.created_at)}
                   </span>
-                  {job.salary && job.salary !== "—" ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Banknote className="h-4 w-4 shrink-0" />
-                      {job.salary}
-                    </span>
-                  ) : null}
                 </div>
-                {job.employment_type && job.employment_type !== "—" ? (
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">Employment: </span>
-                    {job.employment_type}
-                  </p>
-                ) : null}
-                {requiredSkills.length > 0 ? (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Required skills
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {requiredSkills.map((skill) => (
-                        <Badge
-                          key={skill}
-                          variant="outline"
-                          className="capitalize px-3 py-1.5 text-xs rounded-[10px] bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
-                        >
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                <JobListingMetaBadges
+                  className="mt-0"
+                  employmentType={resolveJobEmploymentType(job)}
+                  workArrangement={resolveJobWorkArrangement(job)}
+                  salary={formatJobSalaryWithLari(job.salary)}
+                />
               </CardContent>
             </Card>
 

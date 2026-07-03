@@ -30,6 +30,7 @@ export function employerJobToJobDetail(job: EmployerJob): JobDetail {
     country: job.country ?? job.location_country,
     city: job.city,
     employment_type: job.employment_type,
+    work_mode: job.work_mode,
     remote: job.remote,
     responsibilities: formatJobSectionList(resolved.responsibilities),
     qualifications: qualificationsText,

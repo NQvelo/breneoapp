@@ -13,12 +13,12 @@ import apiClient from "@/api/auth/apiClient";
 import { getJobAggregatorClient } from "@/api/httpClients";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
+  Bookmark,
   Heart,
   ArrowLeft,
   Briefcase,
   MapPin,
   DollarSign,
-  PiggyBank,
   Clock,
   Calendar,
   Calendar as CalendarIcon,
@@ -70,6 +70,14 @@ import {
   buildStructuredJobForDisplayedSkills,
 } from "@/services/matching";
 import { resolveJobDisplayRequiredSkills } from "@/utils/jobSkillsResolve";
+import {
+  formatJobSalaryDisplay,
+  stripTrailingLari,
+} from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
 import type { MatchResult } from "@/types/matching";
@@ -347,54 +355,8 @@ const JobDetailPage = () => {
     },
   });
 
-  // Format salary
-  const formatSalary = () => {
-    if (!jobDetail) return "By agreement";
-
-    if (jobDetail.salary && typeof jobDetail.salary === "string") {
-      return jobDetail.salary;
-    }
-
-    const minSalary = jobDetail.min_salary;
-    const maxSalary = jobDetail.max_salary;
-    const salaryCurrency = jobDetail.salary_currency || "$";
-    const salaryPeriod = jobDetail.salary_period || "yearly";
-
-    if (
-      minSalary &&
-      maxSalary &&
-      typeof minSalary === "number" &&
-      typeof maxSalary === "number"
-    ) {
-      const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-      const minSalaryFormatted = minSalary.toLocaleString();
-      const maxSalaryFormatted = maxSalary.toLocaleString();
-      const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-      const isCurrencyBefore = currencySymbols.some((sym) =>
-        salaryCurrency.includes(sym),
-      );
-      if (isCurrencyBefore) {
-        return `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-          periodLabel ? `/${periodLabel}` : ""
-        }`;
-      } else {
-        return `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-          periodLabel ? `/${periodLabel}` : ""
-        }`;
-      }
-    } else if (minSalary && typeof minSalary === "number") {
-      const minSalaryFormatted = minSalary.toLocaleString();
-      const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-      const isCurrencyBefore = currencySymbols.some((sym) =>
-        salaryCurrency.includes(sym),
-      );
-      return isCurrencyBefore
-        ? `${salaryCurrency}${minSalaryFormatted}+`
-        : `${minSalaryFormatted}+ ${salaryCurrency}`;
-    }
-
-    return "By agreement";
-  };
+  const formatSalary = () =>
+    jobDetail ? formatJobSalaryDisplay(jobDetail) : "By agreement";
 
   // Get apply URL
   const getApplyUrl = (): string => {
@@ -1059,34 +1021,9 @@ const JobDetailPage = () => {
     );
   };
 
-  // Get employment type
-  const getEmploymentType = () => {
-    if (!jobDetail) return "Full Time";
-    const jobDetailAny = jobDetail as Record<string, unknown>;
-    // Check all possible employment type fields including JSearch format
-    return (
-      jobDetail.employment_type ||
-      jobDetail.job_employment_type ||
-      (jobDetailAny.job_employment_type as string) ||
-      "Full Time"
-    );
-  };
+  const getEmploymentType = () => resolveJobEmploymentType(jobDetail);
 
-  // Get work arrangement
-  const getWorkArrangement = () => {
-    if (!jobDetail) return "On-site";
-    const jobDetailAny = jobDetail as Record<string, unknown>;
-    // Check all possible remote flags including JSearch format
-    const isRemote =
-      jobDetail.is_remote ||
-      jobDetail.remote === true ||
-      jobDetailAny.job_is_remote === true ||
-      jobDetailAny.remote === true;
-    if (isRemote) return "Remote";
-    const title = getJobTitle().toLowerCase();
-    if (title.includes("hybrid")) return "Hybrid";
-    return "On-site";
-  };
+  const getWorkArrangement = () => resolveJobWorkArrangement(jobDetail);
 
   // Get requirements/qualifications
   const getRequirements = () => {
@@ -1570,7 +1507,7 @@ const JobDetailPage = () => {
     <DashboardLayout>
       <div
         ref={mainContentRef}
-        className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-32 md:pb-24 sm:px-4 md:px-6"
+        className="max-w-7xl mx-auto w-full py-6 pb-40 sm:pb-32 md:pb-24 px-2 sm:px-6 lg:px-8"
       >
         {error && (
           <Card className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900">
@@ -1629,7 +1566,7 @@ const JobDetailPage = () => {
 
         {!isLoading && jobDetail && jobListingActive && (
           <Card className="bg-transparent border-0 shadow-none h-full">
-            <CardContent className="p-1 sm:p-6 space-y-2">
+            <CardContent className="p-0 space-y-2">
               {/* Job Header */}
               <div>
                 <div className="flex flex-col md:flex-row md:items-start gap-6 bg-white rounded-3xl p-6 shadow-none border-0">
@@ -1700,10 +1637,26 @@ const JobDetailPage = () => {
                     </div>
 
                     {/* Job Highlights */}
-                    <div className="flex flex-col md:flex-row md:flex-wrap gap-2 md:gap-4 mb-6 text-sm md:text-base font-medium text-gray-700 dark:text-gray-200 ">
+                    <div className="flex flex-row flex-wrap items-center gap-2 md:gap-4 mb-6 text-sm md:text-base font-medium text-gray-700 dark:text-gray-200">
                       <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
-                        <PiggyBank className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                        <span>{formatSalary()}</span>
+                        {(() => {
+                          const salaryText = formatSalary();
+                          const isAgreement = salaryText === "By agreement";
+                          return (
+                            <>
+                              {!isAgreement ? (
+                                <span className="shrink-0 text-sm font-semibold">
+                                  ₾
+                                </span>
+                              ) : null}
+                              <span>
+                                {isAgreement
+                                  ? salaryText
+                                  : stripTrailingLari(salaryText)}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
                         <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
@@ -1753,10 +1706,10 @@ const JobDetailPage = () => {
                         aria-label={isSaved ? "Unsave job" : "Save job"}
                         className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
                       >
-                        <Heart
+                        <Bookmark
                           className={`h-4 w-4 ${
                             isSaved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                               : ""
                           }`}
                         />
@@ -2267,10 +2220,10 @@ const JobDetailPage = () => {
                     aria-label={isSaved ? "Unsave job" : "Save job"}
                     className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
                   >
-                    <Heart
+                    <Bookmark
                       className={`h-4 w-4 ${
                         isSaved
-                          ? "text-red-500 fill-red-500 animate-heart-pop"
+                          ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                           : ""
                       }`}
                     />

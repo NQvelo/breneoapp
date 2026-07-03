@@ -2,13 +2,13 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
-import { Bell, Moon, Sun, Globe, ArrowLeft } from "lucide-react";
+import { Bell, Moon, Sun, Zap, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRole } from "@/utils/getRole";
 import { useTheme } from "next-themes";
-import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface DashboardHeaderProps {
   sidebarCollapsed: boolean;
@@ -122,6 +122,7 @@ const getPageTitle = (
     pathname.startsWith("/employer/notifications")
   )
     return t.notifications.title;
+  if (pathname.startsWith("/cv-views")) return "CV views";
   if (pathname.startsWith("/skill-test")) return t.skillTest.title;
   // Don't show title for skill-path page - show back button instead
   if (pathname.startsWith("/skill-path")) return null;
@@ -137,8 +138,9 @@ export function DashboardHeader({
   const navigate = useNavigate();
   const { user, academyDisplay } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { language, setLanguage } = useLanguage();
   const t = useTranslation();
+  // TODO: wire up to real gamification XP source once available
+  const xp = 0;
   const [mounted, setMounted] = React.useState(false);
   const currentPath = removeLanguagePrefix(location.pathname);
   const username =
@@ -172,7 +174,6 @@ export function DashboardHeader({
 
   const courseAddEditTitle = getCourseAddEditTitle();
 
-  const currentLanguageText = language === "ka" ? "GEO" : "EN";
   const notificationsPath =
     getRole() === "employer" ? "/employer/notifications" : "/notifications";
 
@@ -239,13 +240,12 @@ export function DashboardHeader({
         <div className="hidden md:flex items-center gap-2">
           <Button
             variant="ghost"
-            onClick={() => setLanguage(language === "en" ? "ka" : "en")}
             className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
                        text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                        text-sm font-medium flex items-center gap-2 transition-colors"
           >
-            <Globe className="h-4 w-4" />
-            <span>{currentLanguageText}</span>
+            <Zap className="h-4 w-4" />
+            <span>{xp} XP</span>
           </Button>
           <Button
             variant="ghost"

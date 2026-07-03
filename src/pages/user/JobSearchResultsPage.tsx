@@ -17,11 +17,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
   Filter,
-  Heart,
+  Bookmark,
   MapPin,
   Clock,
   Briefcase,
-  DollarSign,
   Tag,
   ChevronLeft,
   ChevronRight,
@@ -34,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
+import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { profileApi } from "@/api/profile";
@@ -44,7 +44,7 @@ import {
 } from "@/services/matching";
 import type { JobDetail } from "@/api/jobs/types";
 import { useMobile } from "@/hooks/use-mobile";
-import { countries } from "@/data/countries";
+import { georgianCityLabelById } from "@/data/georgian-cities";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
@@ -54,7 +54,7 @@ import {
   filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob, JobSearchSort } from "@/api/jobs";
-import { useTranslation } from "@/contexts/LanguageContext";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
 import {
@@ -62,6 +62,14 @@ import {
   extractJobSkills,
   jobDataMatchesSelectedCountries,
 } from "@/utils/jobMatchUtils";
+import {
+  formatJobSalaryDisplay,
+  formatSalaryFilterLabel,
+} from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 
 interface Job {
   id: string;
@@ -144,6 +152,7 @@ const JobSearchResultsPage = () => {
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [dateSortOrder, setDateSortOrder] = useState<"desc" | "asc">("desc");
   const t = useTranslation();
+  const { language } = useLanguage();
 
   const { data: profileSkills = [] } = useQuery({
     queryKey: ["profileSkills", user?.id],
@@ -591,65 +600,10 @@ const JobSearchResultsPage = () => {
             setLogoIfValid(employerObj.employer_logo);
         }
 
-        let salary = "By agreement";
-        const minSalary = job.job_min_salary || job.min_salary;
-        const maxSalary = job.job_max_salary || job.max_salary;
-        const salaryCurrency =
-          job.job_salary_currency || job.salary_currency || "$";
-        const salaryPeriod =
-          job.job_salary_period || job.salary_period || "yearly";
+        const salary = formatJobSalaryDisplay(job);
 
-        if (
-          minSalary &&
-          maxSalary &&
-          typeof minSalary === "number" &&
-          typeof maxSalary === "number"
-        ) {
-          const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const maxSalaryFormatted = maxSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym),
-          );
-          if (isCurrencyBefore) {
-            salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          } else {
-            salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          }
-        } else if (minSalary && typeof minSalary === "number") {
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym),
-          );
-          salary = isCurrencyBefore
-            ? `${salaryCurrency}${minSalaryFormatted}+`
-            : `${minSalaryFormatted}+ ${salaryCurrency}`;
-        } else if (job.salary && typeof job.salary === "string") {
-          salary = job.salary;
-        }
-
-        const employmentTypeRaw =
-          job.job_employment_type ||
-          job.employment_type ||
-          job.type ||
-          "FULLTIME";
-        const employmentType =
-          jobTypeLabels[employmentTypeRaw] || employmentTypeRaw || "Full time";
-
-        let workArrangement = "On-site";
-        const isRemote =
-          job.job_is_remote || job.is_remote || job.remote === true;
-        if (isRemote) {
-          workArrangement = "Remote";
-        } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-          workArrangement = "Hybrid";
-        }
+        const employmentType = resolveJobEmploymentType(job);
+        const workArrangement = resolveJobWorkArrangement(job);
 
         const jobSkills = extractJobSkills(job);
         const matchPercentage =
@@ -905,15 +859,14 @@ const JobSearchResultsPage = () => {
       });
     });
 
-    // Countries
-    activeFilters.countries.forEach((countryCode) => {
-      const country = countries.find((c) => c.code === countryCode);
-      const countryName = country?.name || countryCode;
+    // Cities (Georgian city ids stored in countries filter field)
+    activeFilters.countries.forEach((cityId) => {
+      const cityName = georgianCityLabelById(cityId, language);
       filters.push({
-        id: `country-${countryCode}`,
-        label: countryName,
-        onRemove: () => handleRemoveCountry(countryCode),
-        ariaLabel: `Remove ${countryName} filter`,
+        id: `country-${cityId}`,
+        label: cityName,
+        onRemove: () => handleRemoveCountry(cityId),
+        ariaLabel: `Remove ${cityName} filter`,
       });
     });
 
@@ -968,13 +921,10 @@ const JobSearchResultsPage = () => {
       activeFilters.salaryMin !== undefined ||
       activeFilters.salaryMax !== undefined
     ) {
-      const salaryLabel =
-        activeFilters.salaryMin !== undefined &&
-        activeFilters.salaryMax !== undefined
-          ? `$${activeFilters.salaryMin} - $${activeFilters.salaryMax}`
-          : activeFilters.salaryMin !== undefined
-            ? `Min: $${activeFilters.salaryMin}`
-            : `Max: $${activeFilters.salaryMax}`;
+      const salaryLabel = formatSalaryFilterLabel(
+        activeFilters.salaryMin,
+        activeFilters.salaryMax,
+      );
       filters.push({
         id: "salaryRange",
         label: salaryLabel,
@@ -1014,6 +964,7 @@ const JobSearchResultsPage = () => {
   }, [
     activeFilters,
     searchTerm,
+    language,
     handleRemoveSkill,
     handleRemoveCountry,
     handleRemoveJobType,
@@ -1222,7 +1173,7 @@ const JobSearchResultsPage = () => {
         {/* Active Filters Section */}
         {allFilters.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-lg font-bold mb-4">Active Filters</h2>
+            <h2 className="text-lg font-bold mb-4">{t.jobs.activeFilters}</h2>
             <div ref={filtersContainerRef} className="flex flex-wrap gap-2">
               {allFilters.slice(0, visibleFilterCount).map((filter) => (
                 <div
@@ -1368,15 +1319,15 @@ const JobSearchResultsPage = () => {
                           className={cn(
                             "flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                             job.is_saved
-                              ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                              ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                               : "text-black dark:text-white",
                           )}
                         >
-                          <Heart
+                          <Bookmark
                             className={cn(
                               "h-4 w-4 transition-colors",
                               job.is_saved
-                                ? "text-red-500 fill-red-500 animate-heart-pop"
+                                ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                                 : "text-black dark:text-white",
                             )}
                           />
@@ -1390,18 +1341,12 @@ const JobSearchResultsPage = () => {
 
                       {/* Chips left; matching bar + text on the right, under save button */}
                       <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {job.employment_type && (
-                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                              {job.employment_type}
-                            </Badge>
-                          )}
-                          {job.work_arrangement && (
-                            <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                              {job.work_arrangement}
-                            </Badge>
-                          )}
-                        </div>
+                        <JobListingMetaBadges
+                          className="mt-0"
+                          employmentType={job.employment_type}
+                          workArrangement={job.work_arrangement}
+                          salary={job.salary}
+                        />
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <RadialProgress
                             value={job.matchPercentage ?? 0}
@@ -1464,6 +1409,11 @@ const JobSearchResultsPage = () => {
                                   <Briefcase className="h-4 w-4" />
                                   <span>{job.work_arrangement}</span>
                                 </div>
+                                {job.salary ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{job.salary}</span>
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -1498,15 +1448,15 @@ const JobSearchResultsPage = () => {
                           className={cn(
                             "absolute top-4 right-4 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-10 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                             job.is_saved
-                              ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                              ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                               : "text-black dark:text-white",
                           )}
                         >
-                          <Heart
+                          <Bookmark
                             className={cn(
                               "h-4 w-4 transition-colors",
                               job.is_saved
-                                ? "text-red-500 fill-red-500 animate-heart-pop"
+                                ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                                 : "text-black dark:text-white",
                             )}
                           />
@@ -1577,6 +1527,7 @@ const JobSearchResultsPage = () => {
           onFiltersChange={setTempFilters}
           onApply={handleApplyFilters}
           onClear={handleClearFilters}
+          showSaveFilter
           userTopSkills={userTopSkills}
         />
       </div>

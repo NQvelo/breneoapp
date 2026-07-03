@@ -24,6 +24,10 @@ import {
   formatSalaryRange,
 } from "@/services/jobs/salaryService";
 import {
+  formatJobSalaryDisplay,
+  formatJobSalaryWithLari,
+} from "@/utils/jobSalaryFormat";
+import {
   getCompleteMarketData,
   generateAIMarketInsights,
 } from "@/services/jobs/marketDataService";
@@ -110,7 +114,7 @@ const SkillPathDetailPage = () => {
   const [jobs, setJobs] = useState<ApiJob[]>([]);
   const [userCountry, setUserCountry] = useState<string>("Georgia");
   const [activeCountry, setActiveCountry] = useState<string>("US");
-  const [salaryCurrency, setSalaryCurrency] = useState<string>("$");
+  const [salaryCurrency, setSalaryCurrency] = useState<string>("₾");
   const [pageTitle, setPageTitle] = useState<string>("");
   const [userSkillSet, setUserSkillSet] = useState<Set<string>>(new Set());
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -253,7 +257,7 @@ const SkillPathDetailPage = () => {
             const defaultSalary = salaryInfoMap[initialCountry];
 
             if (defaultSalary) {
-                setSalaryInfo(defaultSalary.display);
+                setSalaryInfo(formatJobSalaryWithLari(defaultSalary.display));
                 setSalaryCurrency(defaultSalary.currency);
             } else {
                  loadSalaryInfo("Georgia");
@@ -324,7 +328,9 @@ const SkillPathDetailPage = () => {
              const salaryInfoMap = professionDetails.salary_info || {};
              if (salaryInfoMap[country]) {
                  setActiveCountry(country);
-                 setSalaryInfo(salaryInfoMap[country].display);
+                 setSalaryInfo(
+                   formatJobSalaryWithLari(salaryInfoMap[country].display),
+                 );
              }
         } else if (country !== "Georgia") {
           loadSalaryInfo(country); // Update salary if country differs
@@ -658,8 +664,8 @@ const SkillPathDetailPage = () => {
        const salaryEntry = professionDetails.salary_info[country];
 
        if (salaryEntry) {
-           setSalaryInfo(salaryEntry.display);
-           setSalaryCurrency(salaryEntry.currency);
+           setSalaryInfo(formatJobSalaryWithLari(salaryEntry.display));
+           setSalaryCurrency("₾");
        }
     }
   };
@@ -833,8 +839,7 @@ const SkillPathDetailPage = () => {
                           Minimum
                         </p>
                         <p className="font-semibold text-sm mt-1">
-                          {selectedSalary.currency}
-                          {selectedSalary.min.toLocaleString()}
+                          {selectedSalary.min.toLocaleString()} ₾
                         </p>
                       </div>
                       <div className="rounded-xl border bg-background/70 p-3">
@@ -842,8 +847,7 @@ const SkillPathDetailPage = () => {
                           Maximum
                         </p>
                         <p className="font-semibold text-sm mt-1">
-                          {selectedSalary.currency}
-                          {selectedSalary.max.toLocaleString()}
+                          {selectedSalary.max.toLocaleString()} ₾
                         </p>
                       </div>
                     </div>
@@ -1060,26 +1064,7 @@ const SkillPathDetailPage = () => {
                     jobListing.logo_url ||
                     "";
 
-                  let salary = "By agreement";
-                  const minSalary =
-                    jobListing.job_min_salary || jobListing.min_salary;
-                  const maxSalary =
-                    jobListing.job_max_salary || jobListing.max_salary;
-                  const salaryCurrency =
-                    jobListing.job_salary_currency ||
-                    jobListing.salary_currency ||
-                    "$";
-
-                  if (
-                    minSalary &&
-                    maxSalary &&
-                    typeof minSalary === "number" &&
-                    typeof maxSalary === "number"
-                  ) {
-                    salary = `${salaryCurrency}${minSalary.toLocaleString()} - ${salaryCurrency}${maxSalary.toLocaleString()}`;
-                  } else if (minSalary && typeof minSalary === "number") {
-                    salary = `${salaryCurrency}${minSalary.toLocaleString()}+`;
-                  }
+                  const salary = formatJobSalaryDisplay(jobListing);
 
                   return (
                     <Card

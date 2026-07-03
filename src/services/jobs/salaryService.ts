@@ -502,38 +502,24 @@ export const formatSalaryRange = (salaryData: SalaryData | null): string => {
     return "Salary data not available";
   }
 
-  const currencySymbol =
-    currency === "USD"
-      ? "$"
-      : currency === "EUR"
-      ? "€"
-      : currency === "GBP"
-      ? "£"
-      : currency === "GEL"
-      ? "₾"
-      : currency || "$";
   const period =
     salary_period === "YEARLY"
       ? "year"
       : salary_period === "MONTHLY"
       ? "month"
       : "";
+  const periodSuffix = period ? `/${period}` : "";
 
   if (min_salary && max_salary) {
-    // Format numbers with commas
     const minFormatted = Math.round(min_salary).toLocaleString();
     const maxFormatted = Math.round(max_salary).toLocaleString();
-    return `${currencySymbol}${minFormatted} - ${currencySymbol}${maxFormatted}${
-      period ? `/${period}` : ""
-    }`;
+    return `${minFormatted} - ${maxFormatted} ₾${periodSuffix}`;
   } else if (min_salary) {
     const minFormatted = Math.round(min_salary).toLocaleString();
-    return `${currencySymbol}${minFormatted}+${period ? `/${period}` : ""}`;
+    return `${minFormatted}+ ₾${periodSuffix}`;
   } else if (max_salary) {
     const maxFormatted = Math.round(max_salary).toLocaleString();
-    return `Up to ${currencySymbol}${maxFormatted}${
-      period ? `/${period}` : ""
-    }`;
+    return `Up to ${maxFormatted} ₾${periodSuffix}`;
   }
 
   return "Salary data not available";

@@ -25,6 +25,9 @@
  * - GET /api/app/users/me/applications — JWT → aggregator list (query external_user_id, page, limit, sort)
  * - DELETE /api/app/jobs/:jobId/application — JWT → aggregator DELETE withdraw
  * - GET /api/app/jobs/:jobId/applicants — employer JWT → aggregator applicants + X-Employer-Key
+ * - POST /api/app/jobs/:jobId/applicants/:applicantUserId/cv-view — record/increment CV view
+ * - GET /api/app/users/me/cv-views — applicant JWT → list CV views on my profile
+ * - PATCH /api/app/users/me/cv-views/:cvViewId — applicant acknowledge CV view
  *
  * Run: node server/employer-jobs-proxy.mjs (see npm run dev).
  *
@@ -2606,6 +2609,187 @@ async function handleAppJobApplicants(req, res) {
 app.get("/api/app/jobs/:jobId/applicants", handleAppJobApplicants);
 app.get("/api/app/jobs/:jobId/applicants/", handleAppJobApplicants);
 
+/**
+ * Employer JWT → aggregator with X-Employer-Key (app BFF envelope).
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @param {{ method: string; upstreamPath: string }} opts
+ */
+async function forwardAppEmployerAggregator(req, res, opts) {
+  const ctx = await requireEmployerAuth(req, res);
+  if (!ctx) return;
+  if (!AGGREGATOR_KEY) {
+    return res.status(500).json({
+      success: false,
+      message:
+        "EMPLOYER_POST_SECRET is not set. Add it to .env and restart the BFF.",
+      data: null,
+      error: "server_config",
+    });
+  }
+  const upstreamUrl = new URL(
+    `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${opts.upstreamPath}`,
+  );
+  for (const [key, val] of Object.entries(req.query || {})) {
+    if (val == null || val === "") continue;
+    if (Array.isArray(val)) {
+      val.forEach((v) => upstreamUrl.searchParams.append(key, String(v)));
+    } else {
+      upstreamUrl.searchParams.set(key, String(val));
+    }
+  }
+  if (!upstreamUrl.searchParams.has("external_user_id") && ctx.userId) {
+    upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+  }
+  /** @type {RequestInit} */
+  const fetchInit = {
+    method: opts.method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Employer-Key": AGGREGATOR_KEY,
+    },
+  };
+  if (["POST", "PATCH", "PUT"].includes(opts.method) && req.body != null) {
+    fetchInit.body = JSON.stringify(req.body);
+  }
+  const upstream = await fetch(upstreamUrl.toString(), fetchInit);
+  const text = await upstream.text();
+  const normalized = normalizeAppBffJson(text, upstream.status, upstream.ok);
+  return res.status(normalized.httpStatus).json({
+    success: normalized.success,
+    message: normalized.message,
+    data: normalized.data,
+    ...(normalized.error ? { error: normalized.error } : {}),
+  });
+}
+
+/**
+ * Job seeker JWT → aggregator CV-view routes (X-Application-Key).
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @param {{ method: string; upstreamPath: string }} opts
+ */
+async function forwardAppApplicantCvViews(req, res, opts) {
+  const ctx = await requireUserAuth(req, res);
+  if (!ctx) return;
+  if (!AGGREGATOR_KEY) {
+    return res.status(500).json({
+      success: false,
+      message:
+        "EMPLOYER_POST_SECRET is not set. Add it to .env and restart the BFF.",
+      data: null,
+      error: "server_config",
+    });
+  }
+  const upstreamUrl = new URL(
+    `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}${opts.upstreamPath}`,
+  );
+  upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+  for (const [key, val] of Object.entries(req.query || {})) {
+    if (val == null || val === "" || key === "external_user_id") continue;
+    if (Array.isArray(val)) {
+      val.forEach((v) => upstreamUrl.searchParams.append(key, String(v)));
+    } else {
+      upstreamUrl.searchParams.set(key, String(val));
+    }
+  }
+  /** @type {RequestInit} */
+  const fetchInit = {
+    method: opts.method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Application-Key": AGGREGATOR_KEY,
+    },
+  };
+  if (["POST", "PATCH", "PUT"].includes(opts.method) && req.body != null) {
+    fetchInit.body = JSON.stringify(req.body);
+  }
+  const upstream = await fetch(upstreamUrl.toString(), fetchInit);
+  const text = await upstream.text();
+  const normalized = normalizeAppBffJson(text, upstream.status, upstream.ok);
+  return res.status(normalized.httpStatus).json({
+    success: normalized.success,
+    message: normalized.message,
+    data: normalized.data,
+    ...(normalized.error ? { error: normalized.error } : {}),
+  });
+}
+
+/** POST /api/app/jobs/:jobId/applicants/:applicantUserId/cv-view */
+async function handleAppRecordApplicantCvView(req, res) {
+  try {
+    const jobId = encodeURIComponent(String(req.params.jobId || "").trim());
+    const applicantUserId = encodeURIComponent(
+      String(req.params.applicantUserId || "").trim(),
+    );
+    await forwardAppEmployerAggregator(req, res, {
+      method: "POST",
+      upstreamPath: `/api/jobs/${jobId}/applicants/${applicantUserId}/cv-view`,
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+app.post(
+  "/api/app/jobs/:jobId/applicants/:applicantUserId/cv-view",
+  handleAppRecordApplicantCvView,
+);
+app.post(
+  "/api/app/jobs/:jobId/applicants/:applicantUserId/cv-view/",
+  handleAppRecordApplicantCvView,
+);
+
+/** GET /api/app/users/me/cv-views */
+async function handleAppMyCvViews(req, res) {
+  try {
+    await forwardAppApplicantCvViews(req, res, {
+      method: "GET",
+      upstreamPath: "/api/users/me/cv-views",
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+/** PATCH /api/app/users/me/cv-views/:cvViewId */
+async function handleAppAcknowledgeCvView(req, res) {
+  try {
+    const cvViewId = encodeURIComponent(String(req.params.cvViewId || "").trim());
+    await forwardAppApplicantCvViews(req, res, {
+      method: "PATCH",
+      upstreamPath: `/api/users/me/cv-views/${cvViewId}`,
+    });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: "server_error",
+    });
+  }
+}
+
+app.get("/api/app/users/me/cv-views", handleAppMyCvViews);
+app.get("/api/app/users/me/cv-views/", handleAppMyCvViews);
+app.patch("/api/app/users/me/cv-views/:cvViewId", handleAppAcknowledgeCvView);
+app.patch("/api/app/users/me/cv-views/:cvViewId/", handleAppAcknowledgeCvView);
+
 function parseUpstreamJson(text) {
   try {
     return text ? JSON.parse(text) : {};
@@ -2746,6 +2930,16 @@ function buildAggregatorPayload(body, company, isPatch = false) {
 
   if (!isPatch || has("work_mode")) {
     payload.work_mode = normalizeWorkMode(body.work_mode);
+  }
+
+  if (!isPatch || has("employment_type_note")) {
+    const employmentNote =
+      body.employment_type_note != null
+        ? String(body.employment_type_note).trim()
+        : "";
+    if (employmentNote) {
+      payload.employment_type = employmentNote;
+    }
   }
 
   // Aggregator POST expects company *name* in JSON; scope via ?company_id= on the URL.

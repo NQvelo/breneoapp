@@ -3,11 +3,17 @@ import { MapPin, X, Search } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { countries, Country } from "@/data/countries";
+import {
+  filterGeorgianCities,
+  georgianCityLabel,
+  georgianCityLabelById,
+} from "@/data/georgian-cities";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
 interface LocationDropdownProps {
-  selectedLocations: string[]; // Array of country codes
+  /** Georgian city ids (stored in filters.countries for API compat). */
+  selectedLocations: string[];
   onLocationsChange: (locations: string[]) => void;
   placeholder?: string;
 }
@@ -15,22 +21,24 @@ interface LocationDropdownProps {
 export const LocationDropdown: React.FC<LocationDropdownProps> = ({
   selectedLocations,
   onLocationsChange,
-  placeholder = "Location",
+  placeholder,
 }) => {
+  const { language } = useLanguage();
+  const t = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [tempSelectedLocations, setTempSelectedLocations] =
     useState<string[]>(selectedLocations);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Initialize temp state when dropdown opens
+  const placeholderText = placeholder ?? t.jobs.location;
+
   useEffect(() => {
     if (isOpen) {
       setTempSelectedLocations(selectedLocations);
     }
   }, [isOpen, selectedLocations]);
 
-  // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -38,14 +46,14 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
         !dropdownRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
-        setTempSelectedLocations(selectedLocations); // Reset temp state on cancel
+        setTempSelectedLocations(selectedLocations);
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsOpen(false);
-        setTempSelectedLocations(selectedLocations); // Reset temp state on cancel
+        setTempSelectedLocations(selectedLocations);
       }
     };
 
@@ -60,36 +68,26 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
     };
   }, [isOpen, selectedLocations]);
 
-  // Filter countries based on search query
-  const filteredCountries = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return countries;
-    }
-    const query = searchQuery.toLowerCase();
-    return countries.filter(
-      (country) =>
-        country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query),
-    );
-  }, [searchQuery]);
+  const filteredCities = useMemo(
+    () => filterGeorgianCities(searchQuery, language),
+    [searchQuery, language],
+  );
 
-  const handleToggleCountry = (countryCode: string) => {
-    if (tempSelectedLocations.includes(countryCode)) {
+  const handleToggleCity = (cityId: string) => {
+    if (tempSelectedLocations.includes(cityId)) {
       setTempSelectedLocations(
-        tempSelectedLocations.filter((code) => code !== countryCode),
+        tempSelectedLocations.filter((id) => id !== cityId),
       );
     } else {
-      setTempSelectedLocations([...tempSelectedLocations, countryCode]);
+      setTempSelectedLocations([...tempSelectedLocations, cityId]);
     }
   };
 
   const handleSelectAll = () => {
-    if (tempSelectedLocations.length === filteredCountries.length) {
+    if (tempSelectedLocations.length === filteredCities.length) {
       setTempSelectedLocations([]);
     } else {
-      setTempSelectedLocations(
-        filteredCountries.map((country) => country.code),
-      );
+      setTempSelectedLocations(filteredCities.map((city) => city.id));
     }
   };
 
@@ -99,42 +97,33 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
   };
 
   const isAllSelected =
-    filteredCountries.length > 0 &&
-    filteredCountries.every((country) =>
-      tempSelectedLocations.includes(country.code),
-    );
+    filteredCities.length > 0 &&
+    filteredCities.every((city) => tempSelectedLocations.includes(city.id));
 
-  // Smart display text: show count when too many countries selected
   const displayText = useMemo(() => {
     if (selectedLocations.length === 0) {
-      return placeholder;
+      return placeholderText;
     }
 
     if (selectedLocations.length === 1) {
-      return (
-        countries.find((c) => c.code === selectedLocations[0])?.name ||
-        placeholder
-      );
+      return georgianCityLabelById(selectedLocations[0], language);
     }
 
-    // If more than 3 countries selected, show count instead of all names
     if (selectedLocations.length > 3) {
-      return `${selectedLocations.length} countries selected`;
+      return `${selectedLocations.length} ${t.jobs.citiesSelected}`;
     }
 
-    // Show up to 3 country names, truncate if needed
-    const countryNames = selectedLocations
+    return selectedLocations
       .slice(0, 3)
-      .map((code) => countries.find((c) => c.code === code)?.name || code);
-
-    return countryNames.join(", ");
-  }, [selectedLocations, placeholder]);
+      .map((id) => georgianCityLabelById(id, language))
+      .join(", ");
+  }, [selectedLocations, placeholderText, language, t.jobs.citiesSelected]);
 
   const isPlaceholder = selectedLocations.length === 0;
 
-  const handleRemoveCountry = (e: React.MouseEvent, countryCode: string) => {
+  const handleRemoveCity = (e: React.MouseEvent, cityId: string) => {
     e.stopPropagation();
-    onLocationsChange(selectedLocations.filter((code) => code !== countryCode));
+    onLocationsChange(selectedLocations.filter((id) => id !== cityId));
   };
 
   const handleRemoveAll = (e: React.MouseEvent) => {
@@ -144,7 +133,6 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
 
   return (
     <div className="relative w-full max-w-full" ref={dropdownRef}>
-      {/* Location Input Field */}
       <div className="flex items-center gap-2 w-full min-w-0">
         <button
           type="button"
@@ -158,15 +146,9 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
           )}
         >
           <MapPin className="h-4 w-4 md:h-5 md:w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2" />
-          {selectedLocations.length === 0 ? (
-            <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">
-              {placeholder}
-            </span>
-          ) : (
-            <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">
-              {displayText}
-            </span>
-          )}
+          <span className="flex-1 min-w-0 truncate text-sm overflow-hidden text-ellipsis whitespace-nowrap">
+            {displayText}
+          </span>
         </button>
         {selectedLocations.length > 0 && (
           <button
@@ -174,7 +156,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               if (selectedLocations.length === 1) {
-                handleRemoveCountry(e, selectedLocations[0]);
+                handleRemoveCity(e, selectedLocations[0]);
               } else {
                 handleRemoveAll(e);
               }
@@ -191,7 +173,6 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
         )}
       </div>
 
-      {/* Dropdown Panel */}
       {isOpen && (
         <div
           className={cn(
@@ -201,7 +182,6 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             "left-0 md:right-0 md:left-auto",
           )}
         >
-          {/* Header with Title and Close Button */}
           <div
             className={cn(
               "flex items-center justify-between px-4 py-3 border-b",
@@ -214,7 +194,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                 "text-gray-900 dark:text-gray-100",
               )}
             >
-              Countries
+              {t.jobs.city}
             </h3>
             <button
               type="button"
@@ -235,13 +215,12 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             </button>
           </div>
 
-          {/* Search Input */}
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="text"
-                placeholder="Search countries..."
+                placeholder={t.jobs.searchCities}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
@@ -255,10 +234,8 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             </div>
           </div>
 
-          {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto min-h-0">
-            {/* Select All Option - Only show if there are filtered results */}
-            {filteredCountries.length > 0 && (
+            {filteredCities.length > 0 && (
               <div
                 className={cn(
                   "flex items-center px-4 py-3 cursor-pointer transition-colors border-b",
@@ -275,16 +252,13 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                   onCheckedChange={(checked) => {
                     if (checked) {
                       setTempSelectedLocations(
-                        filteredCountries.map((country) => country.code),
+                        filteredCities.map((city) => city.id),
                       );
                     } else {
-                      // Remove all filtered countries from selection
-                      const filteredCodes = filteredCountries.map(
-                        (c) => c.code,
-                      );
+                      const filteredIds = filteredCities.map((c) => c.id);
                       setTempSelectedLocations(
                         tempSelectedLocations.filter(
-                          (code) => !filteredCodes.includes(code),
+                          (id) => !filteredIds.includes(id),
                         ),
                       );
                     }
@@ -294,29 +268,28 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                 <span
                   className={cn("text-sm", "text-gray-900 dark:text-gray-100")}
                 >
-                  Select All
+                  {t.jobs.selectAllCities}
                 </span>
               </div>
             )}
 
-            {/* Country List */}
-            {filteredCountries.length === 0 ? (
+            {filteredCities.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                No countries found
+                {t.jobs.noCitiesFound}
               </div>
             ) : (
-              filteredCountries.map((country) => {
-                const isChecked = tempSelectedLocations.includes(country.code);
+              filteredCities.map((city) => {
+                const isChecked = tempSelectedLocations.includes(city.id);
                 return (
                   <div
-                    key={country.code}
+                    key={city.id}
                     className={cn(
                       "flex items-center px-4 py-2.5 cursor-pointer transition-colors",
                       "hover:bg-gray-50 dark:hover:bg-gray-700/50",
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleToggleCountry(country.code);
+                      handleToggleCity(city.id);
                     }}
                   >
                     <Checkbox
@@ -325,13 +298,11 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                         if (checked) {
                           setTempSelectedLocations([
                             ...tempSelectedLocations,
-                            country.code,
+                            city.id,
                           ]);
                         } else {
                           setTempSelectedLocations(
-                            tempSelectedLocations.filter(
-                              (code) => code !== country.code,
-                            ),
+                            tempSelectedLocations.filter((id) => id !== city.id),
                           );
                         }
                       }}
@@ -343,7 +314,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
                         "text-gray-900 dark:text-gray-100",
                       )}
                     >
-                      {country.name}
+                      {georgianCityLabel(city, language)}
                     </span>
                   </div>
                 );
@@ -351,7 +322,6 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
             )}
           </div>
 
-          {/* Save Button - Fixed at Bottom */}
           <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800 sticky bottom-0 z-10">
             <Button
               onClick={(e) => {
@@ -360,7 +330,7 @@ export const LocationDropdown: React.FC<LocationDropdownProps> = ({
               }}
               className="w-full"
             >
-              Save
+              {t.common.save}
             </Button>
           </div>
         </div>

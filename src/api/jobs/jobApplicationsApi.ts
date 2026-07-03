@@ -34,6 +34,9 @@ export interface JobApplicationItem extends JobApplicationUserFields {
   jobId?: string | number;
   status?: string;
   applied_at?: string;
+  employer_viewed_cv?: boolean;
+  employer_first_viewed_at?: string;
+  employer_cv_view_count?: number;
   job?: ApplicationJobSummary;
   [key: string]: unknown;
 }

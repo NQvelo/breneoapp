@@ -8,10 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Heart,
-  Clock,
-  Briefcase,
-  DollarSign,
+  Bookmark,
   Tag,
   ArrowLeft,
   Loader2,
@@ -23,6 +20,12 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, ApiJob } from "@/api/jobs";
 import { filterTechJobs, filterATSJobs } from "@/utils/jobFilterUtils";
+import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 
 interface Job {
   id: string;
@@ -37,14 +40,6 @@ interface Job {
   work_arrangement?: string;
   benefits?: string;
 }
-
-const jobTypeLabels: Record<string, string> = {
-  FULLTIME: "Full Time",
-  PARTTIME: "Part Time",
-  CONTRACTOR: "Contractor",
-  INTERN: "Intern",
-  INTERNSHIP: "Internship",
-};
 
 // Fetch jobs for a specific company
 const fetchCompanyJobs = async (
@@ -410,72 +405,10 @@ const CompanyJobsPage = () => {
           }
         }
 
-        // Format salary
-        let salary = "By agreement";
-        const minSalary = job.job_min_salary || job.min_salary;
-        const maxSalary = job.job_max_salary || job.max_salary;
-        const salaryCurrency =
-          job.job_salary_currency || job.salary_currency || "$";
-        const salaryPeriod =
-          job.job_salary_period || job.salary_period || "yearly";
+        const salary = formatJobSalaryDisplay(job);
 
-        if (
-          minSalary &&
-          maxSalary &&
-          typeof minSalary === "number" &&
-          typeof maxSalary === "number"
-        ) {
-          const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const maxSalaryFormatted = maxSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym),
-          );
-          if (isCurrencyBefore) {
-            salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          } else {
-            salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-              periodLabel ? `/${periodLabel}` : ""
-            }`;
-          }
-        } else if (minSalary && typeof minSalary === "number") {
-          const minSalaryFormatted = minSalary.toLocaleString();
-          const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-          const isCurrencyBefore = currencySymbols.some((sym) =>
-            salaryCurrency.includes(sym),
-          );
-          salary = isCurrencyBefore
-            ? `${salaryCurrency}${minSalaryFormatted}+`
-            : `${minSalaryFormatted}+ ${salaryCurrency}`;
-        } else if (job.salary && typeof job.salary === "string") {
-          salary = job.salary;
-        }
-
-        // Format employment type
-        const employmentTypeRaw =
-          job.job_employment_type ||
-          job.employment_type ||
-          job.type ||
-          "FULLTIME";
-        const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-        const employmentType =
-          jobTypeLabels[employmentTypeRawUpper] ||
-          jobTypeLabels[employmentTypeRaw] ||
-          employmentTypeRaw ||
-          "Full time";
-
-        // Determine work arrangement
-        let workArrangement = "On-site";
-        const isRemote =
-          job.job_is_remote || job.is_remote || job.remote === true;
-        if (isRemote) {
-          workArrangement = "Remote";
-        } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-          workArrangement = "Hybrid";
-        }
+        const employmentType = resolveJobEmploymentType(job);
+        const workArrangement = resolveJobWorkArrangement(job);
 
         return {
           id: jobId,
@@ -613,29 +546,12 @@ const CompanyJobsPage = () => {
                       {job.title}
                     </h4>
 
-                    {/* Job Details */}
-                    <div className="space-y-2 mb-4 md:mb-4 flex-grow pb-20 md:pb-0">
-                      <div className="flex items-center gap-2 text-sm">
-                        <DollarSign className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">{job.salary}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700">
-                          {job.employment_type}
-                        </span>
-                      </div>
-
-                      {job.work_arrangement && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Briefcase className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700">
-                            {job.work_arrangement}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <JobListingMetaBadges
+                      className="mb-4 md:mb-4 flex-grow pb-20 md:pb-0"
+                      employmentType={job.employment_type}
+                      workArrangement={job.work_arrangement}
+                      salary={job.salary}
+                    />
 
                     {/* Action Buttons */}
                     <div className="absolute bottom-0 left-0 right-0 p-5 bg-card flex items-center gap-2 transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 transition-transform duration-200 ease-in-out shadow-lg">
@@ -659,12 +575,16 @@ const CompanyJobsPage = () => {
                         size="icon"
                         onClick={() => saveJobMutation.mutate(job)}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                        className={job.is_saved ? "bg-primary/90" : ""}
+                        className={
+                          job.is_saved
+                            ? "bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
+                            : ""
+                        }
                       >
-                        <Heart
+                        <Bookmark
                           className={`h-5 w-5 transition-colors ${
                             job.is_saved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                               : "text-white"
                           }`}
                         />

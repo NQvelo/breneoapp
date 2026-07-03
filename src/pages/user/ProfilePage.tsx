@@ -37,7 +37,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -68,7 +67,7 @@ import {
   GraduationCap,
   ArrowRight,
   MapPin,
-  Heart,
+  Bookmark,
   Loader2,
   X,
 } from "lucide-react";
@@ -77,7 +76,13 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { RadialProgress } from "@/components/ui/radial-progress";
+import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
+import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 import type { JobDetail } from "@/api/jobs/types";
 import {
   matchJobDetailToUser,
@@ -102,9 +107,6 @@ const SkillsBarChart = React.lazy(
   () => import("@/components/profile/SkillsBarChart").then((m) => ({ default: m.SkillsBarChart })),
 );
 import { refreshUserIndustryProfile } from "@/services/industry/refreshUserIndustryProfile";
-import { parseResumePdf } from "@/services/resume/resumeImportService";
-import { useSubscription } from "@/contexts/SubscriptionContext";
-
 interface SkillTestResult {
   final_role?: string;
   skills_json?: {
@@ -307,9 +309,6 @@ const platformLabels: Record<SocialPlatform, string> = {
   behance: "Behance",
 };
 
-const normalizeSkillName = (value: string): string =>
-  value.replace(/\s+/g, " ").trim();
-
 const ProfilePage = () => {
   // ✅ Get user, loading state, and logout function from AuthContext
   const { user, loading, logout } = useAuth();
@@ -318,7 +317,6 @@ const ProfilePage = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const t = useTranslation();
-  const { subscriptionInfo, loading: subscriptionLoading } = useSubscription();
 
   // State for skill test results
   const [skillResults, setSkillResults] = useState<SkillTestResult | null>(
@@ -341,9 +339,6 @@ const ProfilePage = () => {
     "courses",
   );
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [importingCv, setImportingCv] = useState(false);
-  const [cvImportProgress, setCvImportProgress] = useState(0);
-  const [isCvUploadDoneModalOpen, setIsCvUploadDoneModalOpen] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
 
   // Update active view based on hash
@@ -755,82 +750,10 @@ const ProfilePage = () => {
                   (jobDetail.company as { company_logo?: string }).company_logo
                 : undefined);
 
-            // Format salary
-            let salary = "By agreement";
-            const minSalary = jobDetail.job_min_salary || jobDetail.min_salary;
-            const maxSalary = jobDetail.job_max_salary || jobDetail.max_salary;
-            const salaryCurrency = (jobDetail.job_salary_currency ||
-              jobDetail.salary_currency ||
-              "$") as string;
-            const salaryPeriod = (jobDetail.job_salary_period ||
-              jobDetail.salary_period ||
-              "yearly") as string;
+            const salary = formatJobSalaryDisplay(jobDetail);
 
-            if (
-              minSalary &&
-              maxSalary &&
-              typeof minSalary === "number" &&
-              typeof maxSalary === "number"
-            ) {
-              const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-              const minSalaryFormatted = minSalary.toLocaleString();
-              const maxSalaryFormatted = maxSalary.toLocaleString();
-              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-              const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym),
-              );
-              if (isCurrencyBefore) {
-                salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-                  periodLabel ? `/${periodLabel}` : ""
-                }`;
-              } else {
-                salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-                  periodLabel ? `/${periodLabel}` : ""
-                }`;
-              }
-            } else if (minSalary && typeof minSalary === "number") {
-              const minSalaryFormatted = minSalary.toLocaleString();
-              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-              const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym),
-              );
-              salary = isCurrencyBefore
-                ? `${salaryCurrency}${minSalaryFormatted}+`
-                : `${minSalaryFormatted}+ ${salaryCurrency}`;
-            } else if (
-              jobDetail.salary &&
-              typeof jobDetail.salary === "string"
-            ) {
-              salary = jobDetail.salary;
-            }
-
-            // Format employment type
-            const employmentTypeRaw = (jobDetail.job_employment_type ||
-              jobDetail.employment_type ||
-              jobDetail.type ||
-              "FULLTIME") as string;
-            const jobTypeLabels: Record<string, string> = {
-              FULLTIME: "Full time",
-              PARTTIME: "Part time",
-              CONTRACTOR: "Contract",
-              INTERN: "Internship",
-            };
-            const employmentType =
-              jobTypeLabels[employmentTypeRaw] ||
-              employmentTypeRaw ||
-              "Full time";
-
-            // Determine work arrangement
-            let workArrangement = "On-site";
-            const isRemote =
-              jobDetail.job_is_remote ||
-              jobDetail.is_remote ||
-              jobDetail.remote === true;
-            if (isRemote) {
-              workArrangement = "Remote";
-            } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-              workArrangement = "Hybrid";
-            }
+            const employmentType = resolveJobEmploymentType(jobDetail);
+            const workArrangement = resolveJobWorkArrangement(jobDetail);
 
             // Total match % (same logic as JobsPage / job detail)
             const matchPercentage =
@@ -1758,168 +1681,6 @@ const ProfilePage = () => {
     }
   };
 
-  const toEducationKey = (entry: {
-    school_name?: string;
-    major?: string;
-    start_date?: string;
-    end_date?: string | null;
-  }) =>
-    [
-      (entry.school_name || "").trim().toLowerCase(),
-      (entry.major || "").trim().toLowerCase(),
-      (entry.start_date || "").trim(),
-      (entry.end_date || "").trim(),
-    ].join("|");
-
-  const toWorkKey = (entry: {
-    company?: string;
-    job_title?: string;
-    start_date?: string;
-    end_date?: string | null;
-  }) =>
-    [
-      (entry.company || "").trim().toLowerCase(),
-      (entry.job_title || "").trim().toLowerCase(),
-      (entry.start_date || "").trim(),
-      (entry.end_date || "").trim(),
-    ].join("|");
-
-  const handleCvUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    if (subscriptionInfo?.is_active !== true) {
-      navigate({
-        pathname: location.pathname,
-        search: "?upgrade=true",
-      });
-      return;
-    }
-
-    const isPdf =
-      file.type === "application/pdf" ||
-      file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf) {
-      toast.error("Please upload a PDF CV file.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("CV file size must be 10MB or less.");
-      return;
-    }
-
-    setImportingCv(true);
-    setCvImportProgress(3);
-    try {
-      const parsed = await parseResumePdf(file, (percent) => {
-        setCvImportProgress((prev) => Math.max(prev, percent));
-      });
-      setCvImportProgress((prev) => Math.max(prev, 92));
-
-      let createdEducationCount = 0;
-      let createdWorkCount = 0;
-      let createdSkillCount = 0;
-      let aboutMeUpdated = false;
-
-      if (parsed.aboutMe?.trim()) {
-        await profileApi.updateProfile({ about_me: parsed.aboutMe.trim() });
-        setAboutMe(parsed.aboutMe.trim());
-        setAboutMeText(parsed.aboutMe.trim());
-        aboutMeUpdated = true;
-      }
-
-      const existingEducationKeys = new Set(
-        educations.map((e) => toEducationKey(e)),
-      );
-      for (const education of parsed.educations) {
-        const key = toEducationKey(education);
-        if (existingEducationKeys.has(key)) continue;
-        await profileApi.createEducation(education);
-        existingEducationKeys.add(key);
-        createdEducationCount += 1;
-      }
-
-      const existingWorkKeys = new Set(
-        workExperiences.map((w) => toWorkKey(w)),
-      );
-      for (const work of parsed.workExperiences) {
-        const key = toWorkKey(work);
-        if (existingWorkKeys.has(key)) continue;
-        await profileApi.createWorkExperience(work);
-        existingWorkKeys.add(key);
-        createdWorkCount += 1;
-      }
-
-      const existingSkills = new Set(
-        profileSkills.map((s) =>
-          normalizeSkillName(s.skill_name).toLowerCase(),
-        ),
-      );
-      for (const skill of parsed.skills) {
-        const normalized = normalizeSkillName(skill).toLowerCase();
-        if (!normalized || existingSkills.has(normalized)) continue;
-        await profileApi.addSkill(skill);
-        existingSkills.add(normalized);
-        createdSkillCount += 1;
-      }
-
-      await fetchEducations();
-      const freshWork = await profileApi.getWorkExperiences().catch(() => []);
-      setWorkExperiences(Array.isArray(freshWork) ? freshWork : []);
-      await fetchProfileSkills();
-
-      if (user?.id) {
-        try {
-          await refreshUserIndustryProfile(
-            String(user.id),
-            Array.isArray(freshWork) ? freshWork : [],
-          );
-        } catch (err) {
-          console.error(
-            "[Industry profile] refresh after CV import failed:",
-            err,
-          );
-        }
-      }
-
-      const insertedTotal =
-        createdEducationCount + createdWorkCount + createdSkillCount;
-      if (!insertedTotal && !aboutMeUpdated) {
-        toast.info("CV parsed, but no new profile data was found to import.");
-      } else {
-        toast.success(
-          `CV imported: ${createdEducationCount} education, ${createdWorkCount} work experience, ${createdSkillCount} skills${aboutMeUpdated ? ", about me updated" : ""}.`,
-        );
-      }
-      setCvImportProgress(100);
-      setIsCvUploadDoneModalOpen(true);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to parse and import CV.";
-      toast.error(message);
-    } finally {
-      setTimeout(() => {
-        setImportingCv(false);
-        setCvImportProgress(0);
-      }, 600);
-    }
-  };
-
-  const triggerCvUpload = () => {
-    if (subscriptionLoading) return;
-    const isPremium = subscriptionInfo?.is_active === true;
-    if (!isPremium) {
-      navigate({
-        pathname: location.pathname,
-        search: "?upgrade=true",
-      });
-      return;
-    }
-    document.getElementById("cv-upload-input")?.click();
-  };
-
   const handleSendPhoneVerification = async () => {
     try {
       await triggerPhoneVerificationCode();
@@ -2055,14 +1816,6 @@ const ProfilePage = () => {
               </div>
             </CardHeader>
             <CardContent className="px-6 pb-6">
-              <input
-                id="cv-upload-input"
-                type="file"
-                accept="application/pdf,.pdf"
-                className="hidden"
-                onChange={handleCvUpload}
-                disabled={importingCv}
-              />
               <div className="flex flex-row items-center gap-4 mb-4">
                 <div className="flex-shrink-0">
                   <div
@@ -2154,107 +1907,6 @@ const ProfilePage = () => {
               </div>
             </CardContent>
           </Card>
-
-          {/* Skill/Resume Quick Actions */}
-          <div className="grid grid-cols-2 gap-3 md:gap-4 w-full">
-            <Card className="bg-white transition-all w-full rounded-3xl border-0 hover:shadow-soft transition-shadow cursor-pointer">
-              <CardContent className="p-3 md:p-4">
-                {loadingResults ? (
-                  <div className="flex items-center justify-center min-h-[96px] md:min-h-[120px]">
-                    <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-                  </div>
-                ) : skillResults?.final_role || getAllSkills().length > 0 ? (
-                  <Link to="/skill-path" className="block cursor-pointer group">
-                    <div className="flex items-center gap-3 md:gap-4">
-                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                        <h3 className="font-bold text-base md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[2.4rem] md:min-h-[3rem]">
-                          {t.home.skillPathTitle}
-                        </h3>
-                        <p className="hidden md:block text-sm text-gray-900">
-                          {t.home.skillPathSubtitle}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0 w-16 h-16 md:w-28 md:h-28 flex items-center justify-center">
-                        <img
-                          src="/lovable-uploads/checklisto.png"
-                          alt="Checklist"
-                          className="w-14 h-14 md:w-24 md:h-24 object-contain"
-                        />
-                      </div>
-                    </div>
-                  </Link>
-                ) : (
-                  <Link to="/skill-test" className="block cursor-pointer group">
-                    <div className="flex items-center gap-3 md:gap-4">
-                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                        <h3 className="font-bold text-base md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[2.4rem] md:min-h-[3rem]">
-                          {t.home.skillTestTitle}
-                        </h3>
-                        <p className="hidden md:block text-sm text-gray-900">
-                          {t.home.skillTestSubtitle}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0 w-16 h-16 md:w-28 md:h-28 flex items-center justify-center">
-                        <img
-                          src="/lovable-uploads/3dicons-target-front-color.png"
-                          alt="Skill test"
-                          className="w-14 h-14 md:w-full md:h-full object-contain"
-                        />
-                      </div>
-                    </div>
-                  </Link>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white transition-all w-full rounded-3xl border-0 hover:shadow-soft transition-shadow cursor-pointer">
-              <CardContent className="p-3 md:p-4">
-                <button
-                  type="button"
-                  onClick={triggerCvUpload}
-                  disabled={importingCv || subscriptionLoading}
-                  className="w-full text-left group disabled:opacity-70"
-                >
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                      <h3 className="font-bold text-base md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[2.4rem] md:min-h-[3rem]">
-                        {importingCv ? "Importing Resume..." : "Import Resume"}
-                      </h3>
-                      <p className="text-xs font-semibold text-breneo-blue">
-                        Premium feature
-                      </p>
-                      <p className="hidden md:block text-sm text-gray-900">
-                        Upload a PDF CV and auto-fill profile, education, work
-                        experience, and skills.
-                      </p>
-                      {importingCv && (
-                        <div className="mt-1.5 space-y-1">
-                          <Progress
-                            value={cvImportProgress}
-                            className="h-2 bg-blue-100"
-                          />
-                          <p className="text-xs text-gray-600">
-                            {cvImportProgress}%
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-shrink-0 w-16 h-16 md:w-28 md:h-28 flex items-center justify-center">
-                      {importingCv ? (
-                        <Loader2 className="h-10 w-10 animate-spin text-breneo-blue" />
-                      ) : (
-                        <img
-                          src="/lovable-uploads/document-uploado.png"
-                          alt="Document upload"
-                          className="w-14 h-14 md:w-24 md:h-24 object-contain"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </button>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* 2. About Me */}
           <Card className="border-0 rounded-3xl">
@@ -2650,15 +2302,15 @@ const ProfilePage = () => {
                                   className={cn(
                                     "flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                     isCourseSaved
-                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                                       : "text-black dark:text-white",
                                   )}
                                 >
-                                  <Heart
+                                  <Bookmark
                                     className={cn(
                                       "h-4 w-4 transition-colors",
                                       isCourseSaved
-                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                                         : "text-black dark:text-white",
                                     )}
                                   />
@@ -2764,15 +2416,15 @@ const ProfilePage = () => {
                                   className={cn(
                                     "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                     isCourseSaved
-                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                                       : "text-black dark:text-white",
                                   )}
                                 >
-                                  <Heart
+                                  <Bookmark
                                     className={cn(
                                       "h-4 w-4 transition-colors",
                                       isCourseSaved
-                                        ? "text-red-500 fill-red-500"
+                                        ? "text-breneo-blue fill-breneo-blue"
                                         : "text-black dark:text-white",
                                     )}
                                   />
@@ -2892,15 +2544,15 @@ const ProfilePage = () => {
                                   className={cn(
                                     "flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                     isJobSaved
-                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                                       : "text-black dark:text-white",
                                   )}
                                 >
-                                  <Heart
+                                  <Bookmark
                                     className={cn(
                                       "h-4 w-4 transition-colors",
                                       isJobSaved
-                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                                         : "text-black dark:text-white",
                                     )}
                                   />
@@ -2914,18 +2566,12 @@ const ProfilePage = () => {
 
                               {/* Chips left; matching bar + text on the right */}
                               <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {job.employment_type && (
-                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
-                                      {job.employment_type}
-                                    </Badge>
-                                  )}
-                                  {job.work_arrangement && (
-                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 border-0">
-                                      {job.work_arrangement}
-                                    </Badge>
-                                  )}
-                                </div>
+                                <JobListingMetaBadges
+                                  className="mt-0"
+                                  employmentType={job.employment_type}
+                                  workArrangement={job.work_arrangement}
+                                  salary={job.salary}
+                                />
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                   <RadialProgress
                                     value={job.matchPercentage ?? 0}
@@ -3009,6 +2655,12 @@ const ProfilePage = () => {
                                           <Briefcase className="h-4 w-4" />
                                           <span>{job.work_arrangement}</span>
                                         </div>
+                                        {job.salary ? (
+                                          <div className="flex items-center gap-1.5">
+                                            <Tag className="h-4 w-4" />
+                                            <span>{job.salary}</span>
+                                          </div>
+                                        ) : null}
                                       </div>
                                     </div>
                                   </div>
@@ -3045,15 +2697,15 @@ const ProfilePage = () => {
                                   className={cn(
                                     "absolute top-4 right-4 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-10 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                                     isJobSaved
-                                      ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                                      ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                                       : "text-black dark:text-white",
                                   )}
                                 >
-                                  <Heart
+                                  <Bookmark
                                     className={cn(
                                       "h-4 w-4 transition-colors",
                                       isJobSaved
-                                        ? "text-red-500 fill-red-500 animate-heart-pop"
+                                        ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                                         : "text-black dark:text-white",
                                     )}
                                   />
@@ -3214,51 +2866,6 @@ const ProfilePage = () => {
         </SheetContent>
       </Sheet>
 
-      {/* CV Upload Completed Modal (same pattern as filter modals: desktop dialog, mobile drawer) */}
-      {isMobile ? (
-        <Drawer
-          open={isCvUploadDoneModalOpen}
-          onOpenChange={setIsCvUploadDoneModalOpen}
-        >
-          <DrawerContent className="rounded-t-3xl">
-            <DrawerHeader>
-              <DrawerTitle>CV Upload Completed</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-2 text-sm text-gray-700 dark:text-gray-300">
-              CV uploading process finished. You can now see the result in your
-              profile.
-            </div>
-            <DrawerFooter>
-              <Button onClick={() => setIsCvUploadDoneModalOpen(false)}>
-                Got it
-              </Button>
-            </DrawerFooter>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog
-          open={isCvUploadDoneModalOpen}
-          onOpenChange={setIsCvUploadDoneModalOpen}
-        >
-          <DialogContent className="sm:max-w-md rounded-3xl">
-            <DialogHeader>
-              <DialogTitle>CV Upload Completed</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              CV uploading process finished. You can now see the result in your
-              profile.
-            </p>
-            <div className="pt-2">
-              <Button
-                className="w-full"
-                onClick={() => setIsCvUploadDoneModalOpen(false)}
-              >
-                Got it
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </DashboardLayout>
   );
 };

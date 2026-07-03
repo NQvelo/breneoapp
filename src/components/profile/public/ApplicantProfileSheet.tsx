@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useRef } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { EmployerJob } from "@/api/employer/jobsApi";
+import { recordApplicantCvView } from "@/api/employer/jobApplicantsApi";
 import { computeApplicantMatchPercent } from "@/utils/applicantJobMatch";
 import { employerJobToJobDetail } from "@/utils/employerJobToJobDetail";
 import {
@@ -20,12 +21,14 @@ import { PublicUserProfileView } from "@/components/profile/public/PublicUserPro
 
 interface ApplicantProfileSheetProps {
   userId: number | null;
+  jobId?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   applicantName?: string;
   job?: EmployerJob | null;
   matchPercentage?: number | null;
   matchLoading?: boolean;
+  onCvViewRecorded?: () => void;
 }
 
 function ProfileSkeleton() {
@@ -47,18 +50,50 @@ function ProfileSkeleton() {
 
 export function ApplicantProfileSheet({
   userId,
+  jobId = null,
   open,
   onOpenChange,
   applicantName,
   job = null,
   matchPercentage: matchPercentageProp = null,
   matchLoading = false,
+  onCvViewRecorded,
 }: ApplicantProfileSheetProps) {
+  const recordedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      recordedKeyRef.current = null;
+      return;
+    }
+    const jid = String(jobId ?? job?.id ?? "").trim();
+    if (!jid || userId == null) return;
+
+    const sessionKey = `${jid}:${userId}`;
+    if (recordedKeyRef.current === sessionKey) return;
+    recordedKeyRef.current = sessionKey;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await recordApplicantCvView(jid, userId);
+        if (!cancelled) onCvViewRecorded?.();
+      } catch (err) {
+        console.warn("[ApplicantProfileSheet] CV view record failed:", err);
+        if (!cancelled) recordedKeyRef.current = null;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, jobId, job?.id, userId, onCvViewRecorded]);
+
   const { data, isLoading, isError, error, refetch, isFetching } =
     usePublicUserProfile(open ? userId : null);
 
   const jobDetail = job ? employerJobToJobDetail(job) : null;
-  const resolvedMatchPercent = useMemo(() => {
+  const resolvedMatchPercent = React.useMemo(() => {
     if (matchPercentageProp != null) return matchPercentageProp;
     if (!data || !jobDetail) return null;
     try {

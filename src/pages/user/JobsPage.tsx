@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Heart,
+  Bookmark,
   AlertCircle,
   Filter,
   ChevronLeft,
@@ -25,8 +25,6 @@ import {
   TrendingUp,
   UtensilsCrossed,
   Truck,
-  Clock,
-  DollarSign,
   Tag,
   Sun,
   X,
@@ -69,7 +67,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
-import { countries, Country } from "@/data/countries";
+import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { georgianCityLabelById } from "@/data/georgian-cities";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { profileApi } from "@/api/profile";
 import {
@@ -93,9 +93,15 @@ import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import {
   getMatchQualityLabel,
-  extractJobSkills,
-  jobDataMatchesSelectedCountries,
 } from "@/utils/jobMatchUtils";
+import {
+  formatJobSalaryDisplay,
+  formatSalaryFilterLabel,
+} from "@/utils/jobSalaryFormat";
+import {
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 
 // Updated Job interface for the new API
 interface Job {
@@ -123,8 +129,6 @@ const jobTypeLabels: Record<string, string> = {
   INTERN: "Intern",
   INTERNSHIP: "Internship",
 };
-
-// extractJobSkills is now imported from @/utils/jobMatchUtils
 
 // Skill icon mapping - maps skill names to appropriate icons
 const getSkillIcon = (
@@ -736,6 +740,7 @@ const loadFiltersFromSession = (
 
 const JobsPage = () => {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const queryClient = useQueryClient();
   const isMobile = useMobile();
   const navigate = useNavigate();
@@ -1639,73 +1644,10 @@ const JobsPage = () => {
                 setLogoIfValid(employerObj.employer_logo);
             }
 
-            // Format salary - handle both numeric and string formats
-            let salary = "By agreement";
-            const minSalary = job.job_min_salary || job.min_salary;
-            const maxSalary = job.job_max_salary || job.max_salary;
-            const salaryCurrency =
-              job.job_salary_currency || job.salary_currency || "$";
-            const salaryPeriod =
-              job.job_salary_period || job.salary_period || "yearly";
+            const salary = formatJobSalaryDisplay(job);
 
-            if (
-              minSalary &&
-              maxSalary &&
-              typeof minSalary === "number" &&
-              typeof maxSalary === "number"
-            ) {
-              const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-              const minSalaryFormatted = minSalary.toLocaleString();
-              const maxSalaryFormatted = maxSalary.toLocaleString();
-              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-              const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym),
-              );
-              if (isCurrencyBefore) {
-                salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-                  periodLabel ? `/${periodLabel}` : ""
-                }`;
-              } else {
-                salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-                  periodLabel ? `/${periodLabel}` : ""
-                }`;
-              }
-            } else if (minSalary && typeof minSalary === "number") {
-              const minSalaryFormatted = minSalary.toLocaleString();
-              const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-              const isCurrencyBefore = currencySymbols.some((sym) =>
-                salaryCurrency.includes(sym),
-              );
-              salary = isCurrencyBefore
-                ? `${salaryCurrency}${minSalaryFormatted}+`
-                : `${minSalaryFormatted}+ ${salaryCurrency}`;
-            } else if (job.salary && typeof job.salary === "string") {
-              salary = job.salary;
-            }
-
-            // Format employment type
-            const employmentTypeRaw =
-              job.job_employment_type ||
-              job.employment_type ||
-              job.type ||
-              "FULLTIME";
-            // Handle case-insensitive matching
-            const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-            const employmentType =
-              jobTypeLabels[employmentTypeRawUpper] ||
-              jobTypeLabels[employmentTypeRaw] ||
-              employmentTypeRaw ||
-              "Full time";
-
-            // Determine work arrangement
-            let workArrangement = "On-site";
-            const isRemote =
-              job.job_is_remote || job.is_remote || job.remote === true;
-            if (isRemote) {
-              workArrangement = "Remote";
-            } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-              workArrangement = "Hybrid";
-            }
+            const employmentType = resolveJobEmploymentType(job);
+            const workArrangement = resolveJobWorkArrangement(job);
 
             // Total match % (same logic as job detail page)
             const matchPercentage =
@@ -1748,165 +1690,12 @@ const JobsPage = () => {
     [jobs, transformApiJobsToJobList],
   );
 
-  // Helper: job must satisfy every active filter dimension (AND across skills, country, type, etc.)
-  const jobMatchesActiveFilters = useCallback(
-    (job: Job, rawJob: ApiJob | undefined, filters: JobFilters): boolean => {
-      const raw =
-        rawJob ||
-        allRegularJobs.find((j) => String(j.id || j.job_id) === job.id);
-
-      if (filters.skills.length > 0) {
-        const jobSkills = extractJobSkills(raw || (job as unknown as ApiJob));
-        const titleLower = (job.title || "").toLowerCase();
-        const hasSkill = filters.skills.some((s) => {
-          const sl = s.toLowerCase();
-          if (titleLower.includes(sl)) return true;
-          return jobSkills.some(
-            (js) =>
-              js.toLowerCase().includes(sl) || sl.includes(js.toLowerCase()),
-          );
-        });
-        if (!hasSkill) return false;
-      }
-
-      if (filters.countries.length > 0) {
-        if (
-          !jobDataMatchesSelectedCountries(filters.countries, {
-            apiJob: raw,
-            locationLabel: job.location,
-          })
-        ) {
-          return false;
-        }
-      }
-
-      if (filters.jobTypes.length > 0) {
-        const empType = (job.employment_type || "")
-          .toUpperCase()
-          .replace(/[-\s]/g, "");
-        const matchType = filters.jobTypes.some((t) => {
-          const label = jobTypeLabels[t] || t;
-          const labelNorm = label.toUpperCase().replace(/[-\s]/g, "");
-          return empType.includes(labelNorm) || labelNorm.includes(empType);
-        });
-        if (!matchType) return false;
-      }
-
-      if (filters.isRemote) {
-        const isRm =
-          job.work_arrangement === "Remote" ||
-          raw?.job_is_remote ||
-          raw?.is_remote ||
-          raw?.remote;
-        if (!isRm) return false;
-      }
-
-      if (filters.datePosted && filters.datePosted !== "all") {
-        const posted = (raw?.posted_at ||
-          raw?.date_posted ||
-          raw?.fetched_at ||
-          "") as string;
-        if (!posted) return false;
-        const postedTime = new Date(posted).getTime();
-        const now = Date.now();
-        const weekMs = 7 * 24 * 60 * 60 * 1000;
-        const monthMs = 30 * 24 * 60 * 60 * 1000;
-        if (filters.datePosted === "week" && now - postedTime > weekMs)
-          return false;
-        if (filters.datePosted === "month" && now - postedTime > monthMs)
-          return false;
-        if (filters.datePosted === "today") {
-          const dayMs = 24 * 60 * 60 * 1000;
-          if (now - postedTime > dayMs) return false;
-        }
-      }
-
-      if (
-        filters.salaryMin !== undefined ||
-        filters.salaryMax !== undefined ||
-        filters.salaryByAgreement
-      ) {
-        const minS = raw?.job_min_salary ?? raw?.min_salary;
-        const maxS = raw?.job_max_salary ?? raw?.max_salary;
-        if (filters.salaryByAgreement && minS == null && maxS == null) {
-          /* ok */
-        } else if (minS != null || maxS != null) {
-          if (
-            filters.salaryMin !== undefined &&
-            maxS != null &&
-            maxS < filters.salaryMin
-          ) {
-            return false;
-          }
-          if (
-            filters.salaryMax !== undefined &&
-            minS != null &&
-            minS > filters.salaryMax
-          ) {
-            return false;
-          }
-        } else {
-          return false;
-        }
-      }
-
-      return true;
-    },
-    [allRegularJobs],
-  );
-
-  // Display latest 9 jobs - when filters are active, show jobs matching all active dimensions, then sort by date
-  const regularJobs = useMemo(() => {
-    const hasActiveFilters =
-      activeFilters.skills.length > 0 ||
-      activeFilters.countries.length > 0 ||
-      activeFilters.jobTypes.length > 0 ||
-      activeFilters.isRemote ||
-      (activeFilters.datePosted && activeFilters.datePosted !== "all") ||
-      activeFilters.salaryMin !== undefined ||
-      activeFilters.salaryMax !== undefined ||
-      activeFilters.salaryByAgreement;
-
-    const sortByDate = (list: Job[]) =>
-      [...list].sort((a, b) => {
-        const jobA = allRegularJobs.find((j) => (j.id || j.job_id) === a.id);
-        const jobB = allRegularJobs.find((j) => (j.id || j.job_id) === b.id);
-        const dateA = (jobA?.posted_at ||
-          jobA?.fetched_at ||
-          jobA?.date_posted ||
-          "") as string;
-        const dateB = (jobB?.posted_at ||
-          jobB?.fetched_at ||
-          jobB?.date_posted ||
-          "") as string;
-        if (dateA && dateB) {
-          try {
-            return new Date(dateB).getTime() - new Date(dateA).getTime();
-          } catch {
-            return 0;
-          }
-        }
-        if (!dateA && dateB) return 1;
-        if (dateA && !dateB) return -1;
-        return 0;
-      });
-
-    if (!hasActiveFilters) {
-      return sortByDate(transformedJobs).slice(0, 9);
-    }
-
-    const filtered = transformedJobs.filter((job) =>
-      jobMatchesActiveFilters(job, undefined, activeFilters),
-    );
-    return sortByDate(filtered);
-  }, [transformedJobs, allRegularJobs, activeFilters, jobMatchesActiveFilters]);
-
-  // Top matched 9 jobs only: sort by match % descending, take exactly 9 (from same latest jobs data)
+  // Top matched jobs: sort by match % descending, show 3 on the home jobs page
   const topMatchedJobs = useMemo(() => {
     const byMatch = [...transformedJobs].sort(
       (a, b) => (b.matchPercentage ?? 0) - (a.matchPercentage ?? 0),
     );
-    return byMatch.slice(0, 9);
+    return byMatch.slice(0, 3);
   }, [transformedJobs]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
@@ -2103,72 +1892,10 @@ const JobsPage = () => {
               setLogoIfValid(employerObj.employer_logo);
           }
 
-          // Format salary (same logic as regular jobs)
-          let salary = "By agreement";
-          const minSalary = job.job_min_salary || job.min_salary;
-          const maxSalary = job.job_max_salary || job.max_salary;
-          const salaryCurrency =
-            job.job_salary_currency || job.salary_currency || "$";
-          const salaryPeriod =
-            job.job_salary_period || job.salary_period || "yearly";
+          const salary = formatJobSalaryDisplay(job);
 
-          if (
-            minSalary &&
-            maxSalary &&
-            typeof minSalary === "number" &&
-            typeof maxSalary === "number"
-          ) {
-            const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-            const minSalaryFormatted = minSalary.toLocaleString();
-            const maxSalaryFormatted = maxSalary.toLocaleString();
-            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-            const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym),
-            );
-            if (isCurrencyBefore) {
-              salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-                periodLabel ? `/${periodLabel}` : ""
-              }`;
-            } else {
-              salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-                periodLabel ? `/${periodLabel}` : ""
-              }`;
-            }
-          } else if (minSalary && typeof minSalary === "number") {
-            const minSalaryFormatted = minSalary.toLocaleString();
-            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-            const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym),
-            );
-            salary = isCurrencyBefore
-              ? `${salaryCurrency}${minSalaryFormatted}+`
-              : `${minSalaryFormatted}+ ${salaryCurrency}`;
-          } else if (job.salary && typeof job.salary === "string") {
-            salary = job.salary;
-          }
-
-          // Format employment type
-          const employmentTypeRaw =
-            job.job_employment_type ||
-            job.employment_type ||
-            job.type ||
-            "INTERN";
-          const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-          const employmentType =
-            jobTypeLabels[employmentTypeRawUpper] ||
-            jobTypeLabels[employmentTypeRaw] ||
-            employmentTypeRaw ||
-            "Intern";
-
-          // Determine work arrangement
-          let workArrangement = "On-site";
-          const isRemote =
-            job.job_is_remote || job.is_remote || job.remote === true;
-          if (isRemote) {
-            workArrangement = "Remote";
-          } else if (jobTitle?.toLowerCase().includes("hybrid")) {
-            workArrangement = "Hybrid";
-          }
+          const employmentType = resolveJobEmploymentType(job);
+          const workArrangement = resolveJobWorkArrangement(job);
 
           // Total match % (same logic as job detail page)
           const matchPercentage =
@@ -2384,65 +2111,10 @@ const JobsPage = () => {
               setLogoIfValid(employerObj.employer_logo);
           }
 
-          // Format salary (same logic as regular jobs)
-          let salary = "By agreement";
-          const minSalary = job.job_min_salary || job.min_salary;
-          const maxSalary = job.job_max_salary || job.max_salary;
-          const salaryCurrency =
-            job.job_salary_currency || job.salary_currency || "$";
-          const salaryPeriod =
-            job.job_salary_period || job.salary_period || "yearly";
+          const salary = formatJobSalaryDisplay(job);
 
-          if (
-            minSalary &&
-            maxSalary &&
-            typeof minSalary === "number" &&
-            typeof maxSalary === "number"
-          ) {
-            const periodLabel = salaryPeriod === "monthly" ? "Monthly" : "";
-            const minSalaryFormatted = minSalary.toLocaleString();
-            const maxSalaryFormatted = maxSalary.toLocaleString();
-            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-            const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym),
-            );
-            if (isCurrencyBefore) {
-              salary = `${salaryCurrency}${minSalaryFormatted} - ${salaryCurrency}${maxSalaryFormatted}${
-                periodLabel ? `/${periodLabel}` : ""
-              }`;
-            } else {
-              salary = `${minSalaryFormatted} - ${maxSalaryFormatted} ${salaryCurrency}${
-                periodLabel ? `/${periodLabel}` : ""
-              }`;
-            }
-          } else if (minSalary && typeof minSalary === "number") {
-            const minSalaryFormatted = minSalary.toLocaleString();
-            const currencySymbols = ["$", "€", "£", "₾", "₹", "¥"];
-            const isCurrencyBefore = currencySymbols.some((sym) =>
-              salaryCurrency.includes(sym),
-            );
-            salary = isCurrencyBefore
-              ? `${salaryCurrency}${minSalaryFormatted}+`
-              : `${minSalaryFormatted}+ ${salaryCurrency}`;
-          } else if (job.salary && typeof job.salary === "string") {
-            salary = job.salary;
-          }
-
-          // Format employment type
-          const employmentTypeRaw =
-            job.job_employment_type ||
-            job.employment_type ||
-            job.type ||
-            "FULLTIME";
-          const employmentTypeRawUpper = employmentTypeRaw.toUpperCase();
-          const employmentType =
-            jobTypeLabels[employmentTypeRawUpper] ||
-            jobTypeLabels[employmentTypeRaw] ||
-            employmentTypeRaw ||
-            "Full time";
-
-          // Determine work arrangement - always Remote for remote jobs
-          const workArrangement = "Remote";
+          const employmentType = resolveJobEmploymentType(job);
+          const workArrangement = resolveJobWorkArrangement(job);
 
           // Total match % (same logic as job detail page)
           const matchPercentage =
@@ -2480,9 +2152,8 @@ const JobsPage = () => {
     }
   }, [allRemoteJobs, savedJobs, user, userSkillsForMatch]);
 
-  // All remote jobs - no filtering
   const remoteJobs = useMemo(() => {
-    return transformedRemoteJobs; // Return all remote jobs
+    return transformedRemoteJobs.slice(0, 3);
   }, [transformedRemoteJobs]);
 
   // Debug logging
@@ -2502,7 +2173,7 @@ const JobsPage = () => {
       transformedJobsCount: transformedJobs.length,
       transformedInternshipJobsCount: transformedInternshipJobs.length,
       transformedRemoteJobsCount: transformedRemoteJobs.length,
-      regularJobsCount: regularJobs.length,
+      topMatchedJobsCount: topMatchedJobs.length,
       internJobsCount: internJobs.length,
       remoteJobsCount: remoteJobs.length,
       regularJobsPage,
@@ -2527,7 +2198,7 @@ const JobsPage = () => {
     transformedJobs.length,
     transformedInternshipJobs.length,
     transformedRemoteJobs.length,
-    regularJobs.length,
+    topMatchedJobs.length,
     internJobs.length,
     remoteJobs.length,
     regularJobsPage,
@@ -2789,24 +2460,21 @@ const JobsPage = () => {
                   </div>
                 ))}
 
-                {/* Countries */}
-                {activeFilters.countries.map((countryCode) => {
-                  const country = countries.find((c) => c.code === countryCode);
-                  const countryName = country?.name
-                    ? String(country.name)
-                    : String(countryCode);
+                {/* Cities */}
+                {activeFilters.countries.map((cityId) => {
+                  const cityName = georgianCityLabelById(cityId, language);
                   return (
                     <div
-                      key={`country-${countryCode}`}
+                      key={`country-${cityId}`}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
                     >
                       <span className="text-sm font-medium whitespace-nowrap">
-                        {countryName}
+                        {cityName}
                       </span>
                       <button
-                        onClick={() => handleRemoveCountry(countryCode)}
+                        onClick={() => handleRemoveCountry(cityId)}
                         className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                        aria-label={`Remove ${countryName} filter`}
+                        aria-label={`Remove ${cityName} filter`}
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -2889,12 +2557,10 @@ const JobsPage = () => {
                   activeFilters.salaryMax !== undefined) && (
                   <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
                     <span className="text-sm font-medium whitespace-nowrap">
-                      {activeFilters.salaryMin !== undefined &&
-                      activeFilters.salaryMax !== undefined
-                        ? `$${activeFilters.salaryMin} - $${activeFilters.salaryMax}`
-                        : activeFilters.salaryMin !== undefined
-                          ? `Min: $${activeFilters.salaryMin}`
-                          : `Max: $${activeFilters.salaryMax}`}
+                      {formatSalaryFilterLabel(
+                        activeFilters.salaryMin,
+                        activeFilters.salaryMax,
+                      )}
                     </span>
                     <button
                       onClick={() => {
@@ -2955,7 +2621,7 @@ const JobsPage = () => {
           </div>
         )}
 
-        {/* Top Matched Jobs Section - exactly 9 jobs by match % only */}
+        {/* Top Matched Jobs Section */}
         {!isLoading && topMatchedJobs.length > 0 && (
           <section className="mb-10">
             <div className="flex items-center gap-3 mb-4">
@@ -3001,18 +2667,11 @@ const JobsPage = () => {
                     <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
                       {job.title}
                     </h4>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {job.employment_type && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                          {job.employment_type}
-                        </Badge>
-                      )}
-                      {job.work_arrangement && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                          {job.work_arrangement}
-                        </Badge>
-                      )}
-                    </div>
+                    <JobListingMetaBadges
+                      employmentType={job.employment_type}
+                      workArrangement={job.work_arrangement}
+                      salary={job.salary}
+                    />
                     <div className="mt-7 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <RadialProgress
@@ -3038,15 +2697,15 @@ const JobsPage = () => {
                         className={cn(
                           "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                           job.is_saved
-                            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                            ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                             : "text-black dark:text-white",
                         )}
                       >
-                        <Heart
+                        <Bookmark
                           className={cn(
                             "h-4 w-4 transition-colors",
                             job.is_saved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                               : "text-black dark:text-white",
                           )}
                         />
@@ -3059,128 +2718,13 @@ const JobsPage = () => {
           </section>
         )}
 
-        {/* Latest Jobs Section */}
-        {!isLoading && regularJobs.length > 0 && (
-          <section className="mb-10">
-            <div className="flex items-center gap-3 mb-4">
-              <Clock className="h-6 w-6 text-breneo-blue" />
-              <h2 className="text-lg font-bold">Latest Jobs</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {regularJobs.map((job) => (
-                <Card
-                  key={job.id}
-                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
-                  onClick={() => {
-                    if (!job.id || String(job.id).trim() === "") return;
-                    const encodedId = encodeURIComponent(String(job.id));
-                    navigate(`/jobs/${encodedId}`);
-                  }}
-                >
-                  <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
-                    {/* Company Logo and Info */}
-                    <div className="flex items-start gap-3 mb-3">
-                      {job.company_logo ? (
-                        <div className="flex-shrink-0 relative w-10 h-10">
-                          <img
-                            src={job.company_logo}
-                            alt={`${job.company_name || job.company} logo`}
-                            className="w-10 h-10 rounded-md object-cover flex-shrink-0"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display =
-                                "none";
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm truncate">
-                          {job.company_name || job.company}
-                        </h3>
-                        <p className="mt-0.5 text-xs text-gray-500 truncate">
-                          {job.location}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Job Title */}
-                    <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
-                      {job.title}
-                    </h4>
-
-                    {/* Job Details as chips (without salary) */}
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {job.employment_type && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                          {job.employment_type}
-                        </Badge>
-                      )}
-                      {job.work_arrangement && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                          {job.work_arrangement}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Match percentage & Save button (same total match as job detail page) */}
-                    <div className="mt-7 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <RadialProgress
-                          value={job.matchPercentage ?? 0}
-                          size={44}
-                          strokeWidth={5}
-                          showLabel={false}
-                          percentageTextSize="sm"
-                          className="text-breneo-blue"
-                        />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
-                          {getMatchQualityLabel(job.matchPercentage)}
-                        </span>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          saveJobMutation.mutate(job);
-                        }}
-                        aria-label={job.is_saved ? "Unsave job" : "Save job"}
-                        className={cn(
-                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
-                          job.is_saved
-                            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
-                            : "text-black dark:text-white",
-                        )}
-                      >
-                        <Heart
-                          className={cn(
-                            "h-4 w-4 transition-colors",
-                            job.is_saved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
-                              : "text-black dark:text-white",
-                          )}
-                        />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Loading state for latest jobs */}
         {isLoading && (
           <section className="mb-10">
             <div className="flex items-center gap-3 mb-4">
-              <Clock className="h-6 w-6 text-breneo-blue" />
-              <h2 className="text-lg font-bold">Latest Jobs</h2>
+              <h2 className="text-lg font-bold">Top Matched Jobs</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(9)].map((_, i) => (
+              {[...Array(3)].map((_, i) => (
                 <Card key={i}>
                   <CardContent className="p-4">
                     <div className="animate-pulse">
@@ -3247,19 +2791,11 @@ const JobsPage = () => {
                       {job.title}
                     </h4>
 
-                    {/* Job Details as chips (without salary) */}
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {job.employment_type && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                          {job.employment_type}
-                        </Badge>
-                      )}
-                      {job.work_arrangement && (
-                        <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
-                          {job.work_arrangement}
-                        </Badge>
-                      )}
-                    </div>
+                    <JobListingMetaBadges
+                      employmentType={job.employment_type}
+                      workArrangement={job.work_arrangement}
+                      salary={job.salary}
+                    />
 
                     {/* Match percentage & Save button (same total match as job detail page) */}
                     <div className="mt-7 flex items-center justify-between gap-4">
@@ -3287,15 +2823,15 @@ const JobsPage = () => {
                         className={cn(
                           "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
                           job.is_saved
-                            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+                            ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                             : "text-black dark:text-white",
                         )}
                       >
-                        <Heart
+                        <Bookmark
                           className={cn(
                             "h-4 w-4 transition-colors",
                             job.is_saved
-                              ? "text-red-500 fill-red-500 animate-heart-pop"
+                              ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
                               : "text-black dark:text-white",
                           )}
                         />

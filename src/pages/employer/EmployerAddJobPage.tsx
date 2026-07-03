@@ -46,6 +46,12 @@ import {
   type EmployerJobSource,
 } from "@/api/employer/jobsApi";
 import { resolveEmployerJobRequiredSkills } from "@/utils/employerJobToJobDetail";
+import {
+  formatJobSalaryWithLari,
+  isValidNumericSalary,
+  sanitizeNumericSalaryInput,
+} from "@/utils/jobSalaryFormat";
+import { parseEmploymentTypeFromDescription } from "@/utils/jobEmploymentDisplay";
 import { scheduleSkillsCatalogSync } from "@/api/profile/skillsCatalogApi";
 import {
   deletePublishedEmployerJob,
@@ -448,15 +454,25 @@ export default function EmployerAddJobPage() {
         }
         setLocation(jobCity);
         setCityQuery(jobCity);
-        setEmploymentType(
+        const employmentFromDesc = parseEmploymentTypeFromDescription(
+          job.description,
+        );
+        const resolvedEmploymentType =
           EMPLOYMENT_TYPES.includes(
             job.employment_type as (typeof EMPLOYMENT_TYPES)[number],
+          ) &&
+          !["remote", "hybrid", "on-site", "onsite", "unknown"].includes(
+            job.employment_type.toLowerCase(),
           )
             ? job.employment_type
-            : EMPLOYMENT_TYPES[0],
-        );
+            : EMPLOYMENT_TYPES.includes(
+                  employmentFromDesc as (typeof EMPLOYMENT_TYPES)[number],
+                )
+              ? employmentFromDesc
+              : EMPLOYMENT_TYPES[0];
+        setEmploymentType(resolvedEmploymentType);
         setApplyUrl(job.apply_url);
-        setSalary(job.salary);
+        setSalary(sanitizeNumericSalaryInput(String(job.salary ?? "")));
         let resolvedWorkMode: AggregatorWorkMode = "unknown";
         if (
           job.work_mode &&
@@ -679,6 +695,20 @@ export default function EmployerAddJobPage() {
         message: "Description is required.",
       };
     }
+    if (!salary.trim()) {
+      return {
+        ok: false,
+        fieldErrors: { salary: ["Salary is required."] },
+        message: "Salary is required.",
+      };
+    }
+    if (!isValidNumericSalary(salary)) {
+      return {
+        ok: false,
+        fieldErrors: { salary: ["Enter a valid numeric salary."] },
+        message: "Enter a valid numeric salary.",
+      };
+    }
 
     const applyCheck = validateHttpUrl(applyUrl);
     if (applyCheck.ok === false) {
@@ -753,6 +783,7 @@ export default function EmployerAddJobPage() {
   }, [
     title,
     description,
+    salary,
     applyUrl,
     locationCountry,
     countryQuery,
@@ -929,9 +960,8 @@ export default function EmployerAddJobPage() {
         if (!snap || nextState.apply_url !== snap.apply_url) {
           patch.apply_url = nextState.apply_url || null;
         }
-        const normalizedSelectedSkills = normalizeSelectedJobSkills(
-          selectedJobSkills,
-        );
+        const normalizedSelectedSkills =
+          normalizeSelectedJobSkills(selectedJobSkills);
         const skillsChanged =
           !snap ||
           normalizeSkillsKey(normalizedSelectedSkills) !== snap.skills_key;
@@ -957,6 +987,7 @@ export default function EmployerAddJobPage() {
         }
         // Always include current skill chips so PATCH reliably persists them.
         patch.required_skills = normalizedSelectedSkills;
+        patch.employment_type_note = employmentType;
         if (showJobPreview) {
           patch.is_active = true;
         }
@@ -1009,17 +1040,14 @@ export default function EmployerAddJobPage() {
           city: normalizedCity,
           location_country: normalizedCountry,
           location: normalizedCity,
-          salary: salary.trim() || undefined,
+          salary: salary.trim(),
           apply_url: applyCheck.url || null,
           is_active: listingShouldBeActive,
           employment_type_note: employmentType,
           ...parsed,
         });
         scheduleSkillsCatalogSync(
-          [
-            ...selectedJobSkills,
-            ...(parsed.skills_preferred ?? []),
-          ],
+          [...selectedJobSkills, ...(parsed.skills_preferred ?? [])],
           "employer-job-publish",
         );
         const id = data.id ?? data.pk ?? data.job_id;
@@ -1204,7 +1232,9 @@ export default function EmployerAddJobPage() {
     cityQuery,
   ]);
 
-  const previewSalaryLine = salary.trim() ? salary.trim() : "By agreement";
+  const previewSalaryLine = salary.trim()
+    ? formatJobSalaryWithLari(salary)
+    : "By agreement";
 
   const companyName =
     headerCompanyName.trim() ||
@@ -1717,14 +1747,24 @@ export default function EmployerAddJobPage() {
                 <div className="rounded-xl border border-gray-100 bg-gray-50/90 dark:bg-white/5 p-4 space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Banknote className="h-4 w-4 text-breneo-blue" />
-                    Salary (optional)
+                    Salary <span className="text-destructive">*</span>
                   </div>
                   <Input
                     value={salary}
-                    onChange={(e) => setSalary(e.target.value)}
-                    placeholder="e.g. 3000–5000 GEL"
+                    onChange={(e) =>
+                      setSalary(sanitizeNumericSalaryInput(e.target.value))
+                    }
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="e.g. 3500 or 3000-5000"
                     className="bg-white dark:bg-background"
+                    aria-required
                   />
+                  {fieldErrors.salary?.[0] ? (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.salary[0]}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

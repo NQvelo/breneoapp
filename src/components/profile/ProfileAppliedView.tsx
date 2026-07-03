@@ -9,8 +9,6 @@ import { useEnrolledCourses } from "@/hooks/useEnrolledCourses";
 import { useMyApplications } from "@/hooks/useMyApplications";
 import {
   jobIdFromApplication,
-  applicationUserDisplayName,
-  applicationUserEmail,
   type JobApplicationItem,
 } from "@/api/jobs/jobApplicationsApi";
 import {
@@ -103,7 +101,7 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
 
   return (
     <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
-      <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
           Applied Jobs
         </h2>
@@ -132,9 +130,11 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
             const when = formatAppliedDate(
               typeof item.applied_at === "string" ? item.applied_at : undefined,
             );
-            const status = typeof item.status === "string" ? item.status : null;
-            const applicantName = applicationUserDisplayName(item);
-            const applicantEmail = applicationUserEmail(item);
+            const employerViewedCv = item.employer_viewed_cv === true;
+            const employerCvViewCount =
+              typeof item.employer_cv_view_count === "number"
+                ? item.employer_cv_view_count
+                : undefined;
 
             return (
               <div
@@ -150,11 +150,8 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
                   location={location}
                   logo={logo}
                   when={when}
-                  status={status}
-                  applicantName={applicantName}
-                  applicantEmail={applicantEmail}
-                  appliedLabel={t.jobs.applied}
-                  isMobile={isMobile}
+                  employerViewedCv={employerViewedCv}
+                  employerCvViewCount={employerCvViewCount}
                 />
               </div>
             );
@@ -275,31 +272,23 @@ function JobRow({
   location,
   logo,
   when,
-  status,
-  applicantName,
-  applicantEmail,
-  appliedLabel,
-  isMobile,
+  employerViewedCv,
+  employerCvViewCount,
 }: {
   title: string;
   company: string;
   location: string;
   logo?: string;
   when: string | null;
-  status: string | null;
-  applicantName: string;
-  applicantEmail: string;
-  appliedLabel: string;
-  isMobile: boolean;
+  employerViewedCv: boolean;
+  employerCvViewCount?: number;
 }) {
+  const viewCount = employerViewedCv
+    ? Math.max(employerCvViewCount ?? 1, 1)
+    : 0;
+
   return (
-    <div
-      className={
-        isMobile
-          ? "px-5 pt-5 pb-4 flex flex-col"
-          : "p-4 md:p-5 flex items-center gap-4"
-      }
-    >
+    <div className="px-5 pt-5 pb-4 md:p-5 flex items-start gap-3 md:gap-4">
       <div className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden bg-breneo-accent flex items-center justify-center">
         {logo ? (
           <img
@@ -315,53 +304,31 @@ function JobRow({
           <Briefcase className="h-6 w-6 text-white" />
         )}
       </div>
-      <div className="flex-1 min-w-0 mt-3 md:mt-0">
+      <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
           {company || "Company"}
         </p>
         <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-2 mt-0.5">
           {title}
         </h3>
-        {applicantName || applicantEmail ? (
-          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-            {applicantName ? (
-              <span className="font-medium">{applicantName}</span>
-            ) : null}
-            {applicantName && applicantEmail ? (
-              <span className="text-gray-400 dark:text-gray-500"> · </span>
-            ) : null}
-            {applicantEmail ? (
-              <span className="text-gray-500 dark:text-gray-400">
-                {applicantEmail}
-              </span>
-            ) : null}
-          </p>
-        ) : null}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
           {location ? (
             <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5" />
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
               {location}
             </span>
           ) : null}
           {when ? (
             <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
               {when}
             </span>
           ) : null}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Badge className="rounded-[10px] bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100 border-0">
-            {appliedLabel}
-          </Badge>
-          {status ? (
-            <Badge
-              variant="secondary"
-              className="rounded-[10px] border-0 capitalize"
-            >
-              {status.replace(/_/g, " ")}
-            </Badge>
+          {employerViewedCv ? (
+            <span className="text-breneo-blue dark:text-sky-300">
+              Employer viewed your application {viewCount}{" "}
+              {viewCount === 1 ? "time" : "times"}
+            </span>
           ) : null}
         </div>
       </div>

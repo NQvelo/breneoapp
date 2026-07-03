@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 
 interface SalaryRangeFilterProps {
   minSalary: number;
@@ -11,24 +11,26 @@ interface SalaryRangeFilterProps {
   salaryMin?: number;
   salaryMax?: number;
   salaryByAgreement?: boolean;
-  onSalaryChange: (min: number | undefined, max: number | undefined, byAgreement: boolean) => void;
+  onSalaryChange: (
+    min: number | undefined,
+    max: number | undefined,
+    byAgreement: boolean,
+  ) => void;
 }
 
-// Generate histogram data (mock distribution for visualization)
-const generateHistogramData = (min: number, max: number, bins: number = 20): number[] => {
-  const binSize = (max - min) / bins;
-  const data: number[] = [];
-  
-  // Create a distribution that's denser on the left (lower salaries more common)
-  for (let i = 0; i < bins; i++) {
-    const binStart = min + i * binSize;
-    // Higher frequency for lower values (exponential decay)
-    const frequency = Math.exp(-i * 0.15) * 100;
-    data.push(Math.max(5, Math.min(100, frequency))); // Clamp between 5 and 100
-  }
-  
-  return data;
-};
+const pillInputClassName =
+  "w-full min-w-0 bg-transparent text-center text-sm font-medium text-gray-900 dark:text-gray-100 tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+
+function parseSalaryInput(raw: string): number | null {
+  const cleaned = raw.replace(/[^\d]/g, "");
+  if (!cleaned) return null;
+  const parsed = parseInt(cleaned, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatMaxDisplay(value: number, ceiling: number): string {
+  return value >= ceiling ? `${value}+` : String(value);
+}
 
 export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
   minSalary,
@@ -41,121 +43,137 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
   const { t } = useLanguage();
   const [localMin, setLocalMin] = useState<number>(salaryMin ?? minSalary);
   const [localMax, setLocalMax] = useState<number>(salaryMax ?? maxSalary);
-  const [localByAgreement, setLocalByAgreement] = useState<boolean>(salaryByAgreement);
-  
-  const histogramData = generateHistogramData(minSalary, maxSalary, 20);
-  const maxHistogramHeight = Math.max(...histogramData);
+  const [localByAgreement, setLocalByAgreement] =
+    useState<boolean>(salaryByAgreement);
+  const [minDraft, setMinDraft] = useState<string | null>(null);
+  const [maxDraft, setMaxDraft] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalMin(salaryMin ?? minSalary);
     setLocalMax(salaryMax ?? maxSalary);
     setLocalByAgreement(salaryByAgreement ?? false);
+    setMinDraft(null);
+    setMaxDraft(null);
   }, [salaryMin, salaryMax, salaryByAgreement, minSalary, maxSalary]);
+
+  const commitRange = (
+    min: number,
+    max: number,
+    byAgreement = localByAgreement,
+  ) => {
+    const nextMin = Math.max(minSalary, Math.min(min, max));
+    const nextMax = Math.min(maxSalary, Math.max(max, nextMin));
+    setLocalMin(nextMin);
+    setLocalMax(nextMax);
+    setMinDraft(null);
+    setMaxDraft(null);
+    onSalaryChange(
+      nextMin === minSalary ? undefined : nextMin,
+      nextMax === maxSalary ? undefined : nextMax,
+      byAgreement,
+    );
+  };
 
   const handleSliderChange = (values: number[]) => {
     const [min, max] = values;
-    setLocalMin(min);
-    setLocalMax(max);
-    onSalaryChange(min === minSalary ? undefined : min, max === maxSalary ? undefined : max, localByAgreement);
+    commitRange(min, max);
   };
 
-  const handleMinInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || minSalary;
-    const clampedValue = Math.max(minSalary, Math.min(value, localMax));
-    setLocalMin(clampedValue);
-    onSalaryChange(clampedValue === minSalary ? undefined : clampedValue, localMax === maxSalary ? undefined : localMax, localByAgreement);
+  const handleMinBlur = () => {
+    const parsed = parseSalaryInput(minDraft ?? String(localMin));
+    const nextMin = parsed ?? minSalary;
+    commitRange(nextMin, localMax);
   };
 
-  const handleMaxInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || maxSalary;
-    const clampedValue = Math.min(maxSalary, Math.max(value, localMin));
-    setLocalMax(clampedValue);
-    onSalaryChange(localMin === minSalary ? undefined : localMin, clampedValue === maxSalary ? undefined : clampedValue, localByAgreement);
+  const handleMaxBlur = () => {
+    const parsed = parseSalaryInput(maxDraft ?? String(localMax));
+    const nextMax = parsed ?? maxSalary;
+    commitRange(localMin, nextMax);
+  };
+
+  const handleMinKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
+
+  const handleMaxKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
   };
 
   const handleByAgreementChange = (checked: boolean) => {
     setLocalByAgreement(checked);
-    onSalaryChange(localMin === minSalary ? undefined : localMin, localMax === maxSalary ? undefined : localMax, checked);
+    onSalaryChange(
+      localMin === minSalary ? undefined : localMin,
+      localMax === maxSalary ? undefined : localMax,
+      checked,
+    );
   };
 
   return (
     <div className="space-y-4">
-      {/* Title */}
       <h3 className="text-base font-medium text-left text-gray-900 dark:text-gray-100">
         {t.jobs.salaryRange}
       </h3>
 
-      {/* Histogram */}
-      <div className="relative h-16 flex items-end justify-between gap-0.5 px-1">
-        {histogramData.map((height, index) => {
-          const barHeight = (height / maxHistogramHeight) * 100;
-          const binStart = minSalary + (index * (maxSalary - minSalary) / histogramData.length);
-          const binEnd = minSalary + ((index + 1) * (maxSalary - minSalary) / histogramData.length);
-          const isInRange = binStart >= localMin && binEnd <= localMax;
-          
-          return (
-            <div
-              key={index}
-              className="flex-1 bg-gray-900 dark:bg-gray-200 transition-opacity rounded-md"
-              style={{
-                height: `${barHeight}%`,
-                minHeight: '4px',
-                opacity: isInRange ? 1 : 0.3,
-              }}
-            />
-          );
-        })}
-      </div>
+      <Slider
+        variant="salary"
+        value={[localMin, localMax]}
+        onValueChange={handleSliderChange}
+        min={minSalary}
+        max={maxSalary}
+        step={100}
+        className="w-full"
+      />
 
-      {/* Range Slider */}
-      <div className="px-2">
-        <Slider
-          value={[localMin, localMax]}
-          onValueChange={handleSliderChange}
-          min={minSalary}
-          max={maxSalary}
-          step={100}
-          className="w-full"
-        />
-      </div>
-
-      {/* Input Fields */}
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <Label htmlFor="salary-min" className="text-xs text-gray-600 dark:text-gray-300 mb-1 block">
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             {t.jobs.minimum}
-          </Label>
-          <Input
-            id="salary-min"
-            type="number"
-            value={localMin}
-            onChange={handleMinInputChange}
-            min={minSalary}
-            max={localMax}
-            className="h-10"
-          />
+          </span>
+          <div className="flex w-[90px] items-center justify-center rounded-full border border-gray-200 bg-white px-2 py-2.5 dark:border-gray-700 dark:bg-transparent">
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label={t.jobs.minimum}
+              value={minDraft ?? String(localMin)}
+              onChange={(e) => setMinDraft(e.target.value)}
+              onFocus={() => setMinDraft(String(localMin))}
+              onBlur={handleMinBlur}
+              onKeyDown={handleMinKeyDown}
+              className={cn(pillInputClassName, "pr-1")}
+            />
+            <span className="shrink-0 text-sm font-medium text-gray-900 dark:text-gray-100">
+              ₾
+            </span>
+          </div>
         </div>
-        <div className="pb-2.5">
-          <span className="text-gray-400 dark:text-gray-400">-</span>
-        </div>
-        <div className="flex-1">
-          <Label htmlFor="salary-max" className="text-xs text-gray-600 dark:text-gray-300 mb-1 block">
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             {t.jobs.maximum}
-          </Label>
-          <Input
-            id="salary-max"
-            type="number"
-            value={localMax}
-            onChange={handleMaxInputChange}
-            min={localMin}
-            max={maxSalary}
-            className="h-10"
-          />
+          </span>
+          <div className="flex w-[90px] items-center justify-center rounded-full border border-gray-200 bg-white px-2 py-2.5 dark:border-gray-700 dark:bg-transparent">
+            <input
+              type="text"
+              inputMode="numeric"
+              aria-label={t.jobs.maximum}
+              value={maxDraft ?? formatMaxDisplay(localMax, maxSalary)}
+              onChange={(e) => setMaxDraft(e.target.value.replace(/\+$/, ""))}
+              onFocus={() => setMaxDraft(String(localMax))}
+              onBlur={handleMaxBlur}
+              onKeyDown={handleMaxKeyDown}
+              className={cn(pillInputClassName, "pr-1")}
+            />
+            <span className="shrink-0 text-sm font-medium text-gray-900 dark:text-gray-100">
+              ₾
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* By Agreement Checkbox */}
-      <div className="flex items-center space-x-2 pt-2">
+      <div className="flex items-center space-x-2">
         <Checkbox
           id="salary-by-agreement"
           checked={localByAgreement}
@@ -171,4 +189,3 @@ export const SalaryRangeFilter: React.FC<SalaryRangeFilterProps> = ({
     </div>
   );
 };
-

@@ -15,7 +15,7 @@ import {
 } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Heart,
+  Bookmark,
   Filter,
   Search,
   GraduationCap,
@@ -754,15 +754,15 @@ const CoursesPage = () => {
         className={cn(
           "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
           isCourseSaved
-            ? "text-red-500 bg-red-50 hover:bg-red-50/90 dark:bg-red-900/40 dark:hover:bg-red-900/60"
+            ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
             : "text-black dark:text-white",
         )}
       >
-        <Heart
+        <Bookmark
           className={cn(
             "h-4 w-4 transition-colors",
             isCourseSaved
-              ? "text-red-500 fill-red-500 animate-heart-pop"
+              ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
               : "text-black dark:text-white",
           )}
         />

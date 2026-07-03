@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import React, { useCallback, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, Loader2 } from "lucide-react";
 import {
   fetchEmployerJobApplicants,
   type JobApplicant,
@@ -20,6 +20,7 @@ import { ApplicantProfileSheet } from "@/components/profile/public/ApplicantProf
 import { JobMatchIndicator } from "@/components/jobs/JobMatchIndicator";
 import { useApplicantMatchPercents } from "@/hooks/useApplicantMatchPercents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -42,6 +43,7 @@ export function EmployerJobApplicantsPanel({
   jobId,
   job = null,
 }: EmployerJobApplicantsPanelProps) {
+  const queryClient = useQueryClient();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedApplicantName, setSelectedApplicantName] = useState("");
   const [selectedMatchPercent, setSelectedMatchPercent] = useState<
@@ -70,6 +72,12 @@ export function EmployerJobApplicantsPanel({
     setSelectedMatchPercent(resolveListMatchPercent(applicant, matchByUserId));
     setProfileOpen(true);
   };
+
+  const handleCvViewRecorded = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: ["employerJobApplicants", jobId],
+    });
+  }, [queryClient, jobId]);
 
   return (
     <>
@@ -124,6 +132,7 @@ export function EmployerJobApplicantsPanel({
 
       <ApplicantProfileSheet
         userId={selectedUserId}
+        jobId={jobId}
         job={job}
         open={profileOpen}
         onOpenChange={setProfileOpen}
@@ -134,6 +143,7 @@ export function EmployerJobApplicantsPanel({
           selectedMatchPercent == null &&
           selectedUserId != null
         }
+        onCvViewRecorded={handleCvViewRecorded}
       />
     </>
   );
@@ -195,6 +205,8 @@ function ApplicantListItem({
     typeof applicant.status === "string" && applicant.status.trim()
       ? applicant.status.replace(/_/g, " ")
       : "—";
+  const cvViewedByMe = applicant.cv_viewed_by_me === true;
+  const employerViewedCv = applicant.employer_viewed_cv === true;
   const hasProfile = applicantUserId(applicant) != null;
 
   const matchIndicator = matchLoading ? (
@@ -247,6 +259,27 @@ function ApplicantListItem({
                 <p className="text-sm text-muted-foreground truncate">
                   {email}
                 </p>
+              ) : null}
+              {cvViewedByMe || employerViewedCv ? (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {cvViewedByMe ? (
+                    <Badge
+                      variant="secondary"
+                      className="rounded-[8px] px-2 py-0 text-[11px] font-medium border-0 bg-breneo-blue/10 text-breneo-blue"
+                    >
+                      <Eye className="h-3 w-3 mr-1 inline" />
+                      CV viewed
+                    </Badge>
+                  ) : null}
+                  {employerViewedCv && !cvViewedByMe ? (
+                    <Badge
+                      variant="secondary"
+                      className="rounded-[8px] px-2 py-0 text-[11px] font-medium border-0 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                    >
+                      CV viewed by team
+                    </Badge>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           </div>

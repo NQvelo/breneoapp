@@ -13,7 +13,7 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  Heart,
+  Bookmark,
   Loader2,
   Clock,
   Diamond,
@@ -749,9 +749,9 @@ const CoursePage = () => {
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : isSaved ? (
-                        <Heart className="h-4 w-4 fill-red-500 text-red-500" />
+                        <Bookmark className="h-4 w-4 fill-breneo-blue text-breneo-blue" />
                       ) : (
-                        <Heart className="h-4 w-4" />
+                        <Bookmark className="h-4 w-4" />
                       )}
                     </Button>
 

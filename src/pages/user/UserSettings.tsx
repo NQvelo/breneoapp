@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
@@ -55,12 +55,16 @@ import {
   CreditCard,
   BookOpen,
   AlertCircle,
+  ChevronRight,
+  Menu,
+  LogOut,
 } from "lucide-react";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { bogService } from "@/api/bog/bogService";
 import { PaymentTransaction } from "@/api/bog/bogService";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { ResumeImportCard } from "@/components/profile/ResumeImportCard";
 
 type SettingsSection =
   | "account"
@@ -71,7 +75,7 @@ type SettingsSection =
   | "accessibility";
 
 const settingsSections: Array<{ id: SettingsSection; label: string }> = [
-  { id: "account", label: "Account Settings" },
+  { id: "account", label: "Account" },
   { id: "notifications", label: "Notifications" },
   { id: "privacy", label: "Privacy & Security" },
   { id: "subscription", label: "Subscription & Billing" },
@@ -92,10 +96,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const activeButtonRef = useRef<HTMLButtonElement>(null);
-
-  // Get initial section from URL or default to account
+  // Get initial section from URL or default to notifications
   const getInitialSection = (): SettingsSection => {
     const validSections: SettingsSection[] = [
       "account",
@@ -113,13 +114,15 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error getting initial section:", error);
     }
-    return "account";
+    return "notifications";
   };
 
   const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
     getInitialSection(),
   );
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
 
   /** Same email shown in AppSidebar (employer company / academy profile when applicable). */
   const recoveryEmail = useMemo(() => {
@@ -143,6 +146,114 @@ export default function SettingsPage() {
     academyDisplay?.email,
   ]);
 
+  useEffect(() => {
+    if (!changePasswordOpen) return;
+    setPasswordModalEmail(recoveryEmail);
+  }, [changePasswordOpen, recoveryEmail]);
+
+  const handleChangePasswordOpenChange = (open: boolean) => {
+    setChangePasswordOpen(open);
+    if (!open) {
+      setPasswordStep(1);
+      setPasswordModalEmail(recoveryEmail);
+      setCode("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
+
+  const renderChangePasswordModalContent = () => (
+    <div className="space-y-4">
+      {passwordStep === 1 && (
+        <form onSubmit={handleSendCode} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="change-password-email">Email</Label>
+            <Input
+              id="change-password-email"
+              type="email"
+              value={passwordModalEmail}
+              onChange={(e) => setPasswordModalEmail(e.target.value)}
+              placeholder="Enter your email"
+              className="h-[3.2rem]"
+              autoComplete="email"
+            />
+          </div>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={passwordLoading || !passwordModalEmail.trim()}
+          >
+            {passwordLoading ? "Sending..." : "Send Verification Code"}
+          </Button>
+        </form>
+      )}
+      {passwordStep === 2 && (
+        <form onSubmit={handleVerifyCode} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="change-password-code">Verification code</Label>
+            <Input
+              id="change-password-code"
+              placeholder="Enter 6-digit code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="h-[3.2rem]"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1" disabled={passwordLoading}>
+              {passwordLoading ? "Verifying..." : "Verify Code"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasswordStep(1)}
+            >
+              Back
+            </Button>
+          </div>
+        </form>
+      )}
+      {passwordStep === 3 && (
+        <form onSubmit={handleSetNewPassword} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="change-password-new">New password</Label>
+            <Input
+              id="change-password-new"
+              type="password"
+              placeholder="New password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="h-[3.2rem]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="change-password-confirm">Confirm password</Label>
+            <Input
+              id="change-password-confirm"
+              type="password"
+              placeholder="Confirm new password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="h-[3.2rem]"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1" disabled={passwordLoading}>
+              {passwordLoading ? "Updating..." : "Update Password"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPasswordStep(2)}
+            >
+              Back
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+
   // Handle payment redirect status
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
@@ -165,46 +276,9 @@ export default function SettingsPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Scroll active button into view on mobile (for horizontal switcher)
-  useEffect(() => {
-    if (!isMobile || !scrollContainerRef.current) return;
-
-    const timeoutId = setTimeout(() => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
-
-      const activeButton = container.querySelector(
-        `[data-section="${activeSection}"]`,
-      ) as HTMLButtonElement;
-
-      if (!activeButton) return;
-
-      const containerRect = container.getBoundingClientRect();
-      const buttonRect = activeButton.getBoundingClientRect();
-
-      const scrollLeft = container.scrollLeft;
-      const buttonLeft = buttonRect.left - containerRect.left + scrollLeft;
-      const buttonWidth = buttonRect.width;
-      const containerWidth = containerRect.width;
-
-      // Center the button in the container
-      const targetScroll = buttonLeft - containerWidth / 2 + buttonWidth / 2;
-
-      container.scrollTo({
-        left: Math.max(0, targetScroll),
-        behavior: "smooth",
-      });
-    }, 50);
-
-    return () => clearTimeout(timeoutId);
-  }, [activeSection, isMobile]);
-
-  // Account Settings
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [profileLoading, setProfileLoading] = useState(false);
-  const isEditingRef = useRef(false);
+  // Password reset
   const [passwordStep, setPasswordStep] = useState(1);
+  const [passwordModalEmail, setPasswordModalEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -218,9 +292,11 @@ export default function SettingsPage() {
   const [inAppProgress, setInAppProgress] = useState(true);
   const [newsletter, setNewsletter] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(false);
-  
+
   const { subscriptionInfo, loading: subscriptionLoading } = useSubscription();
-  const [paymentHistory, setPaymentHistory] = useState<PaymentTransaction[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentTransaction[]>(
+    [],
+  );
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Privacy & Security
@@ -243,14 +319,6 @@ export default function SettingsPage() {
   const handleSectionChange = (section: SettingsSection) => {
     setActiveSection(section);
   };
-
-  // Initialize name fields from user data (only when not actively editing)
-  useEffect(() => {
-    if (user && !isEditingRef.current) {
-      setFirstName(user.first_name || "");
-      setLastName(user.last_name || "");
-    }
-  }, [user?.id, user?.first_name, user?.last_name]); // Update when user ID or name fields change
 
   // Sync fontSize and language with context
   useEffect(() => {
@@ -444,14 +512,15 @@ export default function SettingsPage() {
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordLoading(true);
-    if (!recoveryEmail) {
+    const email = passwordModalEmail.trim();
+    if (!email) {
       toast.error("Email not found. Please log in again.");
       setPasswordLoading(false);
       return;
     }
     try {
       const res = await apiClient.post(API_ENDPOINTS.AUTH.PASSWORD_RESET, {
-        email: recoveryEmail,
+        email,
       });
       toast.success(res.data.message || "Code sent to your email!");
       setPasswordStep(2);
@@ -468,7 +537,8 @@ export default function SettingsPage() {
 
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryEmail) {
+    const email = passwordModalEmail.trim();
+    if (!email) {
       toast.error("Email not found. Please log in again.");
       return;
     }
@@ -477,7 +547,7 @@ export default function SettingsPage() {
       const res = await apiClient.post(
         API_ENDPOINTS.AUTH.PASSWORD_RESET_VERIFY,
         {
-          email: recoveryEmail,
+          email,
           code: code,
         },
       );
@@ -496,7 +566,8 @@ export default function SettingsPage() {
 
   const handleSetNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryEmail) {
+    const email = passwordModalEmail.trim();
+    if (!email) {
       toast.error("Email not found. Please log in again.");
       return;
     }
@@ -513,17 +584,14 @@ export default function SettingsPage() {
       const res = await apiClient.post(
         API_ENDPOINTS.AUTH.PASSWORD_RESET_CONFIRM,
         {
-          email: recoveryEmail,
+          email,
           code: code,
           new_password: newPassword,
           confirm_password: confirmPassword,
         },
       );
       toast.success(res.data.message || "Password updated successfully!");
-      setPasswordStep(1);
-      setCode("");
-      setNewPassword("");
-      setConfirmPassword("");
+      handleChangePasswordOpenChange(false);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         toast.error(err.response?.data?.error || "Error setting new password");
@@ -545,123 +613,6 @@ export default function SettingsPage() {
     }, 2000);
   };
 
-  const handleSaveProfile = async () => {
-    if (!user) {
-      toast.error("User not found. Please log in again.");
-      return;
-    }
-
-    // Validate inputs
-    if (!firstName.trim() && !lastName.trim()) {
-      toast.error("Please enter at least a first name or last name");
-      return;
-    }
-
-    // Set editing flag to true to prevent useEffect from resetting inputs during save
-    isEditingRef.current = true;
-    setProfileLoading(true);
-
-    try {
-      const token = localStorage.getItem("authToken");
-
-      // Prepare update payload - only include fields that have values
-      const updateData: { first_name?: string; last_name?: string } = {};
-
-      if (firstName.trim()) {
-        updateData.first_name = firstName.trim();
-      }
-
-      if (lastName.trim()) {
-        updateData.last_name = lastName.trim();
-      }
-
-      // console.log("📤 Updating profile with PATCH method:");
-      // console.log("📝 Request payload:", updateData);
-
-      // Use the same pattern as phone_number and about_me updates
-      const response = await apiClient.patch(
-        API_ENDPOINTS.AUTH.PROFILE,
-        updateData,
-        {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
-          },
-        },
-      );
-
-      // console.log("✅ Profile update response:", response.data);
-
-      // Refresh profile data (same pattern as phone_number/about_me)
-      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
-      });
-
-      // console.log("✅ Refreshed profile data:", profileResponse.data);
-
-      // Update local state with new values
-      if (profileResponse.data) {
-        const profileData = profileResponse.data as Record<string, unknown>;
-        const updatedFirstName =
-          profileData.first_name ||
-          (profileData.user as Record<string, unknown>)?.first_name ||
-          (profileData.profile as Record<string, unknown>)?.first_name;
-        const updatedLastName =
-          profileData.last_name ||
-          (profileData.user as Record<string, unknown>)?.last_name ||
-          (profileData.profile as Record<string, unknown>)?.last_name;
-
-        if (updatedFirstName !== undefined) {
-          setFirstName(String(updatedFirstName || ""));
-        }
-        if (updatedLastName !== undefined) {
-          setLastName(String(updatedLastName || ""));
-        }
-      }
-
-      toast.success("Profile updated successfully!");
-
-      // Reset editing flag
-      isEditingRef.current = false;
-
-      // Reload to update user context (same pattern as phone_number/about_me)
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
-    } catch (err: unknown) {
-      console.error("❌ Error updating profile:", err);
-      // Reset editing flag on error so user can try again
-      isEditingRef.current = false;
-
-      if (axios.isAxiosError(err)) {
-        const errorData = err.response?.data;
-        const errorMessage =
-          (typeof errorData === "object" && errorData !== null
-            ? (errorData as Record<string, unknown>).error ||
-              (errorData as Record<string, unknown>).message ||
-              (errorData as Record<string, unknown>).detail
-            : null) ||
-          err.message ||
-          "Failed to update profile";
-
-        console.error("❌ Error details:", {
-          status: err.response?.status,
-          statusText: err.response?.statusText,
-          data: errorData,
-          message: err.message,
-        });
-
-        toast.error(String(errorMessage));
-      } else {
-        console.error("❌ Non-Axios error:", err);
-        toast.error("Failed to update profile. Please try again.");
-      }
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
   const darkModeValue =
     theme === "dark" ? "ON" : theme === "system" ? "AUTO" : "OFF";
 
@@ -671,91 +622,7 @@ export default function SettingsPage() {
         return (
           <div className="space-y-8">
             <h1 className="text-xl font-bold">Account Settings</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Password recovery</CardTitle>
-                <CardDescription>
-                  We&apos;ll send a verification code to the address below (same
-                  as in the sidebar).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1 rounded-lg border border-border/80 bg-muted/40 px-3 py-2.5">
-                  <p className="text-xs text-muted-foreground">Email</p>
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {recoveryEmail || "—"}
-                  </p>
-                </div>
-                <div className="space-y-4">
-                  <Label>Change password</Label>
-                  {passwordStep === 1 && (
-                    <form onSubmit={handleSendCode} className="space-y-4">
-                      <Button
-                        type="submit"
-                        disabled={passwordLoading || !recoveryEmail}
-                      >
-                        {passwordLoading
-                          ? "Sending..."
-                          : "Send Verification Code"}
-                      </Button>
-                    </form>
-                  )}
-                  {passwordStep === 2 && (
-                    <form onSubmit={handleVerifyCode} className="space-y-4">
-                      <Input
-                        placeholder="Enter 6-digit code"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className="h-[3.2rem]"
-                      />
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={passwordLoading}>
-                          {passwordLoading ? "Verifying..." : "Verify Code"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setPasswordStep(1)}
-                        >
-                          Back
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                  {passwordStep === 3 && (
-                    <form onSubmit={handleSetNewPassword} className="space-y-4">
-                      <Input
-                        type="password"
-                        placeholder="New password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="h-[3.2rem]"
-                      />
-                      <Input
-                        type="password"
-                        placeholder="Confirm new password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="h-[3.2rem]"
-                      />
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={passwordLoading}>
-                          {passwordLoading ? "Updating..." : "Update Password"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setPasswordStep(2)}
-                        >
-                          Back
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <ResumeImportCard />
           </div>
         );
 
@@ -891,6 +758,27 @@ export default function SettingsPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Security</CardTitle>
+                <CardDescription>
+                  Manage your account security settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordOpen(true)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-border/80 bg-white px-4 py-4 text-left transition-colors hover:bg-muted/40 dark:bg-background dark:hover:bg-muted/20"
+                >
+                  <span className="text-sm font-medium text-foreground">
+                    Change password
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+                </button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Data Visibility</CardTitle>
                 <CardDescription>
                   Manage what information is visible on your profile
@@ -975,7 +863,9 @@ export default function SettingsPage() {
                   <div className="relative z-10">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-2xl font-bold">
-                        {subscriptionLoading ? "..." : (subscriptionInfo?.plan_name || "Free Plan")}
+                        {subscriptionLoading
+                          ? "..."
+                          : subscriptionInfo?.plan_name || "Free Plan"}
                       </p>
                       {subscriptionInfo?.is_active && (
                         <Badge className="bg-green-500 text-white border-0 text-[10px] h-5 uppercase px-2 font-bold tracking-tight">
@@ -984,17 +874,29 @@ export default function SettingsPage() {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {subscriptionInfo?.is_active 
-                        ? `Next automatic renewal: ${subscriptionInfo.next_payment_date || "Monthly"}` 
+                      {subscriptionInfo?.is_active
+                        ? `Next automatic renewal: ${subscriptionInfo.next_payment_date || "Monthly"}`
                         : "Basic access with limited features"}
                     </p>
-
-                    </div>
-                    {subscriptionInfo?.is_active ? (
+                  </div>
+                  {subscriptionInfo?.is_active ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="relative z-10 shadow-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white dark:text-white border-0 h-8 text-xs px-3 font-semibold"
+                      onClick={() => {
+                        setSearchParams(
+                          { section: "subscription", upgrade: "true" },
+                          { replace: true },
+                        );
+                      }}
+                    >
+                      Change Plan
+                    </Button>
+                  ) : (
+                    !subscriptionLoading && (
                       <Button
-                        variant="default"
-                        size="sm"
-                        className="relative z-10 shadow-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white dark:text-white border-0 h-8 text-xs px-3 font-semibold"
+                        className="relative z-10 shadow-lg shadow-primary/20"
                         onClick={() => {
                           setSearchParams(
                             { section: "subscription", upgrade: "true" },
@@ -1002,25 +904,11 @@ export default function SettingsPage() {
                           );
                         }}
                       >
-                        Change Plan
+                        Unlock Pro Features
                       </Button>
-                    ) : (
-                      !subscriptionLoading && (
-                        <Button
-                          className="relative z-10 shadow-lg shadow-primary/20"
-                          onClick={() => {
-                            setSearchParams(
-                              { section: "subscription", upgrade: "true" },
-                              { replace: true },
-                            );
-                          }}
-                        >
-                          Unlock Pro Features
-                        </Button>
-                      )
-                    )}
-                    {/* Decorative background element */}
-
+                    )
+                  )}
+                  {/* Decorative background element */}
                 </div>
               </CardContent>
             </Card>
@@ -1033,7 +921,9 @@ export default function SettingsPage() {
               <CardContent>
                 <div className="space-y-3">
                   {subscriptionLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading payment methods...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Loading payment methods...
+                    </p>
                   ) : subscriptionInfo?.card_mask ? (
                     <div className="flex items-center justify-between p-4 rounded-2xl">
                       <div className="flex items-center gap-3">
@@ -1045,10 +935,11 @@ export default function SettingsPage() {
                             {(() => {
                               const mask = subscriptionInfo.card_mask;
                               const type = subscriptionInfo.card_type || "Card";
-                              
+
                               if (mask && mask !== "N/A") {
                                 // If it's a full mask like ************1234, take last 4
-                                const last4 = mask.length > 4 ? mask.slice(-4) : mask;
+                                const last4 =
+                                  mask.length > 4 ? mask.slice(-4) : mask;
                                 return `${type} •••• ${last4}`;
                               }
                               // Fallback if mask is missing but we know it's a saved card
@@ -1060,11 +951,17 @@ export default function SettingsPage() {
                           </p>
                         </div>
                       </div>
-                      <Badge variant="outline" className="text-[10px] uppercase">Default</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase"
+                      >
+                        Default
+                      </Badge>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                  No payment methods saved. Subscribe to a plan to save your card.
+                      No payment methods saved. Subscribe to a plan to save your
+                      card.
                     </p>
                   )}
                 </div>
@@ -1080,7 +977,10 @@ export default function SettingsPage() {
                       View and manage your recent transactions
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider px-2.5">
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] uppercase font-bold tracking-wider px-2.5"
+                  >
                     BOG Checkout
                   </Badge>
                 </div>
@@ -1089,7 +989,9 @@ export default function SettingsPage() {
                 {historyLoading ? (
                   <div className="flex flex-col items-center justify-center py-8 space-y-3">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="text-sm text-muted-foreground">Fetching transaction history...</p>
+                    <p className="text-sm text-muted-foreground">
+                      Fetching transaction history...
+                    </p>
                   </div>
                 ) : paymentHistory.length > 0 ? (
                   <div className="w-full rounded-lg overflow-hidden">
@@ -1097,18 +999,28 @@ export default function SettingsPage() {
                       <table className="w-full text-sm">
                         <thead className="border-b">
                           <tr>
-                            <th className="px-4 py-3 text-left font-medium">Date</th>
-                            <th className="px-4 py-3 text-left font-medium">Description</th>
+                            <th className="px-4 py-3 text-left font-medium">
+                              Date
+                            </th>
+                            <th className="px-4 py-3 text-left font-medium">
+                              Description
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {paymentHistory.map((transaction) => (
-                            <tr key={transaction.id} className="transition-colors">
+                            <tr
+                              key={transaction.id}
+                              className="transition-colors"
+                            >
                               <td className="px-4 py-3 text-muted-foreground tabular-nums whitespace-nowrap">
-                                {new Date(transaction.date).toLocaleDateString()}
+                                {new Date(
+                                  transaction.date,
+                                ).toLocaleDateString()}
                               </td>
                               <td className="px-4 py-3 font-medium">
-                                {transaction.description || "Subscription Payment"}
+                                {transaction.description ||
+                                  "Subscription Payment"}
                               </td>
                             </tr>
                           ))}
@@ -1121,15 +1033,17 @@ export default function SettingsPage() {
                     <div className="p-3 rounded-full mb-3">
                       <Download className="h-6 w-6 text-muted-foreground/50" />
                     </div>
-                    <CardTitle className="text-base mb-1">No transaction history found</CardTitle>
+                    <CardTitle className="text-base mb-1">
+                      No transaction history found
+                    </CardTitle>
                     <CardDescription className="max-w-[250px]">
-                      When you start subscribing to plans, your payment history will appear here.
+                      When you start subscribing to plans, your payment history
+                      will appear here.
                     </CardDescription>
                   </div>
                 )}
               </CardContent>
             </Card>
-
           </div>
         );
 
@@ -1262,83 +1176,31 @@ export default function SettingsPage() {
     }
   };
 
+  const activeSectionLabel =
+    settingsSections.find((section) => section.id === activeSection)?.label ??
+    "Settings";
+
   return (
     <DashboardLayout>
-      {/* Mobile: Settings Sections Switcher */}
+      {/* Mobile: section menu + logout fixed bottom bar */}
       {isMobile && (
-        <div
-          className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:hidden"
-          style={{ width: "380px" }}
-        >
-          <div className="relative rounded-full overflow-hidden">
-            <div
-              ref={scrollContainerRef}
-              className="overflow-x-auto scrollbar-hide touch-pan-x"
-              style={{ WebkitOverflowScrolling: "touch" }}
-            >
-              <motion.div
-                layout
-                transition={{
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 40,
-                  mass: 1,
-                }}
-                className="relative inline-flex items-center bg-white dark:bg-[#242424]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-sm min-w-max"
-              >
-                {settingsSections.map((section, index) => {
-                  const isFirst = index === 0;
-                  const isLast = index === settingsSections.length - 1;
-                  const isActive = activeSection === section.id;
-
-                  return (
-                    <motion.button
-                      key={section.id}
-                      layout
-                      type="button"
-                      data-section={section.id}
-                      ref={
-                        activeSection === section.id ? activeButtonRef : null
-                      }
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSectionChange(section.id);
-                      }}
-                      onTouchStart={(e) => {
-                        e.stopPropagation();
-                      }}
-                      className={`relative px-6 py-2.5 text-sm transition-colors duration-200 whitespace-nowrap outline-none touch-manipulation ${
-                        isFirst ? "rounded-l-full" : ""
-                      } ${isLast ? "rounded-r-full" : ""} ${
-                        !isFirst && !isLast ? "rounded-none" : ""
-                      } ${
-                        isActive
-                          ? "text-sky-950 dark:text-gray-100 font-bold"
-                          : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200"
-                      }`}
-                    >
-                      {isActive && (
-                        <motion.div
-                          layoutId="active-settings-pill"
-                          className="absolute inset-0 bg-sky-100 dark:bg-gray-700 rounded-full"
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 40,
-                            mass: 1,
-                          }}
-                        />
-                      )}
-                      <span className="relative z-10">{section.label}</span>
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            </div>
-            {/* Right side fade gradient */}
-            <div className="absolute right-0 top-0 bottom-0 w-12 pointer-events-none bg-gradient-to-l from-white dark:from-[#242424]/90 to-transparent rounded-r-full" />
-          </div>
+        <div className="fixed inset-x-0 bottom-[85px] z-40 flex items-center justify-between gap-3 px-4 md:hidden">
+          <button
+            type="button"
+            onClick={() => setSectionMenuOpen(true)}
+            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-4 py-3 text-sm font-semibold text-foreground backdrop-blur-xl shadow-[0_4px_20px_rgba(255,255,255,0.95),0_8px_32px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/40 dark:border-gray-800 dark:bg-[#242424]/90 dark:shadow-[0_8px_32px_rgba(80,80,80,0.45),0_4px_16px_rgba(0,0,0,0.35)] dark:hover:bg-[#2d2d2d]/90"
+          >
+            <Menu className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{activeSectionLabel}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLogoutConfirmOpen(true)}
+            className="flex items-center gap-2 rounded-full border border-red-100 bg-white/95 px-4 py-3 text-sm font-semibold text-red-600 backdrop-blur-xl shadow-[0_4px_20px_rgba(255,255,255,0.95),0_8px_32px_rgba(0,0,0,0.06)] transition-colors hover:bg-red-50 dark:border-red-950/50 dark:bg-[#242424]/90 dark:text-red-500 dark:shadow-[0_8px_32px_rgba(80,80,80,0.45),0_4px_16px_rgba(0,0,0,0.35)] dark:hover:bg-red-950/30"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span>Log out</span>
+          </button>
         </div>
       )}
 
@@ -1347,23 +1209,6 @@ export default function SettingsPage() {
           {/* Left Column - Content */}
           <div className={cn(isMobile && "min-h-screen pb-32")}>
             {renderContent()}
-            {isMobile && (
-              <Card className="mt-8">
-                <CardContent className="p-3">
-                  <div className="relative rounded-full p-1">
-                    <button
-                      type="button"
-                      onClick={() => setLogoutConfirmOpen(true)}
-                      className={cn(
-                        "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700 dark:text-red-500 dark:hover:bg-red-950/35 dark:hover:text-red-400",
-                      )}
-                    >
-                      <span className="relative z-10">Log out</span>
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           {/* Right Column - Sidebar Navigation (Desktop Only) */}
@@ -1430,6 +1275,78 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {isMobile && (
+        <Drawer open={sectionMenuOpen} onOpenChange={setSectionMenuOpen}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader>
+              <DrawerTitle>Settings</DrawerTitle>
+            </DrawerHeader>
+            <div className="px-4 pb-8">
+              <div className="space-y-1">
+                {settingsSections.map((section) => {
+                  const isActive = activeSection === section.id;
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => {
+                        handleSectionChange(section.id);
+                        setSectionMenuOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-sm transition-colors",
+                        isActive
+                          ? "bg-sky-100 font-bold text-sky-950 dark:bg-gray-800 dark:text-gray-100"
+                          : "font-medium text-gray-600 hover:bg-muted/40 dark:text-gray-300 dark:hover:bg-muted/20",
+                      )}
+                    >
+                      <span>{section.label}</span>
+                      {isActive && (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-sky-950 dark:text-gray-100" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      )}
+
+      {isMobile ? (
+        <Drawer
+          open={changePasswordOpen}
+          onOpenChange={handleChangePasswordOpenChange}
+        >
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader>
+              <DrawerTitle>Change password</DrawerTitle>
+              <DrawerDescription>
+                We&apos;ll send a verification code to your email address.
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="px-6 pb-6">
+              {renderChangePasswordModalContent()}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog
+          open={changePasswordOpen}
+          onOpenChange={handleChangePasswordOpenChange}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Change password</DialogTitle>
+              <DialogDescription>
+                We&apos;ll send a verification code to your email address.
+              </DialogDescription>
+            </DialogHeader>
+            {renderChangePasswordModalContent()}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {isMobile ? (
         <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>

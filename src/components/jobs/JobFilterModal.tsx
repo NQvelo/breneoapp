@@ -25,9 +25,18 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useMobile } from "@/hooks/use-mobile";
-import { countries, Country } from "@/data/countries";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, Search as SearchIcon, ChevronDown } from "lucide-react";
+import {
+  filterGeorgianCities,
+  georgianCityLabel,
+  georgianCityLabelById,
+} from "@/data/georgian-cities";
+import {
+  ChevronRight,
+  Search as SearchIcon,
+  ChevronDown,
+  Trash2,
+} from "lucide-react";
 import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
@@ -65,6 +74,7 @@ interface JobFilterModalProps {
   }) => void;
   onApply: () => void;
   onClear?: () => void;
+  showSaveFilter?: boolean;
   userTopSkills?: string[]; // User's top skills from test results
 }
 
@@ -100,7 +110,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   countrySearchQuery = "",
   onCountrySearchChange,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isWorkTypeOpen, setIsWorkTypeOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [internalCountrySearchQuery, setInternalCountrySearchQuery] =
@@ -120,18 +130,10 @@ const FilterForm: React.FC<FilterFormProps> = ({
     }
   };
 
-  // Filter countries based on search query
-  const filteredCountries = React.useMemo(() => {
-    if (!searchQuery.trim()) {
-      return countries;
-    }
-    const query = searchQuery.toLowerCase();
-    return countries.filter(
-      (country) =>
-        country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query),
-    );
-  }, [searchQuery]);
+  const filteredCities = React.useMemo(
+    () => filterGeorgianCities(searchQuery, language),
+    [searchQuery, language],
+  );
 
   // Reset search query when leaving country view
   useEffect(() => {
@@ -164,10 +166,10 @@ const FilterForm: React.FC<FilterFormProps> = ({
     });
   };
 
-  const handleCountryToggle = (countryCode: string) => {
-    const newCountries = filters.countries.includes(countryCode)
-      ? filters.countries.filter((code) => code !== countryCode)
-      : [...filters.countries, countryCode];
+  const handleCityToggle = (cityId: string) => {
+    const newCountries = filters.countries.includes(cityId)
+      ? filters.countries.filter((id) => id !== cityId)
+      : [...filters.countries, cityId];
     onFiltersChange({
       ...filters,
       countries: newCountries,
@@ -203,22 +205,16 @@ const FilterForm: React.FC<FilterFormProps> = ({
   };
 
   const getLocationDisplayText = () => {
-    if (filters.countries.length === 0) return "Choose";
+    if (filters.countries.length === 0) return t.jobs.choose;
     if (filters.countries.length === 1) {
-      const country = countries.find((c) => c.code === filters.countries[0]);
-      return country?.name || "Choose";
+      return georgianCityLabelById(filters.countries[0], language);
     }
-    // If more than 3 countries selected, show count instead of all names
     if (filters.countries.length > 3) {
-      return `${filters.countries.length} countries selected`;
+      return `${filters.countries.length} ${t.jobs.citiesSelected}`;
     }
-    // Show up to 3 country names
     return filters.countries
       .slice(0, 3)
-      .map((code) => {
-        const country = countries.find((c) => c.code === code);
-        return country?.name || code;
-      })
+      .map((id) => georgianCityLabelById(id, language))
       .join(", ");
   };
 
@@ -334,32 +330,30 @@ const FilterForm: React.FC<FilterFormProps> = ({
       );
     }
 
-    // Country Picker View
+    // City picker (mobile)
     if (mobileView === "country") {
       return (
         <div className="flex flex-col h-full">
           <div className="flex-1 overflow-y-auto overflow-x-hidden -mx-6 px-6">
             <div className="space-y-2">
-              {filteredCountries.length === 0 ? (
+              {filteredCities.length === 0 ? (
                 <div className="py-8 text-center text-sm text-gray-500">
-                  No countries found
+                  {t.jobs.noCitiesFound}
                 </div>
               ) : (
-                filteredCountries.map((country) => {
-                  const isChecked = filters.countries.includes(country.code);
+                filteredCities.map((city) => {
+                  const isChecked = filters.countries.includes(city.id);
                   return (
                     <label
-                      key={country.code}
+                      key={city.id}
                       className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-2"
                     >
                       <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 truncate">
-                        {country.name}
+                        {georgianCityLabel(city, language)}
                       </span>
                       <Checkbox
                         checked={isChecked}
-                        onCheckedChange={() =>
-                          handleCountryToggle(country.code)
-                        }
+                        onCheckedChange={() => handleCityToggle(city.id)}
                         className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                       />
                     </label>
@@ -409,7 +403,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
             className="flex items-center justify-between w-full bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
           >
             <span className="text-sm font-medium text-gray-900">
-              {t.jobs.country}
+              {t.jobs.city}
             </span>
             <ChevronRight className="h-4 w-4 text-gray-400" />
           </button>
@@ -461,7 +455,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   return (
     <div className="space-y-6">
       {/* Salary Range Filter - Desktop */}
-      <div className="space-y-3">
+      <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-lg p-4">
         <SalaryRangeFilter
           minSalary={0}
           maxSalary={20000}
@@ -474,7 +468,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
       {/* Skills/Interests Filter - Desktop */}
       {userTopSkills.length > 0 && (
-        <div className="space-y-3">
+        <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-base font-medium dark:text-gray-100">
               {t.jobs.interests}
@@ -586,7 +580,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
             }`}
           >
             <Label className="text-base font-medium dark:text-gray-100 cursor-pointer">
-              {t.jobs.country}
+              {t.jobs.city}
             </Label>
             <ChevronDown
               className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${
@@ -602,7 +596,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                   <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="text"
-                    placeholder="Search countries..."
+                    placeholder={t.jobs.searchCities}
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     className="pl-9 pr-3 h-9 text-sm bg-white dark:bg-gray-700"
@@ -611,29 +605,25 @@ const FilterForm: React.FC<FilterFormProps> = ({
               </div>
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-2">
-                  {filteredCountries.length === 0 ? (
+                  {filteredCities.length === 0 ? (
                     <div className="col-span-2 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No countries found
+                      {t.jobs.noCitiesFound}
                     </div>
                   ) : (
-                    filteredCountries.map((country) => {
-                      const isChecked = filters.countries.includes(
-                        country.code,
-                      );
+                    filteredCities.map((city) => {
+                      const isChecked = filters.countries.includes(city.id);
                       return (
                         <label
-                          key={country.code}
+                          key={city.id}
                           className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2"
                         >
                           <Checkbox
                             checked={isChecked}
-                            onCheckedChange={() =>
-                              handleCountryToggle(country.code)
-                            }
+                            onCheckedChange={() => handleCityToggle(city.id)}
                             className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                           />
                           <span className="text-sm text-gray-900 dark:text-gray-100">
-                            {country.name}
+                            {georgianCityLabel(city, language)}
                           </span>
                         </label>
                       );
@@ -656,6 +646,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   onFiltersChange,
   onApply,
   onClear,
+  showSaveFilter = false,
   userTopSkills = [],
 }) => {
   const { t } = useLanguage();
@@ -667,19 +658,6 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
   const [countrySearchQuery, setCountrySearchQuery] = useState("");
-
-  // Filter countries for mobile location picker
-  const filteredCountriesMobile = React.useMemo(() => {
-    if (!locationSearchQuery.trim()) {
-      return countries;
-    }
-    const query = locationSearchQuery.toLowerCase();
-    return countries.filter(
-      (country) =>
-        country.name.toLowerCase().includes(query) ||
-        country.code.toLowerCase().includes(query),
-    );
-  }, [locationSearchQuery]);
 
   const handleWorkTypeChange = (workTypes: string[]) => {
     onFiltersChange({
@@ -764,7 +742,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               {mobileView === "workType"
                 ? t.jobs.workType
                 : mobileView === "country"
-                  ? t.jobs.country
+                  ? t.jobs.city
                   : SEARCH_TITLE_KA}
             </DrawerTitle>
           </DrawerHeader>
@@ -774,7 +752,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                 <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="text"
-                  placeholder="Search countries..."
+                  placeholder={t.jobs.searchCities}
                   value={countrySearchQuery}
                   onChange={(e) => setCountrySearchQuery(e.target.value)}
                   className="pl-9 pr-3 h-9 text-sm"
@@ -808,20 +786,34 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                       setMobileView("main");
                     }}
                     variant="ghost"
-                    className="h-12 px-6 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0 rounded-[18px]"
+                    size="icon"
+                    aria-label={t.common.clear}
+                    className="h-12 w-12 shrink-0 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-600 dark:bg-red-950/30 dark:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-600 border-0 rounded-[18px]"
                   >
-                    {t.common.clear}
+                    <Trash2 className="h-5 w-5" />
                   </Button>
                 )}
-                <Button
-                  onClick={() => {
-                    onApply();
-                    setMobileView("main");
-                  }}
-                  className="h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
-                >
-                  {t.common.apply}
-                </Button>
+                <div className="flex gap-2">
+                  {showSaveFilter && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled
+                      className="h-12 px-4 rounded-[18px] text-base font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 border-0"
+                    >
+                      {t.common.save}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => {
+                      onApply();
+                      setMobileView("main");
+                    }}
+                    className="h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
+                  >
+                    {t.common.apply}
+                  </Button>
+                </div>
               </div>
             </DrawerFooter>
           )}
@@ -845,7 +837,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
+      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Filter Jobs</DialogTitle>
         </DialogHeader>
@@ -869,17 +861,31 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                   onClear();
                 }}
                 variant="ghost"
-                className="w-auto h-10 px-4 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-0"
+                size="icon"
+                aria-label={t.common.clear}
+                className="h-12 w-12 shrink-0 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-600 dark:bg-red-950/30 dark:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-600 border-0"
               >
-                {t.common.clear}
+                <Trash2 className="h-5 w-5" />
               </Button>
             )}
-            <Button
-              onClick={onApply}
-              className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90"
-            >
-              {t.common.apply}
-            </Button>
+            <div className="flex gap-2 ml-auto">
+              {showSaveFilter && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled
+                  className="h-12 px-4 text-base font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 border-0"
+                >
+                  {t.common.save}
+                </Button>
+              )}
+              <Button
+                onClick={onApply}
+                className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90"
+              >
+                {t.common.apply}
+              </Button>
+            </div>
           </div>
         </DialogFooter>
       </DialogContent>

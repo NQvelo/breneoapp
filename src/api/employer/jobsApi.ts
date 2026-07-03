@@ -5,6 +5,7 @@ import {
 import { employerBffFetch } from "@/api/employer/employerBffClient";
 import { TokenManager } from "@/api/auth/tokenManager";
 import { resolveJobSectionsAfterAi } from "@/utils/jobSectionsDedup";
+import { parseEmploymentTypeFromDescription } from "@/utils/jobEmploymentDisplay";
 
 export type EmployerJobSource = "breneo" | "aggregator";
 
@@ -64,13 +65,23 @@ function toIsActive(value: unknown): boolean {
   return true;
 }
 
-function workModeLabel(mode: string): string {
-  const m = (mode || "").toLowerCase();
-  if (m === "remote") return "Remote";
-  if (m === "hybrid") return "Hybrid";
-  if (m === "on-site" || m === "onsite") return "On-site";
-  if (m === "unknown" || !m) return "—";
-  return mode;
+function pickAggregatorString(
+  raw: Record<string, unknown>,
+  keys: readonly string[],
+): string {
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    const s = String(raw[key] ?? "").trim();
+    if (s && s !== "—") return s;
+  }
+  return "";
+}
+
+function isWorkModeToken(value: string): boolean {
+  const m = value.toLowerCase().replace(/\s+/g, "-");
+  return ["remote", "hybrid", "on-site", "onsite", "unknown"].includes(
+    m === "onsite" ? "on-site" : m,
+  );
 }
 
 /** One bullet / line from API (string or nested object from DRF). */
@@ -280,9 +291,29 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
       employerSubmitted?.city,
       rawEnvelope?.city,
     ),
-    employment_type: String(
-      raw.employment_type ?? raw.job_type ?? raw.type ?? workModeLabel(wm),
-    ),
+    employment_type: (() => {
+      const fromNote = pickAggregatorString(raw, [
+        "employment_type_note",
+        "employmentTypeNote",
+      ]);
+      const fromSubmitted = employerSubmitted
+        ? pickAggregatorString(employerSubmitted, [
+            "employment_type_note",
+            "employmentTypeNote",
+          ])
+        : "";
+      const explicit = pickAggregatorString(raw, [
+        "employment_type",
+        "job_type",
+        "type",
+      ]);
+      const candidate = fromNote || fromSubmitted || explicit;
+      if (candidate && !isWorkModeToken(candidate)) return candidate;
+      const fromDesc = parseEmploymentTypeFromDescription(
+        String(raw.full_description ?? raw.description ?? ""),
+      );
+      return fromDesc || candidate || "—";
+    })(),
     apply_url: String(raw.apply_url ?? raw.application_url ?? ""),
     salary: String(raw.salary ?? raw.salary_range ?? ""),
     remote: wm.toLowerCase() === "remote" || Boolean(raw.remote ?? raw.is_remote),

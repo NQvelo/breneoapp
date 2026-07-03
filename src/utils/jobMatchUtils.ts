@@ -10,7 +10,7 @@
  * - Relevance: how many user skills are utilized
  */
 
-import { countries } from "@/data/countries";
+import { georgianCities } from "@/data/georgian-cities";
 import type { ApiJob } from "@/api/jobs/types";
 
 // Common tech skills keywords for extraction from job text
@@ -403,14 +403,13 @@ export const getMatchQualityLabel = (matchPercentage?: number): string => {
 };
 
 /**
- * Whether a job matches any of the selected ISO country codes (location / country fields).
- * Used for client-side enforcement when the API returns inexact matches.
+ * Whether a job matches any selected Georgian city ids (filters.countries stores city ids).
  */
 export function jobDataMatchesSelectedCountries(
-  countryCodes: string[],
+  selectedIds: string[],
   options: { apiJob?: ApiJob | null; locationLabel?: string },
 ): boolean {
-  if (!countryCodes || countryCodes.length === 0) return true;
+  if (!selectedIds || selectedIds.length === 0) return true;
 
   const { apiJob, locationLabel = "" } = options;
   const loc = (locationLabel || "").toLowerCase();
@@ -441,16 +440,28 @@ export function jobDataMatchesSelectedCountries(
       "") as string
   ).toLowerCase();
 
-  return countryCodes.some((code) => {
-    const c = countries.find((co) => co.code === code);
-    const name = (c?.name || code).toLowerCase();
+  return selectedIds.some((id) => {
+    const city = georgianCities.find((c) => c.id === id);
+    if (city) {
+      const needles = [
+        city.name.toLowerCase(),
+        city.nameKa.toLowerCase(),
+        city.id.toLowerCase(),
+      ];
+      return needles.some(
+        (needle) =>
+          loc.includes(needle) ||
+          jobLoc.includes(needle) ||
+          rawCity.includes(needle) ||
+          rawCountry.includes(needle),
+      );
+    }
+    const legacy = id.toLowerCase();
     return (
-      loc.includes(name) ||
-      jobLoc.includes(name) ||
-      rawCountry.includes(name) ||
-      rawCity.includes(name) ||
-      loc.includes(code.toLowerCase()) ||
-      jobLoc.includes(code.toLowerCase())
+      loc.includes(legacy) ||
+      jobLoc.includes(legacy) ||
+      rawCountry.includes(legacy) ||
+      rawCity.includes(legacy)
     );
   });
 }
