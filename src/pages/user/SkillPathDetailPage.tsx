@@ -20,12 +20,10 @@ import { filterATSJobs } from "@/utils/jobFilterUtils";
 import { profileApi } from "@/api/profile";
 import { normalizeSkillName } from "@/services/matching";
 import {
-  calculateAISalary,
-  formatSalaryRange,
-} from "@/services/jobs/salaryService";
-import {
+  computeAverageJobSalary,
+  formatAverageJobSalary,
   formatJobSalaryDisplay,
-  formatJobSalaryWithLari,
+  type SkillPathSalaryCountry,
 } from "@/utils/jobSalaryFormat";
 import {
   getCompleteMarketData,
@@ -97,6 +95,33 @@ export interface MatchedProfession {
   created_at: string;
 }
 
+const SALARY_COUNTRIES: SkillPathSalaryCountry[] = ["Georgia", "USA"];
+
+const mapToSalaryCountry = (country: string): SkillPathSalaryCountry => {
+  const lower = country.toLowerCase().trim();
+  if (lower === "georgia" || lower === "ge") return "Georgia";
+  return "USA";
+};
+
+const salaryCountryCurrency = (country: SkillPathSalaryCountry): string =>
+  country === "USA" ? "$" : "₾";
+
+const buildSalaryJobFilters = (
+  country: SkillPathSalaryCountry,
+  searchTerm: string,
+): JobFilters => ({
+  country: country === "Georgia" ? "Georgia" : "United States",
+  countries: country === "Georgia" ? ["georgia"] : [],
+  locationCountry: country === "Georgia" ? ["Georgia"] : ["USA"],
+  jobTypes: [],
+  isRemote: false,
+  datePosted: undefined,
+  skills: [searchTerm],
+  salaryMin: undefined,
+  salaryMax: undefined,
+  salaryByAgreement: false,
+});
+
 const SkillPathDetailPage = () => {
   const { skillName } = useParams<{ skillName: string }>();
   const navigate = useNavigate();
@@ -112,9 +137,10 @@ const SkillPathDetailPage = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [projectIdeas, setProjectIdeas] = useState<string[]>([]);
   const [jobs, setJobs] = useState<ApiJob[]>([]);
-  const [userCountry, setUserCountry] = useState<string>("Georgia");
-  const [activeCountry, setActiveCountry] = useState<string>("US");
-  const [salaryCurrency, setSalaryCurrency] = useState<string>("₾");
+  const [activeCountry, setActiveCountry] =
+    useState<SkillPathSalaryCountry>("Georgia");
+  const [salaryJobCount, setSalaryJobCount] = useState(0);
+  const [salaryLoading, setSalaryLoading] = useState(false);
   const [pageTitle, setPageTitle] = useState<string>("");
   const [userSkillSet, setUserSkillSet] = useState<Set<string>>(new Set());
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -243,26 +269,6 @@ const SkillPathDetailPage = () => {
             setPageTitle(professionDetails.title); // Update title from loaded details
             searchTerm = professionDetails.title; // Use the actual title for searching
             
-            // Initial Salary Set - Try to find based on user country or default to US
-            const salaryInfoMap = professionDetails.salary_info || {};
-            const availableCountries = Object.keys(salaryInfoMap);
-            
-            // Default to US or first available
-            let initialCountry = "US";
-            if (!salaryInfoMap["US"]) {
-                initialCountry = availableCountries[0] || "US";
-            }
-            
-            setActiveCountry(initialCountry);
-            const defaultSalary = salaryInfoMap[initialCountry];
-
-            if (defaultSalary) {
-                setSalaryInfo(formatJobSalaryWithLari(defaultSalary.display));
-                setSalaryCurrency(defaultSalary.currency);
-            } else {
-                 loadSalaryInfo("Georgia");
-            }
-            
             // Market data from profession
             if (professionDetails.market_popularity && professionDetails.market_popularity.length > 0) {
                  const popularity = professionDetails.market_popularity;
@@ -296,9 +302,6 @@ const SkillPathDetailPage = () => {
             const defaultStats = `${decodedSkillName} professionals are in high demand. Loading real-time market data...`;
             setPopularityData(defaultStats);
             
-             // Calculate salary immediately with default country (instant, no API call)
-            loadSalaryInfo("Georgia"); // Use default, will update if country differs
-            
             generateProjectIdeas(searchTerm);
         }
     
@@ -318,29 +321,15 @@ const SkillPathDetailPage = () => {
 
         // Fetch country and update salary in background (non-blocking)
         const country = await fetchUserCountry();
-        
-        // Only update salary logic if we are NOT using the API data
-        // OR if we want to auto-switch the currency to the user's country if available in API data
-        // Only update salary logic if we are NOT using the API data
-        // OR if we want to auto-switch the currency to the user's country if available in API data
-        if (professionDetails) {
-             // Try to switch to user's country currency if available in API
-             const salaryInfoMap = professionDetails.salary_info || {};
-             if (salaryInfoMap[country]) {
-                 setActiveCountry(country);
-                 setSalaryInfo(
-                   formatJobSalaryWithLari(salaryInfoMap[country].display),
-                 );
-             }
-        } else if (country !== "Georgia") {
-          loadSalaryInfo(country); // Update salary if country differs
-        }
+        const salaryCountry = mapToSalaryCountry(country);
+        setActiveCountry(salaryCountry);
 
         // Parallelize all async operations (non-blocking)
         Promise.all([
           !professionDetails ? loadPopularityData(country) : Promise.resolve(), // Load real market data only if not provided
           loadCourses(searchTerm),
-          loadJobs(country, searchTerm),
+          loadJobs(salaryCountry, searchTerm),
+          loadSalaryFromJobs(salaryCountry, searchTerm),
         ]).catch((error) => {
           console.error("Error in background operations:", error);
         });
@@ -362,7 +351,6 @@ const SkillPathDetailPage = () => {
         (profileData as { country?: string })?.country ||
         (user as { country?: string })?.country ||
         "Georgia";
-      setUserCountry(country);
       return country;
     } catch (error) {
       console.error("Error fetching user country:", error);
@@ -391,109 +379,42 @@ const SkillPathDetailPage = () => {
     setRoleInfo(info);
   };
 
-  const loadSalaryInfo = (country: string) => {
+  const loadSalaryFromJobs = async (
+    country: SkillPathSalaryCountry,
+    searchTerm: string = decodedSkillName,
+  ) => {
     try {
-      // Map skill names to common job titles for better salary accuracy
-      const jobTitleMap: Record<string, string> = {
-        javascript: "javascript developer",
-        python: "python developer",
-        react: "react developer",
-        "ui/ux design": "ux designer",
-        "ui/ux": "ux designer",
-        "data analysis": "data analyst",
-        "data analytics": "data analyst",
-        "software development": "software developer",
-        "web development": "web developer",
-        "mobile development": "mobile developer",
-        devops: "devops engineer",
-        cybersecurity: "cybersecurity specialist",
-        "quality assurance": "qa engineer",
-        "product management": "product manager",
-        "3d modeler": "3d artist",
-      };
+      setSalaryLoading(true);
+      const filters = buildSalaryJobFilters(country, searchTerm);
 
-      // Try mapped title first, then skill name directly
-      const skillLower = decodedSkillName.toLowerCase();
-      let searchTitle = jobTitleMap[skillLower] || skillLower;
+      const jobsPromise = jobService.fetchActiveJobs({
+        query: searchTerm,
+        filters,
+        page: 1,
+        pageSize: 50,
+      });
 
-      // Calculate salary instantly using AI (no API call, no async needed)
-      let salaryData = calculateAISalary(searchTitle, country);
+      const timeoutPromise = new Promise<{ jobs: ApiJob[] }>((resolve) => {
+        setTimeout(() => resolve({ jobs: [] }), 8000);
+      });
 
-      // If no results and searchTitle doesn't already include "developer", try with "developer" suffix
-      if (
-        !salaryData.min_salary &&
-        !salaryData.max_salary &&
-        !searchTitle.includes("developer")
-      ) {
-        const developerTitle = `${searchTitle} developer`;
-        salaryData = calculateAISalary(developerTitle, country);
-        if (salaryData.min_salary || salaryData.max_salary) {
-          searchTitle = developerTitle;
-        }
-      }
+      const jobsResponse = await Promise.race([jobsPromise, timeoutPromise]);
+      const allowedJobs = filterATSJobs(jobsResponse.jobs);
+      const salaryResult = computeAverageJobSalary(allowedJobs);
 
-      // If still no results and searchTitle doesn't already include "engineer", try as "engineer"
-      if (
-        !salaryData.min_salary &&
-        !salaryData.max_salary &&
-        !searchTitle.includes("engineer")
-      ) {
-        const engineerTitle = `${searchTitle} engineer`;
-        salaryData = calculateAISalary(engineerTitle, country);
-        if (salaryData.min_salary || salaryData.max_salary) {
-          searchTitle = engineerTitle;
-        }
-      }
-
-      // Validate salary data before formatting
-      if (
-        salaryData &&
-        (salaryData.min_salary || salaryData.max_salary) &&
-        (salaryData.min_salary! > 0 || salaryData.max_salary! > 0)
-      ) {
-        const formatted = formatSalaryRange(salaryData);
-        if (formatted && formatted !== "Salary data not available") {
-          setSalaryInfo(formatted);
-          return;
-        }
-      }
-
-      // Fallback: try with generic title based on skill category
-      const genericTitle =
-        skillLower.includes("design") ||
-        skillLower.includes("ui") ||
-        skillLower.includes("ux")
-          ? "ui/ux designer"
-          : skillLower.includes("data") ||
-              skillLower.includes("analyst") ||
-              skillLower.includes("analytics")
-            ? "data analyst"
-            : skillLower.includes("manager") || skillLower.includes("product")
-              ? "product manager"
-              : skillLower.includes("security") || skillLower.includes("cyber")
-                ? "cybersecurity specialist"
-                : skillLower.includes("devops") || skillLower.includes("cloud")
-                  ? "devops engineer"
-                  : "software developer";
-
-      const fallbackSalary = calculateAISalary(genericTitle, country);
-      if (fallbackSalary.min_salary && fallbackSalary.max_salary) {
-        const formatted = formatSalaryRange(fallbackSalary);
-        setSalaryInfo(formatted);
+      if (salaryResult) {
+        setSalaryInfo(formatAverageJobSalary(salaryResult, country));
+        setSalaryJobCount(salaryResult.count);
       } else {
-        // Last resort: use default software developer salary
-        const defaultSalary = calculateAISalary("software developer", country);
-        setSalaryInfo(formatSalaryRange(defaultSalary));
+        setSalaryInfo("Salary data not available");
+        setSalaryJobCount(0);
       }
     } catch (error) {
-      console.error("Error calculating salary:", error);
-      // Even on error, try to show a default salary
-      try {
-        const defaultSalary = calculateAISalary("software developer", country);
-        setSalaryInfo(formatSalaryRange(defaultSalary));
-      } catch (fallbackError) {
-        setSalaryInfo("Salary data not available");
-      }
+      console.error("Error loading salary from jobs:", error);
+      setSalaryInfo("Salary data not available");
+      setSalaryJobCount(0);
+    } finally {
+      setSalaryLoading(false);
     }
   };
 
@@ -654,35 +575,20 @@ const SkillPathDetailPage = () => {
     setProjectIdeas(ideas);
   };
 
-  const handleCountryChange = (country: string) => {
+  const handleCountryChange = (country: SkillPathSalaryCountry) => {
     setActiveCountry(country);
-    
-    const matchedProfessionWrapper = location.state?.profession as MatchedProfession | undefined;
-    const professionDetails = matchedProfessionWrapper?.profession;
-
-    if (professionDetails && professionDetails.salary_info) {
-       const salaryEntry = professionDetails.salary_info[country];
-
-       if (salaryEntry) {
-           setSalaryInfo(formatJobSalaryWithLari(salaryEntry.display));
-           setSalaryCurrency("₾");
-       }
-    }
+    const searchTerm =
+      matchedProfession?.profession?.title || pageTitle || decodedSkillName;
+    loadSalaryFromJobs(country, searchTerm);
+    loadJobs(country, searchTerm);
   };
 
-  const loadJobs = async (country: string, searchTerm: string = decodedSkillName) => {
+  const loadJobs = async (
+    country: SkillPathSalaryCountry,
+    searchTerm: string = decodedSkillName,
+  ) => {
     try {
-      const filters: JobFilters = {
-        country: country,
-        countries: [],
-        jobTypes: [],
-        isRemote: false,
-        datePosted: undefined,
-        skills: [searchTerm],
-        salaryMin: undefined,
-        salaryMax: undefined,
-        salaryByAgreement: false,
-      };
+      const filters = buildSalaryJobFilters(country, searchTerm);
 
       // Fetch jobs with timeout to prevent hanging (5 seconds max)
       const jobsPromise = jobService.fetchActiveJobs({
@@ -719,8 +625,7 @@ const SkillPathDetailPage = () => {
     );
   }
 
-  const salaryCountries = Object.keys(matchedProfession?.profession?.salary_info || {});
-  const selectedSalary = matchedProfession?.profession?.salary_info?.[activeCountry];
+  const salaryCurrency = salaryCountryCurrency(activeCountry);
 
   return (
     <DashboardLayout>
@@ -797,61 +702,36 @@ const SkillPathDetailPage = () => {
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="sm:w-40 sm:shrink-0">
                   <div className="space-y-1">
-                    {salaryCountries.length > 0 ? (
-                      salaryCountries.map((country) => (
-                        <button
-                          key={country}
-                          onClick={() => handleCountryChange(country)}
-                          className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                            activeCountry === country
-                              ? "bg-breneo-blue/10 text-breneo-blue"
-                              : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
-                          }`}
-                        >
-                          {country}
-                        </button>
-                      ))
-                    ) : (
-                      <button className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium bg-breneo-blue/10 text-breneo-blue">
-                        {userCountry}
+                    {SALARY_COUNTRIES.map((country) => (
+                      <button
+                        key={country}
+                        onClick={() => handleCountryChange(country)}
+                        className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                          activeCountry === country
+                            ? "bg-breneo-blue/10 text-breneo-blue"
+                            : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue"
+                        }`}
+                      >
+                        {country}
                       </button>
-                    )}
+                    ))}
                   </div>
                 </div>
 
                 <div className="flex flex-1 flex-col justify-center gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                      Estimated yearly Range
+                      Average salary
                     </p>
                     <div className="text-3xl font-bold text-foreground tracking-tight">
-                      {salaryInfo}
+                      {salaryLoading ? "..." : salaryInfo}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Salary in {activeCountry} ({salaryCurrency})
+                      {salaryJobCount > 0
+                        ? `Based on ${salaryJobCount} job${salaryJobCount === 1 ? "" : "s"} in ${activeCountry} (${salaryCurrency})`
+                        : `Salary in ${activeCountry} (${salaryCurrency})`}
                     </p>
                   </div>
-
-                  {selectedSalary && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl border bg-background/70 p-3">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Minimum
-                        </p>
-                        <p className="font-semibold text-sm mt-1">
-                          {selectedSalary.min.toLocaleString()} ₾
-                        </p>
-                      </div>
-                      <div className="rounded-xl border bg-background/70 p-3">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                          Maximum
-                        </p>
-                        <p className="font-semibold text-sm mt-1">
-                          {selectedSalary.max.toLocaleString()} ₾
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>

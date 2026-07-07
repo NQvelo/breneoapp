@@ -66,8 +66,6 @@ import {
   resolveJobEmploymentType,
   resolveJobWorkArrangement,
 } from "@/utils/jobEmploymentDisplay";
-import { OnboardingModal } from "@/components/common/OnboardingModal";
-
 // extractJobSkills is now imported from @/utils/jobMatchUtils
 
 // Function to calculate job relevance score based on user's hard skills
@@ -394,8 +392,6 @@ const UserHome = () => {
   const coursesScrollRef = useRef<HTMLDivElement>(null);
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-
   const extractSavedIds = (
     items: unknown,
     idKeys: string[],
@@ -583,19 +579,6 @@ const UserHome = () => {
 
     fetchUserSkills();
   }, [user]);
-
-  // Open onboarding modal if it's user's first time
-  useEffect(() => {
-    const onboardingShown = localStorage.getItem("breneo_onboarding_shown");
-    if (!onboardingShown) {
-      setIsOnboardingOpen(true);
-    }
-  }, []);
-
-  const handleCloseOnboarding = () => {
-    setIsOnboardingOpen(false);
-    localStorage.setItem("breneo_onboarding_shown", "true");
-  };
 
   // Fetch profile once and derive saved IDs to avoid duplicate initial requests.
   const { data: profileData } = useQuery<UserProfileResponse>({
@@ -1518,11 +1501,6 @@ const UserHome = () => {
           </div>
         </div>
       </div>
-      <OnboardingModal 
-        isOpen={isOnboardingOpen} 
-        onClose={handleCloseOnboarding} 
-      />
-      <BetaVersionModal />
     </DashboardLayout>
   );
 };

@@ -29,36 +29,58 @@ const UserProfile = lazy(() => import("@/pages/user/ProfilePage"));
 const SavedPage = lazy(() => import("@/pages/user/SavedPage"));
 const UserSettings = lazy(() => import("@/pages/user/UserSettings"));
 const JobsPage = lazy(() => import("@/pages/user/JobsPage"));
-const JobSearchResultsPage = lazy(() => import("@/pages/user/JobSearchResultsPage"));
+const JobSearchResultsPage = lazy(
+  () => import("@/pages/user/JobSearchResultsPage"),
+);
 const JobDetailPage = lazy(() => import("@/pages/user/JobDetailPage"));
 const CompanyJobsPage = lazy(() => import("@/pages/user/CompanyJobsPage"));
 const CoursesPage = lazy(() => import("@/pages/CoursesPage"));
 const CoursePage = lazy(() => import("@/pages/CoursePage"));
 const SkillTestPage = lazy(() => import("@/pages/user/SkillTestPage"));
 const SkillPathPage = lazy(() => import("@/pages/user/SkillPathPage"));
-const SkillPathDetailPage = lazy(() => import("@/pages/user/SkillPathDetailPage"));
+const SkillPathDetailPage = lazy(
+  () => import("@/pages/user/SkillPathDetailPage"),
+);
 const InterestsPage = lazy(() => import("@/pages/user/InterestsPage"));
 const UserNotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const CvViewsPage = lazy(() => import("@/pages/user/CvViewsPage"));
 
 // Academy pages (Academy-only)
 const AcademyHomePage = lazy(() => import("@/pages/academy/AcademyHomePage"));
-const AcademyCoursesPage = lazy(() => import("@/pages/academy/AcademyCoursesPage"));
+const AcademyCoursesPage = lazy(
+  () => import("@/pages/academy/AcademyCoursesPage"),
+);
 const AcademyProfile = lazy(() => import("@/pages/academy/AcademyProfilePage"));
 const AcademySettings = lazy(() => import("@/pages/academy/AcademySettings"));
 const AcademyPage = lazy(() => import("@/pages/academy/AcademyPage"));
-const AcademyRegistrationPage = lazy(() => import("@/pages/academy/AcademyRegistrationPage"));
+const AcademyRegistrationPage = lazy(
+  () => import("@/pages/academy/AcademyRegistrationPage"),
+);
 const AddCoursePage = lazy(() => import("@/pages/academy/AddCoursePage"));
-const EmployerRegistrationPage = lazy(() => import("@/pages/employer/EmployerRegistrationPage"));
-const EmployerDashboardPage = lazy(() => import("@/pages/employer/EmployerDashboardPage"));
-const EmployerJobsPage = lazy(() => import("@/pages/employer/EmployerJobsPage"));
-const EmployerAddJobPage = lazy(() => import("@/pages/employer/EmployerAddJobPage"));
-const EmployerJobStatsPage = lazy(() => import("@/pages/employer/EmployerJobStatsPage"));
+const EmployerRegistrationPage = lazy(
+  () => import("@/pages/employer/EmployerRegistrationPage"),
+);
+const EmployerDashboardPage = lazy(
+  () => import("@/pages/employer/EmployerDashboardPage"),
+);
+const EmployerJobsPage = lazy(
+  () => import("@/pages/employer/EmployerJobsPage"),
+);
+const EmployerAddJobPage = lazy(
+  () => import("@/pages/employer/EmployerAddJobPage"),
+);
+const EmployerJobStatsPage = lazy(
+  () => import("@/pages/employer/EmployerJobStatsPage"),
+);
 const AcademyCourseStatsPage = lazy(
   () => import("@/pages/academy/AcademyCourseStatsPage"),
 );
-const EmployerProfilePage = lazy(() => import("@/pages/employer/EmployerProfilePage"));
-const EmployerMembersPage = lazy(() => import("@/pages/employer/EmployerMembersPage"));
+const EmployerProfilePage = lazy(
+  () => import("@/pages/employer/EmployerProfilePage"),
+);
+const EmployerMembersPage = lazy(
+  () => import("@/pages/employer/EmployerMembersPage"),
+);
 const EmployerJoinCompanyPage = lazy(
   () => import("@/pages/employer/EmployerJoinCompanyPage"),
 );
@@ -160,7 +182,8 @@ export const AppRoutes = () => {
   const location = useLocation();
 
   useEffect(() => {
-    const role = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
+    const role =
+      typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
     const preloads =
       role === "employer"
         ? [...preloadCommonChunks, ...preloadEmployerChunks]
@@ -189,261 +212,264 @@ export const AppRoutes = () => {
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
-      {/* ==========================================
+        {/* ==========================================
           PUBLIC ROUTES - No authentication required
           ========================================== */}
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/auth/login" element={<LoginPage />} />
-      <Route path="/auth/signup" element={<SignupPage />} />
-      <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/email-verification" element={<EmailVerification />} />
-      <Route path="/email-confirmed" element={<EmailConfirmed />} />
-      <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/signup" element={<SignupPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/email-verification" element={<EmailVerification />} />
+        <Route path="/email-confirmed" element={<EmailConfirmed />} />
+        <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
 
-      {/* ==========================================
+        {/* ==========================================
           USER-ONLY ROUTES - Require role "user"
           ========================================== */}
-      {createLocalizedRoute(
-        "/home",
-        <ProtectedRoute requiredRole="user">
-          <UserDashboard />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/dashboard",
-        <ProtectedRoute requiredRole="user">
-          <UserDashboard />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/profile",
-        <ProtectedRoute requiredRole="user">
-          <UserProfile />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/saved",
-        <ProtectedRoute requiredRole="user">
-          <SavedPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/settings",
-        <ProtectedRoute requiredRole="user">
-          <UserSettings />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/notifications",
-        <ProtectedRoute requiredRole="user">
-          <UserNotificationsPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/cv-views",
-        <ProtectedRoute requiredRole="user">
-          <CvViewsPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/interests",
-        <ProtectedRoute requiredRole="user">
-          <InterestsPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/skill-test",
-        <ProtectedRoute requiredRole="user">
-          <SkillTestPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/skill-path/:skillName",
-        <ProtectedRoute requiredRole="user">
-          <SkillPathDetailPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/skill-path",
-        <ProtectedRoute requiredRole="user">
-          <SkillPathPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/jobs",
-        <ProtectedRoute requiredRole="user">
-          <JobsPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/jobs/search",
-        <ProtectedRoute requiredRole="user">
-          <JobSearchResultsPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/jobs/:jobId",
-        <ProtectedRoute requiredRole="user">
-          <JobDetailPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/jobs/company/:companyName",
-        <ProtectedRoute requiredRole="user">
-          <CompanyJobsPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/courses",
-        <ProtectedRoute requiredRole="user">
-          <CoursesPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/course/:courseId",
-        <ProtectedRoute requiredRole="user">
-          <CoursePage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/webinars",
-        <ProtectedRoute requiredRole="user">
-          <WebinarsPage />
-        </ProtectedRoute>,
-      )}
+        {createLocalizedRoute(
+          "/home",
+          <ProtectedRoute requiredRole="user">
+            <UserDashboard />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/dashboard",
+          <ProtectedRoute requiredRole="user">
+            <UserDashboard />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/profile",
+          <ProtectedRoute requiredRole="user">
+            <UserProfile />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/saved",
+          <ProtectedRoute requiredRole="user">
+            <SavedPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/settings",
+          <ProtectedRoute requiredRole="user">
+            <UserSettings />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/notifications",
+          <ProtectedRoute requiredRole="user">
+            <UserNotificationsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/cv-views",
+          <ProtectedRoute requiredRole="user">
+            <CvViewsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/interests",
+          <ProtectedRoute requiredRole="user">
+            <InterestsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/skill-test",
+          <ProtectedRoute requiredRole="user">
+            <SkillTestPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/skill-path/:skillName",
+          <ProtectedRoute requiredRole="user">
+            <SkillPathDetailPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/skill-path",
+          <ProtectedRoute requiredRole="user">
+            <SkillPathPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/jobs",
+          <ProtectedRoute requiredRole="user">
+            <JobsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/jobs/search",
+          <ProtectedRoute requiredRole="user">
+            <JobSearchResultsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/jobs/:jobId",
+          <ProtectedRoute requiredRole="user">
+            <JobDetailPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/jobs/company/:companyName",
+          <ProtectedRoute requiredRole="user">
+            <CompanyJobsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/courses",
+          <ProtectedRoute requiredRole="user">
+            <CoursesPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/course/:courseId",
+          <ProtectedRoute requiredRole="user">
+            <CoursePage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/webinars",
+          <ProtectedRoute requiredRole="user">
+            <WebinarsPage />
+          </ProtectedRoute>,
+        )}
 
-      {/* ==========================================
+        {/* ==========================================
           ACADEMY-ONLY ROUTES - Require role "academy"
           ========================================== */}
-      <Route path="/academy/register" element={<AcademyRegistrationPage />} />
-      <Route path="/employer/register" element={<EmployerRegistrationPage />} />
-      {createLocalizedRoute(
-        "/employer/join-company",
-        <ProtectedRoute requiredRole="employer">
-          <EmployerJoinCompanyPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/employer/accept-invite",
-        <EmployerAcceptInvitePage />,
-      )}
-      {createLocalizedRoute(
-        "/employer/pending-approval",
-        <ProtectedRoute requiredRole="employer">
-          <EmployerPendingApprovalPage />
-        </ProtectedRoute>,
-      )}
-      {createEmployerDashboardRoutes([
-        {
-          path: "/employer/notifications",
-          element: <EmployerNotificationsPage />,
-        },
-        {
-          path: "/employer/dashboard",
-          element: <EmployerDashboardPage />,
-        },
-        { path: "/employer/home", element: <EmployerDashboardPage /> },
-        { path: "/employer/jobs", element: <EmployerJobsPage /> },
-        { path: "/employer/jobs/add", element: <EmployerAddJobPage /> },
-        {
-          path: "/employer/jobs/edit/:jobId",
-          element: <EmployerAddJobPage />,
-        },
-        { path: "/employer/jobs/:jobId", element: <EmployerJobStatsPage /> },
-        { path: "/employer/profile", element: <EmployerProfilePage /> },
-        { path: "/employer/members", element: <EmployerMembersPage /> },
-        { path: "/employer/settings", element: <UserSettings /> },
-      ])}
-      {createLocalizedRoute(
-        "/academy/home",
-        <ProtectedRoute requiredRole="academy">
-          <AcademyHomePage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/dashboard",
-        <ProtectedRoute requiredRole="academy">
-          <AcademyHomePage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/courses",
-        <ProtectedRoute requiredRole="academy">
-          <AcademyCoursesPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/profile",
-        <ProtectedRoute requiredRole="academy">
-          <AcademyProfile />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/settings",
-        <ProtectedRoute requiredRole="academy">
-          <AcademySettings />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/courses/add",
-        <ProtectedRoute requiredRole="academy">
-          <AddCoursePage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/courses/edit/:courseId",
-        <ProtectedRoute requiredRole="academy">
-          <AddCoursePage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/academy/courses/:courseId",
-        <ProtectedRoute requiredRole="academy">
-          <AcademyCourseStatsPage />
-        </ProtectedRoute>,
-      )}
+        <Route path="/academy/register" element={<AcademyRegistrationPage />} />
+        <Route
+          path="/employer/register"
+          element={<EmployerRegistrationPage />}
+        />
+        {createLocalizedRoute(
+          "/employer/join-company",
+          <ProtectedRoute requiredRole="employer">
+            <EmployerJoinCompanyPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/employer/accept-invite",
+          <EmployerAcceptInvitePage />,
+        )}
+        {createLocalizedRoute(
+          "/employer/pending-approval",
+          <ProtectedRoute requiredRole="employer">
+            <EmployerPendingApprovalPage />
+          </ProtectedRoute>,
+        )}
+        {createEmployerDashboardRoutes([
+          {
+            path: "/employer/notifications",
+            element: <EmployerNotificationsPage />,
+          },
+          {
+            path: "/employer/dashboard",
+            element: <EmployerDashboardPage />,
+          },
+          { path: "/employer/home", element: <EmployerDashboardPage /> },
+          { path: "/employer/jobs", element: <EmployerJobsPage /> },
+          { path: "/employer/jobs/add", element: <EmployerAddJobPage /> },
+          {
+            path: "/employer/jobs/edit/:jobId",
+            element: <EmployerAddJobPage />,
+          },
+          { path: "/employer/jobs/:jobId", element: <EmployerJobStatsPage /> },
+          { path: "/employer/profile", element: <EmployerProfilePage /> },
+          { path: "/employer/members", element: <EmployerMembersPage /> },
+          { path: "/employer/settings", element: <UserSettings /> },
+        ])}
+        {createLocalizedRoute(
+          "/academy/home",
+          <ProtectedRoute requiredRole="academy">
+            <AcademyHomePage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/dashboard",
+          <ProtectedRoute requiredRole="academy">
+            <AcademyHomePage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/courses",
+          <ProtectedRoute requiredRole="academy">
+            <AcademyCoursesPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/profile",
+          <ProtectedRoute requiredRole="academy">
+            <AcademyProfile />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/settings",
+          <ProtectedRoute requiredRole="academy">
+            <AcademySettings />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/courses/add",
+          <ProtectedRoute requiredRole="academy">
+            <AddCoursePage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/courses/edit/:courseId",
+          <ProtectedRoute requiredRole="academy">
+            <AddCoursePage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/academy/courses/:courseId",
+          <ProtectedRoute requiredRole="academy">
+            <AcademyCourseStatsPage />
+          </ProtectedRoute>,
+        )}
 
-      {/* ==========================================
+        {/* ==========================================
           COMMON ROUTES - Available to all authenticated users
           ========================================== */}
-      {/* Academy public view page - accessible to all authenticated users
+        {/* Academy public view page - accessible to all authenticated users
           Accepts academy_id (UUID) or slug as parameter
           Displays academy profile and courses from Supabase */}
-      {createLocalizedRoute(
-        "/academy/:academySlug",
-        <ProtectedRoute>
-          <AcademyPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/terms-of-use",
-        <ProtectedRoute>
-          <TermsOfUse />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/help",
-        <ProtectedRoute>
-          <HelpCenter />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/success",
-        <ProtectedRoute>
-          <PaymentSuccessPage />
-        </ProtectedRoute>,
-      )}
-      {createLocalizedRoute(
-        "/failure",
-        <ProtectedRoute>
-          <PaymentFailurePage />
-        </ProtectedRoute>,
-      )}
+        {createLocalizedRoute(
+          "/academy/:academySlug",
+          <ProtectedRoute>
+            <AcademyPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/terms-of-use",
+          <ProtectedRoute>
+            <TermsOfUse />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/help",
+          <ProtectedRoute>
+            <HelpCenter />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/success",
+          <ProtectedRoute>
+            <PaymentSuccessPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/failure",
+          <ProtectedRoute>
+            <PaymentFailurePage />
+          </ProtectedRoute>,
+        )}
 
-      {/* ==========================================
+        {/* ==========================================
           404 - Not Found
           ========================================== */}
-      <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

@@ -12,7 +12,7 @@ import {
   Moon,
   Sun,
   LibraryBig,
-  Video,
+  Atom,
   ArrowRight,
   Zap,
   Sparkles,
@@ -212,7 +212,9 @@ export function AppSidebar({
     };
   }, [isEmployer, user?.id, user?.email, readEmployerCache]);
 
-  const hasEmployerSidebarCache = Boolean(readEmployerCache()?.memberName || readEmployerCache()?.logo);
+  const hasEmployerSidebarCache = Boolean(
+    readEmployerCache()?.memberName || readEmployerCache()?.logo,
+  );
 
   if (loading && !user && !(isEmployer && hasEmployerSidebarCache)) return null;
 
@@ -302,7 +304,7 @@ export function AppSidebar({
           { icon: Home, label: t.nav.home, href: "/home" },
           { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
           { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
-          { icon: Video, label: t.nav.webinars, href: "/webinars" },
+          { icon: Atom, label: t.nav.atoms, href: "/webinars" },
         ];
 
   const profilePath = isAcademy
@@ -582,7 +584,9 @@ export function AppSidebar({
                       )}
                     />
                     {!collapsed && (
-                      <span className="font-medium text-base">{t.nav.help}</span>
+                      <span className="font-medium text-base">
+                        {t.nav.help}
+                      </span>
                     )}
                   </LocalizedLink>
 

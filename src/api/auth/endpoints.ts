@@ -64,6 +64,17 @@ export const API_ENDPOINTS = {
     JOIN_REQUEST_APPROVE: (id: string) =>
       `/api/employer/join-requests/${encodeURIComponent(id)}/approve/`,
   },
+  PROFESSIONS: {
+    LIST: "/api/professions/",
+  },
+  ATOMS: {
+    LIST: (professionId: number) =>
+      `/api/v1/professions/${professionId}/atoms/`,
+    DETAIL: (atomId: number) => `/api/v1/atoms/${atomId}/`,
+    NEXT_ATOM: (professionId: number) =>
+      `/api/v1/professions/${professionId}/next-atom/`,
+    SUBMIT: (atomId: number) => `/api/v1/atoms/${atomId}/submit/`,
+  },
   /** In-app notifications (Django — not Supabase) */
   NOTIFICATIONS: {
     LIST: "/api/me/notifications/",

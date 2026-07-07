@@ -423,3 +423,23 @@
   animation: heart-pop 0.3s ease-in-out;
   transform-origin: center;
 }
+
+@keyframes story-progress-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.story-progress-fill {
+  animation: story-progress-fill 6s linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-progress-fill {
+    animation: none;
+    width: 100%;
+  }
+}
