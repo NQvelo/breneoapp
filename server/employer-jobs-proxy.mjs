@@ -60,6 +60,7 @@ import { createDjangoNotification } from "./djangoNotifications.mjs";
 import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
 import { registerCourseAnalyticsRoutes } from "./courseAnalytics.mjs";
 import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
+import { registerInterviewRoutes } from "./interviewRoutes.mjs";
 import {
   dedupeSkillNames,
   scheduleSkillsCatalogSync,
@@ -372,7 +373,16 @@ function getBodyQualifications(body) {
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: "2mb" }));
+const jsonBodyParser = express.json({ limit: "2mb" });
+app.use((req, res, next) => {
+  const isInterviewAudioUpload =
+    req.method === "POST" &&
+    /\/api\/v1\/interview\/submit-audio\//i.test(
+      String(req.originalUrl || req.url || ""),
+    );
+  if (isInterviewAudioUpload) return next();
+  return jsonBodyParser(req, res, next);
+});
 
 /** Railway / load-balancer health checks (BFF-only or production.mjs mount). */
 app.get("/health", (_req, res) => {
@@ -1106,7 +1116,11 @@ function extractAggregatorCompanyIdFromJob(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const row = /** @type {Record<string, unknown>} */ (data);
   const company = row.company;
-  if (company != null && typeof company === "object" && !Array.isArray(company)) {
+  if (
+    company != null &&
+    typeof company === "object" &&
+    !Array.isArray(company)
+  ) {
     const id = /** @type {Record<string, unknown>} */ (company).id;
     return id != null && String(id).trim() !== "" ? String(id).trim() : null;
   }
@@ -1386,7 +1400,9 @@ async function handleStaffMembershipsCreate(req, res) {
     const responseBody = typeof data === "object" && data !== null ? data : {};
     if (payload.status === "pending") {
       const membershipId =
-        responseBody && typeof responseBody === "object" && responseBody.id != null
+        responseBody &&
+        typeof responseBody === "object" &&
+        responseBody.id != null
           ? responseBody.id
           : null;
       if (membershipId != null) {
@@ -2279,19 +2295,11 @@ function collectJobSkillNamesForCatalog(body, payload = {}) {
   }
   const req = payload[AGG_FIELD_SKILLS_REQUIRED];
   if (Array.isArray(req)) {
-    names.push(
-      ...req
-        .map((x) => String(x ?? "").trim())
-        .filter(Boolean),
-    );
+    names.push(...req.map((x) => String(x ?? "").trim()).filter(Boolean));
   }
   const pref = payload[AGG_FIELD_SKILLS_PREFERRED];
   if (Array.isArray(pref)) {
-    names.push(
-      ...pref
-        .map((x) => String(x ?? "").trim())
-        .filter(Boolean),
-    );
+    names.push(...pref.map((x) => String(x ?? "").trim()).filter(Boolean));
   }
   return dedupeSkillNames(names);
 }
@@ -2308,9 +2316,8 @@ async function handleEmployerJobPreviewParse(req, res) {
 
     const gemini = await extractJobSectionsFromDescription(fullDescription);
     if (!gemini.ok) {
-      const { extractSkillsFromTextFallback } = await import(
-        "./jobSkillsFallback.mjs"
-      );
+      const { extractSkillsFromTextFallback } =
+        await import("./jobSkillsFallback.mjs");
       const fallbackSkills = extractSkillsFromTextFallback(fullDescription);
       scheduleSkillsCatalogSync({
         mainApiBase: MAIN_API_BASE,
@@ -2769,7 +2776,9 @@ async function handleAppMyCvViews(req, res) {
 /** PATCH /api/app/users/me/cv-views/:cvViewId */
 async function handleAppAcknowledgeCvView(req, res) {
   try {
-    const cvViewId = encodeURIComponent(String(req.params.cvViewId || "").trim());
+    const cvViewId = encodeURIComponent(
+      String(req.params.cvViewId || "").trim(),
+    );
     await forwardAppApplicantCvViews(req, res, {
       method: "PATCH",
       upstreamPath: `/api/users/me/cv-views/${cvViewId}`,
@@ -3390,7 +3399,11 @@ async function patchStaffMembershipStatus(membershipId, actingUserId, status) {
   return { ok: res.ok, status: res.status, data, text };
 }
 
-async function notifyCompanyAdminsPendingMember(companyId, requester, membershipId) {
+async function notifyCompanyAdminsPendingMember(
+  companyId,
+  requester,
+  membershipId,
+) {
   const staff = await fetchStaffForCompany(companyId).catch(() => []);
   const adminIds = new Set();
   for (const row of staff) {
@@ -3440,9 +3453,7 @@ async function postStaffMembershipForUser(companyIdRaw, userCtx, options = {}) {
       "Content-Type": "application/json",
       "X-Employer-Key": AGGREGATOR_KEY || "",
     },
-    body: JSON.stringify(
-      buildStaffMembershipBody(n, userCtx, extra),
-    ),
+    body: JSON.stringify(buildStaffMembershipBody(n, userCtx, extra)),
   });
   const text = await res.text();
   const data = parseUpstreamJson(text);
@@ -3482,6 +3493,14 @@ registerCourseAnalyticsRoutes(app, {
     if (!authHeader?.startsWith("Bearer ")) return null;
     return extractUserIdFromBearerJwt(authHeader);
   },
+});
+
+registerInterviewRoutes(app, {
+  requireUserAuth,
+  aggregatorBaseUrl: AGGREGATOR_BASE_URL,
+  aggregatorKey: AGGREGATOR_KEY,
+  readRequestBodyIntoBuffer,
+  parseUpstreamJson,
 });
 
 export { app };

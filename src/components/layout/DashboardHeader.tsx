@@ -124,6 +124,7 @@ const getPageTitle = (
     return t.notifications.title;
   if (pathname.startsWith("/cv-views")) return "CV views";
   if (pathname.startsWith("/skill-test")) return t.skillTest.title;
+  if (pathname.startsWith("/webinars")) return t.atoms.headerTitle;
   // Don't show title for skill-path page - show back button instead
   if (pathname.startsWith("/skill-path")) return null;
   return t.nav.home;
@@ -187,7 +188,11 @@ export function DashboardHeader({
         "fixed top-0 right-0 z-30",
         "bg-gradient-to-b from-breneo-lightgray dark:from-background to-transparent",
         "transition-opacity duration-300 ease-in-out",
-        showSidebar ? (sidebarCollapsed ? "md:left-24" : "md:left-[17rem]") : "md:left-0",
+        showSidebar
+          ? sidebarCollapsed
+            ? "md:left-24"
+            : "md:left-[17rem]"
+          : "md:left-0",
         "left-0",
         isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
       )}

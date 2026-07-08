@@ -58,6 +58,11 @@ export default defineConfig(({ mode }) => ({
               target: "http://127.0.0.1:8787",
               changeOrigin: true,
             },
+            // Mock interview BFF: start + submit-audio (Breneo JWT + X-Employer-Key server-side).
+            "/api/v1/interview": {
+              target: "http://127.0.0.1:8787",
+              changeOrigin: true,
+            },
             "/api/job-details": {
               target: "https://breneo-job-aggregator.up.railway.app/",
               changeOrigin: true,

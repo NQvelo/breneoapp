@@ -99,6 +99,7 @@ const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
 const HelpCenter = lazy(() => import("@/pages/HelpCenter"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const WebinarsPage = lazy(() => import("@/pages/user/WebinarsPage"));
+const InterviewsPage = lazy(() => import("@/pages/user/InterviewsPage"));
 const PaymentSuccessPage = lazy(() => import("@/pages/PaymentSuccessPage"));
 const PaymentFailurePage = lazy(() => import("@/pages/PaymentFailurePage"));
 
@@ -332,6 +333,12 @@ export const AppRoutes = () => {
           "/webinars",
           <ProtectedRoute requiredRole="user">
             <WebinarsPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/interviews",
+          <ProtectedRoute requiredRole="user">
+            <InterviewsPage />
           </ProtectedRoute>,
         )}
 

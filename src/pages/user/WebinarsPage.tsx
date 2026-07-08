@@ -14,7 +14,6 @@ import {
   type AtomSubmitResult,
   type Profession,
 } from "@/api/atoms";
-import { LearningPathHeader } from "@/components/atoms/LearningPathHeader";
 import { ProfessionPicker } from "@/components/atoms/ProfessionPicker";
 import { AtomsPathMap } from "@/components/atoms/AtomsPathMap";
 import { AtomStoryViewer } from "@/components/atoms/AtomStoryViewer";
@@ -26,21 +25,19 @@ const WebinarsPage = () => {
   const t = useTranslation();
   const queryClient = useQueryClient();
 
-  const [selectedProfession, setSelectedProfession] = useState<Profession | null>(
-    null,
-  );
+  const [selectedProfession, setSelectedProfession] =
+    useState<Profession | null>(null);
   const [currentAtom, setCurrentAtom] = useState<Atom | null>(null);
   const [pageView, setPageView] = useState<PageView>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isStoryOpen, setIsStoryOpen] = useState(false);
   const [storySession, setStorySession] = useState(0);
 
-  const { data: matchedProfessions = [], isLoading: isLoadingMatched } = useQuery(
-    {
+  const { data: matchedProfessions = [], isLoading: isLoadingMatched } =
+    useQuery({
       queryKey: ["atoms", "matched-professions"],
       queryFn: () => atomsApi.getMyProfessions(),
-    },
-  );
+    });
 
   const { data: allProfessions = [], isLoading: isLoadingCatalog } = useQuery({
     queryKey: ["atoms", "professions"],
@@ -53,10 +50,12 @@ const WebinarsPage = () => {
     isLoading: isLoadingPath,
     refetch: refetchAtomPath,
     isError: isPathError,
+    error: pathQueryError,
   } = useQuery({
     queryKey: ["atoms", "path", selectedProfession?.id],
     queryFn: () => atomsApi.getProfessionAtomPath(selectedProfession!.id),
     enabled: !!selectedProfession,
+    retry: 1,
   });
 
   const resolvePageView = useCallback(
@@ -88,7 +87,12 @@ const WebinarsPage = () => {
     if (matchedProfessions.length === 0 && !isLoadingCatalog) {
       setPageView("picker");
     }
-  }, [isLoadingMatched, isLoadingCatalog, matchedProfessions, selectedProfession]);
+  }, [
+    isLoadingMatched,
+    isLoadingCatalog,
+    matchedProfessions,
+    selectedProfession,
+  ]);
 
   useEffect(() => {
     if (!selectedProfession) return;
@@ -100,7 +104,11 @@ const WebinarsPage = () => {
 
     if (isPathError) {
       setPageView("error");
-      setErrorMessage(t.atoms.loadError);
+      const status = (pathQueryError as { response?: { status?: number } })
+        ?.response?.status;
+      setErrorMessage(
+        status === 401 ? t.auth.login : t.atoms.loadError,
+      );
       return;
     }
 
@@ -111,7 +119,9 @@ const WebinarsPage = () => {
     isPathError,
     atomPath,
     resolvePageView,
+    pathQueryError,
     t.atoms.loadError,
+    t.auth.login,
   ]);
 
   const submitMutation = useMutation({
@@ -164,6 +174,10 @@ const WebinarsPage = () => {
   const handleQuizComplete = async (result: AtomSubmitResult) => {
     if (!selectedProfession) return;
 
+    if (result.passed && currentAtom) {
+      atomsApi.rememberCompletedAtom(selectedProfession.id, currentAtom);
+    }
+
     setIsStoryOpen(false);
     setCurrentAtom(null);
 
@@ -195,14 +209,19 @@ const WebinarsPage = () => {
       : allProfessions;
 
   const isInitialLoading =
-    pageView === "loading" || isLoadingMatched || isLoadingCatalog || isLoadingPath;
+    pageView === "loading" ||
+    isLoadingMatched ||
+    isLoadingCatalog ||
+    isLoadingPath;
 
-  const activeAtom = atomPath?.atoms.find((atom) => atom.status === "available");
+  const activeAtom = atomPath?.atoms.find(
+    (atom) => atom.status === "available",
+  );
 
   return (
     <DashboardLayout>
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-1 py-2 sm:px-0">
-        <LearningPathHeader
+        {/* <LearningPathHeader
           professionTitle={
             selectedProfession?.title ??
             atomPath?.profession_title ??
@@ -210,7 +229,7 @@ const WebinarsPage = () => {
           }
           completedCount={atomPath?.completed_count}
           totalCount={atomPath?.total_count}
-        />
+        /> */}
 
         {isInitialLoading ? (
           <div className="space-y-3">
@@ -222,7 +241,9 @@ const WebinarsPage = () => {
 
         {pageView === "picker" ? (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t.atoms.choosePath}</p>
+            <p className="text-sm text-muted-foreground">
+              {t.atoms.choosePath}
+            </p>
             <ProfessionPicker
               professions={professionsForPicker}
               selectedProfessionId={selectedProfession?.id}

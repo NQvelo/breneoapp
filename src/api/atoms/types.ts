@@ -32,6 +32,14 @@ export interface Atom {
   sequence_order: number;
   content_cards: ContentCard[];
   quiz: { options: [string, string, string] };
+  /** Total atoms in this profession path (when returned by API). */
+  total_atoms?: number;
+  /** Lightweight path preview (when returned by API). */
+  path_atoms?: {
+    id: number;
+    title: string;
+    sequence_order: number;
+  }[];
 }
 
 export interface AtomSubmitResult {

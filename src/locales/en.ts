@@ -2,7 +2,7 @@ export const en = {
   // Navigation
   nav: {
     home: "Home",
-    jobs: "Vacancies",
+    jobs: "Jobs",
     courses: "Courses",
     atoms: "Atoms",
     profile: "Profile",
@@ -11,6 +11,7 @@ export const en = {
     notifications: "Notifications",
     yourJobs: "Your jobs",
     members: "Members",
+    interviews: "Interviews",
   },
   // Common
   common: {
@@ -68,7 +69,7 @@ export const en = {
   },
   // Jobs
   jobs: {
-    title: "Vacancies",
+    title: "Jobs",
     noJobs: "No jobs found",
     apply: "Apply",
     applied: "Applied",
@@ -110,7 +111,7 @@ export const en = {
     searchPlaceholder: "Search",
     filters: "Filters",
     vacancy: "vacancy",
-    vacancies: "vacancies",
+    vacancies: "Jobs",
     dateDescending: "Date Descending",
     dateAscending: "Date Ascending",
     dateDescendingFull: "Date Descending",
@@ -257,6 +258,14 @@ export const en = {
     scoreDescription:
       "This score shows how closely your skills match the job requirements, prioritizing exact and key skill matches.",
   },
+  mockInterview: {
+    badge: "AI practice",
+    title: "AI-based mock interview",
+    description:
+      "Practice for this role with a virtual HR interviewer — 10 tailored questions, live camera, and instant feedback on every answer.",
+    roleHint: "Interview practice for: {role}",
+    startButton: "Start mock interview",
+  },
   // Webinars
   webinars: {
     title: "Webinars",
@@ -271,6 +280,7 @@ export const en = {
   },
   atoms: {
     title: "Micro-learning Atoms",
+    headerTitle: "Learning Atoms",
     choosePath: "Choose a career path to start your next atom lesson.",
     pathSubtitle:
       "Follow your atom path lesson by lesson. Complete each quiz to unlock the next atom.",

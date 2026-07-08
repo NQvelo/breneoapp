@@ -39,7 +39,7 @@ export function AtomsPathMap({
             index % 3 === 0 ? "center" : index % 3 === 1 ? "start" : "end";
 
           return (
-            <div key={atom.id} className="flex flex-col">
+            <div key={`${atom.id}-${atom.sequence_order}`} className="flex flex-col">
               {index > 0 ? <PathConnector /> : null}
               <div
                 className={cn(

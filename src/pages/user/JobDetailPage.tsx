@@ -80,6 +80,7 @@ import {
 } from "@/utils/jobEmploymentDisplay";
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
+import { JobMockInterviewPromo } from "@/components/jobs/JobMockInterviewPromo";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
@@ -2042,6 +2043,13 @@ const JobDetailPage = () => {
                   </div>
                 </div>
               )}
+
+              {user ? (
+                <JobMockInterviewPromo
+                  jobTitle={getJobTitle()}
+                  className="mt-6"
+                />
+              ) : null}
 
               {/* Company Details Section - Redesigned */}
               <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">

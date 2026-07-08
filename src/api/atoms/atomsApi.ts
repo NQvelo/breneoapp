@@ -15,11 +15,16 @@ import type {
 
 const PATH_CACHE_KEY = "breneo:atom-path-cache";
 
-type CachedAtom = Pick<AtomPathItem, "id" | "title" | "sequence_order">;
+type AtomCatalogItem = Pick<AtomPathItem, "id" | "title" | "sequence_order">;
 
 interface PathCacheEntry {
-  atoms: CachedAtom[];
+  atoms: AtomCatalogItem[];
 }
+
+const CATALOG_ENDPOINTS = (professionId: number) => [
+  API_ENDPOINTS.ATOMS.LIST(professionId),
+  `/api/professions/${professionId}/atoms/`,
+];
 
 function parseNextAtomError(detail: unknown): NextAtomResult["errorReason"] {
   const message =
@@ -35,10 +40,10 @@ function parseNextAtomError(detail: unknown): NextAtomResult["errorReason"] {
   return "unknown";
 }
 
-function readPathCache(professionId: number): CachedAtom[] {
+function readPathCache(professionId: number): AtomCatalogItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = sessionStorage.getItem(PATH_CACHE_KEY);
+    const raw = localStorage.getItem(PATH_CACHE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Record<string, PathCacheEntry>;
     return parsed[String(professionId)]?.atoms ?? [];
@@ -47,14 +52,14 @@ function readPathCache(professionId: number): CachedAtom[] {
   }
 }
 
-function writePathCache(professionId: number, atoms: CachedAtom[]) {
+function writePathCache(professionId: number, atoms: AtomCatalogItem[]) {
   if (typeof window === "undefined") return;
   try {
-    const raw = sessionStorage.getItem(PATH_CACHE_KEY);
+    const raw = localStorage.getItem(PATH_CACHE_KEY);
     const parsed = raw
       ? (JSON.parse(raw) as Record<string, PathCacheEntry>)
       : {};
-    const merged = new Map<number, CachedAtom>();
+    const merged = new Map<number, AtomCatalogItem>();
     [...(parsed[String(professionId)]?.atoms ?? []), ...atoms].forEach((atom) => {
       merged.set(atom.sequence_order, atom);
     });
@@ -63,7 +68,7 @@ function writePathCache(professionId: number, atoms: CachedAtom[]) {
         (a, b) => a.sequence_order - b.sequence_order,
       ),
     };
-    sessionStorage.setItem(PATH_CACHE_KEY, JSON.stringify(parsed));
+    localStorage.setItem(PATH_CACHE_KEY, JSON.stringify(parsed));
   } catch {
     // ignore storage errors
   }
@@ -76,31 +81,102 @@ function normalizeStatus(value: unknown): AtomPathStatus | null {
   return null;
 }
 
-function normalizePathItem(raw: Record<string, unknown>): AtomPathItem | null {
-  const id = Number(raw.id);
-  const sequence_order = Number(raw.sequence_order);
-  const title = typeof raw.title === "string" ? raw.title : "";
+function pickString(raw: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
 
-  if (!id || !sequence_order || !title) return null;
+function pickNumber(raw: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const value = Number(raw[key]);
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
+}
+
+function normalizeCatalogItem(
+  raw: Record<string, unknown>,
+): AtomCatalogItem | null {
+  const id = pickNumber(raw, ["id", "atom_id", "pk"]);
+  const sequence_order = pickNumber(raw, [
+    "sequence_order",
+    "sequence",
+    "order",
+    "ordering",
+  ]);
+  const title = pickString(raw, ["title", "name", "lesson_title"]);
+
+  if (!id || !sequence_order) return null;
+
+  return {
+    id,
+    title: title || `Lesson ${sequence_order}`,
+    sequence_order,
+  };
+}
+
+function extractAtomsArray(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+
+  if (!data || typeof data !== "object") return [];
+
+  const payload = data as Record<string, unknown>;
+  if (Array.isArray(payload.atoms)) return payload.atoms;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.items)) return payload.items;
+
+  return [];
+}
+
+function normalizeCatalog(data: unknown): AtomCatalogItem[] {
+  const merged = new Map<number, AtomCatalogItem>();
+
+  extractAtomsArray(data).forEach((item) => {
+    if (!item || typeof item !== "object") return;
+    const normalized = normalizeCatalogItem(item as Record<string, unknown>);
+    if (normalized) merged.set(normalized.sequence_order, normalized);
+  });
+
+  return [...merged.values()].sort(
+    (a, b) => a.sequence_order - b.sequence_order,
+  );
+}
+
+function normalizePathItemWithStatus(
+  raw: Record<string, unknown>,
+): AtomPathItem | null {
+  const catalogItem = normalizeCatalogItem(raw);
+  if (!catalogItem) return null;
 
   const explicitStatus = normalizeStatus(raw.status);
   if (explicitStatus) {
-    return { id, title, sequence_order, status: explicitStatus };
+    return { ...catalogItem, status: explicitStatus };
   }
 
-  if (raw.is_completed === true) {
-    return { id, title, sequence_order, status: "completed" };
+  if (raw.is_completed === true || raw.completed === true) {
+    return { ...catalogItem, status: "completed" };
   }
 
-  if (raw.is_unlocked === false || raw.is_locked === true) {
-    return { id, title, sequence_order, status: "locked" };
+  if (
+    raw.is_unlocked === false ||
+    raw.is_locked === true ||
+    raw.locked === true
+  ) {
+    return { ...catalogItem, status: "locked" };
   }
 
-  if (raw.is_unlocked === true || raw.is_current === true) {
-    return { id, title, sequence_order, status: "available" };
+  if (
+    raw.is_unlocked === true ||
+    raw.is_current === true ||
+    raw.unlocked === true
+  ) {
+    return { ...catalogItem, status: "available" };
   }
 
-  return { id, title, sequence_order, status: "locked" };
+  return null;
 }
 
 function normalizeProfessionAtomPath(
@@ -108,62 +184,138 @@ function normalizeProfessionAtomPath(
   professionId: number,
 ): ProfessionAtomPath | null {
   const payload =
-    Array.isArray(data)
-      ? { atoms: data }
-      : data && typeof data === "object"
-        ? (data as Record<string, unknown>)
-        : null;
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : null;
 
-  if (!payload) return null;
-
-  const atomsRaw = Array.isArray(payload.atoms) ? payload.atoms : [];
-  const atoms = atomsRaw
+  const atomsRaw = extractAtomsArray(data);
+  const atomsWithStatus = atomsRaw
     .map((item) =>
       item && typeof item === "object"
-        ? normalizePathItem(item as Record<string, unknown>)
+        ? normalizePathItemWithStatus(item as Record<string, unknown>)
         : null,
     )
     .filter((item): item is AtomPathItem => item !== null)
     .sort((a, b) => a.sequence_order - b.sequence_order);
 
-  if (atoms.length === 0) return null;
+  if (
+    atomsWithStatus.length === 0 ||
+    atomsWithStatus.length !== atomsRaw.length
+  ) {
+    return null;
+  }
 
-  const completed_count = atoms.filter((a) => a.status === "completed").length;
+  const completed_count = atomsWithStatus.filter(
+    (a) => a.status === "completed",
+  ).length;
   const current =
-    atoms.find((a) => a.status === "available") ??
-    atoms.find((a) => a.status === "locked");
+    atomsWithStatus.find((a) => a.status === "available") ??
+    atomsWithStatus.find((a) => a.status === "locked");
 
   return {
-    profession_id: Number(payload.profession_id) || professionId,
+    profession_id: Number(payload?.profession_id) || professionId,
     profession_title:
-      typeof payload.profession_title === "string" ? payload.profession_title : "",
-    atoms,
+      typeof payload?.profession_title === "string"
+        ? payload.profession_title
+        : "",
+    atoms: atomsWithStatus,
     current_atom_id: current?.id ?? null,
     completed_count,
-    total_count: atoms.length,
+    total_count: atomsWithStatus.length,
   };
 }
 
-function buildPathFromNextAtom(
+function mergeCatalog(
+  primary: AtomCatalogItem[],
+  secondary: AtomCatalogItem[],
+): AtomCatalogItem[] {
+  const merged = new Map<number, AtomCatalogItem>();
+  [...primary, ...secondary].forEach((atom) => {
+    merged.set(atom.sequence_order, atom);
+  });
+  return [...merged.values()].sort(
+    (a, b) => a.sequence_order - b.sequence_order,
+  );
+}
+
+function fillSequenceGaps(
+  catalog: AtomCatalogItem[],
+  maxSequence: number,
+): AtomCatalogItem[] {
+  if (maxSequence <= 0) return catalog;
+
+  const byOrder = new Map(catalog.map((atom) => [atom.sequence_order, atom]));
+  const filled: AtomCatalogItem[] = [];
+
+  for (let order = 1; order <= maxSequence; order += 1) {
+    filled.push(
+      byOrder.get(order) ?? {
+        id: -(order * 1000),
+        title: `Lesson ${order}`,
+        sequence_order: order,
+      },
+    );
+  }
+
+  return filled;
+}
+
+function catalogFromPathItems(atoms: AtomPathItem[]): AtomCatalogItem[] {
+  return atoms.map(({ id, title, sequence_order }) => ({
+    id,
+    title,
+    sequence_order,
+  }));
+}
+
+function pathNeedsProgressMerge(path: ProfessionAtomPath): boolean {
+  return (
+    path.completed_count < path.total_count &&
+    !path.atoms.some((atom) => atom.status === "available")
+  );
+}
+
+async function fetchAtomCatalog(professionId: number): Promise<AtomCatalogItem[]> {
+  let catalog: AtomCatalogItem[] = [];
+
+  for (const endpoint of CATALOG_ENDPOINTS(professionId)) {
+    try {
+      const { data } = await apiClient.get(endpoint);
+      const withStatus = normalizeProfessionAtomPath(data, professionId);
+
+      if (withStatus) {
+        catalog = mergeCatalog(catalog, catalogFromPathItems(withStatus.atoms));
+        continue;
+      }
+
+      catalog = mergeCatalog(catalog, normalizeCatalog(data));
+    } catch {
+      // Catalog endpoints are optional — always fall back to next-atom.
+    }
+  }
+
+  return mergeCatalog(catalog, readPathCache(professionId));
+}
+
+function applyProgressToCatalog(
   professionId: number,
+  catalog: AtomCatalogItem[],
   next: NextAtomResult,
-  cachedAtoms: CachedAtom[],
+  professionTitle = "",
 ): ProfessionAtomPath | null {
   if (next.errorReason === "no_atoms") return null;
 
-  const merged = new Map<number, CachedAtom>();
-  cachedAtoms.forEach((atom) => merged.set(atom.sequence_order, atom));
-
   if (next.errorReason === "all_completed") {
-    const atoms = [...merged.values()]
-      .sort((a, b) => a.sequence_order - b.sequence_order)
-      .map((atom) => ({ ...atom, status: "completed" as const }));
+    const atoms = catalog.map((atom) => ({
+      ...atom,
+      status: "completed" as const,
+    }));
 
     if (atoms.length === 0) return null;
 
     return {
       profession_id: professionId,
-      profession_title: atoms[0] ? "" : "",
+      profession_title: professionTitle,
       atoms,
       current_atom_id: null,
       completed_count: atoms.length,
@@ -174,29 +326,40 @@ function buildPathFromNextAtom(
   const current = next.atom;
   if (!current) return null;
 
-  merged.set(current.sequence_order, {
-    id: current.id,
-    title: current.title,
-    sequence_order: current.sequence_order,
+  const catalogWithPreview = mergeCatalog(
+    catalog,
+    current.path_atoms?.map((atom) => ({
+      id: atom.id,
+      title: atom.title,
+      sequence_order: atom.sequence_order,
+    })) ?? [],
+  );
+
+  const maxSequence = Math.max(
+    current.sequence_order,
+    current.total_atoms ?? 0,
+    catalogWithPreview.at(-1)?.sequence_order ?? 0,
+  );
+  const fullCatalog = fillSequenceGaps(catalogWithPreview, maxSequence);
+
+  const atoms: AtomPathItem[] = fullCatalog.map((atom) => {
+    let status: AtomPathStatus = "locked";
+    if (atom.sequence_order < current.sequence_order) {
+      status = "completed";
+    } else if (
+      atom.id === current.id ||
+      atom.sequence_order === current.sequence_order
+    ) {
+      status = "available";
+    }
+    return { ...atom, status };
   });
 
-  writePathCache(professionId, [...merged.values()]);
-
-  const atoms = [...merged.values()]
-    .sort((a, b) => a.sequence_order - b.sequence_order)
-    .map((atom) => {
-      let status: AtomPathStatus = "locked";
-      if (atom.sequence_order < current.sequence_order) {
-        status = "completed";
-      } else if (atom.id === current.id) {
-        status = "available";
-      }
-      return { ...atom, status };
-    });
+  writePathCache(professionId, fullCatalog);
 
   return {
     profession_id: professionId,
-    profession_title: current.profession_title,
+    profession_title: current.profession_title || professionTitle,
     atoms,
     current_atom_id: current.id,
     completed_count: atoms.filter((a) => a.status === "completed").length,
@@ -219,33 +382,48 @@ export const atomsApi = {
     return Array.isArray(data) ? data : [];
   },
 
-  async getProfessionAtomPath(professionId: number): Promise<ProfessionAtomPath | null> {
+  async getProfessionAtomPath(
+    professionId: number,
+  ): Promise<ProfessionAtomPath | null> {
     try {
-      const { data } = await apiClient.get(
-        API_ENDPOINTS.ATOMS.LIST(professionId),
-      );
-      const normalized = normalizeProfessionAtomPath(data, professionId);
-      if (normalized) {
-        writePathCache(
-          professionId,
-          normalized.atoms.map(({ id, title, sequence_order }) => ({
-            id,
-            title,
-            sequence_order,
-          })),
-        );
-        return normalized;
+      for (const endpoint of CATALOG_ENDPOINTS(professionId)) {
+        try {
+          const { data } = await apiClient.get(endpoint);
+          const withStatus = normalizeProfessionAtomPath(data, professionId);
+          if (withStatus && !pathNeedsProgressMerge(withStatus)) {
+            writePathCache(
+              professionId,
+              catalogFromPathItems(withStatus.atoms),
+            );
+            return withStatus;
+          }
+        } catch {
+          // Optional catalog endpoint — continue to next-atom fallback.
+        }
       }
+
+      const catalog = await fetchAtomCatalog(professionId);
+      const next = await this.getNextAtom(professionId);
+
+      if (next.errorReason === "profession_not_found") {
+        return null;
+      }
+
+      return applyProgressToCatalog(professionId, catalog, next);
     } catch (error: unknown) {
       const axiosError = error as { response?: { status?: number } };
-      if (axiosError.response?.status !== 404) {
+      if (axiosError.response?.status === 401) {
+        throw error;
+      }
+
+      try {
+        const next = await this.getNextAtom(professionId);
+        const cached = mergeCatalog([], readPathCache(professionId));
+        return applyProgressToCatalog(professionId, cached, next);
+      } catch {
         throw error;
       }
     }
-
-    const cached = readPathCache(professionId);
-    const next = await this.getNextAtom(professionId);
-    return buildPathFromNextAtom(professionId, next, cached);
   },
 
   async getAtom(atomId: number): Promise<Atom> {
@@ -264,6 +442,11 @@ export const atomsApi = {
           title: data.title,
           sequence_order: data.sequence_order,
         },
+        ...(data.path_atoms?.map((atom) => ({
+          id: atom.id,
+          title: atom.title,
+          sequence_order: atom.sequence_order,
+        })) ?? []),
       ]);
       return { atom: data };
     } catch (error: unknown) {
@@ -287,13 +470,8 @@ export const atomsApi = {
     professionId: number,
     atomId: number,
   ): Promise<Atom> {
-    try {
-      return await this.getAtom(atomId);
-    } catch (error: unknown) {
-      const axiosError = error as { response?: { status?: number } };
-      if (axiosError.response?.status !== 404) {
-        throw error;
-      }
+    if (atomId < 0) {
+      throw new Error("This atom is not available yet.");
     }
 
     const next = await this.getNextAtom(professionId);
@@ -301,7 +479,18 @@ export const atomsApi = {
       return next.atom;
     }
 
-    throw new Error("This atom is not available yet.");
+    try {
+      return await this.getAtom(atomId);
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number } };
+      if (axiosError.response?.status === 404 && next.atom?.id === atomId) {
+        return next.atom;
+      }
+      if (axiosError.response?.status === 404) {
+        throw new Error("This atom is not available yet.");
+      }
+      throw error;
+    }
   },
 
   async submitAtomQuiz(
@@ -313,5 +502,18 @@ export const atomsApi = {
       { selected_option_index: selectedOptionIndex },
     );
     return data;
+  },
+
+  rememberCompletedAtom(
+    professionId: number,
+    atom: Pick<Atom, "id" | "title" | "sequence_order">,
+  ) {
+    writePathCache(professionId, [
+      {
+        id: atom.id,
+        title: atom.title,
+        sequence_order: atom.sequence_order,
+      },
+    ]);
   },
 };
