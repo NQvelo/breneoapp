@@ -396,67 +396,67 @@ export function AppSidebar({
         />
 
         <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
-        <nav className="mx-auto flex max-w-xl items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]">
-          {mobileNavItems.map((item, index) => {
-            let isActive = currentPath === item.href;
-            if (item.href === "/home") {
-              isActive =
-                currentPath === "/home" ||
-                currentPath === "/dashboard" ||
-                rawPathname.includes("/home") ||
-                rawPathname.includes("/dashboard");
-            } else if (item.href === "/academy/home") {
-              isActive =
-                currentPath === "/academy/home" ||
-                currentPath === "/academy/dashboard" ||
-                rawPathname.includes("/academy/home") ||
-                rawPathname.includes("/academy/dashboard");
-            } else if (item.href === "/employer/jobs") {
-              isActive =
-                currentPath.startsWith("/employer/jobs") ||
-                rawPathname.includes("/employer/jobs");
-            } else if (item.href === "/employer/members") {
-              isActive =
-                currentPath.startsWith("/employer/members") ||
-                rawPathname.includes("/employer/members");
-            } else {
-              isActive =
-                currentPath === item.href || rawPathname.endsWith(item.href);
-            }
-            return (
-              <LocalizedLink
-                key={index}
-                to={item.href}
-                className={cn(
-                  "group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-2 transition-all duration-200",
-                  isActive
-                    ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
-                    : "text-[#6B7280] hover:bg-black/[0.04] hover:text-[#111827] dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white",
-                )}
-              >
-                <item.icon
-                  size={20}
+          <nav className="mx-auto flex max-w-xl items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]">
+            {mobileNavItems.map((item, index) => {
+              let isActive = currentPath === item.href;
+              if (item.href === "/home") {
+                isActive =
+                  currentPath === "/home" ||
+                  currentPath === "/dashboard" ||
+                  rawPathname.includes("/home") ||
+                  rawPathname.includes("/dashboard");
+              } else if (item.href === "/academy/home") {
+                isActive =
+                  currentPath === "/academy/home" ||
+                  currentPath === "/academy/dashboard" ||
+                  rawPathname.includes("/academy/home") ||
+                  rawPathname.includes("/academy/dashboard");
+              } else if (item.href === "/employer/jobs") {
+                isActive =
+                  currentPath.startsWith("/employer/jobs") ||
+                  rawPathname.includes("/employer/jobs");
+              } else if (item.href === "/employer/members") {
+                isActive =
+                  currentPath.startsWith("/employer/members") ||
+                  rawPathname.includes("/employer/members");
+              } else {
+                isActive =
+                  currentPath === item.href || rawPathname.endsWith(item.href);
+              }
+              return (
+                <LocalizedLink
+                  key={index}
+                  to={item.href}
                   className={cn(
-                    "mb-0.5 transition-colors duration-200",
+                    "group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-2 transition-all duration-200",
                     isActive
-                      ? "text-breneo-blue"
-                      : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-center text-[11px] font-semibold leading-tight transition-colors duration-200",
-                    isActive
-                      ? "text-[#111827] dark:text-white"
-                      : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
+                      ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
+                      : "text-[#6B7280] hover:bg-black/[0.04] hover:text-[#111827] dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white",
                   )}
                 >
-                  {item.label}
-                </span>
-              </LocalizedLink>
-            );
-          })}
-        </nav>
+                  <item.icon
+                    size={20}
+                    className={cn(
+                      "mb-0.5 transition-colors duration-200",
+                      isActive
+                        ? "text-breneo-blue"
+                        : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-center text-[11px] font-semibold leading-tight transition-colors duration-200",
+                      isActive
+                        ? "text-[#111827] dark:text-white"
+                        : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                </LocalizedLink>
+              );
+            })}
+          </nav>
         </div>
       </div>
 

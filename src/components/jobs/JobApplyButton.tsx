@@ -99,7 +99,10 @@ export function JobApplyButton({
       <Button size={size} className={className} asChild>
         <a href={externalUrl} target="_blank" rel="noopener noreferrer">
           {t.jobs.apply}
-          <ExternalLink className="ml-1 h-3.5 w-3.5" aria-hidden />
+          <ExternalLink
+            className="ml-1 h-3.5 w-3.5 max-md:hidden"
+            aria-hidden
+          />
         </a>
       </Button>
     );

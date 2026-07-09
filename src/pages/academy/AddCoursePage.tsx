@@ -46,6 +46,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { cn } from "@/lib/utils";
+import { PLATFORM_CHIP_SKILL_CLASS } from "@/lib/chipStyles";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
@@ -1107,7 +1108,7 @@ const AddCoursePage = () => {
                             <Badge
                               key={id}
                               variant="outline"
-                              className="inline-flex items-center gap-1 capitalize px-3 py-1.5 text-xs rounded-[10px] bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700"
+                              className={cn("border-0", PLATFORM_CHIP_SKILL_CLASS)}
                             >
                               {skillChipLabels[id] ?? id}
                               <button

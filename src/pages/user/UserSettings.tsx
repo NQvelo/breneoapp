@@ -1184,7 +1184,7 @@ export default function SettingsPage() {
     <DashboardLayout>
       {/* Mobile: section menu + logout fixed bottom bar */}
       {isMobile && (
-        <div className="fixed inset-x-0 bottom-[85px] z-40 flex items-center justify-between gap-3 px-4 md:hidden">
+        <div className="fixed inset-x-0 bottom-above-mobile-nav z-40 flex items-center justify-between gap-3 px-4 md:hidden">
           <button
             type="button"
             onClick={() => setSectionMenuOpen(true)}

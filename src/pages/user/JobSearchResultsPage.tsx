@@ -57,6 +57,7 @@ import { jobService, JobFilters, ApiJob, JobSearchSort } from "@/api/jobs";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
+import { PLATFORM_FILTER_CHIP_CLASS } from "@/lib/chipStyles";
 import {
   getMatchQualityLabel,
   extractJobSkills,
@@ -1022,7 +1023,7 @@ const JobSearchResultsPage = () => {
             .slice(0, mid)
             .map(
               (f) =>
-                `<div class="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700"><span class="text-sm font-medium whitespace-nowrap">${f.label}</span><button><svg class="h-4 w-4"></svg></button></div>`,
+                `<div class="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-100 dark:bg-[#3A3A3A]"><span class="text-sm font-medium whitespace-nowrap">${f.label}</span><button><svg class="h-4 w-4"></svg></button></div>`,
             )
             .join("");
 
@@ -1178,7 +1179,10 @@ const JobSearchResultsPage = () => {
               {allFilters.slice(0, visibleFilterCount).map((filter) => (
                 <div
                   key={filter.id}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                    PLATFORM_FILTER_CHIP_CLASS,
+                  )}
                 >
                   <span className="text-sm font-medium whitespace-nowrap">
                     {filter.label}

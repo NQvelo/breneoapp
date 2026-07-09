@@ -10,6 +10,7 @@ import { RadialProgress } from "@/components/ui/radial-progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { PLATFORM_FILTER_CHIP_CLASS } from "@/lib/chipStyles";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Bookmark,
@@ -2445,7 +2446,10 @@ const JobsPage = () => {
                 {activeFilters.skills.map((skill) => (
                   <div
                     key={`skill-${skill}`}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
                   >
                     <span className="text-sm font-medium whitespace-nowrap">
                       {String(skill)}
@@ -2466,7 +2470,10 @@ const JobsPage = () => {
                   return (
                     <div
                       key={`country-${cityId}`}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                      className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
                     >
                       <span className="text-sm font-medium whitespace-nowrap">
                         {cityName}
@@ -2490,7 +2497,10 @@ const JobsPage = () => {
                   return (
                     <div
                       key={`jobType-${jobType}`}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                      className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
                     >
                       <span className="text-sm font-medium whitespace-nowrap">
                         {jobTypeLabel}
@@ -2508,7 +2518,12 @@ const JobsPage = () => {
 
                 {/* Remote */}
                 {activeFilters.isRemote && (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
+                  >
                     <span className="text-sm font-medium whitespace-nowrap">
                       Remote
                     </span>
@@ -2524,7 +2539,12 @@ const JobsPage = () => {
 
                 {/* Date Posted */}
                 {activeFilters.datePosted && (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
+                  >
                     <span className="text-sm font-medium whitespace-nowrap">
                       {activeFilters.datePosted === "today"
                         ? "Posted Today"
@@ -2555,7 +2575,12 @@ const JobsPage = () => {
                 {/* Salary Range */}
                 {(activeFilters.salaryMin !== undefined ||
                   activeFilters.salaryMax !== undefined) && (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
+                  >
                     <span className="text-sm font-medium whitespace-nowrap">
                       {formatSalaryFilterLabel(
                         activeFilters.salaryMin,
@@ -2583,7 +2608,12 @@ const JobsPage = () => {
 
                 {/* Salary By Agreement */}
                 {activeFilters.salaryByAgreement && (
-                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
+                      PLATFORM_FILTER_CHIP_CLASS,
+                    )}
+                  >
                     <span className="text-sm font-medium whitespace-nowrap">
                       Salary By Agreement
                     </span>

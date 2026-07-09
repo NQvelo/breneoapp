@@ -367,10 +367,16 @@ const fetchJobsFromBreneoAPI = async (
   // For example: location=London AND work_mode=remote AND seniority=senior
   // This means jobs must match ALL specified filters to be returned
 
-  // Add location filter — Georgian city ids → English city name for v1 API
+  // Add location filter — Georgian city ids or country names
   if (filters.countries.length > 0) {
-    const locationValue = georgianCityApiName(filters.countries[0]);
-    queryParams.set("location", locationValue);
+    const cityNames = filters.countries
+      .map((id) => georgianCityApiName(id))
+      .filter(Boolean);
+    if (cityNames.length > 0) {
+      queryParams.set("location", cityNames.join(","));
+    }
+  } else if (filters.locationCountry && filters.locationCountry.length > 0) {
+    queryParams.set("location", filters.locationCountry.join(","));
   }
 
   // Add work_mode filter

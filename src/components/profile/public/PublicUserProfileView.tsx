@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { cn } from "@/lib/utils";
+import { PLATFORM_CHIP_BG_CLASS, PLATFORM_CHIP_SKILL_CLASS } from "@/lib/chipStyles";
 import type { PublicUserProfile } from "@/api/profile/publicUserProfileTypes";
 import { formatProfileDateRange } from "@/utils/profileDateFormat";
 import {
@@ -86,7 +87,12 @@ export function PublicUserProfileView({
           </div>
           <div className="flex flex-wrap gap-2">
             {location ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm",
+                  PLATFORM_CHIP_BG_CLASS,
+                )}
+              >
                 <MapPin className="h-4 w-4 text-gray-500" />
                 {location}
               </span>
@@ -94,7 +100,10 @@ export function PublicUserProfileView({
             {profile.email ? (
               <a
                 href={`mailto:${profile.email}`}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm hover:underline",
+                  PLATFORM_CHIP_BG_CLASS,
+                )}
               >
                 <Mail className="h-4 w-4 text-gray-500" />
                 {profile.email}
@@ -103,7 +112,10 @@ export function PublicUserProfileView({
             {profile.phone_number ? (
               <a
                 href={`tel:${profile.phone_number}`}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm hover:underline",
+                  PLATFORM_CHIP_BG_CLASS,
+                )}
               >
                 <Phone className="h-4 w-4 text-gray-500" />
                 {profile.phone_number}
@@ -115,7 +127,10 @@ export function PublicUserProfileView({
                 href={url!}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm hover:underline",
+                  PLATFORM_CHIP_BG_CLASS,
+                )}
               >
                 {getSocialIcon(platform, "h-4 w-4 text-gray-500")}
                 {formatSocialUrlLabel(url!)}
@@ -239,7 +254,7 @@ export function PublicUserProfileView({
               <Badge
                 key={s.id}
                 variant="outline"
-                className="capitalize px-3 py-1.5 text-xs rounded-[10px] bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
+                className={cn("capitalize px-3 py-1.5 text-xs rounded-[10px] border-0", PLATFORM_CHIP_SKILL_CLASS)}
               >
                 {s.skill_name}
               </Badge>

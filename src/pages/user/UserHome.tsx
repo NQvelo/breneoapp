@@ -57,6 +57,7 @@ import {
 import type { JobDetail } from "@/api/jobs/types";
 // Removed filterATSJobs import - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
+import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
@@ -223,10 +224,15 @@ const isTechJob = (job: ApiJob): boolean => {
 
 /** Jobs based in Georgia (country), not the US state. */
 const isGeorgianJob = (job: ApiJob): boolean => {
-  const cc = (job.job_country || job.country || "")
-    .toLowerCase()
-    .trim();
-  if (cc === "georgia" || cc === "ge") return true;
+  const jobAny = job as Record<string, unknown>;
+  const cc = [job.job_country, job.country, jobAny.location_country]
+    .map((value) =>
+      String(value ?? "")
+        .toLowerCase()
+        .trim(),
+    )
+    .find(Boolean);
+  if (cc === "georgia" || cc === "ge" || cc === "საქართველო") return true;
 
   const loc = [
     job.job_location,
@@ -307,9 +313,7 @@ const normalizeHomeCourseCoverUrl = (
   return `/${raw}`;
 };
 
-const mapApiCourseToHomeCourse = (
-  course: Record<string, unknown>,
-): Course => {
+const mapApiCourseToHomeCourse = (course: Record<string, unknown>): Course => {
   const id = course.id != null ? String(course.id) : "";
   const requiredSkills = Array.isArray(course.required_skills)
     ? (course.required_skills as unknown[]).map((s) => String(s))
@@ -340,11 +344,25 @@ const EMPTY_JOB_FILTERS: JobFilters = {
 
 const GEORGIAN_JOB_FILTERS: JobFilters = {
   country: "Georgia",
-  countries: ["georgia"], // /api/search?country=georgia
+  countries: [],
+  locationCountry: ["Georgia"],
   jobTypes: [],
   isRemote: false,
   datePosted: undefined,
   skills: [],
+};
+
+const dedupeApiJobs = (jobs: ApiJob[]): ApiJob[] => {
+  const seen = new Set<string>();
+  return jobs.filter((job) => {
+    const id = String(job.id || job.job_id || "").trim();
+    const key =
+      id ||
+      `${job.title || job.job_title || ""}_${job.company_name || job.employer_name || job.company || ""}`;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 const fetchGeorgianJobs = async () => {
@@ -377,6 +395,13 @@ const fetchWorldwideJobs = async () => {
   }
 };
 
+const dashboardCarouselNavButtonClass = cn(
+  "h-8 w-8 border-0 backdrop-blur-sm",
+  "bg-white/75 hover:bg-white/90 text-gray-700",
+  "dark:bg-[#3A3A3A]/75 dark:hover:bg-[#3A3A3A]/90 dark:text-white",
+  "[&_svg]:text-current",
+);
+
 const UserHome = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -392,10 +417,7 @@ const UserHome = () => {
   const coursesScrollRef = useRef<HTMLDivElement>(null);
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
-  const extractSavedIds = (
-    items: unknown,
-    idKeys: string[],
-  ): string[] => {
+  const extractSavedIds = (items: unknown, idKeys: string[]): string[] => {
     if (!Array.isArray(items)) return [];
     return items
       .map((item: unknown) => {
@@ -603,7 +625,11 @@ const UserHome = () => {
 
   const savedCourseIds = useMemo(
     () =>
-      extractSavedIds(profileData?.saved_courses, ["id", "course_id", "courseId"]),
+      extractSavedIds(profileData?.saved_courses, [
+        "id",
+        "course_id",
+        "courseId",
+      ]),
     [profileData],
   );
 
@@ -772,10 +798,15 @@ const UserHome = () => {
     },
   });
 
-  // Georgian jobs from API (country=georgia); worldwide excludes Georgia to avoid duplicates
+  // Georgian jobs from API (location_country=Georgia); merge worldwide fallback to avoid empty section
   const { transformedGeorgianJobs, transformedWorldwideJobs } = useMemo(() => {
-    const georgianSource = georgianJobs || [];
-    const worldwideSource = (worldwideJobs || []).filter((j) => !isGeorgianJob(j));
+    const georgianSource = dedupeApiJobs([
+      ...(georgianJobs || []),
+      ...(worldwideJobs || []).filter(isGeorgianJob),
+    ]);
+    const worldwideSource = (worldwideJobs || []).filter(
+      (j) => !isGeorgianJob(j),
+    );
 
     const sortAndTakeTopApiJobs = (source: ApiJob[]) => {
       const jobsWithMatchPercentage = source.map((job: ApiJob) => {
@@ -819,7 +850,7 @@ const UserHome = () => {
       job: ApiJob,
       precomputedMatchPercentage?: number,
     ): Job | null => {
-      const jobId = job.id || "";
+      const jobId = String(job.id || job.job_id || "").trim();
       if (!jobId) {
         console.warn("Skipping job without valid ID:", job);
         return null;
@@ -849,7 +880,8 @@ const UserHome = () => {
         job.company_logo ||
         job.logo_url ||
         (typeof job.company === "object" && job.company
-          ? (job.company as { logo_upload?: string; logo?: string }).logo_upload ||
+          ? (job.company as { logo_upload?: string; logo?: string })
+              .logo_upload ||
             (job.company as { logo?: string; company_logo?: string }).logo ||
             (job.company as { company_logo?: string }).company_logo
           : undefined);
@@ -974,9 +1006,7 @@ const UserHome = () => {
   const jobsErrorCard = (
     <Card>
       <CardContent className="p-6 text-center">
-        <p className="text-gray-500 mb-2">
-          Unable to load jobs at the moment.
-        </p>
+        <p className="text-gray-500 mb-2">Unable to load jobs at the moment.</p>
         <p className="text-sm text-gray-400">Please try again later.</p>
       </CardContent>
     </Card>
@@ -986,67 +1016,71 @@ const UserHome = () => {
     jobRows.map((job) => (
       <Card
         key={job.id}
-        className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px] hover:shadow-soft"
+        className="group flex h-full max-md:h-[300px] flex-col self-stretch transition-all duration-200 overflow-hidden rounded-3xl flex-shrink-0 snap-start cursor-pointer w-[calc((100%-2rem)/3)] min-w-[280px] hover:shadow-soft"
         onClick={() => {
           if (!job.id || String(job.id).trim() === "") return;
           const encodedId = encodeURIComponent(String(job.id));
           navigate(`/jobs/${encodedId}`);
         }}
       >
-        <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
-          <div className="flex items-start gap-3 mb-3">
-            {job.company_logo ? (
-              <div className="flex-shrink-0 relative w-10 h-10">
-                <img
-                  src={job.company_logo}
-                  alt={`${
-                    job.company_name ||
+        <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex items-start gap-3 mb-3 min-h-10">
+              {job.company_logo ? (
+                <div className="flex-shrink-0 relative w-10 h-10">
+                  <img
+                    src={job.company_logo}
+                    alt={`${
+                      job.company_name ||
+                      (typeof job.company === "string"
+                        ? job.company
+                        : job.company?.name || "Company")
+                    } logo`}
+                    className="w-10 h-10 rounded-md object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              ) : null}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm truncate">
+                  {job.company_name ||
                     (typeof job.company === "string"
                       ? job.company
-                      : job.company?.name || "Company")
-                  } logo`}
-                  className="w-10 h-10 rounded-md object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
+                      : job.company?.name || "Company")}
+                </h3>
+                <p className="mt-0.5 text-xs text-gray-500 truncate">
+                  {job.location}
+                </p>
               </div>
-            ) : null}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-sm truncate">
-                {job.company_name ||
-                  (typeof job.company === "string"
-                    ? job.company
-                    : job.company?.name || "Company")}
-              </h3>
-              <p className="mt-0.5 text-xs text-gray-500 truncate">
-                {job.location}
-              </p>
+            </div>
+
+            <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+              {job.title}
+            </h4>
+
+            <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
+              <JobListingMetaBadges
+                employmentType={job.employment_type}
+                workArrangement={job.work_arrangement}
+                salary={job.salary}
+              />
             </div>
           </div>
 
-          <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
-            {job.title}
-          </h4>
-
-          <JobListingMetaBadges
-            employmentType={job.employment_type}
-            workArrangement={job.work_arrangement}
-            salary={job.salary}
-          />
-
-          <div className="mt-7 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="mt-auto flex shrink-0 items-center justify-between gap-4 pt-7">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <RadialProgress
                 value={job.matchPercentage ?? 0}
                 size={44}
                 strokeWidth={5}
                 showLabel={false}
                 percentageTextSize="sm"
-                className="text-breneo-blue"
+                className="shrink-0 text-breneo-blue"
               />
-              <span className="text-xs font-semibold text-gray-700">
+              <span className="line-clamp-2 text-xs font-semibold text-gray-700">
                 {job.matchPercentage != null
                   ? (() => {
                       const p = job.matchPercentage!;
@@ -1074,7 +1108,8 @@ const UserHome = () => {
               }}
               aria-label={job.is_saved ? "Unsave job" : "Save job"}
               className={cn(
-                "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                "h-10 w-10 shrink-0",
+                "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
                 job.is_saved
                   ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                   : "text-black dark:text-white",
@@ -1093,6 +1128,73 @@ const UserHome = () => {
         </CardContent>
       </Card>
     ));
+
+  const renderJobsCarouselSection = ({
+    title,
+    jobs,
+    isLoading,
+    error,
+    emptyMessage,
+    scrollRef,
+    onScroll,
+    scrollLabel,
+  }: {
+    title: string;
+    jobs: Job[];
+    isLoading: boolean;
+    error: unknown;
+    emptyMessage: string;
+    scrollRef: React.RefObject<HTMLDivElement | null>;
+    onScroll: (direction: "left" | "right") => void;
+    scrollLabel: string;
+  }) => (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">{title}</h2>
+        {!isLoading && !error && jobs.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="icon"
+              className={dashboardCarouselNavButtonClass}
+              onClick={() => onScroll("left")}
+              aria-label={`Scroll ${scrollLabel} left`}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="icon"
+              className={dashboardCarouselNavButtonClass}
+              onClick={() => onScroll("right")}
+              aria-label={`Scroll ${scrollLabel} right`}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        jobsSkeletonRow
+      ) : error ? (
+        jobsErrorCard
+      ) : jobs.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-500">{emptyMessage}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div
+          ref={scrollRef}
+          className="flex items-stretch gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2 max-md:[&>*]:h-[300px]"
+        >
+          {renderJobCardsContent(jobs)}
+        </div>
+      )}
+    </div>
+  );
 
   // Debug logging
   // console.log("🏠 UserHome render:", {
@@ -1247,113 +1349,28 @@ const UserHome = () => {
 
           {/* Main Content - Top Jobs and Courses */}
           <div className="space-y-6 pt-6 md:pt-8">
-            {/* Georgian jobs */}
-            <div>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900 mb-1">
-                  Georgian jobs for you
-                </h2>
-                {!georgianJobsLoading &&
-                  !georgianJobsError &&
-                  transformedGeorgianJobs.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => scrollGeorgiaJobs("left")}
-                        aria-label="Scroll Georgian jobs left"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => scrollGeorgiaJobs("right")}
-                        aria-label="Scroll Georgian jobs right"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-              </div>
+            {renderJobsCarouselSection({
+              title: "Georgian jobs for you",
+              jobs: transformedGeorgianJobs,
+              isLoading: georgianJobsLoading,
+              error: georgianJobsError,
+              emptyMessage: "No Georgian jobs available right now.",
+              scrollRef: georgiaJobsScrollRef,
+              onScroll: scrollGeorgiaJobs,
+              scrollLabel: "Georgian jobs",
+            })}
 
-              {georgianJobsLoading ? (
-                jobsSkeletonRow
-              ) : georgianJobsError ? (
-                jobsErrorCard
-              ) : transformedGeorgianJobs.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <p className="text-gray-500">
-                      No Georgian jobs available right now.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div
-                  ref={georgiaJobsScrollRef}
-                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
-                >
-                  {renderJobCardsContent(transformedGeorgianJobs)}
-                </div>
-              )}
-            </div>
-
-            {/* Worldwide jobs for you */}
-            <div>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-gray-900 mb-1">
-                  Worldwide jobs for you
-                </h2>
-                {!worldwideJobsLoading &&
-                  !worldwideJobsError &&
-                  transformedWorldwideJobs.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => scrollJobs("left")}
-                        aria-label="Scroll worldwide jobs left"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => scrollJobs("right")}
-                        aria-label="Scroll worldwide jobs right"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-              </div>
-
-              {worldwideJobsLoading ? (
-                jobsSkeletonRow
-              ) : worldwideJobsError ? (
-                jobsErrorCard
-              ) : transformedWorldwideJobs.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <p className="text-gray-500">
-                      No jobs found. Try adjusting your search criteria.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div
-                  ref={jobsScrollRef}
-                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
-                >
-                  {renderJobCardsContent(transformedWorldwideJobs)}
-                </div>
-              )}
-            </div>
+            {renderJobsCarouselSection({
+              title: "Worldwide jobs for you",
+              jobs: transformedWorldwideJobs,
+              isLoading: worldwideJobsLoading,
+              error: worldwideJobsError,
+              emptyMessage:
+                "No jobs found. Try adjusting your search criteria.",
+              scrollRef: jobsScrollRef,
+              onScroll: scrollJobs,
+              scrollLabel: "worldwide jobs",
+            })}
 
             {/* Top Courses Section */}
             <div>
@@ -1367,18 +1384,18 @@ const UserHome = () => {
                 {!coursesLoading && filteredCourses.length > 0 && (
                   <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="icon"
-                      className="h-8 w-8"
+                      className={dashboardCarouselNavButtonClass}
                       onClick={() => scrollCourses("left")}
                       aria-label="Scroll courses left"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="icon"
-                      className="h-8 w-8"
+                      className={dashboardCarouselNavButtonClass}
                       onClick={() => scrollCourses("right")}
                       aria-label="Scroll courses right"
                     >
@@ -1452,7 +1469,9 @@ const UserHome = () => {
                               <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   {course.duration && (
-                                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                                    <Badge
+                                      className={PLATFORM_CHIP_BADGE_CLASS}
+                                    >
                                       {course.duration}
                                     </Badge>
                                   )}

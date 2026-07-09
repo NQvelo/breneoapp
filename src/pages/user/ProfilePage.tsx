@@ -62,6 +62,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
 import {
   Briefcase,
   GraduationCap,
@@ -1794,26 +1795,15 @@ const ProfilePage = () => {
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Personal information
               </h3>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full"
-                  onClick={() => navigate("/settings")}
-                  aria-label="Settings"
-                >
-                  <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full"
-                  onClick={() => setIsPersonalInfoModalOpen(true)}
-                  aria-label="Edit personal information"
-                >
-                  <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => setIsPersonalInfoModalOpen(true)}
+                aria-label="Edit personal information"
+              >
+                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+              </Button>
             </CardHeader>
             <CardContent className="px-6 pb-6">
               <div className="flex flex-row items-center gap-4 mb-4">
@@ -1866,7 +1856,12 @@ const ProfilePage = () => {
               <div className="flex flex-wrap gap-2">
                 {(profileData as Record<string, unknown>)?.country_region ||
                 (profileData as Record<string, unknown>)?.city ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm",
+                      PLATFORM_CHIP_BG_CLASS,
+                    )}
+                  >
                     <MapPin className="h-4 w-4 text-gray-500" />
                     {[
                       (profileData as Record<string, unknown>)?.country_region,
@@ -1877,13 +1872,23 @@ const ProfilePage = () => {
                   </span>
                 ) : null}
                 {email && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm",
+                      PLATFORM_CHIP_BG_CLASS,
+                    )}
+                  >
                     <Mail className="h-4 w-4 text-gray-500" />
                     {email}
                   </span>
                 )}
                 {phone_number && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm",
+                      PLATFORM_CHIP_BG_CLASS,
+                    )}
+                  >
                     <Phone className="h-4 w-4 text-gray-500" />
                     {phone_number}
                   </span>
@@ -1896,7 +1901,10 @@ const ProfilePage = () => {
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm hover:underline",
+                        PLATFORM_CHIP_BG_CLASS,
+                      )}
                     >
                       {getSocialIcon(platform, "h-4 w-4 text-gray-500")}
                       {url.length > 35
@@ -1905,6 +1913,15 @@ const ProfilePage = () => {
                     </a>
                   ))}
               </div>
+              <Button
+                variant="secondary"
+                onClick={() => navigate("/settings")}
+                className="mt-4 w-full rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
+                aria-label={t.nav.settings}
+              >
+                <Settings className="h-4 w-4" />
+                {t.nav.settings}
+              </Button>
             </CardContent>
           </Card>
 
@@ -2093,7 +2110,10 @@ const ProfilePage = () => {
                     <Badge
                       key={s.id}
                       variant="outline"
-                      className="capitalize px-3 py-1.5 text-xs rounded-[10px] bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
+                      className={cn(
+                        "capitalize px-3 py-1.5 text-xs rounded-[10px] border-0",
+                        PLATFORM_CHIP_BG_CLASS,
+                      )}
                     >
                       {s.skill_name}
                     </Badge>
@@ -2325,12 +2345,22 @@ const ProfilePage = () => {
                               {/* Chips */}
                               <div className="mt-1 flex flex-wrap items-center gap-2">
                                 {course.duration && (
-                                  <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 border-0">
+                                  <Badge
+                                    className={cn(
+                                      "rounded-[10px] px-3 py-1 text-[13px] font-medium border-0",
+                                      PLATFORM_CHIP_BG_CLASS,
+                                    )}
+                                  >
                                     {course.duration}
                                   </Badge>
                                 )}
                                 {course.category && (
-                                  <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 border-0">
+                                  <Badge
+                                    className={cn(
+                                      "rounded-[10px] px-3 py-1 text-[13px] font-medium border-0",
+                                      PLATFORM_CHIP_BG_CLASS,
+                                    )}
+                                  >
                                     {course.category}
                                   </Badge>
                                 )}

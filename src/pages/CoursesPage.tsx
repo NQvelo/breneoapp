@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -916,7 +917,7 @@ const CoursesPage = () => {
               <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
                   {course.duration && (
-                    <Badge className="rounded-[10px] px-3 py-1 text-[13px] font-medium bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-100">
+                    <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
                       {course.duration}
                     </Badge>
                   )}

@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 
 import { numericIdToUuid, cn } from "@/lib/utils";
+import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
 import { jobService, JobDetail, CompanyInfo } from "@/api/jobs";
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ import {
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
 import { JobMockInterviewPromo } from "@/components/jobs/JobMockInterviewPromo";
+import { JobStartAiInterviewButton } from "@/components/jobs/JobStartAiInterviewButton";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
@@ -1697,7 +1699,7 @@ const JobDetailPage = () => {
                   </div>
 
                   {/* Right Side: Action Buttons - Save, Share, then Apply (last) */}
-                  <div className="flex flex-row items-start gap-2 md:pt-0 flex-shrink-0 flex-wrap justify-end">
+                  <div className="flex w-full flex-row flex-nowrap items-center justify-end gap-2 overflow-x-auto md:w-auto md:overflow-visible [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {user && (
                       <Button
                         variant="secondary"
@@ -1705,7 +1707,7 @@ const JobDetailPage = () => {
                         onClick={() => saveJobMutation.mutate()}
                         disabled={saveJobMutation.isPending}
                         aria-label={isSaved ? "Unsave job" : "Save job"}
-                        className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                        className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
                       >
                         <Bookmark
                           className={`h-4 w-4 ${
@@ -1722,18 +1724,19 @@ const JobDetailPage = () => {
                         size="icon"
                         onClick={handleShareClick}
                         aria-label="Share job"
-                        className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                        className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
                       >
                         <Share2 className="h-4 w-4" />
                       </Button>
                     ) : (
-                      <DropdownMenu>
+                      <div className="shrink-0">
+                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="secondary"
                             size="icon"
                             aria-label="Share job"
-                            className="h-10 w-10 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                            className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
                           >
                             <Share2 className="h-4 w-4" />
                           </Button>
@@ -1752,8 +1755,17 @@ const JobDetailPage = () => {
                             <span>Share on LinkedIn</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                        </DropdownMenu>
+                      </div>
                     )}
+                    {user ? (
+                      <JobStartAiInterviewButton
+                        jobTitle={getJobTitle()}
+                        jobId={applicationJobId}
+                        size="sm"
+                        className="shrink-0"
+                      />
+                    ) : null}
                     <JobApplyButton
                       jobId={applicationJobId}
                       supportsInAppApply={supportsInAppApply}
@@ -1761,6 +1773,7 @@ const JobDetailPage = () => {
                       externalApplyUrl={getApplyUrl()}
                       userLoggedIn={!!user}
                       size="sm"
+                      className="shrink-0"
                     />
                   </div>
                 </div>
@@ -1851,6 +1864,7 @@ const JobDetailPage = () => {
                 resolvedJobSections.description) ||
               resolvedJobSections.responsibilities.length > 0 ||
               resolvedJobSections.qualifications.length > 0 ||
+              requiredSkillsList.length > 0 ||
               jobDetail.team_description ||
               jobDetail.benefits ? (
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6 space-y-[4.5rem]">
@@ -1879,67 +1893,62 @@ const JobDetailPage = () => {
                   ) : null}
 
                   {/* Qualifications */}
-                  {(resolvedJobSections.qualifications.length > 0 ||
-                    requiredSkillsList.length > 0) && (
+                  {resolvedJobSections.qualifications.length > 0 ? (
                     <div>
                       <h2 className="text-lg font-semibold mb-4">
                         Qualifications
                       </h2>
-                      {resolvedJobSections.qualifications.length > 0 ? (
-                        <JobSectionBulletList
-                          items={resolvedJobSections.qualifications}
-                        />
-                      ) : null}
-                      {requiredSkillsList.length > 0 && (
-                        <div
-                          className={
-                            resolvedJobSections.qualifications.length > 0
-                              ? "mt-7"
-                              : undefined
-                          }
-                        >
-                          <h2 className="text-lg font-semibold mb-4">
-                            Required Skills
-                          </h2>
-                          <div className="flex flex-wrap gap-3">
-                            {requiredSkillsList.map((skill) => {
-                              const selected =
-                                selectedRequiredSkills.has(skill);
-                              return (
-                                <Badge
-                                  key={skill}
-                                  variant="outline"
-                                  className={cn(
-                                    "cursor-pointer transition-colors capitalize px-4 py-2 text-sm min-h-[2.25rem] rounded-lg select-none",
-                                    selected
-                                      ? "bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700 dark:hover:bg-sky-800/50"
-                                      : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700",
-                                  )}
-                                  onClick={() => {
-                                    if (!user) return;
-                                    setSelectedRequiredSkills((prev) => {
-                                      const next = new Set(prev);
-                                      if (next.has(skill)) next.delete(skill);
-                                      else next.add(skill);
-                                      return next;
-                                    });
-                                  }}
-                                >
-                                  {skill}
-                                  {selected && (
-                                    <CheckCircle2 className="ml-2 h-4 w-4 inline-block" />
-                                  )}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                          <JobMissingSkillsCoursesSlider
-                            missingSkills={missingJobSkills}
-                          />
-                        </div>
-                      )}
+                      <JobSectionBulletList
+                        items={resolvedJobSections.qualifications}
+                      />
                     </div>
-                  )}
+                  ) : null}
+
+                  {/* Required Skills */}
+                  {requiredSkillsList.length > 0 ? (
+                    <div>
+                      <h2 className="text-lg font-semibold mb-4">
+                        Required Skills
+                      </h2>
+                      <div className="flex flex-wrap gap-3">
+                        {requiredSkillsList.map((skill) => {
+                          const selected = selectedRequiredSkills.has(skill);
+                          return (
+                            <Badge
+                              key={skill}
+                              variant="outline"
+                              className={cn(
+                                "cursor-pointer transition-colors capitalize px-4 py-2 text-sm min-h-[2.25rem] rounded-lg select-none",
+                                selected
+                                  ? "bg-sky-100 text-sky-800 border-sky-200 hover:bg-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700 dark:hover:bg-sky-800/50"
+                                  : cn(
+                                      "border-0 hover:bg-gray-200 dark:hover:bg-[#4A4A4A]",
+                                      PLATFORM_CHIP_BG_CLASS,
+                                    ),
+                              )}
+                              onClick={() => {
+                                if (!user) return;
+                                setSelectedRequiredSkills((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(skill)) next.delete(skill);
+                                  else next.add(skill);
+                                  return next;
+                                });
+                              }}
+                            >
+                              {skill}
+                              {selected && (
+                                <CheckCircle2 className="ml-2 h-4 w-4 inline-block" />
+                              )}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                      <JobMissingSkillsCoursesSlider
+                        missingSkills={missingJobSkills}
+                      />
+                    </div>
+                  ) : null}
 
                   {/* Team Description - Only show if available */}
                   {jobDetail.team_description && (

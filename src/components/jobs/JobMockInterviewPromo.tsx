@@ -1,9 +1,8 @@
 import React from "react";
-import { Mic, Sparkles, UserRound, Video } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Sparkles, UserRound, Video } from "lucide-react";
 import { useTranslation } from "@/contexts/LanguageContext";
-import { useLocalizedNavigate } from "@/hooks/useLocalizedNavigate";
 import { cn } from "@/lib/utils";
+import { JobStartAiInterviewButton } from "@/components/jobs/JobStartAiInterviewButton";
 
 interface JobMockInterviewPromoProps {
   jobTitle: string;
@@ -17,16 +16,6 @@ export function JobMockInterviewPromo({
   className,
 }: JobMockInterviewPromoProps) {
   const t = useTranslation();
-  const navigate = useLocalizedNavigate();
-
-  const handleStart = () => {
-    const params = new URLSearchParams({
-      job_id: String(jobId),
-      position: jobTitle,
-      return: window.location.pathname + window.location.search,
-    });
-    navigate(`/interviews?${params.toString()}`);
-  };
 
   return (
     <div
@@ -76,13 +65,11 @@ export function JobMockInterviewPromo({
             <p className="mt-1 text-xs text-muted-foreground/90">
               {t.mockInterview.roleHint.replace("{role}", jobTitle)}
             </p>
-            <Button
-              className="mt-4 rounded-xl bg-rose-600 px-5 text-white hover:bg-rose-700"
-              onClick={handleStart}
-            >
-              <Mic className="mr-2 h-4 w-4" />
-              {t.mockInterview.startButton}
-            </Button>
+            <JobStartAiInterviewButton
+              jobTitle={jobTitle}
+              jobId={jobId}
+              className="mt-4"
+            />
           </div>
         </div>
     </div>

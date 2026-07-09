@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
 
-const chipClassName =
-  "inline-flex items-center rounded-[10px] px-3 py-1 text-[13px] font-medium bg-breneo-blue/10 text-gray-800 dark:bg-breneo-blue/15 dark:text-gray-100";
+import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
+
+const defaultChipClassName = PLATFORM_CHIP_BADGE_CLASS;
 
 function isDisplayableSalary(salary?: string): boolean {
   const trimmed = (salary ?? "").trim();
@@ -13,6 +14,7 @@ type JobListingMetaBadgesProps = {
   workArrangement?: string;
   salary?: string;
   className?: string;
+  chipClassName?: string;
 };
 
 export function JobListingMetaBadges({
@@ -20,6 +22,7 @@ export function JobListingMetaBadges({
   workArrangement,
   salary,
   className,
+  chipClassName = defaultChipClassName,
 }: JobListingMetaBadgesProps) {
   const showSalary = isDisplayableSalary(salary);
 

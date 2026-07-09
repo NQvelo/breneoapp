@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, X } from "lucide-react";
 import type { UserSkill, SkillSuggestion } from "@/api/profile/types";
 import { profileApi } from "@/api/profile/profileApi";
+import { cn } from "@/lib/utils";
+import { PLATFORM_CHIP_SKILL_CLASS } from "@/lib/chipStyles";
 
 export interface EditSkillsModalProps {
   open: boolean;
@@ -206,7 +208,7 @@ export function EditSkillsModal({
                   <Badge
                     key={s.id}
                     variant="outline"
-                    className="inline-flex items-center gap-1 capitalize px-3 py-1.5 text-xs rounded-[10px] bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
+                    className={cn("gap-1", PLATFORM_CHIP_SKILL_CLASS)}
                   >
                     {s.skill_name}
                     <button

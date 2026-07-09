@@ -11,6 +11,7 @@ import {
   jobIdFromApplication,
   type JobApplicationItem,
 } from "@/api/jobs/jobApplicationsApi";
+import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import {
   Briefcase,
   GraduationCap,
@@ -247,16 +248,16 @@ function CourseRow({
           {course.title}
         </h3>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge className="rounded-[10px] bg-sky-100 text-sky-900 dark:bg-sky-900/40 dark:text-sky-100 border-0">
+          <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
             {enrolledLabel}
           </Badge>
           {course.level ? (
-            <Badge variant="secondary" className="rounded-[10px] border-0">
+            <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
               {course.level}
             </Badge>
           ) : null}
           {course.duration ? (
-            <Badge variant="secondary" className="rounded-[10px] border-0">
+            <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
               {course.duration}
             </Badge>
           ) : null}

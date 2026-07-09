@@ -75,7 +75,7 @@ function JobTypeDropdown({
                 "cursor-pointer select-none rounded-md px-3 py-2.5 text-base md:text-sm",
                 "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-gray-100",
                 value === opt.value &&
-                  "bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100",
+                  "bg-gray-100 text-gray-900 dark:bg-[#3A3A3A] dark:text-gray-100",
               )}
               onMouseDown={(e) => {
                 e.preventDefault();

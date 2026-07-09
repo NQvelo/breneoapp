@@ -14,6 +14,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
 import { supabase } from "@/integrations/supabase/client";
 import { jobService, ApiJob, JobFilters } from "@/api/jobs";
 import { filterATSJobs } from "@/utils/jobFilterUtils";
@@ -674,7 +675,7 @@ const SkillPathDetailPage = () => {
                         "transition-colors capitalize px-4 py-2 text-sm min-h-[2.25rem] rounded-lg select-none",
                         selected
                           ? "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-200 dark:border-sky-700"
-                          : "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700",
+                          : cn("border-0", PLATFORM_CHIP_BG_CLASS),
                       )}
                     >
                       {skill}

@@ -1465,7 +1465,7 @@ const AcademyProfilePage = () => {
                   href={websiteHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
                 >
                   <Globe className="h-4 w-4 text-gray-500" />
                   {websiteRaw.length > 40
@@ -1474,20 +1474,20 @@ const AcademyProfilePage = () => {
                 </a>
               ) : null}
               {user?.email && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
                   <Mail className="h-4 w-4 text-gray-500" />
                   {user.email}
                 </span>
               )}
               {academyProfile?.contact_email &&
                 academyProfile.contact_email !== user?.email && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
                     <Mail className="h-4 w-4 text-gray-500" />
                     {academyProfile.contact_email}
                   </span>
                 )}
               {user?.phone_number && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
                   <Phone className="h-4 w-4 text-gray-500" />
                   {user.phone_number}
                 </span>
@@ -1503,7 +1503,7 @@ const AcademyProfilePage = () => {
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline max-w-full min-w-0"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline max-w-full min-w-0"
                     >
                       {getSocialIcon(
                         platform,
