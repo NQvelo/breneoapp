@@ -2181,7 +2181,7 @@ const JobDetailPage = () => {
         <div
           className={cn(
             "fixed z-[60] left-4 right-4 transition-all duration-300 ease-in-out",
-            "max-md:bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:bottom-4",
+            "max-md:bottom-above-mobile-nav md:bottom-4",
             sidebarCollapsed ? "md:left-28" : "md:left-[18rem]",
             showFixedBar
               ? "opacity-100 translate-y-0"

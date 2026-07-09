@@ -202,6 +202,10 @@
 }
 
 @layer utilities {
+  .bottom-above-mobile-nav {
+    bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+
   /* Dark mode support for custom background colors with improved contrast */
   .dark .bg-breneo-lightgray {
     background-color: hsl(var(--background));

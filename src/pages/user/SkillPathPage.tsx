@@ -1704,7 +1704,7 @@ const SkillPathPage = () => {
   return (
     <DashboardLayout>
       {/* Skills/Matched Roles Switcher */}
-      <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+      <div className="fixed bottom-above-mobile-nav left-1/2 -translate-x-1/2 z-40 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
         <motion.div
           layout
           transition={{ type: "spring", stiffness: 500, damping: 40, mass: 1 }}

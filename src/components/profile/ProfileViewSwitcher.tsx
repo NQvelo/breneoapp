@@ -82,7 +82,7 @@ export function ProfileViewSwitcher({
         : "applied-secondary";
 
   return (
-    <div className="fixed bottom-[85px] left-1/2 z-40 -translate-x-1/2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+    <div className="fixed bottom-above-mobile-nav left-1/2 z-40 -translate-x-1/2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
       <motion.div
         layout
         transition={pillSpring}

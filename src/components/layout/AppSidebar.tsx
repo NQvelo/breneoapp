@@ -391,20 +391,9 @@ export function AppSidebar({
       {/* Mobile Bottom Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
         <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6.5rem+env(safe-area-inset-bottom))]"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background/50 to-transparent"
           aria-hidden
-        >
-          <div className="absolute inset-0 bg-gradient-to-t from-background/35 via-background/15 to-transparent" />
-          <div
-            className="absolute inset-0 bg-background/10 backdrop-blur-md backdrop-saturate-125"
-            style={{
-              maskImage:
-                "linear-gradient(to top, black 0%, black 28%, transparent 100%)",
-              WebkitMaskImage:
-                "linear-gradient(to top, black 0%, black 28%, transparent 100%)",
-            }}
-          />
-        </div>
+        />
 
         <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
         <nav className="mx-auto flex max-w-xl items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]">
