@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 
 interface JobMockInterviewPromoProps {
   jobTitle: string;
+  jobId: string | number;
   className?: string;
 }
 
 export function JobMockInterviewPromo({
   jobTitle,
+  jobId,
   className,
 }: JobMockInterviewPromoProps) {
   const t = useTranslation();
@@ -19,6 +21,7 @@ export function JobMockInterviewPromo({
 
   const handleStart = () => {
     const params = new URLSearchParams({
+      job_id: String(jobId),
       position: jobTitle,
       return: window.location.pathname + window.location.search,
     });

@@ -30,6 +30,7 @@ export interface InterviewSessionSummary {
   results: SubmitInterviewResponse[];
   totalQuestions: number;
   interviewId?: string;
+  questionTextByNumber?: Record<number, string>;
 }
 
 interface InterviewReportProps {
@@ -136,7 +137,7 @@ export function InterviewReport({
   const metrics = metricsList(evaluation);
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 pb-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 pb-8">
       {sessionSummary ? (
         <Card className="border-[#01bfff]/20 bg-gradient-to-br from-[#01bfff]/5 to-transparent shadow-md">
           <CardContent className="flex flex-col items-center gap-2 p-6 text-center sm:flex-row sm:text-left">
@@ -152,38 +153,63 @@ export function InterviewReport({
         </Card>
       ) : null}
 
-      <Card className="overflow-hidden border-0 shadow-lg">
-        <CardContent className="p-6 sm:p-8">
-          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-            <CircularScore score={displayScore} passed={passed} />
-            <div className="flex-1 space-y-2">
-              <div
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold",
-                  passed
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-                )}
-              >
-                {passed ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <XCircle className="h-4 w-4" />
-                )}
-                {passed ? "გაიარე" : "ვერ გაიარე"}
+      <div className="grid gap-6 lg:grid-cols-12">
+        <Card className="overflow-hidden border-0 shadow-lg lg:col-span-5">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left lg:flex-col lg:text-center">
+              <CircularScore score={displayScore} passed={passed} />
+              <div className="space-y-2">
+                <div
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold",
+                    passed
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+                  )}
+                >
+                  {passed ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <XCircle className="h-4 w-4" />
+                  )}
+                  {passed ? "გაიარე" : "ვერ გაიარე"}
+                </div>
+                <h2 className="text-xl font-bold sm:text-2xl">
+                  {sessionSummary ? "სესიის შეჯამება" : "AI შეფასების შედეგი"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {sessionSummary
+                    ? `საშუალო ქულა: ${displayScore} — საჭირო მინიმუმი ${PASS_THRESHOLD}`
+                    : `ზოგადი ქულა: ${evaluation.overall_score} — საჭირო მინიმუმი ${PASS_THRESHOLD}`}
+                </p>
               </div>
-              <h2 className="text-xl font-bold sm:text-2xl">
-                {sessionSummary ? "სესიის შეჯამება" : "AI შეფასების შედეგი"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {sessionSummary
-                  ? `საშუალო ქულა: ${displayScore} — საჭირო მინიმუმი ${PASS_THRESHOLD}`
-                  : `ზოგადი ქულა: ${evaluation.overall_score} — საჭირო მინიმუმი ${PASS_THRESHOLD}`}
-              </p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-md lg:col-span-7">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Sparkles className="h-5 w-5 text-[#01bfff]" />
+              {sessionSummary ? "მეტრიკები" : "დეტალური მეტრიკები"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {metrics.length > 0 ? (
+              metrics.map((metric) => (
+                <MetricBar
+                  key={metric.label}
+                  label={metric.label}
+                  score={metric.score}
+                  feedback={metric.feedback}
+                />
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">მეტრიკები არ არის</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {sessionSummary ? (
         <Card className="border-0 shadow-md">
@@ -219,13 +245,30 @@ export function InterviewReport({
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="space-y-2 text-sm text-muted-foreground">
-                      {result.user_transcript ? (
-                        <p className="whitespace-pre-wrap leading-relaxed">
-                          {result.user_transcript}
-                        </p>
-                      ) : (
-                        <p>ტრანსკრიპტი არ არის</p>
-                      )}
+                      <div className="space-y-2">
+                        <div>
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                            კითხვა
+                          </p>
+                          <p className="whitespace-pre-wrap leading-relaxed">
+                            {sessionSummary.questionTextByNumber?.[
+                              result.question_number
+                            ] || "კითხვა ვერ მოიძებნა"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-foreground/70">
+                            პასუხი
+                          </p>
+                          {result.user_transcript ? (
+                            <p className="whitespace-pre-wrap leading-relaxed">
+                              {result.user_transcript}
+                            </p>
+                          ) : (
+                            <p>პასუხი არ არის</p>
+                          )}
+                        </div>
+                      </div>
                     </AccordionContent>
                   </AccordionItem>
                 );
@@ -234,31 +277,6 @@ export function InterviewReport({
           </CardContent>
         </Card>
       ) : null}
-
-      <Card className="border-0 shadow-md">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-[#01bfff]" />
-            {sessionSummary
-              ? "ბოლო კითხვის მეტრიკები"
-              : "დეტალური მეტრიკები"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {metrics.length > 0 ? (
-            metrics.map((metric) => (
-              <MetricBar
-                key={metric.label}
-                label={metric.label}
-                score={metric.score}
-                feedback={metric.feedback}
-              />
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">მეტრიკები არ არის</p>
-          )}
-        </CardContent>
-      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="border-emerald-500/20 bg-emerald-500/5 shadow-sm">
@@ -324,27 +342,6 @@ export function InterviewReport({
           </CardContent>
         </Card>
       </div>
-
-      {evaluation.user_transcript ? (
-        <Accordion
-          type="single"
-          collapsible
-          className="rounded-xl border bg-card px-4 shadow-sm"
-        >
-          <AccordionItem value="transcript" className="border-0">
-            <AccordionTrigger className="text-sm font-semibold hover:no-underline">
-              {sessionSummary
-                ? "ბოლო კითხვის ტრანსკრიპტი"
-                : "თქვენი ტრანსკრიპტი"}
-            </AccordionTrigger>
-            <AccordionContent>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                {evaluation.user_transcript}
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      ) : null}
 
       {evaluation.recommended_answer ? (
         <Card className="border-[#01bfff]/30 bg-gradient-to-br from-[#01bfff]/5 to-transparent shadow-md">

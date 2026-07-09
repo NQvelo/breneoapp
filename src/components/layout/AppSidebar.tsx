@@ -323,11 +323,30 @@ export function AppSidebar({
       ? "/employer/jobs"
       : "/home";
 
-  // Mobile navigation (includes profile for all roles, including employer)
-  const mobileNavItems = [
-    ...navItems,
-    { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
-  ];
+  // Mobile navigation: keep exactly 5 items for every role.
+  const mobileNavItems = isAcademy
+    ? [
+        { icon: Home, label: t.nav.home, href: "/academy/home" },
+        { icon: LibraryBig, label: t.nav.courses, href: "/academy/courses" },
+        { icon: Bell, label: t.nav.notifications, href: notificationsPath },
+        { icon: Settings, label: t.nav.settings, href: settingsPath },
+        { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
+      ]
+    : isEmployer
+      ? [
+          { icon: Briefcase, label: t.nav.yourJobs, href: "/employer/jobs" },
+          { icon: Users, label: t.nav.members, href: "/employer/members" },
+          { icon: Bell, label: t.nav.notifications, href: notificationsPath },
+          { icon: Settings, label: t.nav.settings, href: settingsPath },
+          { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
+        ]
+      : [
+          { icon: Home, label: t.nav.home, href: "/home" },
+          { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
+          { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
+          { icon: Atom, label: t.nav.atoms, href: "/webinars" },
+          { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
+        ];
 
   return (
     <>
@@ -370,8 +389,8 @@ export function AppSidebar({
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#F3F3F4]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 ">
-        <nav className="flex justify-around items-center py-3">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2">
+        <nav className="mx-auto flex max-w-xl items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_10px_32px_rgba(0,0,0,0.14)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_10px_32px_rgba(0,0,0,0.42)]">
           {mobileNavItems.map((item, index) => {
             let isActive = currentPath === item.href;
             if (item.href === "/home") {
@@ -403,27 +422,27 @@ export function AppSidebar({
                 key={index}
                 to={item.href}
                 className={cn(
-                  "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-0 flex-1 mx-0",
+                  "group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-2 transition-all duration-200",
                   isActive
-                    ? "text-gray-600"
-                    : "text-gray-600 hover:text-breneo-blue",
+                    ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
+                    : "text-[#6B7280] hover:bg-black/[0.04] hover:text-[#111827] dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white",
                 )}
               >
                 <item.icon
-                  size={20}
+                  size={19}
                   className={cn(
-                    "transition-colors duration-200 mb-0.5",
+                    "mb-0.5 transition-colors duration-200",
                     isActive
                       ? "text-breneo-blue"
-                      : "text-gray-600 group-hover:text-breneo-blue",
+                      : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
                   )}
                 />
                 <span
                   className={cn(
-                    "text-xs font-medium transition-colors duration-200 text-center",
+                    "text-center text-[11px] font-semibold leading-tight transition-colors duration-200",
                     isActive
-                      ? "text-gray-600"
-                      : "text-gray-600 group-hover:text-breneo-blue",
+                      ? "text-[#111827] dark:text-white"
+                      : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
                   )}
                 >
                   {item.label}

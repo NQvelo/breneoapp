@@ -4,6 +4,7 @@ import {
   getJobApplicationsApiBaseUrl,
 } from "@/api/employer/employerJobsApiBase";
 import type {
+  StartInterviewParams,
   StartInterviewResponse,
   SubmitInterviewResponse,
 } from "@/api/interview/types";
@@ -72,19 +73,29 @@ function throwInterviewError(
 
 /** POST /api/v1/interview/start/ — BFF injects user_id server-side. */
 export async function startInterview(
-  jobPosition: string,
+  params: StartInterviewParams | string,
 ): Promise<StartInterviewResponse> {
   assertEmployerJobsProxyConfigured("POST");
 
-  const position = jobPosition.trim();
-  if (!position) {
+  const body =
+    typeof params === "string"
+      ? { job_position: params.trim() }
+      : "job_id" in params && params.job_id != null
+        ? { job_id: params.job_id }
+        : { job_position: String(params.job_position ?? "").trim() };
+
+  if ("job_id" in body && body.job_id != null) {
+    if (!Number.isFinite(body.job_id)) {
+      throw new Error("არასწორი სამუშაოს იდენტიფიკატორი.");
+    }
+  } else if (!body.job_position) {
     throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
   }
 
   const res = await employerBffFetch(interviewUrl("/api/v1/interview/start/"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ job_position: position }),
+    body: JSON.stringify(body),
   });
 
   const data = await parseJsonBody(res);

@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { interviewApi } from "@/api/interview/interviewApi";
 import type {
+  InterviewPlaybackItem,
   InterviewQuestion,
+  StartInterviewParams,
   SubmitInterviewResponse,
 } from "@/api/interview/types";
 import {
@@ -12,6 +14,12 @@ import {
 import { InterviewReport } from "@/components/interviews/InterviewReport";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getLocalizedPath } from "@/utils/localeUtils";
+import {
+  isAutoplayBlockedError,
+  playAudioUrl,
+  playPlaybackSequence,
+  stopActiveAudio,
+} from "@/utils/playAudioSequence";
 
 const MIN_RECORDING_MS = 3000;
 const RECORD_COUNTDOWN_SEC = 3;
@@ -33,6 +41,22 @@ function mediaErrorMessage(error: unknown): string {
   return "მედია მოწყობილობის გახსნა ვერ მოხერხდა.";
 }
 
+function resolveStartParams(
+  jobIdRaw: string,
+  position: string,
+): StartInterviewParams | null {
+  const trimmedId = jobIdRaw.trim();
+  if (trimmedId) {
+    const numericId = Number(trimmedId);
+    if (Number.isFinite(numericId) && trimmedId === String(numericId)) {
+      return { job_id: numericId };
+    }
+  }
+  const trimmedPosition = position.trim();
+  if (trimmedPosition) return { job_position: trimmedPosition };
+  return null;
+}
+
 export function InterviewContainer() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -40,8 +64,10 @@ export function InterviewContainer() {
   const returnPath =
     searchParams.get("return")?.trim() ||
     getLocalizedPath("/home", language);
+  const presetJobIdRaw = searchParams.get("job_id")?.trim() ?? "";
   const presetPosition = searchParams.get("position")?.trim() ?? "";
-  const autoStartRequested = presetPosition.length > 0;
+  const startParams = resolveStartParams(presetJobIdRaw, presetPosition);
+  const hasJobContext = startParams != null;
   const autoStartTriggeredRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -51,15 +77,20 @@ export function InterviewContainer() {
   const currentQuestionRef = useRef<InterviewQuestion | null>(null);
   const handleSubmitRecordingRef = useRef<() => Promise<void>>(async () => {});
   const beginActualRecordingRef = useRef<() => void>(() => {});
+  const pendingPlaybackRef = useRef<InterviewPlaybackItem[] | null>(null);
+  const pendingSingleAudioRef = useRef<string | null>(null);
 
   const [phase, setPhase] = useState<MeetingPhase>("setup");
-  const [jobPosition, setJobPosition] = useState("");
+  const [jobPosition, setJobPosition] = useState(presetPosition);
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] =
     useState<InterviewQuestion | null>(null);
   const [perQuestionResults, setPerQuestionResults] = useState<
     SubmitInterviewResponse[]
   >([]);
+  const [questionTextByNumber, setQuestionTextByNumber] = useState<
+    Record<number, string>
+  >({});
   const [lastFeedback, setLastFeedback] =
     useState<SubmitInterviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,10 +98,15 @@ export function InterviewContainer() {
   const [cameraReady, setCameraReady] = useState(false);
   const [recordingMs, setRecordingMs] = useState(0);
   const [recordCountdownSec, setRecordCountdownSec] = useState(0);
+  const [audioCaption, setAudioCaption] = useState("");
+  const [isPlayingWelcome, setIsPlayingWelcome] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [needsManualPlay, setNeedsManualPlay] = useState(false);
 
   currentQuestionRef.current = currentQuestion;
 
   const stopMedia = useCallback(() => {
+    stopActiveAudio();
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state !== "inactive"
@@ -88,10 +124,14 @@ export function InterviewContainer() {
       videoRef.current.srcObject = null;
     }
     setCameraReady(false);
+    setIsAudioPlaying(false);
+    setIsPlayingWelcome(false);
   }, []);
 
   const leaveMeeting = useCallback(() => {
     stopMedia();
+    pendingPlaybackRef.current = null;
+    pendingSingleAudioRef.current = null;
     if (document.fullscreenElement) {
       void document.exitFullscreen?.().catch(() => undefined);
     }
@@ -140,82 +180,243 @@ export function InterviewContainer() {
   }, []);
 
   useEffect(() => {
-    if (
-      phase === "setup" ||
-      phase === "session_complete"
-    ) {
-      return;
-    }
+    if (phase === "setup" || phase === "session_complete") return;
     const id = window.requestAnimationFrame(() => bindVideoElement());
     return () => window.cancelAnimationFrame(id);
   }, [phase, currentQuestion?.id, bindVideoElement]);
+
+  const handlePlaybackSegment = useCallback(
+    (item: InterviewPlaybackItem) => {
+      setAudioCaption(item.text);
+      setIsPlayingWelcome(item.type === "welcome");
+    },
+    [],
+  );
+
+  const runPlaybackSequenceLocal = useCallback(
+    async (items: InterviewPlaybackItem[]) => {
+      setPhase("playing_audio");
+      setNeedsManualPlay(false);
+      setIsAudioPlaying(true);
+      setError(null);
+
+      try {
+        await playPlaybackSequence(items, (item) => {
+          handlePlaybackSegment(item);
+        });
+        pendingPlaybackRef.current = null;
+        setIsAudioPlaying(false);
+        setIsPlayingWelcome(false);
+        setPhase("ready_to_record");
+      } catch (e) {
+        setIsAudioPlaying(false);
+        if (isAutoplayBlockedError(e)) {
+          pendingPlaybackRef.current = items;
+          pendingSingleAudioRef.current = null;
+          setNeedsManualPlay(true);
+          setPhase("playing_audio");
+        } else {
+          setError(
+            e instanceof Error ? e.message : "აუდიოს დაკვრა ვერ მოხერხდა.",
+          );
+          setPhase("ready_to_record");
+        }
+      }
+    },
+    [handlePlaybackSegment],
+  );
+
+  const runSingleQuestionAudio = useCallback(
+    async (question: InterviewQuestion) => {
+      setPhase("playing_audio");
+      setNeedsManualPlay(false);
+      setIsAudioPlaying(true);
+      setIsPlayingWelcome(false);
+      setAudioCaption(question.question_text);
+      setError(null);
+
+      if (!question.question_audio_url) {
+        setIsAudioPlaying(false);
+        setPhase("ready_to_record");
+        return;
+      }
+
+      try {
+        await playAudioUrl(question.question_audio_url);
+        pendingSingleAudioRef.current = null;
+        setIsAudioPlaying(false);
+        setPhase("ready_to_record");
+      } catch (e) {
+        setIsAudioPlaying(false);
+        if (isAutoplayBlockedError(e)) {
+          pendingSingleAudioRef.current = question.question_audio_url;
+          pendingPlaybackRef.current = null;
+          setNeedsManualPlay(true);
+          setPhase("playing_audio");
+        } else {
+          setError(
+            e instanceof Error ? e.message : "აუდიოს დაკვრა ვერ მოხერხდა.",
+          );
+          setPhase("ready_to_record");
+        }
+      }
+    },
+    [],
+  );
+
+  const handleManualPlayAudio = useCallback(async () => {
+    const playback = pendingPlaybackRef.current;
+    const singleUrl = pendingSingleAudioRef.current;
+
+    setNeedsManualPlay(false);
+    setIsAudioPlaying(true);
+    setError(null);
+
+    try {
+      if (playback?.length) {
+        await playPlaybackSequence(playback, (item) => {
+          handlePlaybackSegment(item);
+        });
+        pendingPlaybackRef.current = null;
+        setIsPlayingWelcome(false);
+        setPhase("ready_to_record");
+      } else if (singleUrl) {
+        await playAudioUrl(singleUrl);
+        pendingSingleAudioRef.current = null;
+        setPhase("ready_to_record");
+      } else if (currentQuestionRef.current?.question_audio_url) {
+        await playAudioUrl(currentQuestionRef.current.question_audio_url);
+        setPhase("ready_to_record");
+      }
+    } catch (e) {
+      if (isAutoplayBlockedError(e)) {
+        setNeedsManualPlay(true);
+      } else {
+        setError(
+          e instanceof Error ? e.message : "აუდიოს დაკვრა ვერ მოხერხდა.",
+        );
+        setPhase("ready_to_record");
+      }
+    } finally {
+      setIsAudioPlaying(false);
+    }
+  }, [handlePlaybackSegment]);
+
+  const handleStartInterview = useCallback(
+    async (explicitParams?: StartInterviewParams) => {
+      const params =
+        explicitParams ?? resolveStartParams(presetJobIdRaw, presetPosition);
+
+      if (!params) {
+        setError("ინტერვიუს დასაწყებად გადადით სამუშაოს გვერდზე.");
+        return;
+      }
+
+      setIsStarting(true);
+      setError(null);
+      setPerQuestionResults([]);
+      setQuestionTextByNumber({});
+      setLastFeedback(null);
+      setNeedsManualPlay(false);
+
+      try {
+        await attachStream();
+        const response = await interviewApi.startInterview(params);
+        setInterviewId(response.interview.id);
+        setJobPosition(
+          response.interview.job_position ||
+            response.question.job_position ||
+            ("job_position" in params ? params.job_position : "") ||
+            presetPosition,
+        );
+        setCurrentQuestion(response.question);
+
+        const playback =
+          response.playback?.length > 0
+            ? response.playback
+            : [
+                ...(response.welcome_audio_url
+                  ? [
+                      {
+                        type: "welcome" as const,
+                        text: response.welcome_text,
+                        audio_url: response.welcome_audio_url,
+                      },
+                    ]
+                  : []),
+                {
+                  type: "question" as const,
+                  text: response.question.question_text,
+                  audio_url: response.question.question_audio_url,
+                },
+              ];
+
+        const firstSegment = playback[0];
+        if (firstSegment) {
+          setAudioCaption(firstSegment.text || response.welcome_text);
+          setIsPlayingWelcome(firstSegment.type === "welcome");
+        }
+
+        await runPlaybackSequenceLocal(playback);
+      } catch (e) {
+        stopMedia();
+        setError(
+          e instanceof Error
+            ? e.message
+            : "ინტერვიუს დაწყება ვერ მოხერხდა.",
+        );
+        setPhase("setup");
+      } finally {
+        setIsStarting(false);
+      }
+    },
+    [
+      attachStream,
+      presetJobIdRaw,
+      presetPosition,
+      runPlaybackSequenceLocal,
+      stopMedia,
+    ],
+  );
 
   const resetSession = useCallback(() => {
     stopMedia();
     setInterviewId(null);
     setCurrentQuestion(null);
     setPerQuestionResults([]);
+    setQuestionTextByNumber({});
     setLastFeedback(null);
     chunksRef.current = [];
+    pendingPlaybackRef.current = null;
+    pendingSingleAudioRef.current = null;
+    setAudioCaption("");
+    setNeedsManualPlay(false);
     setPhase("setup");
     setError(null);
-  }, [stopMedia]);
-
-  const handleStartInterview = async (positionOverride?: string) => {
-    const position = (positionOverride ?? jobPosition).trim();
-    if (!position) {
-      setError("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
-      return;
+    if (startParams) {
+      void handleStartInterview(startParams);
     }
-
-    setJobPosition(position);
-    setIsStarting(true);
-    setError(null);
-    setPerQuestionResults([]);
-    setLastFeedback(null);
-
-    try {
-      await attachStream();
-      const response = await interviewApi.startInterview(position);
-      setInterviewId(response.interview.id);
-      setCurrentQuestion(response.question);
-      setPhase("waiting_for_host");
-    } catch (e) {
-      stopMedia();
-      setError(
-        e instanceof Error
-          ? e.message
-          : "ინტერვიუს დაწყება ვერ მოხერხდა.",
-      );
-      if (autoStartRequested) {
-        setPhase("setup");
-      }
-    } finally {
-      setIsStarting(false);
-    }
-  };
+  }, [handleStartInterview, startParams, stopMedia]);
 
   useEffect(() => {
-    if (!autoStartRequested || autoStartTriggeredRef.current) return;
+    if (!hasJobContext || autoStartTriggeredRef.current || !startParams) {
+      return;
+    }
     autoStartTriggeredRef.current = true;
-    setJobPosition(presetPosition);
-    void handleStartInterview(presetPosition);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once for URL preset
-  }, [autoStartRequested, presetPosition]);
+    if (presetPosition) setJobPosition(presetPosition);
+    void handleStartInterview(startParams);
+  }, [hasJobContext, handleStartInterview, presetPosition, startParams]);
 
-  const handleQuestionAudioFinished = useCallback(() => {
+  const handleBeginRecording = useCallback(() => {
+    setError(null);
     setPhase("recording_countdown");
-  }, []);
-
-  const handleInterviewerJoined = useCallback(() => {
-    setPhase("playing_question");
   }, []);
 
   const beginActualRecording = useCallback(() => {
     const stream = mediaStreamRef.current;
     if (!stream) {
       setError("კამერა არ არის მზად. გთხოვთ, ხელახლა სცადოთ.");
-      setPhase("recording_countdown");
+      setPhase("ready_to_record");
       return;
     }
 
@@ -300,7 +501,7 @@ export function InterviewContainer() {
 
     if (!blob.size) {
       setError("ჩანაწერი ცარიელია. სცადეთ ხელახლა.");
-      setPhase("recording_countdown");
+      setPhase("ready_to_record");
       return;
     }
 
@@ -308,12 +509,16 @@ export function InterviewContainer() {
       setError(
         "ჩანაწერი ძალიან მცირეა. სცადეთ ხელახლა და ილაპარაკეთ მინიმუმ 3 წამი.",
       );
-      setPhase("recording_countdown");
+      setPhase("ready_to_record");
       return;
     }
 
     setPhase("submitting");
     setError(null);
+    setQuestionTextByNumber((prev) => ({
+      ...prev,
+      [question.question_number]: question.question_text,
+    }));
 
     try {
       const result = await interviewApi.submitInterviewAudio(question.id, blob);
@@ -335,18 +540,21 @@ export function InterviewContainer() {
           ? e.message
           : "პასუხის გაგზავნა ვერ მოხერხდა.",
       );
-      setPhase("recording_countdown");
+      setPhase("ready_to_record");
     }
   };
   handleSubmitRecordingRef.current = handleSubmitRecording;
 
-  const handleNextQuestion = useCallback(() => {
-    if (!lastFeedback?.next_question) return;
-    setCurrentQuestion(lastFeedback.next_question);
+  const handleNextQuestion = useCallback(async () => {
+    const next = lastFeedback?.next_question;
+    if (!next) return;
+
+    setCurrentQuestion(next);
     setLastFeedback(null);
     chunksRef.current = [];
-    setPhase("playing_question");
-  }, [lastFeedback]);
+    setError(null);
+    await runSingleQuestionAudio(next);
+  }, [lastFeedback, runSingleQuestionAudio]);
 
   const sessionReport =
     phase === "session_complete" && lastFeedback ? (
@@ -361,6 +569,7 @@ export function InterviewContainer() {
           results: perQuestionResults,
           totalQuestions: lastFeedback.total_questions,
           interviewId: interviewId ?? undefined,
+          questionTextByNumber,
         }}
       />
     ) : null;
@@ -369,9 +578,7 @@ export function InterviewContainer() {
     <InterviewMeetingRoom
       phase={phase}
       jobPosition={jobPosition}
-      jobPositionInput={jobPosition}
-      onJobPositionInputChange={setJobPosition}
-      onStartInterview={() => void handleStartInterview()}
+      hasJobContext={hasJobContext}
       isStarting={isStarting}
       currentQuestion={currentQuestion}
       completedCount={perQuestionResults.length}
@@ -381,12 +588,15 @@ export function InterviewContainer() {
       recordCountdownSec={recordCountdownSec}
       error={error}
       lastFeedback={lastFeedback}
-      onQuestionAudioFinished={handleQuestionAudioFinished}
+      audioCaption={audioCaption}
+      isPlayingWelcome={isPlayingWelcome}
+      isAudioPlaying={isAudioPlaying}
+      needsManualPlay={needsManualPlay}
+      onManualPlayAudio={() => void handleManualPlayAudio()}
+      onBeginRecording={handleBeginRecording}
       onStopRecording={handleStopRecording}
-      onNextQuestion={handleNextQuestion}
+      onNextQuestion={() => void handleNextQuestion()}
       onLeave={leaveMeeting}
-      onInterviewerJoined={handleInterviewerJoined}
-      launchingFromJob={autoStartRequested}
     >
       {sessionReport}
     </InterviewMeetingRoom>

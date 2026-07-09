@@ -262,7 +262,7 @@ export const en = {
     badge: "AI practice",
     title: "AI-based mock interview",
     description:
-      "Practice for this role with a virtual HR interviewer — 10 tailored questions, live camera, and instant feedback on every answer.",
+      "Practice for this role with a virtual HR interviewer — 3 tailored questions, live camera, and instant feedback on every answer.",
     roleHint: "Interview practice for: {role}",
     startButton: "Start mock interview",
   },

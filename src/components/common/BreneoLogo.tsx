@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 
 interface BreneoLogoProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   className?: string;
+  /** Use dark logo asset (e.g. on always-dark surfaces outside theme). */
+  preferDark?: boolean;
 }
 
 const LIGHT_LOGO = "/lovable-uploads/Breneo-logo.png";
@@ -13,7 +15,11 @@ const DARK_LOGO = "/lovable-uploads/Breneo-logo-dark.png";
  * Theme-aware Breneo logo. Shows Breneo-logo.png in light mode and
  * Breneo-logo-dark.png in dark mode.
  */
-export function BreneoLogo({ className, ...props }: BreneoLogoProps) {
+export function BreneoLogo({
+  className,
+  preferDark = false,
+  ...props
+}: BreneoLogoProps) {
   const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
@@ -21,7 +27,8 @@ export function BreneoLogo({ className, ...props }: BreneoLogoProps) {
     setMounted(true);
   }, []);
 
-  const isDark = mounted && (resolvedTheme ?? theme) === "dark";
+  const isDark =
+    preferDark || (mounted && (resolvedTheme ?? theme) === "dark");
   const logoSrc = isDark ? DARK_LOGO : LIGHT_LOGO;
 
   return (

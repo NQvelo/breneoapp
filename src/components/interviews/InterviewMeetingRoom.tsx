@@ -9,11 +9,8 @@ import {
   MeetReviewPanel,
   MeetSelfTile,
 } from "@/components/interviews/InterviewMeetTiles";
-import { WaitingForHostPanel } from "@/components/interviews/WaitingForHostPanel";
 import { setMeetingSoundsEnabled } from "@/components/interviews/interviewMeetingSounds";
-import { useInterviewQuestionAudio } from "@/components/interviews/useInterviewQuestionAudio";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 import { cn } from "@/lib/utils";
 import {
@@ -24,15 +21,15 @@ import {
   PhoneOff,
   Play,
   Square,
-  Video,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 
 export type MeetingPhase =
   | "setup"
-  | "waiting_for_host"
-  | "playing_question"
+  | "playing_audio"
+  | "ready_to_record"
   | "recording_countdown"
   | "recording"
   | "submitting"
@@ -42,20 +39,10 @@ export type MeetingPhase =
 const MIN_RECORDING_MS = 3000;
 const NEXT_QUESTION_AUTO_MS = 8000;
 
-const DEFAULT_JOB_POSITIONS = [
-  "Python Developer",
-  "Frontend Developer",
-  "Data Analyst",
-  "Product Manager",
-  "UX Designer",
-];
-
 interface InterviewMeetingRoomProps {
   phase: MeetingPhase;
   jobPosition: string;
-  jobPositionInput: string;
-  onJobPositionInputChange: (value: string) => void;
-  onStartInterview: () => void;
+  hasJobContext: boolean;
   isStarting: boolean;
   currentQuestion: InterviewQuestion | null;
   completedCount: number;
@@ -65,12 +52,15 @@ interface InterviewMeetingRoomProps {
   recordCountdownSec: number;
   error: string | null;
   lastFeedback: SubmitInterviewResponse | null;
-  onQuestionAudioFinished: () => void;
+  audioCaption: string;
+  isPlayingWelcome: boolean;
+  isAudioPlaying: boolean;
+  needsManualPlay: boolean;
+  onManualPlayAudio: () => void;
+  onBeginRecording: () => void;
   onStopRecording: () => void;
   onNextQuestion: () => void;
   onLeave: () => void;
-  onInterviewerJoined: () => void;
-  launchingFromJob?: boolean;
   children?: React.ReactNode;
 }
 
@@ -107,17 +97,38 @@ function MeetingProgress({
 function MeetSplitLayout({
   left,
   right,
+  mobileSelfMinimized = false,
 }: {
   left: React.ReactNode;
   right: React.ReactNode;
+  mobileSelfMinimized?: boolean;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-2 p-2 sm:flex-row sm:items-stretch sm:gap-3 sm:p-4">
-      <div className="flex min-h-0 min-w-0 shrink-0 flex-col gap-2 overflow-y-auto sm:flex-[1.45] sm:gap-3">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-2 p-3 sm:flex-row sm:items-stretch sm:gap-4 sm:p-5 md:p-6">
+      <div
+        className={cn(
+          "flex min-h-0 min-w-0 shrink-0 flex-col gap-2 overflow-y-auto sm:flex-[1.45] sm:gap-3",
+          mobileSelfMinimized && "flex-1",
+        )}
+      >
         {left}
       </div>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col sm:flex-[1.15]">
-        <div className="min-h-[200px] flex-1">{right}</div>
+      <div
+        className={cn(
+          "flex min-h-0 min-w-0 flex-col transition-all duration-500 ease-in-out sm:flex-[1.15] sm:flex-1",
+          mobileSelfMinimized
+            ? "absolute bottom-3 right-3 z-30 h-[7.5rem] w-[5.5rem] flex-none shadow-lg shadow-black/40 sm:relative sm:bottom-auto sm:right-auto sm:h-auto sm:w-auto sm:shadow-none"
+            : "min-h-[200px] flex-1",
+        )}
+      >
+        <div
+          className={cn(
+            "min-h-[200px] flex-1 transition-all duration-500 ease-in-out",
+            mobileSelfMinimized && "min-h-0 h-full",
+          )}
+        >
+          {right}
+        </div>
       </div>
     </div>
   );
@@ -126,9 +137,7 @@ function MeetSplitLayout({
 export function InterviewMeetingRoom({
   phase,
   jobPosition,
-  jobPositionInput,
-  onJobPositionInputChange,
-  onStartInterview,
+  hasJobContext,
   isStarting,
   currentQuestion,
   completedCount,
@@ -138,15 +147,18 @@ export function InterviewMeetingRoom({
   recordCountdownSec,
   error,
   lastFeedback,
-  onQuestionAudioFinished,
+  audioCaption,
+  isPlayingWelcome,
+  isAudioPlaying,
+  needsManualPlay,
+  onManualPlayAudio,
+  onBeginRecording,
   onStopRecording,
   onNextQuestion,
   onLeave,
-  onInterviewerJoined,
-  launchingFromJob = false,
   children,
 }: InterviewMeetingRoomProps) {
-  const totalQuestions = currentQuestion?.total_questions ?? 10;
+  const totalQuestions = currentQuestion?.total_questions ?? 3;
   const inSession = phase !== "setup" && phase !== "session_complete";
   const [nextQuestionSecLeft, setNextQuestionSecLeft] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
@@ -182,13 +194,6 @@ export function InterviewMeetingRoom({
     };
   }, [hasNextQuestion, lastFeedback?.question_number, onNextQuestion]);
 
-  const audio = useInterviewQuestionAudio(
-    currentQuestion,
-    onQuestionAudioFinished,
-    phase === "playing_question",
-    soundOn,
-  );
-
   const toggleSound = () => {
     setSoundOn((on) => {
       const next = !on;
@@ -199,33 +204,53 @@ export function InterviewMeetingRoom({
 
   const statusLabel = useMemo(() => {
     switch (phase) {
-      case "waiting_for_host":
-        return "მოლოდინი ინტერვიუერზე";
-      case "playing_question":
-        return audio.isPlaying ? "ინტერვიუერი საუბრობს" : "მოისმინეთ კითხვა";
+      case "playing_audio":
+        if (needsManualPlay) return "დააჭირეთ დასაწყებად";
+        return isPlayingWelcome
+          ? "ინტერვიუერი გიხსნით..."
+          : currentQuestion
+            ? `კითხვა ${currentQuestion.question_number} / ${totalQuestions}`
+            : "მოისმინეთ";
+      case "ready_to_record":
+        return currentQuestion
+          ? `კითხვა ${currentQuestion.question_number} / ${totalQuestions}`
+          : "მზად ხართ პასუხისთვის";
       case "recording_countdown":
         return recordCountdownSec > 0
           ? `პასუხი ${recordCountdownSec} წამში...`
           : "მზადება ჩაწერისთვის";
       case "recording":
-        return "ჩაწერა მიმდინარეობს";
+        return "ჩაწერა მიმდინარეობს...";
       case "submitting":
-        return "AI ანალიზი...";
+        return "AI-ის მიერ პასუხის გაანალიზება...";
       case "question_feedback":
         return "შეფასება";
       default:
         return "ინტერვიუ";
     }
-  }, [audio.isPlaying, phase, recordCountdownSec]);
+  }, [
+    currentQuestion,
+    isPlayingWelcome,
+    needsManualPlay,
+    phase,
+    recordCountdownSec,
+    totalQuestions,
+  ]);
 
-  const isSpeaking = phase === "playing_question" && audio.isPlaying;
-  const showQuestion =
-    currentQuestion &&
-    (phase === "playing_question" ||
-      phase === "recording_countdown" ||
-      phase === "recording" ||
-      phase === "submitting" ||
-      phase === "question_feedback");
+  const isSpeaking = phase === "playing_audio" && isAudioPlaying;
+  const showCaptionPanel =
+    phase === "playing_audio" ||
+    phase === "ready_to_record" ||
+    phase === "recording_countdown" ||
+    phase === "recording" ||
+    phase === "submitting" ||
+    phase === "question_feedback";
+
+  const captionText =
+    audioCaption ||
+    (phase !== "playing_audio" && currentQuestion
+      ? currentQuestion.question_text
+      : "");
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -253,6 +278,7 @@ export function InterviewMeetingRoom({
       cameraReady={cameraReady}
       recordingMs={recordingMs}
       isRecording={phase === "recording"}
+      isMinimized={phase === "submitting"}
     />
   );
 
@@ -261,8 +287,15 @@ export function InterviewMeetingRoom({
       <div className="fixed inset-0 z-[200] overflow-y-auto bg-background">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur-md">
           <BreneoLogo className="h-6" />
-          <Button variant="outline" size="sm" onClick={onLeave}>
-            დახურვა
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-10 w-10 p-0 shrink-0"
+            onClick={onLeave}
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
           </Button>
         </div>
         <div className="px-4 py-6">{children}</div>
@@ -271,58 +304,6 @@ export function InterviewMeetingRoom({
   }
 
   if (phase === "setup") {
-    if (launchingFromJob) {
-      return (
-        <div className="fixed inset-0 z-[200] flex flex-col bg-[#050508]">
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#8ab4f818,_transparent_55%),radial-gradient(ellipse_at_bottom_right,_#4285f412,_transparent_50%)]"
-            aria-hidden
-          />
-          <header className="relative z-10 flex items-center justify-between px-5 py-4">
-            <BreneoLogo className="h-7 brightness-0 invert" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white/70 hover:bg-white/10 hover:text-white"
-              onClick={onLeave}
-            >
-              დახურვა
-            </Button>
-          </header>
-
-          <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-8">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
-              {isStarting ? (
-                <>
-                  <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[#8ab4f8]" />
-                  <h1 className="text-xl font-bold text-white">
-                    ინტერვიუს მომზადება...
-                  </h1>
-                  <p className="mt-2 text-sm text-white/60">
-                    {jobPosition || "..."}
-                  </p>
-                </>
-              ) : error ? (
-                <>
-                  <AlertCircle className="mx-auto mb-4 h-12 w-12 text-rose-400" />
-                  <h1 className="text-xl font-bold text-white">
-                    ინტერვიუს დაწყება ვერ მოხერხდა
-                  </h1>
-                  <p className="mt-2 text-sm text-rose-200">{error}</p>
-                  <Button
-                    className="mt-6 rounded-2xl bg-white/10 text-white hover:bg-white/20"
-                    onClick={onLeave}
-                  >
-                    დაბრუნება
-                  </Button>
-                </>
-              ) : null}
-            </div>
-          </main>
-        </div>
-      );
-    }
-
     return (
       <div className="fixed inset-0 z-[200] flex flex-col bg-[#050508]">
         <div
@@ -330,7 +311,7 @@ export function InterviewMeetingRoom({
           aria-hidden
         />
         <header className="relative z-10 flex items-center justify-between px-5 py-4">
-          <BreneoLogo className="h-7 brightness-0 invert" />
+          <BreneoLogo preferDark className="h-6" />
           <Button
             variant="ghost"
             size="sm"
@@ -342,59 +323,51 @@ export function InterviewMeetingRoom({
         </header>
 
         <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-8">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-            <div className="mb-6 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#8ab4f8]/20">
-                <Video className="h-8 w-8 text-[#8ab4f8]" />
-              </div>
-              <h1 className="text-2xl font-bold text-white">
-                HR Mock ინტერვიუ
-              </h1>
-              <p className="mt-2 text-sm leading-relaxed text-white/60">
-                შედით სრულეკრანიან ვირტუალურ ინტერვიუში — 10 კითხვა, ქართული
-                ხმოვანი ინტერვიუერი, ცოცხალი კამერა.
-              </p>
-            </div>
-
-            <label className="mb-2 block text-sm font-medium text-white/80">
-              სამუშაო პოზიცია
-            </label>
-            <Input
-              value={jobPositionInput}
-              onChange={(e) => onJobPositionInputChange(e.target.value)}
-              placeholder="მაგ: Python Developer"
-              list="meeting-job-suggestions"
-              className="mb-6 h-12 rounded-xl border-white/10 bg-white/5 text-white placeholder:text-white/30"
-            />
-            <datalist id="meeting-job-suggestions">
-              {DEFAULT_JOB_POSITIONS.map((p) => (
-                <option key={p} value={p} />
-              ))}
-            </datalist>
-
-            <Button
-              className="h-12 w-full rounded-2xl bg-[#8ab4f8] text-base font-semibold text-[#202124] hover:bg-[#8ab4f8]/90"
-              disabled={isStarting}
-              onClick={onStartInterview}
-            >
-              {isStarting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  შეერთება...
-                </>
-              ) : (
-                "შეხვედრაში შესვლა"
-              )}
-            </Button>
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
+            {!hasJobContext ? (
+              <>
+                <AlertCircle className="mx-auto mb-4 h-12 w-12 text-amber-400" />
+                <h1 className="text-xl font-bold text-white">
+                  ინტERVიუ სამუშაოს გვერდიდან იწყება
+                </h1>
+                <p className="mt-2 text-sm leading-relaxed text-white/60">
+                  გახსენით კონკრეტული სამუშაოს გვერდი და დააჭირეთ „საცდელი
+                  ინტერვიუს დაწყება“.
+                </p>
+                <Button
+                  className="mt-6 rounded-2xl bg-white/10 text-white hover:bg-white/20"
+                  onClick={onLeave}
+                >
+                  დაბრუნება
+                </Button>
+              </>
+            ) : isStarting ? (
+              <>
+                <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[#8ab4f8]" />
+                <h1 className="text-xl font-bold text-white">
+                  ინტერვიუს მომზადება...
+                </h1>
+                <p className="mt-2 text-sm text-white/60">
+                  {jobPosition || "..."}
+                </p>
+              </>
+            ) : error ? (
+              <>
+                <AlertCircle className="mx-auto mb-4 h-12 w-12 text-rose-400" />
+                <h1 className="text-xl font-bold text-white">
+                  ინტერვიუს დაწყება ვერ მოხერხდა
+                </h1>
+                <p className="mt-2 text-sm text-rose-200">{error}</p>
+                <Button
+                  className="mt-6 rounded-2xl bg-white/10 text-white hover:bg-white/20"
+                  onClick={onLeave}
+                >
+                  დაბრუნება
+                </Button>
+              </>
+            ) : null}
           </div>
         </main>
-
-        {error ? (
-          <div className="relative z-10 mx-4 mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            {error}
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -402,7 +375,7 @@ export function InterviewMeetingRoom({
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-[#202124] text-white">
       <header className="relative z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/5 bg-[#1a1a1a] px-4 py-3 sm:px-6">
-        <BreneoLogo className="h-5 shrink-0 brightness-0 invert sm:h-6" />
+        <BreneoLogo preferDark className="h-6 shrink-0" />
 
         <div className="hidden sm:block">
           {currentQuestion ? (
@@ -428,45 +401,45 @@ export function InterviewMeetingRoom({
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {phase === "waiting_for_host" ? (
-          <MeetSplitLayout
-            left={
-              <WaitingForHostPanel
-                jobPosition={jobPosition}
-                onInterviewerJoined={onInterviewerJoined}
-              />
-            }
-            right={selfTile}
-          />
-        ) : (
-          <MeetSplitLayout
-            left={
-              <>
-                {phase !== "question_feedback" ? (
-                  <MeetInterviewerTile
-                    isSpeaking={isSpeaking}
-                    isActive={phase === "playing_question"}
-                  >
-                    {phase === "submitting" ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
-                        <Loader2 className="mb-3 h-10 w-10 animate-spin text-[#8ab4f8]" />
-                        <p className="text-sm font-medium">AI ანალიზი...</p>
-                      </div>
-                    ) : null}
-                  </MeetInterviewerTile>
-                ) : null}
+        <MeetSplitLayout
+          mobileSelfMinimized={phase === "submitting"}
+          left={
+            <>
+              {phase !== "question_feedback" ? (
+                <MeetInterviewerTile
+                  isSpeaking={isSpeaking}
+                  isActive={phase === "playing_audio"}
+                >
+                  {phase === "submitting" ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm">
+                      <Loader2 className="mb-3 h-10 w-10 animate-spin text-[#8ab4f8]" />
+                      <p className="text-sm font-medium">
+                        AI-ის მიერ პასუხის გაანალიზება...
+                      </p>
+                    </div>
+                  ) : null}
+                </MeetInterviewerTile>
+              ) : null}
 
-                {showQuestion && currentQuestion ? (
-                  <MeetQuestionPanel
-                    questionNumber={currentQuestion.question_number}
-                    questionText={currentQuestion.question_text}
-                    status={
-                      phase === "playing_question"
-                        ? audio.isPlaying
+              {showCaptionPanel && captionText ? (
+                <MeetQuestionPanel
+                  questionNumber={
+                    isPlayingWelcome
+                      ? undefined
+                      : currentQuestion?.question_number
+                  }
+                  questionText={captionText}
+                  status={
+                    phase === "playing_audio"
+                      ? isPlayingWelcome
+                        ? "ინტერვიუერი გიხსნით..."
+                        : isAudioPlaying
                           ? "მოსმენა..."
                           : "მოისმინეთ"
+                      : phase === "ready_to_record"
+                        ? "მზად ხართ პასუხისთვის"
                         : phase === "recording_countdown"
-                          ? "მზeadება..."
+                          ? "მზადება..."
                           : phase === "recording"
                             ? "ჩაწერა..."
                             : phase === "submitting"
@@ -474,72 +447,51 @@ export function InterviewMeetingRoom({
                               : phase === "question_feedback"
                                 ? "შეფასება"
                                 : undefined
-                    }
-                    extra={
-                      phase === "playing_question" ? (
-                        <div className="flex flex-wrap gap-2">
-                          {audio.needsManualPlay && audio.hasAudio ? (
-                            <Button
-                              size="sm"
-                              className="rounded-lg bg-[#8ab4f8] text-[#202124] hover:bg-[#8ab4f8]/90"
-                              onClick={() => void audio.playAudio()}
-                            >
-                              <Play className="mr-2 h-4 w-4" />
-                              კითხვის მოსმენა
-                            </Button>
-                          ) : null}
-                          {!audio.hasAudio || audio.needsManualPlay ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="rounded-lg border-white/20 bg-transparent text-white hover:bg-white/10"
-                              onClick={audio.skipWithoutAudio}
-                            >
-                              პასუხზე გადასვლა
-                            </Button>
-                          ) : null}
-                          {audio.audioError ? (
-                            <p className="w-full text-xs text-amber-300">
-                              {audio.audioError}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null
-                    }
-                  />
-                ) : null}
+                  }
+                  extra={
+                    phase === "playing_audio" && needsManualPlay ? (
+                      <Button
+                        size="sm"
+                        className="rounded-lg bg-[#8ab4f8] text-[#202124] hover:bg-[#8ab4f8]/90"
+                        onClick={onManualPlayAudio}
+                      >
+                        <Play className="mr-2 h-4 w-4" />▶ ინტერვიუს დაწყება
+                      </Button>
+                    ) : null
+                  }
+                />
+              ) : null}
 
-                {phase === "question_feedback" && lastFeedback ? (
-                  <MeetReviewPanel result={lastFeedback} />
-                ) : null}
-              </>
-            }
-            right={selfTile}
-          />
-        )}
+              {phase === "question_feedback" && lastFeedback ? (
+                <MeetReviewPanel result={lastFeedback} />
+              ) : null}
+            </>
+          }
+          right={selfTile}
+        />
       </div>
 
       <footer className="relative z-20 shrink-0 border-t border-white/5 bg-[#1a1a1a] px-4 py-4 sm:px-6">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="min-w-0 flex-1">
+        <div className="absolute left-4 top-1/2 hidden max-w-[40%] -translate-y-1/2 sm:block">
             <p className="truncate text-sm font-semibold sm:text-base">
               {jobPosition || "ინტერვიუ"}
             </p>
             <p className="truncate text-xs text-white/50">{statusLabel}</p>
           </div>
 
-          <div className="flex shrink-0 items-center justify-center gap-3 sm:gap-4">
+        <div className="flex min-h-14 w-full items-center justify-center">
+          <div className="flex items-center justify-center gap-3 sm:gap-4">
             <Button
               variant="ghost"
               size="icon"
               className={cn(
-                "h-14 w-14 rounded-full text-white",
+                "h-14 w-14 shrink-0 rounded-full text-white",
                 soundOn
                   ? "bg-[#3c4043] hover:bg-[#4a4d51] hover:text-white"
                   : "bg-[#3c4043] text-white/50 hover:bg-[#4a4d51] hover:text-white",
               )}
               onClick={toggleSound}
-              title={soundOn ? "ხმის გამორტვა" : "ხმის ჩარტვა"}
+              title={soundOn ? "ხმის გამორთვა" : "ხმის ჩართვა"}
             >
               {soundOn ? (
                 <Volume2 className="h-5 w-5" />
@@ -548,9 +500,19 @@ export function InterviewMeetingRoom({
               )}
             </Button>
 
+            {phase === "ready_to_record" ? (
+              <Button
+                className="h-14 min-w-[160px] rounded-full px-8 text-base font-semibold shadow-lg shadow-primary/30"
+                onClick={onBeginRecording}
+              >
+                <Mic className="mr-2 h-5 w-5" />
+                პასუხის ჩაწერა
+              </Button>
+            ) : null}
+
             {phase === "recording_countdown" ? (
               <Button
-                className="h-14 min-w-[160px] rounded-full bg-rose-600 px-8 text-base font-semibold text-white shadow-lg shadow-rose-600/30"
+                className="h-14 min-w-[160px] rounded-full px-8 text-base font-semibold shadow-lg shadow-primary/30"
                 disabled
               >
                 <Mic className="mr-2 h-5 w-5" />
@@ -571,7 +533,7 @@ export function InterviewMeetingRoom({
 
             {hasNextQuestion ? (
               <Button
-                className="h-14 min-w-[160px] rounded-full bg-rose-600 px-8 text-base font-semibold text-white shadow-lg shadow-rose-600/30 hover:bg-rose-500"
+                className="h-14 min-w-[160px] rounded-full px-8 text-base font-semibold shadow-lg shadow-primary/30"
                 onClick={onNextQuestion}
               >
                 <ArrowRight className="mr-2 h-5 w-5" />
@@ -580,29 +542,36 @@ export function InterviewMeetingRoom({
               </Button>
             ) : null}
 
-            {phase === "waiting_for_host" ||
-            phase === "playing_question" ||
-            phase === "submitting" ? (
+            {phase === "playing_audio" || phase === "submitting" ? (
               <div className="flex h-14 min-w-[160px] items-center justify-center rounded-full bg-white/10 px-6 text-sm text-white/50">
-                {phase === "waiting_for_host"
-                  ? "მოლოდინი..."
-                  : phase === "playing_question"
-                    ? "მოისმინეთ..."
-                    : "დაელოდეთ..."}
+                {phase === "playing_audio"
+                  ? needsManualPlay
+                    ? "დააჭირეთ ▶"
+                    : "მოისმინეთ..."
+                  : "დაელოდეთ..."}
               </div>
             ) : null}
-          </div>
 
-          <div className="flex min-w-[3.5rem] flex-1 justify-end">
             <Button
               size="icon"
-              className="h-14 w-14 rounded-full !bg-rose-600 !text-white hover:!bg-rose-800 hover:!text-white focus-visible:ring-rose-500/40 dark:!bg-rose-600 dark:hover:!bg-rose-800 [&_svg]:!text-white"
+              className="h-14 w-14 shrink-0 rounded-full !bg-rose-600 !text-white hover:!bg-rose-800 hover:!text-white focus-visible:ring-rose-500/40 sm:hidden dark:!bg-rose-600 dark:hover:!bg-rose-800 [&_svg]:!text-white"
               onClick={onLeave}
               title="ზარის დასრულება"
             >
               <PhoneOff className="h-5 w-5 !text-white" />
             </Button>
           </div>
+        </div>
+
+        <div className="absolute right-4 top-1/2 hidden -translate-y-1/2 sm:block">
+          <Button
+            size="icon"
+            className="h-14 w-14 shrink-0 rounded-full !bg-rose-600 !text-white hover:!bg-rose-800 hover:!text-white focus-visible:ring-rose-500/40 dark:!bg-rose-600 dark:hover:!bg-rose-800 [&_svg]:!text-white"
+            onClick={onLeave}
+            title="ზარის დასრულება"
+          >
+            <PhoneOff className="h-5 w-5 !text-white" />
+          </Button>
         </div>
 
         {error ? (

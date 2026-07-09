@@ -2047,6 +2047,7 @@ const JobDetailPage = () => {
               {user ? (
                 <JobMockInterviewPromo
                   jobTitle={getJobTitle()}
+                  jobId={applicationJobId}
                   className="mt-6"
                 />
               ) : null}

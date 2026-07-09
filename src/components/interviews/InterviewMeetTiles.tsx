@@ -18,19 +18,23 @@ export function MeetSelfTile({
   cameraReady,
   recordingMs,
   isRecording,
+  isMinimized = false,
   className,
 }: {
   videoRef: React.RefObject<HTMLVideoElement>;
   cameraReady: boolean;
   recordingMs: number;
   isRecording: boolean;
+  isMinimized?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "relative h-full min-h-[200px] w-full flex-1 overflow-hidden rounded-xl bg-[#202124]",
+        "relative h-full min-h-[200px] w-full flex-1 overflow-hidden rounded-3xl bg-[#202124] transition-all duration-500 ease-in-out",
         isRecording ? "ring-2 ring-rose-500" : "ring-1 ring-white/10",
+        isMinimized &&
+          "max-sm:min-h-0 max-sm:shadow-md max-sm:ring-2 max-sm:ring-white/20",
         className,
       )}
     >
@@ -49,7 +53,12 @@ export function MeetSelfTile({
           <Loader2 className="h-8 w-8 animate-spin text-white/40" />
         </div>
       ) : null}
-      <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white">
+      <div
+        className={cn(
+          "absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white",
+          isMinimized && "bottom-1 left-1 px-1.5 py-0.5 text-[9px] sm:bottom-2 sm:left-2 sm:px-2 sm:py-1 sm:text-xs",
+        )}
+      >
         თქვენ
       </div>
       {isRecording ? (
@@ -74,7 +83,7 @@ export function MeetInterviewerTile({
   return (
     <div
       className={cn(
-        "relative flex min-h-[180px] flex-1 flex-col items-center justify-center overflow-hidden rounded-xl",
+        "relative flex min-h-[180px] flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl",
         INTERVIEWER_PANEL_BG,
         isActive || isSpeaking
           ? "ring-2 ring-[#8ab4f8]"
@@ -120,16 +129,16 @@ export function MeetQuestionPanel({
   status,
   extra,
 }: {
-  questionNumber: number;
+  questionNumber?: number;
   questionText: string;
   status?: string;
   extra?: React.ReactNode;
 }) {
   return (
-    <div className={cn("shrink-0 rounded-xl p-4 ring-1 ring-white/10", INTERVIEWER_PANEL_BG)}>
+    <div className={cn("shrink-0 rounded-3xl p-4 ring-1 ring-white/10", INTERVIEWER_PANEL_BG)}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-[#8ab4f8]">
-          კითხვა {questionNumber}
+          {questionNumber != null ? `კითხვა ${questionNumber}` : "მოხსენება"}
         </p>
         {status ? (
           <span className="text-xs text-white/50">{status}</span>
@@ -152,7 +161,7 @@ export function MeetReviewPanel({
     result.status === "PASSED" || result.overall_score >= PASS_THRESHOLD;
 
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-bottom-2 rounded-xl p-4 ring-1 ring-white/10", INTERVIEWER_PANEL_BG)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col animate-in fade-in slide-in-from-bottom-2 rounded-3xl p-4 ring-1 ring-white/10", INTERVIEWER_PANEL_BG)}>
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-semibold text-white">პასუხის შეფასება</p>
         <Badge
