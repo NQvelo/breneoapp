@@ -1731,30 +1731,30 @@ const JobDetailPage = () => {
                     ) : (
                       <div className="shrink-0">
                         <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            aria-label="Share job"
-                            className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={handleCopyLink}>
-                            <Copy className="mr-2 h-4 w-4" />
-                            <span>Copy Link</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleFacebookShare}>
-                            <Facebook className="mr-2 h-4 w-4" />
-                            <span>Share on Facebook</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={handleLinkedInShare}>
-                            <Linkedin className="mr-2 h-4 w-4" />
-                            <span>Share on LinkedIn</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="icon"
+                              aria-label="Share job"
+                              className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleCopyLink}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              <span>Copy Link</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleFacebookShare}>
+                              <Facebook className="mr-2 h-4 w-4" />
+                              <span>Share on Facebook</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleLinkedInShare}>
+                              <Linkedin className="mr-2 h-4 w-4" />
+                              <span>Share on LinkedIn</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     )}

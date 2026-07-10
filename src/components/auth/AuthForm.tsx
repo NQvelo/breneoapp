@@ -162,7 +162,7 @@ export function AuthForm({
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -245,7 +245,7 @@ export function AuthForm({
                 <Input
                   id="forgot-email"
                   type="email"
-                  placeholder="Enter your email address"
+                  placeholder="you@example.com
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -305,7 +305,7 @@ export function AuthForm({
                     <Input
                       id="signup-email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -501,7 +501,7 @@ export function AuthForm({
                         <Input
                           id="academy-email"
                           type="email"
-                          placeholder="Enter your email"
+                          placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           required

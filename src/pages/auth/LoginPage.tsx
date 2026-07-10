@@ -301,11 +301,11 @@ const LoginPage: React.FC = () => {
             </p>
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                <Label htmlFor="emailOrUsername">Email or Username</Label>
+                <Label htmlFor="emailOrUsername">Email Address </Label>
                 <Input
                   id="emailOrUsername"
                   type="text"
-                  placeholder="Enter your email or username"
+                  placeholder="you@example.com"
                   className="mt-1 h-[3.2rem]"
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}

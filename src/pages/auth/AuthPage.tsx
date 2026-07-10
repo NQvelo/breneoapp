@@ -197,7 +197,7 @@ const AuthPage: React.FC = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="you@example.com"
                   className="mt-1 h-[3.2rem]"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}

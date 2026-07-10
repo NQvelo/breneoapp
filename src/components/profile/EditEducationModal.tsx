@@ -271,9 +271,9 @@ export function EditEducationModal({
       <SheetContent
         side="rightProfile"
         overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
-        className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
+        className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4 bg-white dark:bg-[#181818]"
       >
-        <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
+        <SheetHeader>
           <SheetTitle className="flex-1 min-w-0">Edit education</SheetTitle>
           <div className="flex items-center gap-2 shrink-0 ml-auto">
             <Button

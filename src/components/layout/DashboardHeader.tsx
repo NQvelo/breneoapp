@@ -1,5 +1,5 @@
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
 import { Bell, Moon, Sun, Zap, ArrowLeft } from "lucide-react";
@@ -9,6 +9,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getRole } from "@/utils/getRole";
 import { useTheme } from "next-themes";
 import { useTranslation } from "@/contexts/LanguageContext";
+import {
+  getSettingsSectionLabel,
+  isSettingsPath,
+  isValidSettingsSection,
+} from "@/constants/settingsSections";
 
 interface DashboardHeaderProps {
   sidebarCollapsed: boolean;
@@ -73,11 +78,17 @@ const getPageTitle = (
   pathname: string,
   username?: string,
   t?: ReturnType<typeof useTranslation>,
+  settingsSection?: string | null,
 ) => {
   if (!t) return "Home";
 
   // Don't show title for job detail pages or course detail pages
   if (isJobDetailPage(pathname) || isCourseDetailPage(pathname)) return null;
+
+  if (isSettingsPath(pathname)) {
+    if (isValidSettingsSection(settingsSection ?? null)) return null;
+    return t.settings.title;
+  }
 
   if (pathname.startsWith("/home") || pathname.startsWith("/academy/home")) {
     return (
@@ -107,12 +118,6 @@ const getPageTitle = (
   if (pathname.startsWith("/jobs")) return t.jobs.title;
   if (pathname.startsWith("/courses")) return t.courses.title;
   if (
-    pathname.startsWith("/settings") ||
-    pathname.startsWith("/employer/settings") ||
-    pathname.startsWith("/academy/settings")
-  )
-    return t.settings.title;
-  if (
     pathname.startsWith("/profile") ||
     pathname.startsWith("/academy/profile")
   )
@@ -137,6 +142,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, academyDisplay } = useAuth();
   const { theme, setTheme } = useTheme();
   const t = useTranslation();
@@ -153,9 +159,16 @@ export function DashboardHeader({
     isEmployerJobFormPreviewPath(currentPath) && location.hash === "#preview";
   const isEmployerJobStats = isEmployerJobStatsPath(currentPath);
   const isAcademyCourseStats = isAcademyCourseStatsPath(currentPath);
+  const settingsSectionParam = searchParams.get("section");
+  const isSettings = isSettingsPath(currentPath);
+  const isSettingsDetail =
+    isSettings && isValidSettingsSection(settingsSectionParam);
+  const settingsSectionTitle = isSettingsDetail
+    ? getSettingsSectionLabel(settingsSectionParam, t)
+    : null;
   const pageTitle = isEmployerJobPreview
     ? null
-    : getPageTitle(currentPath, username, t);
+    : getPageTitle(currentPath, username, t, settingsSectionParam);
   const isJobDetail = isJobDetailPage(currentPath);
   const isCourseDetail = isCourseDetailPage(currentPath);
   const isSkillPath = isSkillPathPage(currentPath);
@@ -174,6 +187,16 @@ export function DashboardHeader({
   };
 
   const courseAddEditTitle = getCourseAddEditTitle();
+  const showBackHeader =
+    isJobDetail ||
+    isCourseDetail ||
+    isSkillPath ||
+    isCourseAddEdit ||
+    isEmployerJobPreview ||
+    isEmployerJobStats ||
+    isAcademyCourseStats ||
+    isSettingsDetail;
+  const headerTitle = courseAddEditTitle || settingsSectionTitle;
 
   const notificationsPath =
     getRole() === "employer" ? "/employer/notifications" : "/notifications";
@@ -199,18 +222,16 @@ export function DashboardHeader({
     >
       <div className="flex items-center justify-between px-5 sm:px-9 md:px-12 lg:px-14 pt-6 pb-4">
         <div className="hidden md:flex items-center space-x-3">
-          {isJobDetail ||
-          isCourseDetail ||
-          isSkillPath ||
-          isCourseAddEdit ||
-          isEmployerJobPreview ||
-          isEmployerJobStats ||
-          isAcademyCourseStats ? (
+          {showBackHeader ? (
             <>
               <Button
                 variant="ghost"
                 onClick={() => {
-                  if (isEmployerJobPreview) {
+                  if (isSettingsDetail) {
+                    const nextParams = new URLSearchParams(searchParams);
+                    nextParams.delete("section");
+                    setSearchParams(nextParams, { replace: true });
+                  } else if (isEmployerJobPreview) {
                     navigate({ hash: "" }, { replace: true });
                   } else {
                     navigate(-1);
@@ -223,9 +244,9 @@ export function DashboardHeader({
                 <ArrowLeft className="h-4 w-4" />
                 <span>{t.common.back}</span>
               </Button>
-              {courseAddEditTitle && (
+              {headerTitle && (
                 <h1 className="text-2xl font-semibold text-foreground ml-4">
-                  {courseAddEditTitle}
+                  {headerTitle}
                 </h1>
               )}
             </>

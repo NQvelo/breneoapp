@@ -622,8 +622,7 @@ export function AppSidebar({
                       onClick={onUpgradeClick}
                       className={cn(
                         "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                        "bg-gradient-to-br from-[#cedcfc] to-[#a0dfee] dark:from-[#6B7BA8]/40 dark:to-[#4A9FB8]/40",
-                        "hover:from-[#CFD8EE] hover:to-[#97D9E9] dark:hover:from-[#6B7BA8]/50 dark:hover:to-[#4A9FB8]/50 text-left",
+                        "bg-primary/20 hover:bg-primary/30 text-left",
                         collapsed && "justify-center px-4",
                       )}
                     >

@@ -1913,15 +1913,18 @@ const ProfilePage = () => {
                     </a>
                   ))}
               </div>
-              <Button
-                variant="secondary"
-                onClick={() => navigate("/settings")}
-                className="mt-4 w-full rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
-                aria-label={t.nav.settings}
-              >
-                <Settings className="h-4 w-4" />
-                {t.nav.settings}
-              </Button>
+              <div className="mt-4 flex md:justify-end">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate("/settings")}
+                  className="w-full md:w-auto rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
+                  aria-label={t.nav.settings}
+                >
+                  <Settings className="h-4 w-4" />
+                  {t.nav.settings}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -2807,9 +2810,9 @@ const ProfilePage = () => {
         <SheetContent
           side="rightProfile"
           overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
-          className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
+          className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4 bg-white dark:bg-[#181818]"
         >
-          <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
+          <SheetHeader>
             <SheetTitle className="flex-1 min-w-0">Edit About Me</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               <Button
@@ -2855,9 +2858,9 @@ const ProfilePage = () => {
         <SheetContent
           side="rightProfile"
           overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
-          className="flex flex-col h-full overflow-hidden px-4 py-6 md:p-8 bg-white dark:bg-[#181818]"
+          className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4 bg-white dark:bg-[#181818]"
         >
-          <SheetHeader className="bg-white dark:bg-[#181818] pb-3">
+          <SheetHeader>
             <SheetTitle className="flex-1 min-w-0">Profile Photo</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               <Button

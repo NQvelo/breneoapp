@@ -1,34 +1,18 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
 import { useFontSize } from "@/contexts/FontSizeContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -50,14 +34,16 @@ import {
 } from "@/components/ui/drawer";
 import {
   Download,
-  Mail,
   Bell,
   CreditCard,
-  BookOpen,
-  AlertCircle,
   ChevronRight,
-  Menu,
   LogOut,
+  User,
+  Shield,
+  Palette,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -65,23 +51,25 @@ import { bogService } from "@/api/bog/bogService";
 import { PaymentTransaction } from "@/api/bog/bogService";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { ResumeImportCard } from "@/components/profile/ResumeImportCard";
-
-type SettingsSection =
-  | "account"
-  | "notifications"
-  | "privacy"
-  | "subscription"
-  | "learning"
-  | "accessibility";
-
-const settingsSections: Array<{ id: SettingsSection; label: string }> = [
-  { id: "account", label: "Account" },
-  { id: "notifications", label: "Notifications" },
-  { id: "privacy", label: "Privacy & Security" },
-  { id: "subscription", label: "Subscription & Billing" },
-  { id: "learning", label: "Learning Preferences" },
-  { id: "accessibility", label: "Theme & Accessibility" },
-];
+import {
+  SettingsGroupList,
+  type SettingsListItemConfig,
+} from "@/components/settings/SettingsGroupList";
+import { SettingsDownloadAppCard } from "@/components/settings/SettingsDownloadAppCard";
+import { SettingsMobileHeader } from "@/components/settings/SettingsMobileHeader";
+import {
+  SettingsActionRow,
+  SettingsListRow,
+  SettingsSectionCard,
+  SettingsSegmentedRow,
+  SettingsSubsection,
+  SettingsToggleRow,
+} from "@/components/settings/SettingsSectionUi";
+import {
+  getSettingsSectionLabel,
+  type SettingsSection,
+  isValidSettingsSection,
+} from "@/constants/settingsSections";
 
 export default function SettingsPage() {
   const { user, logout, refreshUser, employerDisplay, academyDisplay } =
@@ -91,38 +79,18 @@ export default function SettingsPage() {
     useFontSize();
   const { language: contextLanguage, setLanguage: setContextLanguage } =
     useLanguage();
+  const t = useTranslation();
   const isMobile = useMobile();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
-  // Get initial section from URL or default to notifications
-  const getInitialSection = (): SettingsSection => {
-    const validSections: SettingsSection[] = [
-      "account",
-      "notifications",
-      "privacy",
-      "subscription",
-      "learning",
-      "accessibility",
-    ];
-    try {
-      const sectionFromUrl = searchParams.get("section") as SettingsSection;
-      if (sectionFromUrl && validSections.includes(sectionFromUrl)) {
-        return sectionFromUrl;
-      }
-    } catch (error) {
-      console.error("Error getting initial section:", error);
-    }
-    return "notifications";
-  };
-
-  const [activeSection, setActiveSection] = useState<SettingsSection>(() =>
-    getInitialSection(),
-  );
+  const sectionFromUrl = searchParams.get("section");
+  const activeSection = isValidSettingsSection(sectionFromUrl)
+    ? sectionFromUrl
+    : null;
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
 
   /** Same email shown in AppSidebar (employer company / academy profile when applicable). */
   const recoveryEmail = useMemo(() => {
@@ -167,14 +135,17 @@ export default function SettingsPage() {
       {passwordStep === 1 && (
         <form onSubmit={handleSendCode} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="change-password-email">Email</Label>
+            <Label htmlFor="change-password-email">
+              {t.settings.changePassword.email}
+            </Label>
             <Input
               id="change-password-email"
               type="email"
               value={passwordModalEmail}
-              onChange={(e) => setPasswordModalEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="h-[3.2rem]"
+              readOnly
+              aria-readonly="true"
+              placeholder={t.auth.email}
+              className="h-[3.2rem] cursor-default bg-muted/50 text-foreground"
               autoComplete="email"
             />
           </div>
@@ -183,17 +154,21 @@ export default function SettingsPage() {
             className="w-full"
             disabled={passwordLoading || !passwordModalEmail.trim()}
           >
-            {passwordLoading ? "Sending..." : "Send Verification Code"}
+            {passwordLoading
+              ? t.settings.changePassword.sending
+              : t.settings.changePassword.sendCode}
           </Button>
         </form>
       )}
       {passwordStep === 2 && (
         <form onSubmit={handleVerifyCode} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="change-password-code">Verification code</Label>
+            <Label htmlFor="change-password-code">
+              {t.settings.changePassword.verificationCode}
+            </Label>
             <Input
               id="change-password-code"
-              placeholder="Enter 6-digit code"
+              placeholder={t.settings.changePassword.verificationCodePlaceholder}
               value={code}
               onChange={(e) => setCode(e.target.value)}
               className="h-[3.2rem]"
@@ -201,14 +176,16 @@ export default function SettingsPage() {
           </div>
           <div className="flex gap-2">
             <Button type="submit" className="flex-1" disabled={passwordLoading}>
-              {passwordLoading ? "Verifying..." : "Verify Code"}
+              {passwordLoading
+                ? t.settings.changePassword.verifying
+                : t.settings.changePassword.verifyCode}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => setPasswordStep(1)}
             >
-              Back
+              {t.common.back}
             </Button>
           </div>
         </form>
@@ -216,22 +193,26 @@ export default function SettingsPage() {
       {passwordStep === 3 && (
         <form onSubmit={handleSetNewPassword} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="change-password-new">New password</Label>
+            <Label htmlFor="change-password-new">
+              {t.settings.changePassword.newPassword}
+            </Label>
             <Input
               id="change-password-new"
               type="password"
-              placeholder="New password"
+              placeholder={t.settings.changePassword.newPassword}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className="h-[3.2rem]"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="change-password-confirm">Confirm password</Label>
+            <Label htmlFor="change-password-confirm">
+              {t.settings.changePassword.confirmPassword}
+            </Label>
             <Input
               id="change-password-confirm"
               type="password"
-              placeholder="Confirm new password"
+              placeholder={t.settings.changePassword.confirmPassword}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="h-[3.2rem]"
@@ -239,14 +220,16 @@ export default function SettingsPage() {
           </div>
           <div className="flex gap-2">
             <Button type="submit" className="flex-1" disabled={passwordLoading}>
-              {passwordLoading ? "Updating..." : "Update Password"}
+              {passwordLoading
+                ? t.settings.changePassword.updating
+                : t.settings.changePassword.updatePassword}
             </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => setPasswordStep(2)}
             >
-              Back
+              {t.common.back}
             </Button>
           </div>
         </form>
@@ -304,11 +287,6 @@ export default function SettingsPage() {
   const [showTestResults, setShowTestResults] = useState(true);
   const [showCompletedCourses, setShowCompletedCourses] = useState(true);
 
-  // Learning Preferences
-  const [aiRecommendationFrequency, setAiRecommendationFrequency] = useState<
-    "daily" | "weekly" | "monthly"
-  >("weekly");
-
   // Accessibility
   const [fontSize, setFontSize] = useState<"small" | "medium" | "big">(
     contextFontSize,
@@ -317,7 +295,13 @@ export default function SettingsPage() {
 
   // Handler to change section
   const handleSectionChange = (section: SettingsSection) => {
-    setActiveSection(section);
+    setSearchParams({ section }, { replace: false });
+  };
+
+  const handleBackToList = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("section");
+    setSearchParams(nextParams, { replace: true });
   };
 
   // Sync fontSize and language with context
@@ -359,9 +343,6 @@ export default function SettingsPage() {
     setShowCompletedCourses(
       loadPreference("privacy_show_completed_courses", true),
     );
-    setAiRecommendationFrequency(
-      loadPreference("ai_recommendation_frequency", "weekly"),
-    );
     const savedFontSize = loadPreference(
       "breneo-font-size",
       contextFontSize,
@@ -397,12 +378,6 @@ export default function SettingsPage() {
 
     loadPaymentHistory();
   }, [mounted, activeSection]);
-
-  // Update URL when section changes (only after component is mounted)
-  useEffect(() => {
-    if (!mounted) return;
-    setSearchParams({ section: activeSection }, { replace: false });
-  }, [activeSection, mounted, setSearchParams]);
 
   // Save preferences to localStorage
   useEffect(() => {
@@ -476,14 +451,6 @@ export default function SettingsPage() {
       );
     }
   }, [showCompletedCourses, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(
-        "ai_recommendation_frequency",
-        JSON.stringify(aiRecommendationFrequency),
-      );
-    }
-  }, [aiRecommendationFrequency, mounted]);
   // Handle font size change - apply immediately
   const handleFontSizeChange = (value: "small" | "medium" | "big") => {
     setFontSize(value);
@@ -614,705 +581,519 @@ export default function SettingsPage() {
   };
 
   const darkModeValue =
-    theme === "dark" ? "ON" : theme === "system" ? "AUTO" : "OFF";
+    theme === "dark"
+      ? t.settings.themeMode.on
+      : theme === "system"
+        ? t.settings.themeMode.auto
+        : t.settings.themeMode.off;
+
+  const languageLabel =
+    language === "ka"
+      ? t.settings.languageLabel.georgian
+      : t.settings.languageLabel.english;
+
+  const fontSizeLabel =
+    fontSize === "small"
+      ? t.settings.fontSize.small
+      : fontSize === "big"
+        ? t.settings.fontSize.large
+        : t.settings.fontSize.medium;
+
+  const notificationsEnabled =
+    emailJobMatches ||
+    emailNewCourses ||
+    emailSkillUpdates ||
+    inAppMessages ||
+    inAppProgress ||
+    newsletter ||
+    pushNotifications;
+
+  const settingsGroups = useMemo((): SettingsListItemConfig[][] => {
+    const openSection = (section: SettingsSection) => () =>
+      handleSectionChange(section);
+
+    return [
+      [
+        {
+          id: "account",
+          title: getSettingsSectionLabel("account", t),
+          subtitle: recoveryEmail || t.settings.list.manageAccount,
+          icon: User,
+          iconBgClass: "bg-sky-100 dark:bg-sky-950/50",
+          iconColorClass: "text-sky-600 dark:text-sky-400",
+          onClick: openSection("account"),
+        },
+        {
+          id: "notifications",
+          title: getSettingsSectionLabel("notifications", t),
+          subtitle: notificationsEnabled
+            ? t.settings.list.on
+            : t.settings.list.off,
+          icon: Bell,
+          iconBgClass: "bg-sky-100 dark:bg-sky-950/50",
+          iconColorClass: "text-sky-600 dark:text-sky-400",
+          onClick: openSection("notifications"),
+        },
+      ],
+      [
+        {
+          id: "accessibility",
+          title: getSettingsSectionLabel("accessibility", t),
+          subtitle: `${darkModeValue} · ${languageLabel} · ${fontSizeLabel}`,
+          icon: Palette,
+          iconBgClass: "bg-amber-100 dark:bg-amber-950/40",
+          iconColorClass: "text-amber-600 dark:text-amber-400",
+          onClick: openSection("accessibility"),
+        },
+      ],
+      [
+        {
+          id: "privacy",
+          title: getSettingsSectionLabel("privacy", t),
+          subtitle: t.settings.list.privacySubtitle,
+          icon: Shield,
+          iconBgClass: "bg-pink-100 dark:bg-pink-950/40",
+          iconColorClass: "text-pink-600 dark:text-pink-400",
+          onClick: openSection("privacy"),
+        },
+      ],
+      [
+        {
+          id: "subscription",
+          title: getSettingsSectionLabel("subscription", t),
+          subtitle: subscriptionLoading
+            ? t.settings.list.loading
+            : subscriptionInfo?.plan_name || t.settings.list.freePlan,
+          icon: CreditCard,
+          iconBgClass: "bg-emerald-100 dark:bg-emerald-950/40",
+          iconColorClass: "text-emerald-600 dark:text-emerald-400",
+          onClick: openSection("subscription"),
+        },
+      ],
+    ];
+  }, [
+    t,
+    recoveryEmail,
+    notificationsEnabled,
+    darkModeValue,
+    languageLabel,
+    fontSizeLabel,
+    subscriptionLoading,
+    subscriptionInfo?.plan_name,
+  ]);
+
+  const logoutItem: SettingsListItemConfig = {
+    id: "logout",
+    title: t.settings.logout,
+    subtitle: t.settings.list.logoutSubtitle,
+    icon: LogOut,
+    iconBgClass: "bg-gray-100 dark:bg-white/10",
+    iconColorClass: "text-gray-900 dark:text-gray-100",
+    onClick: () => setLogoutConfirmOpen(true),
+  };
 
   const renderContent = () => {
+    if (!activeSection) return null;
+
     switch (activeSection) {
       case "account":
-        return (
-          <div className="space-y-8">
-            <h1 className="text-xl font-bold">Account Settings</h1>
-            <ResumeImportCard />
-          </div>
-        );
+        return <ResumeImportCard />;
 
       case "notifications":
         return (
-          <div className="space-y-8">
-            <h1 className="text-xl font-bold">Notifications</h1>
+          <div className="space-y-4">
+            <SettingsSectionCard>
+              <div className="space-y-6">
+                <SettingsSubsection title={t.settings.notificationsPage.email}>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.jobMatches}
+                    description={t.settings.notificationsPage.jobMatchesDesc}
+                  >
+                    <Switch
+                      checked={emailJobMatches}
+                      onCheckedChange={setEmailJobMatches}
+                    />
+                  </SettingsToggleRow>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.newCourses}
+                    description={t.settings.notificationsPage.newCoursesDesc}
+                  >
+                    <Switch
+                      checked={emailNewCourses}
+                      onCheckedChange={setEmailNewCourses}
+                    />
+                  </SettingsToggleRow>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.skillUpdates}
+                    description={t.settings.notificationsPage.skillUpdatesDesc}
+                  >
+                    <Switch
+                      checked={emailSkillUpdates}
+                      onCheckedChange={setEmailSkillUpdates}
+                    />
+                  </SettingsToggleRow>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.newsletter}
+                    description={t.settings.notificationsPage.newsletterDesc}
+                  >
+                    <Switch
+                      checked={newsletter}
+                      onCheckedChange={setNewsletter}
+                    />
+                  </SettingsToggleRow>
+                </SettingsSubsection>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Notifications</CardTitle>
-                <CardDescription>
-                  Control how and when you receive email updates
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Job Matches</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when new jobs match your profile
-                    </p>
-                  </div>
-                  <Switch
-                    checked={emailJobMatches}
-                    onCheckedChange={setEmailJobMatches}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>New Courses</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive updates about new courses in your interests
-                    </p>
-                  </div>
-                  <Switch
-                    checked={emailNewCourses}
-                    onCheckedChange={setEmailNewCourses}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Skill Updates</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified about skill recommendations and updates
-                    </p>
-                  </div>
-                  <Switch
-                    checked={emailSkillUpdates}
-                    onCheckedChange={setEmailSkillUpdates}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Newsletter</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Subscribe to our weekly newsletter
-                    </p>
-                  </div>
-                  <Switch
-                    checked={newsletter}
-                    onCheckedChange={setNewsletter}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                <SettingsSubsection title={t.settings.notificationsPage.inApp}>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.messages}
+                    description={t.settings.notificationsPage.messagesDesc}
+                  >
+                    <Switch
+                      checked={inAppMessages}
+                      onCheckedChange={setInAppMessages}
+                    />
+                  </SettingsToggleRow>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.progressReminders}
+                    description={
+                      t.settings.notificationsPage.progressRemindersDesc
+                    }
+                  >
+                    <Switch
+                      checked={inAppProgress}
+                      onCheckedChange={setInAppProgress}
+                    />
+                  </SettingsToggleRow>
+                </SettingsSubsection>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>In-App Notifications</CardTitle>
-                <CardDescription>
-                  Manage notifications within the application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Messages</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Notify me about new messages
-                    </p>
-                  </div>
-                  <Switch
-                    checked={inAppMessages}
-                    onCheckedChange={setInAppMessages}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Progress Reminders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get reminders about your learning progress
-                    </p>
-                  </div>
-                  <Switch
-                    checked={inAppProgress}
-                    onCheckedChange={setInAppProgress}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Push Notifications</CardTitle>
-                <CardDescription>
-                  Receive notifications even when you're not on the site
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Enable Push Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Allow Breneo to send you push notifications
-                    </p>
-                  </div>
-                  <Switch
-                    checked={pushNotifications}
-                    onCheckedChange={setPushNotifications}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                <SettingsSubsection title={t.settings.notificationsPage.push}>
+                  <SettingsToggleRow
+                    label={t.settings.notificationsPage.pushEnabled}
+                    description={t.settings.notificationsPage.pushEnabledDesc}
+                  >
+                    <Switch
+                      checked={pushNotifications}
+                      onCheckedChange={setPushNotifications}
+                    />
+                  </SettingsToggleRow>
+                </SettingsSubsection>
+              </div>
+            </SettingsSectionCard>
           </div>
         );
 
       case "privacy": {
         return (
-          <div className="space-y-8">
-            <h1 className="text-xl font-bold">Privacy & Security</h1>
+          <div className="space-y-4">
+            <SettingsSectionCard>
+              <div className="space-y-6">
+                <SettingsSubsection title={t.settings.privacyPage.security}>
+                  <SettingsActionRow
+                    label={t.settings.privacyPage.changePassword}
+                    description={t.settings.privacyPage.changePasswordDesc}
+                    onClick={() => setChangePasswordOpen(true)}
+                    trailing={
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    }
+                  />
+                </SettingsSubsection>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Security</CardTitle>
-                <CardDescription>
-                  Manage your account security settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <button
-                  type="button"
-                  onClick={() => setChangePasswordOpen(true)}
-                  className="flex w-full items-center justify-between rounded-2xl border border-border/80 bg-white px-4 py-4 text-left transition-colors hover:bg-muted/40 dark:bg-background dark:hover:bg-muted/20"
-                >
-                  <span className="text-sm font-medium text-foreground">
-                    Change password
-                  </span>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-                </button>
-              </CardContent>
-            </Card>
+                <SettingsSubsection title={t.settings.privacyPage.dataVisibility}>
+                  <SettingsToggleRow
+                    label={t.settings.privacyPage.showSkills}
+                    description={t.settings.privacyPage.showSkillsDesc}
+                  >
+                    <Switch
+                      checked={showSkills}
+                      onCheckedChange={setShowSkills}
+                    />
+                  </SettingsToggleRow>
+                  <SettingsToggleRow
+                    label={t.settings.privacyPage.showTestResults}
+                    description={t.settings.privacyPage.showTestResultsDesc}
+                  >
+                    <Switch
+                      checked={showTestResults}
+                      onCheckedChange={setShowTestResults}
+                    />
+                  </SettingsToggleRow>
+                  <SettingsToggleRow
+                    label={t.settings.privacyPage.showCompletedCourses}
+                    description={t.settings.privacyPage.showCompletedCoursesDesc}
+                  >
+                    <Switch
+                      checked={showCompletedCourses}
+                      onCheckedChange={setShowCompletedCourses}
+                    />
+                  </SettingsToggleRow>
+                </SettingsSubsection>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Data Visibility</CardTitle>
-                <CardDescription>
-                  Manage what information is visible on your profile
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Show Skills</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Display your skills on your profile
+                {/* <SettingsSubsection title="Data management">
+                  <div className="rounded-2xl bg-gray-50/90 px-4 py-4 dark:bg-white/5">
+                    <Button
+                      onClick={handleExportData}
+                      variant="outline"
+                      className="rounded-full"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download My Data
+                    </Button>
+                    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                      Request a copy of all your data. You&apos;ll receive an
+                      email with a download link.
                     </p>
                   </div>
-                  <Switch
-                    checked={showSkills}
-                    onCheckedChange={setShowSkills}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Show Test Results</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Display your skill test results
-                    </p>
-                  </div>
-                  <Switch
-                    checked={showTestResults}
-                    onCheckedChange={setShowTestResults}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Show Completed Courses</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Display courses you've completed
-                    </p>
-                  </div>
-                  <Switch
-                    checked={showCompletedCourses}
-                    onCheckedChange={setShowCompletedCourses}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Data Management</CardTitle>
-                <CardDescription>
-                  Download or export your data (GDPR compliance)
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button onClick={handleExportData} variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download My Data
-                </Button>
-                <p className="text-sm text-muted-foreground">
-                  Request a copy of all your data. You'll receive an email with
-                  a download link.
-                </p>
-              </CardContent>
-            </Card>
+                </SettingsSubsection> */}
+              </div>
+            </SettingsSectionCard>
           </div>
         );
       }
 
       case "subscription":
         return (
-          <div className="space-y-8">
-            <h1 className="text-xl font-bold">Subscription & Billing</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Plan</CardTitle>
-                <CardDescription>
-                  Your current subscription plan
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-0 p-6 rounded-3xl relative overflow-hidden">
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-2xl font-bold">
-                        {subscriptionLoading
-                          ? "..."
-                          : subscriptionInfo?.plan_name || "Free Plan"}
-                      </p>
-                      {subscriptionInfo?.is_active && (
-                        <Badge className="bg-green-500 text-white border-0 text-[10px] h-5 uppercase px-2 font-bold tracking-tight">
-                          Active Now
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {subscriptionInfo?.is_active
-                        ? `Next automatic renewal: ${subscriptionInfo.next_payment_date || "Monthly"}`
-                        : "Basic access with limited features"}
-                    </p>
-                  </div>
-                  {subscriptionInfo?.is_active ? (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="relative z-10 shadow-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white dark:text-white border-0 h-8 text-xs px-3 font-semibold"
-                      onClick={() => {
-                        setSearchParams(
-                          { section: "subscription", upgrade: "true" },
-                          { replace: true },
-                        );
-                      }}
-                    >
-                      Change Plan
-                    </Button>
-                  ) : (
-                    !subscriptionLoading && (
-                      <Button
-                        className="relative z-10 shadow-lg shadow-primary/20"
-                        onClick={() => {
-                          setSearchParams(
-                            { section: "subscription", upgrade: "true" },
-                            { replace: true },
-                          );
-                        }}
-                      >
-                        Unlock Pro Features
-                      </Button>
-                    )
-                  )}
-                  {/* Decorative background element */}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Payment Methods</CardTitle>
-                <CardDescription>Manage your payment methods</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {subscriptionLoading ? (
-                    <p className="text-sm text-muted-foreground">
-                      Loading payment methods...
-                    </p>
-                  ) : subscriptionInfo?.card_mask ? (
-                    <div className="flex items-center justify-between p-4 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-full">
-                          <CreditCard className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {(() => {
-                              const mask = subscriptionInfo.card_mask;
-                              const type = subscriptionInfo.card_type || "Card";
-
-                              if (mask && mask !== "N/A") {
-                                // If it's a full mask like ************1234, take last 4
-                                const last4 =
-                                  mask.length > 4 ? mask.slice(-4) : mask;
-                                return `${type} •••• ${last4}`;
-                              }
-                              // Fallback if mask is missing but we know it's a saved card
-                              return `${type} ••••`;
-                            })()}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Saved via Bank of Georgia
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] uppercase"
-                      >
-                        Default
-                      </Badge>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No payment methods saved. Subscribe to a plan to save your
-                      card.
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Billing History</CardTitle>
-                    <CardDescription>
-                      View and manage your recent transactions
-                    </CardDescription>
-                  </div>
-                  <Badge
+          <div className="space-y-4">
+            <SettingsSectionCard>
+              <div className="space-y-6">
+                <div className="flex justify-end">
+                  {/* <Badge
                     variant="secondary"
-                    className="text-[10px] uppercase font-bold tracking-wider px-2.5"
+                    className="text-[10px] font-bold uppercase tracking-wider"
                   >
                     BOG Checkout
-                  </Badge>
+                  </Badge> */}
                 </div>
-              </CardHeader>
-              <CardContent>
-                {historyLoading ? (
-                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+
+                <SettingsSubsection title={t.settings.subscriptionPage.currentPlan}>
+                  <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-sky-100/70 p-5 dark:from-sky-950/30 dark:to-sky-900/10">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="mb-1 flex items-center gap-2">
+                          <p className="text-2xl font-bold">
+                            {subscriptionLoading
+                              ? "..."
+                              : subscriptionInfo?.plan_name ||
+                                t.settings.list.freePlan}
+                          </p>
+                          {subscriptionInfo?.is_active && (
+                            <Badge className="h-5 border-0 bg-green-500 px-2 text-[10px] font-bold uppercase tracking-tight text-white">
+                              {t.settings.subscriptionPage.activeNow}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {subscriptionInfo?.is_active
+                            ? t.settings.subscriptionPage.nextRenewal.replace(
+                                "{date}",
+                                subscriptionInfo.next_payment_date ||
+                                  t.settings.subscriptionPage.monthly,
+                              )
+                            : t.settings.subscriptionPage.basicAccess}
+                        </p>
+                      </div>
+                      {subscriptionInfo?.is_active ? (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="relative h-9 shrink-0 rounded-full border-0 bg-breneo-blue px-4 text-xs font-semibold text-white shadow-sm hover:bg-breneo-blue/90 dark:text-white"
+                          onClick={() => {
+                            setSearchParams(
+                              { section: "subscription", upgrade: "true" },
+                              { replace: true },
+                            );
+                          }}
+                        >
+                          {t.settings.subscriptionPage.changePlan}
+                        </Button>
+                      ) : (
+                        !subscriptionLoading && (
+                          <Button
+                            className="relative shrink-0 rounded-full shadow-lg shadow-primary/20"
+                            onClick={() => {
+                              setSearchParams(
+                                { section: "subscription", upgrade: "true" },
+                                { replace: true },
+                              );
+                            }}
+                          >
+                            {t.settings.subscriptionPage.unlockPro}
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </SettingsSubsection>
+
+                <SettingsSubsection title={t.settings.subscriptionPage.paymentMethod}>
+                  {subscriptionLoading ? (
                     <p className="text-sm text-muted-foreground">
-                      Fetching transaction history...
+                      {t.settings.subscriptionPage.loadingPaymentMethods}
                     </p>
-                  </div>
-                ) : paymentHistory.length > 0 ? (
-                  <div className="w-full rounded-lg overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-medium">
-                              Date
-                            </th>
-                            <th className="px-4 py-3 text-left font-medium">
-                              Description
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {paymentHistory.map((transaction) => (
-                            <tr
-                              key={transaction.id}
-                              className="transition-colors"
-                            >
-                              <td className="px-4 py-3 text-muted-foreground tabular-nums whitespace-nowrap">
-                                {new Date(
-                                  transaction.date,
-                                ).toLocaleDateString()}
-                              </td>
-                              <td className="px-4 py-3 font-medium">
-                                {transaction.description ||
-                                  "Subscription Payment"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  ) : subscriptionInfo?.card_mask ? (
+                    <SettingsListRow
+                      primary={(() => {
+                        const mask = subscriptionInfo.card_mask;
+                        const type =
+                          subscriptionInfo.card_type ||
+                          t.settings.subscriptionPage.card;
+
+                        if (mask && mask !== "N/A") {
+                          const last4 = mask.length > 4 ? mask.slice(-4) : mask;
+                          return `${type} •••• ${last4}`;
+                        }
+                        return `${type} ••••`;
+                      })()}
+                      secondary={t.settings.subscriptionPage.savedViaBog}
+                      trailing={
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] uppercase"
+                        >
+                          {t.settings.subscriptionPage.default}
+                        </Badge>
+                      }
+                    />
+                  ) : (
+                    <p className="rounded-2xl bg-gray-50/90 px-4 py-3.5 text-sm text-muted-foreground dark:bg-white/5">
+                      {t.settings.subscriptionPage.noPaymentMethods}
+                    </p>
+                  )}
+                </SettingsSubsection>
+
+                <SettingsSubsection title={t.settings.subscriptionPage.billingHistory}>
+                  {historyLoading ? (
+                    <div className="flex flex-col items-center justify-center space-y-3 py-8">
+                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+                      <p className="text-sm text-muted-foreground">
+                        {t.settings.subscriptionPage.fetchingHistory}
+                      </p>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed rounded-3xl">
-                    <div className="p-3 rounded-full mb-3">
-                      <Download className="h-6 w-6 text-muted-foreground/50" />
+                  ) : paymentHistory.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {paymentHistory.map((transaction) => (
+                        <SettingsListRow
+                          key={transaction.id}
+                          primary={
+                            transaction.description ||
+                            t.settings.subscriptionPage.subscriptionPayment
+                          }
+                          secondary={new Date(
+                            transaction.date,
+                          ).toLocaleDateString()}
+                        />
+                      ))}
                     </div>
-                    <CardTitle className="text-base mb-1">
-                      No transaction history found
-                    </CardTitle>
-                    <CardDescription className="max-w-[250px]">
-                      When you start subscribing to plans, your payment history
-                      will appear here.
-                    </CardDescription>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        );
-
-      case "learning":
-        return (
-          <div className="space-y-8">
-            <h1 className="text-xl font-bold">Learning Preferences</h1>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Recommendations</CardTitle>
-                <CardDescription>
-                  How often would you like AI recommendations?
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Select
-                  value={aiRecommendationFrequency}
-                  onValueChange={(value: "daily" | "weekly" | "monthly") =>
-                    setAiRecommendationFrequency(value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Interests & Career Paths</CardTitle>
-                <CardDescription>
-                  Manage your interests and preferred career paths
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link to="/interests">
-                  <Button variant="outline">Manage Interests</Button>
-                </Link>
-              </CardContent>
-            </Card>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center rounded-2xl bg-gray-50/90 px-4 py-10 text-center dark:bg-white/5">
+                      <div className="mb-3 rounded-full bg-white p-3 shadow-sm dark:bg-[#1a1a1a]">
+                        <Download className="h-6 w-6 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-base font-semibold text-foreground">
+                        {t.settings.subscriptionPage.noHistoryTitle}
+                      </p>
+                      <p className="mt-1 max-w-[250px] text-sm text-muted-foreground">
+                        {t.settings.subscriptionPage.noHistoryDesc}
+                      </p>
+                    </div>
+                  )}
+                </SettingsSubsection>
+              </div>
+            </SettingsSectionCard>
           </div>
         );
 
       case "accessibility":
         return (
-          <div className="space-y-8">
-            <h1 className="text-xl font-bold">Theme & Accessibility</h1>
+          <div className="space-y-4">
+            <SettingsSectionCard>
+              <div className="space-y-2.5">
+                <SettingsSegmentedRow
+                  label={t.settings.theme}
+                  value={theme || "light"}
+                  onChange={(value) =>
+                    handleThemeChange(value as "light" | "dark" | "system")
+                  }
+                  options={[
+                    {
+                      value: "light",
+                      label: t.settings.themeMode.light,
+                      icon: <Sun className="h-3.5 w-3.5" />,
+                    },
+                    {
+                      value: "dark",
+                      label: t.settings.themeMode.dark,
+                      icon: <Moon className="h-3.5 w-3.5" />,
+                    },
+                    {
+                      value: "system",
+                      label: t.settings.themeMode.auto,
+                      icon: <Monitor className="h-3.5 w-3.5" />,
+                    },
+                  ]}
+                />
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>
-                  Customize the look and feel of the application
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Theme</Label>
-                  <Select
-                    value={theme || "light"}
-                    onValueChange={(value) =>
-                      handleThemeChange(value as "light" | "dark" | "system")
-                    }
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue>{darkModeValue}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="system">Auto</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                <SettingsSegmentedRow
+                  label={t.settings.fontSize.title}
+                  value={fontSize}
+                  onChange={handleFontSizeChange}
+                  options={[
+                    { value: "small", label: t.settings.fontSize.small },
+                    { value: "medium", label: t.settings.fontSize.medium },
+                    { value: "big", label: t.settings.fontSize.large },
+                  ]}
+                />
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Accessibility</CardTitle>
-                <CardDescription>
-                  Adjust settings for better accessibility
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Font Size</Label>
-                  <Select value={fontSize} onValueChange={handleFontSizeChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="small">Small</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="big">Big</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Language</Label>
-                  <Select value={language} onValueChange={handleLanguageChange}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="ka">Georgian (ქართული)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
+                <SettingsSegmentedRow
+                  label={t.settings.language}
+                  value={language}
+                  onChange={handleLanguageChange}
+                  options={[
+                    { value: "en", label: t.settings.languageLabel.english },
+                    { value: "ka", label: t.settings.languageLabel.georgian },
+                  ]}
+                />
+              </div>
+            </SettingsSectionCard>
           </div>
         );
 
       default:
         return (
-          <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Settings</h1>
-            <p className="text-muted-foreground">Section not found</p>
+          <div className="space-y-6">
+            <p className="text-muted-foreground">{t.settings.sectionNotFound}</p>
           </div>
         );
     }
   };
 
-  const activeSectionLabel =
-    settingsSections.find((section) => section.id === activeSection)?.label ??
-    "Settings";
+  const showListView = activeSection === null;
 
   return (
     <DashboardLayout>
-      {/* Mobile: section menu + logout fixed bottom bar */}
-      {isMobile && (
-        <div className="fixed inset-x-0 bottom-above-mobile-nav z-40 flex items-center justify-between gap-3 px-4 md:hidden">
-          <button
-            type="button"
-            onClick={() => setSectionMenuOpen(true)}
-            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-4 py-3 text-sm font-semibold text-foreground backdrop-blur-xl shadow-[0_4px_20px_rgba(255,255,255,0.95),0_8px_32px_rgba(0,0,0,0.06)] transition-colors hover:bg-muted/40 dark:border-gray-800 dark:bg-[#242424]/90 dark:shadow-[0_8px_32px_rgba(80,80,80,0.45),0_4px_16px_rgba(0,0,0,0.35)] dark:hover:bg-[#2d2d2d]/90"
-          >
-            <Menu className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate">{activeSectionLabel}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setLogoutConfirmOpen(true)}
-            className="flex items-center gap-2 rounded-full border border-red-100 bg-white/95 px-4 py-3 text-sm font-semibold text-red-600 backdrop-blur-xl shadow-[0_4px_20px_rgba(255,255,255,0.95),0_8px_32px_rgba(0,0,0,0.06)] transition-colors hover:bg-red-50 dark:border-red-950/50 dark:bg-[#242424]/90 dark:text-red-500 dark:shadow-[0_8px_32px_rgba(80,80,80,0.45),0_4px_16px_rgba(0,0,0,0.35)] dark:hover:bg-red-950/30"
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            <span>Log out</span>
-          </button>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-8 lg:px-12 xl:px-16">
-        <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:items-start">
-          {/* Left Column - Content */}
-          <div className={cn(isMobile && "min-h-screen pb-32")}>
-            {renderContent()}
-          </div>
-
-          {/* Right Column - Sidebar Navigation (Desktop Only) */}
-          {!isMobile && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Settings</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-0 p-3 pt-0">
-                <div className="relative rounded-full p-1">
-                  {settingsSections.map((section) => {
-                    const isActive = activeSection === section.id;
-
-                    return (
-                      <motion.button
-                        key={section.id}
-                        layout
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleSectionChange(section.id);
-                        }}
-                        className={cn(
-                          "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none",
-                          isActive
-                            ? "text-sky-950 dark:text-gray-100 font-bold"
-                            : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200",
-                        )}
-                      >
-                        {isActive && (
-                          <motion.div
-                            layoutId="active-settings-pill-desktop"
-                            className="absolute inset-0 bg-sky-100 dark:bg-gray-800 rounded-full"
-                            transition={{
-                              type: "spring",
-                              stiffness: 500,
-                              damping: 40,
-                              mass: 1,
-                            }}
-                          />
-                        )}
-                        <span className="relative z-10">{section.label}</span>
-                      </motion.button>
-                    );
-                  })}
+      <div className="mx-auto max-w-7xl px-2 pt-2 pb-32 sm:px-6 md:py-6 md:pb-6 lg:px-8">
+        <SettingsMobileHeader
+          activeSection={activeSection}
+          onBack={handleBackToList}
+        />
+        {showListView ? (
+          <div className="lg:grid lg:grid-cols-[1fr_400px] lg:items-start lg:gap-8">
+            <SettingsGroupList
+              groups={settingsGroups}
+              footerItem={logoutItem}
+              beforeFooter={
+                <div className="lg:hidden">
+                  <SettingsDownloadAppCard variant="compact" />
                 </div>
-
-                <div className="mt-10 border-t border-border/70 pt-8">
-                  <div className="relative rounded-full p-1">
-                    <button
-                      type="button"
-                      onClick={() => setLogoutConfirmOpen(true)}
-                      className={cn(
-                        "relative w-full px-4 py-2.5 text-sm text-left transition-colors duration-200 rounded-full outline-none font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700 focus-visible:ring-2 focus-visible:ring-red-500/30 dark:text-red-500 dark:hover:bg-red-950/35 dark:hover:text-red-400 dark:focus-visible:ring-red-500/40",
-                      )}
-                    >
-                      <span className="relative z-10">Log out</span>
-                    </button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-
-      {isMobile && (
-        <Drawer open={sectionMenuOpen} onOpenChange={setSectionMenuOpen}>
-          <DrawerContent className="border-none bg-white dark:bg-background">
-            <DrawerHeader>
-              <DrawerTitle>Settings</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-8">
-              <div className="space-y-1">
-                {settingsSections.map((section) => {
-                  const isActive = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => {
-                        handleSectionChange(section.id);
-                        setSectionMenuOpen(false);
-                      }}
-                      className={cn(
-                        "flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left text-sm transition-colors",
-                        isActive
-                          ? "bg-sky-100 font-bold text-sky-950 dark:bg-gray-800 dark:text-gray-100"
-                          : "font-medium text-gray-600 hover:bg-muted/40 dark:text-gray-300 dark:hover:bg-muted/20",
-                      )}
-                    >
-                      <span>{section.label}</span>
-                      {isActive && (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-sky-950 dark:text-gray-100" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              }
+            />
+            <div className="hidden lg:block lg:sticky lg:top-28">
+              <SettingsDownloadAppCard variant="sidebar" />
             </div>
-          </DrawerContent>
-        </Drawer>
-      )}
+          </div>
+        ) : (
+          renderContent()
+        )}
+      </div>
 
       {isMobile ? (
         <Drawer
@@ -1321,9 +1102,9 @@ export default function SettingsPage() {
         >
           <DrawerContent className="border-none bg-white dark:bg-background">
             <DrawerHeader>
-              <DrawerTitle>Change password</DrawerTitle>
+              <DrawerTitle>{t.settings.changePassword.title}</DrawerTitle>
               <DrawerDescription>
-                We&apos;ll send a verification code to your email address.
+                {t.settings.changePassword.description}
               </DrawerDescription>
             </DrawerHeader>
             <div className="px-6 pb-6">
@@ -1338,9 +1119,9 @@ export default function SettingsPage() {
         >
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Change password</DialogTitle>
+              <DialogTitle>{t.settings.changePassword.title}</DialogTitle>
               <DialogDescription>
-                We&apos;ll send a verification code to your email address.
+                {t.settings.changePassword.description}
               </DialogDescription>
             </DialogHeader>
             {renderChangePasswordModalContent()}
@@ -1351,61 +1132,59 @@ export default function SettingsPage() {
       {isMobile ? (
         <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
           <DrawerContent className="border-none bg-white dark:bg-background">
-            <DrawerHeader>
-              <DrawerTitle>Log out</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-6 pb-4">
-              <DrawerDescription>
-                Are you sure you want to log out?
+            <DrawerHeader className="pb-2">
+              <DrawerTitle>{t.settings.logoutConfirm.title}</DrawerTitle>
+              <DrawerDescription className="mt-1">
+                {t.settings.logoutConfirm.description}
               </DrawerDescription>
-            </div>
-            <DrawerFooter className="gap-4 border-t border-gray-200 pt-4 dark:border-border">
+            </DrawerHeader>
+            <DrawerFooter className="flex-row gap-2 pt-2">
               <Button
-                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                className="flex-1 bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
                 onClick={() => {
                   setLogoutConfirmOpen(false);
                   logout();
                 }}
               >
-                Log out
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full border-0 !bg-transparent !text-black shadow-none hover:!bg-transparent hover:!text-black dark:!text-white dark:hover:!bg-transparent dark:hover:!text-white"
-                onClick={() => setLogoutConfirmOpen(false)}
-              >
-                Cancel
+                {t.settings.logoutConfirm.confirm}
               </Button>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>Log out</DialogTitle>
+          <DialogContent className="max-w-sm gap-3">
+            <DialogHeader className="space-y-1">
+              <DialogTitle>{t.settings.logoutConfirm.title}</DialogTitle>
               <DialogDescription>
-                Are you sure you want to log out?
+                {t.settings.logoutConfirm.description}
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="flex flex-col gap-4 sm:flex-col sm:space-x-0">
+            <DialogFooter className="flex flex-row gap-2 sm:space-x-0">
               <Button
-                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700 sm:w-full"
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                className="flex-1 bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
                 onClick={() => {
                   setLogoutConfirmOpen(false);
                   logout();
                 }}
               >
-                Log out
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full border-0 !bg-transparent !text-black shadow-none hover:!bg-transparent hover:!text-black dark:!text-white dark:hover:!bg-transparent dark:hover:!text-white sm:w-full"
-                onClick={() => setLogoutConfirmOpen(false)}
-              >
-                Cancel
+                {t.settings.logoutConfirm.confirm}
               </Button>
             </DialogFooter>
           </DialogContent>

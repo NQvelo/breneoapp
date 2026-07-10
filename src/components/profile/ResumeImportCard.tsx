@@ -2,16 +2,11 @@ import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { FileUp, Loader2 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SettingsSectionCard } from "@/components/settings/SettingsSectionUi";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { profileApi } from "@/api/profile";
 import { parseResumePdf } from "@/services/resume/resumeImportService";
@@ -53,6 +48,7 @@ const toWorkKey = (entry: {
  */
 export function ResumeImportCard() {
   const { user } = useAuth();
+  const t = useTranslation();
   const { subscriptionInfo, loading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -195,52 +191,50 @@ export function ResumeImportCard() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Update Profile from Resume</CardTitle>
-        <CardDescription>
-          Update your profile information by uploading your resume. We&apos;ll
-          auto-fill your summary, education, work experience, and skills.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          className="hidden"
-          onChange={handleUpload}
-          disabled={importing}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={triggerUpload}
-          disabled={importing || subscriptionLoading}
-        >
-          {importing ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <FileUp className="h-4 w-4 mr-2" />
-          )}
-          {importing ? "Uploading Resume..." : "Upload Resume"}
-        </Button>
-        {!isPremium && !subscriptionLoading && (
-          <p className="text-xs font-semibold text-breneo-blue">
-            Premium feature
-          </p>
+    <SettingsSectionCard contentClassName="space-y-4">
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        {t.settings.accountPage.resumeDescription}
+      </p>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={handleUpload}
+        disabled={importing}
+      />
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={triggerUpload}
+        disabled={importing || subscriptionLoading}
+        className="h-11 w-full rounded-full sm:w-auto"
+      >
+        {importing ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <FileUp className="mr-2 h-4 w-4" />
         )}
-        {importing && (
-          <div className="space-y-1">
-            <Progress value={progress} className="h-2" />
-            <p className="text-xs text-muted-foreground">{progress}%</p>
-          </div>
-        )}
-        <p className="text-sm text-muted-foreground">
-          Upload a PDF CV (max 10MB). Existing entries won&apos;t be duplicated.
+        {importing
+          ? t.settings.accountPage.uploadingResume
+          : t.settings.accountPage.uploadResume}
+      </Button>
+
+      {!isPremium && !subscriptionLoading && (
+        <p className="text-xs font-semibold text-breneo-blue">
+          {t.settings.accountPage.premiumFeature}
         </p>
-      </CardContent>
-    </Card>
+      )}
+
+      {importing && (
+        <div className="space-y-2">
+          <Progress value={progress} className="h-2" />
+          <p className="text-xs text-muted-foreground">{progress}%</p>
+        </div>
+      )}
+    </SettingsSectionCard>
   );
 }
 
