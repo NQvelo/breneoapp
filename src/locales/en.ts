@@ -300,6 +300,18 @@ export const en = {
       preparing: "Preparing...",
       installNow: "Install now",
       downloadApp: "Download app",
+      installStarted: "App installation started!",
+      installCancelled: "Installation cancelled. You can try again later.",
+      openingBrowser:
+        "Opening your browser to continue installation...",
+      iosShareOpened:
+        "Choose Add to Home Screen in the share menu to finish installing.",
+      installUnavailable:
+        "Install is not available right now. Open this page in Safari or Chrome and try again.",
+    },
+    appVersion: {
+      version: "Version {version}",
+      updateApp: "Update app",
     },
   },
   // Notifications

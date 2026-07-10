@@ -1,146 +1,66 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
-interface NavigatorStandalone extends Navigator {
-  standalone?: boolean;
-}
+import { useTranslation } from "@/contexts/LanguageContext";
+import {
+  canInstallPwa,
+  initPwaInstall,
+  installPwa,
+  isPwaInstalled,
+  subscribePwaInstall,
+} from "@/lib/pwaInstall";
 
 export function usePwaInstall() {
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const t = useTranslation();
+  const [isInstalled, setIsInstalled] = useState(isPwaInstalled);
+  const [canInstall, setCanInstall] = useState(canInstallPwa);
   const [isInstalling, setIsInstalling] = useState(false);
 
-  useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsInstalled(true);
-      return;
-    }
-
-    if ((window.navigator as NavigatorStandalone).standalone === true) {
-      setIsInstalled(true);
-      return;
-    }
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+  const syncState = useCallback(() => {
+    setIsInstalled(isPwaInstalled());
+    setCanInstall(canInstallPwa());
   }, []);
 
-  const install = async () => {
+  useEffect(() => {
+    initPwaInstall();
+    syncState();
+    return subscribePwaInstall(syncState);
+  }, [syncState]);
+
+  const install = useCallback(async () => {
     setIsInstalling(true);
 
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-
-        if (outcome === "accepted") {
-          setIsInstalled(true);
-          setDeferredPrompt(null);
-          toast.success("App installation started!");
-        } else {
-          toast.info("Installation cancelled. You can try again later.");
-        }
-      } catch (error) {
-        console.error("Error installing PWA:", error);
-        toast.error(
-          "Failed to trigger installation. Please try using your browser menu.",
-        );
-      } finally {
-        setIsInstalling(false);
-      }
-      return;
-    }
-
-    let promptReceived = false;
-    const waitForPrompt = new Promise<BeforeInstallPromptEvent | null>(
-      (resolve) => {
-        const handler = (e: Event) => {
-          e.preventDefault();
-          promptReceived = true;
-          const prompt = e as BeforeInstallPromptEvent;
-          setDeferredPrompt(prompt);
-          resolve(prompt);
-        };
-
-        window.addEventListener("beforeinstallprompt", handler, { once: true });
-
-        setTimeout(() => {
-          if (!promptReceived) {
-            window.removeEventListener("beforeinstallprompt", handler);
-            resolve(null);
-          }
-        }, 2000);
-      },
-    );
-
-    const prompt = await waitForPrompt;
-
-    if (prompt) {
-      try {
-        await prompt.prompt();
-        const { outcome } = await prompt.userChoice;
-
-        if (outcome === "accepted") {
-          setIsInstalled(true);
-          setDeferredPrompt(null);
-          toast.success("App installation started!");
-        } else {
-          toast.info("Installation cancelled. You can try again later.");
-        }
-      } catch (error) {
-        console.error("Error installing PWA:", error);
-        toast.error(
-          "Failed to trigger installation. Please try using your browser menu.",
-        );
-      } finally {
-        setIsInstalling(false);
-      }
-      return;
-    }
-
-    const isIOS =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-    if (isIOS) {
-      toast.info(
-        "Tap the Share button, then select 'Add to Home Screen'",
-        { duration: 4000 },
-      );
-      setIsInstalling(false);
-      return;
-    }
-
     try {
-      if ("serviceWorker" in navigator) {
-        await navigator.serviceWorker.ready;
-        toast.info(
-          "Install prompt not available. Check your browser menu for 'Install' or 'Add to Home Screen'.",
-          { duration: 4000 },
-        );
-      }
-    } catch (error) {
-      console.error("Service worker check failed:", error);
-    }
+      const result = await installPwa();
 
-    setIsInstalling(false);
-  };
+      switch (result) {
+        case "accepted":
+        case "already-installed":
+          setIsInstalled(true);
+          toast.success(t.settings.downloadApp.installStarted);
+          break;
+        case "redirected":
+          toast.info(t.settings.downloadApp.openingBrowser);
+          break;
+        case "ios-share":
+          toast.info(t.settings.downloadApp.iosShareOpened);
+          break;
+        case "dismissed":
+          toast.info(t.settings.downloadApp.installCancelled);
+          break;
+        case "unavailable":
+          toast.error(t.settings.downloadApp.installUnavailable);
+          break;
+      }
+    } finally {
+      setIsInstalling(false);
+      syncState();
+    }
+  }, [syncState, t]);
 
   return {
     install,
     isInstalled,
     isInstalling,
-    canInstall: Boolean(deferredPrompt),
+    canInstall,
   };
 }

@@ -92,6 +92,7 @@ export default defineConfig(({ mode }) => ({
       registerType: "prompt",
       includeAssets: ["robots.txt", "lovable-uploads/*.png"],
       manifest: {
+        id: "/",
         name: "Breneo - AI-Powered Learning & Job Matching Platform",
         short_name: "Breneo",
         description:
@@ -107,13 +108,19 @@ export default defineConfig(({ mode }) => ({
             src: "/lovable-uploads/breneo-favicon.png",
             sizes: "192x192",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
           },
           {
             src: "/lovable-uploads/breneo-favicon.png",
-            sizes: "512x512",
+            sizes: "490x490",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: "/lovable-uploads/breneo-favicon.png",
+            sizes: "490x490",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
         categories: ["education", "productivity", "business"],
@@ -262,7 +269,7 @@ export default defineConfig(({ mode }) => ({
         type: "module",
       },
       // Additional options to handle missing routes gracefully
-      injectRegister: "auto",
+      injectRegister: null,
     }),
   ].filter(Boolean),
   resolve: {

@@ -56,6 +56,7 @@ import {
   type SettingsListItemConfig,
 } from "@/components/settings/SettingsGroupList";
 import { SettingsDownloadAppCard } from "@/components/settings/SettingsDownloadAppCard";
+import { SettingsAppVersionFooter } from "@/components/settings/SettingsAppVersionFooter";
 import { SettingsMobileHeader } from "@/components/settings/SettingsMobileHeader";
 import {
   SettingsActionRow,
@@ -1093,6 +1094,7 @@ export default function SettingsPage() {
         ) : (
           renderContent()
         )}
+        <SettingsAppVersionFooter />
       </div>
 
       {isMobile ? (

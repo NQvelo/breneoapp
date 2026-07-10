@@ -2221,10 +2221,6 @@ const ProfilePage = () => {
               )}
             </CardContent>
           </Card>
-
-          <p className="pt-1 text-center text-xs text-gray-500">
-            Version {__APP_VERSION__}
-          </p>
         </div>
       ) : activeView === "saved" ? (
         <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">

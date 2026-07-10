@@ -307,6 +307,17 @@ export const ka = {
       preparing: "მზადდება...",
       installNow: "დააინსტალირე",
       downloadApp: "აპის ჩამოტვირთვა",
+      installStarted: "აპის ინსტალაცია დაიწყო!",
+      installCancelled: "ინსტალაცია გაუქმდა. შეგიძლიათ მოგვიანებით კვლავ სცადოთ.",
+      openingBrowser: "ინსტალაციის გასაგრძელებლად ბრაუზერში გადადის...",
+      iosShareOpened:
+        "დააინსტალირების დასასრულებლად აირჩიეთ მთავარ ეკრანზე დამატება გაზიარების მენიუში.",
+      installUnavailable:
+        "ინსტალაცია ახლა ხელმისაწვდომი არ არის. გახსენით ეს გვერდი Safari-ში ან Chrome-ში და სცადეთ თავიდან.",
+    },
+    appVersion: {
+      version: "ვერსია {version}",
+      updateApp: "აპის განახლება",
     },
   },
   // Notifications
