@@ -10,6 +10,7 @@ import {
   MeetSelfTile,
 } from "@/components/interviews/InterviewMeetTiles";
 import { setMeetingSoundsEnabled } from "@/components/interviews/interviewMeetingSounds";
+import { setInterviewAudioMuted } from "@/utils/playAudioSequence";
 import { Button } from "@/components/ui/button";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,49 @@ export type MeetingPhase =
 
 const MIN_RECORDING_MS = 3000;
 const NEXT_QUESTION_AUTO_MS = 8000;
+
+const INTERVIEW_LOADING_MESSAGES = [
+  "ინტერვიუერი ზარს მალე შემოუერთდება",
+  "AI კითხვებს ამზადებს",
+  "კამერა და მიკროფონი იხსნება",
+  "ინტერვიუს გარემო იტვირთება",
+  "დარჩით მზად — ინტერვიუ მალე დაიწყება",
+  "თქვენს პასუხებს AI გაანალიზებს",
+] as const;
+
+function useRotatingLoadingMessage(active: boolean) {
+  const [index, setIndex] = useState(() =>
+    Math.floor(Math.random() * INTERVIEW_LOADING_MESSAGES.length),
+  );
+
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => {
+      setIndex((current) => (current + 1) % INTERVIEW_LOADING_MESSAGES.length);
+    }, 2400);
+    return () => window.clearInterval(id);
+  }, [active]);
+
+  return INTERVIEW_LOADING_MESSAGES[index];
+}
+
+function InterviewSetupGlow() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(138,180,248,0.22),_transparent_58%),radial-gradient(ellipse_at_bottom_right,_rgba(66,133,244,0.18),_transparent_52%),radial-gradient(ellipse_at_bottom_left,_rgba(168,85,247,0.16),_transparent_55%)]" />
+      <div className="absolute -left-16 top-8 h-72 w-72 animate-pulse rounded-full bg-[#8ab4f8]/30 blur-[90px]" />
+      <div
+        className="absolute -right-12 bottom-12 h-64 w-64 animate-pulse rounded-full bg-[#a855f7]/25 blur-[80px]"
+        style={{ animationDelay: "0.8s" }}
+      />
+      <div
+        className="absolute left-1/2 top-1/3 h-56 w-56 -translate-x-1/2 animate-pulse rounded-full bg-[#38bdf8]/20 blur-[70px]"
+        style={{ animationDelay: "1.4s" }}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(125deg,rgba(99,102,241,0.08)_0%,transparent_40%,rgba(56,189,248,0.08)_100%)]" />
+    </div>
+  );
+}
 
 interface InterviewMeetingRoomProps {
   phase: MeetingPhase;
@@ -104,11 +148,12 @@ function MeetSplitLayout({
   mobileSelfMinimized?: boolean;
 }) {
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-2 p-3 sm:flex-row sm:items-stretch sm:gap-4 sm:p-5 md:p-6">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-3 p-3 max-sm:gap-4 sm:flex-row sm:items-stretch sm:gap-4 sm:p-5 md:p-6">
       <div
         className={cn(
-          "flex min-h-0 min-w-0 shrink-0 flex-col gap-2 overflow-y-auto sm:flex-[1.45] sm:gap-3",
+          "flex min-h-0 min-w-0 shrink-0 flex-col gap-3 overflow-y-auto overflow-x-hidden max-sm:gap-4 sm:flex-[1.45] sm:gap-3",
           mobileSelfMinimized && "flex-1",
+          !mobileSelfMinimized && "max-sm:flex-none max-sm:overflow-visible",
         )}
       >
         {left}
@@ -118,13 +163,13 @@ function MeetSplitLayout({
           "flex min-h-0 min-w-0 flex-col transition-all duration-500 ease-in-out sm:flex-[1.15] sm:flex-1",
           mobileSelfMinimized
             ? "absolute bottom-3 right-3 z-30 h-[7.5rem] w-[5.5rem] flex-none shadow-lg shadow-black/40 sm:relative sm:bottom-auto sm:right-auto sm:h-auto sm:w-auto sm:shadow-none"
-            : "min-h-[200px] flex-1",
+            : "min-h-[200px] flex-1 max-sm:min-h-[220px]",
         )}
       >
         <div
           className={cn(
-            "min-h-[200px] flex-1 transition-all duration-500 ease-in-out",
-            mobileSelfMinimized && "min-h-0 h-full",
+            "min-h-[200px] flex-1 transition-all duration-500 ease-in-out max-sm:min-h-[220px]",
+            mobileSelfMinimized && "min-h-0 h-full max-sm:min-h-0",
           )}
         >
           {right}
@@ -162,6 +207,7 @@ export function InterviewMeetingRoom({
   const inSession = phase !== "setup" && phase !== "session_complete";
   const [nextQuestionSecLeft, setNextQuestionSecLeft] = useState(0);
   const [soundOn, setSoundOn] = useState(true);
+  const loadingMessage = useRotatingLoadingMessage(isStarting);
 
   const hasNextQuestion =
     phase === "question_feedback" &&
@@ -198,6 +244,7 @@ export function InterviewMeetingRoom({
     setSoundOn((on) => {
       const next = !on;
       setMeetingSoundsEnabled(next);
+      setInterviewAudioMuted(!next);
       return next;
     });
   };
@@ -306,24 +353,36 @@ export function InterviewMeetingRoom({
   if (phase === "setup") {
     return (
       <div className="fixed inset-0 z-[200] flex flex-col bg-[#050508]">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_#8ab4f818,_transparent_55%),radial-gradient(ellipse_at_bottom_right,_#4285f412,_transparent_50%)]"
-          aria-hidden
-        />
-        <header className="relative z-10 flex items-center justify-between px-5 py-4">
+        <InterviewSetupGlow />
+        <header className="relative z-10 flex items-center px-5 py-4">
           <BreneoLogo preferDark className="h-6" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:bg-white/10 hover:text-white"
-            onClick={onLeave}
-          >
-            დახურვა
-          </Button>
         </header>
 
         <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-8">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 text-center shadow-2xl backdrop-blur-xl sm:p-8">
+          {isStarting ? (
+            <div className="flex w-full max-w-md flex-col items-center text-center">
+              <Loader2 className="mb-4 h-12 w-12 animate-spin text-[#8ab4f8]" />
+              <h1
+                key={loadingMessage}
+                className="animate-in fade-in slide-in-from-bottom-1 text-lg font-bold leading-snug text-white duration-500 sm:text-xl"
+              >
+                {loadingMessage}
+              </h1>
+              <p className="mt-2 text-sm text-white/60">
+                {jobPosition || "..."}
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-8 min-w-[140px] rounded-2xl bg-secondary/50 text-secondary-foreground backdrop-blur-sm hover:bg-secondary/70"
+                onClick={onLeave}
+              >
+                დახურვა
+              </Button>
+            </div>
+          ) : (
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.06] p-6 text-center shadow-[0_0_0_1px_rgba(129,140,248,0.12),0_8px_32px_-8px_rgba(56,189,248,0.25),0_20px_48px_-12px_rgba(168,85,247,0.2)] backdrop-blur-xl sm:p-8">
+
             {!hasJobContext ? (
               <>
                 <AlertCircle className="mx-auto mb-4 h-12 w-12 text-amber-400" />
@@ -335,21 +394,12 @@ export function InterviewMeetingRoom({
                   ინტერვიუს დაწყება“.
                 </p>
                 <Button
+                  type="button"
                   className="mt-6 rounded-2xl bg-white/10 text-white hover:bg-white/20"
                   onClick={onLeave}
                 >
                   დაბრუნება
                 </Button>
-              </>
-            ) : isStarting ? (
-              <>
-                <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[#8ab4f8]" />
-                <h1 className="text-xl font-bold text-white">
-                  ინტერვიუს მომზადება...
-                </h1>
-                <p className="mt-2 text-sm text-white/60">
-                  {jobPosition || "..."}
-                </p>
               </>
             ) : error ? (
               <>
@@ -359,6 +409,7 @@ export function InterviewMeetingRoom({
                 </h1>
                 <p className="mt-2 text-sm text-rose-200">{error}</p>
                 <Button
+                  type="button"
                   className="mt-6 rounded-2xl bg-white/10 text-white hover:bg-white/20"
                   onClick={onLeave}
                 >
@@ -366,7 +417,8 @@ export function InterviewMeetingRoom({
                 </Button>
               </>
             ) : null}
-          </div>
+            </div>
+          )}
         </main>
       </div>
     );
@@ -482,6 +534,7 @@ export function InterviewMeetingRoom({
         <div className="flex min-h-14 w-full items-center justify-center">
           <div className="flex items-center justify-center gap-3 sm:gap-4">
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className={cn(
@@ -491,6 +544,8 @@ export function InterviewMeetingRoom({
                   : "bg-[#3c4043] text-white/50 hover:bg-[#4a4d51] hover:text-white",
               )}
               onClick={toggleSound}
+              aria-pressed={!soundOn}
+              aria-label={soundOn ? "ხმის გამორთვა" : "ხმის ჩართვა"}
               title={soundOn ? "ხმის გამორთვა" : "ხმის ჩართვა"}
             >
               {soundOn ? (
@@ -553,6 +608,7 @@ export function InterviewMeetingRoom({
             ) : null}
 
             <Button
+              type="button"
               size="icon"
               className="h-14 w-14 shrink-0 rounded-full !bg-rose-600 !text-white hover:!bg-rose-800 hover:!text-white focus-visible:ring-rose-500/40 sm:hidden dark:!bg-rose-600 dark:hover:!bg-rose-800 [&_svg]:!text-white"
               onClick={onLeave}
@@ -565,6 +621,7 @@ export function InterviewMeetingRoom({
 
         <div className="absolute right-4 top-1/2 hidden -translate-y-1/2 sm:block">
           <Button
+            type="button"
             size="icon"
             className="h-14 w-14 shrink-0 rounded-full !bg-rose-600 !text-white hover:!bg-rose-800 hover:!text-white focus-visible:ring-rose-500/40 dark:!bg-rose-600 dark:hover:!bg-rose-800 [&_svg]:!text-white"
             onClick={onLeave}

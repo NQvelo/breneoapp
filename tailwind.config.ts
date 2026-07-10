@@ -122,11 +122,21 @@ export default {
             opacity: "1",
           },
         },
+        "sound-bar": {
+          "0%, 100%": { transform: "scaleY(0.4)" },
+          "50%": { transform: "scaleY(1)" },
+        },
+        "speak-ripple": {
+          "0%": { transform: "scale(1)", opacity: "0.45" },
+          "100%": { transform: "scale(1.55)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "shrink-in": "shrink-in 0.6s ease-out",
+        "sound-bar": "sound-bar 0.55s ease-in-out infinite",
+        "speak-ripple": "speak-ripple 1.6s ease-out infinite",
       },
     },
   },

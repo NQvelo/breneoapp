@@ -24,6 +24,10 @@ import {
 const MIN_RECORDING_MS = 3000;
 const RECORD_COUNTDOWN_SEC = 3;
 
+function isSessionAbortedError(error: unknown): boolean {
+  return error instanceof Error && error.message === "Audio stopped";
+}
+
 function mediaErrorMessage(error: unknown): string {
   const name =
     error && typeof error === "object" && "name" in error
@@ -79,6 +83,7 @@ export function InterviewContainer() {
   const beginActualRecordingRef = useRef<() => void>(() => {});
   const pendingPlaybackRef = useRef<InterviewPlaybackItem[] | null>(null);
   const pendingSingleAudioRef = useRef<string | null>(null);
+  const sessionActiveRef = useRef(true);
 
   const [phase, setPhase] = useState<MeetingPhase>("setup");
   const [jobPosition, setJobPosition] = useState(presetPosition);
@@ -105,15 +110,24 @@ export function InterviewContainer() {
 
   currentQuestionRef.current = currentQuestion;
 
-  const stopMedia = useCallback(() => {
+  const releaseMedia = useCallback((options?: { abandonRecording?: boolean }) => {
     stopActiveAudio();
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !== "inactive"
-    ) {
-      mediaRecorderRef.current.stop();
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder) {
+      if (options?.abandonRecording) {
+        recorder.onstop = null;
+      }
+      if (recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch {
+          // Ignore stop races while leaving the meeting.
+        }
+      }
+      mediaRecorderRef.current = null;
     }
-    mediaRecorderRef.current = null;
+
     if (mediaStreamRef.current) {
       for (const track of mediaStreamRef.current.getTracks()) {
         track.stop();
@@ -123,22 +137,36 @@ export function InterviewContainer() {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    setCameraReady(false);
-    setIsAudioPlaying(false);
-    setIsPlayingWelcome(false);
+
+    if (sessionActiveRef.current) {
+      setCameraReady(false);
+      setIsAudioPlaying(false);
+      setIsPlayingWelcome(false);
+    }
   }, []);
 
+  const stopMedia = useCallback(() => {
+    releaseMedia();
+  }, [releaseMedia]);
+
   const leaveMeeting = useCallback(() => {
-    stopMedia();
+    sessionActiveRef.current = false;
     pendingPlaybackRef.current = null;
     pendingSingleAudioRef.current = null;
+    releaseMedia({ abandonRecording: true });
     if (document.fullscreenElement) {
       void document.exitFullscreen?.().catch(() => undefined);
     }
-    navigate(returnPath);
-  }, [navigate, returnPath, stopMedia]);
+    navigate(returnPath, { replace: true });
+  }, [navigate, returnPath, releaseMedia]);
 
-  useEffect(() => () => stopMedia(), [stopMedia]);
+  useEffect(
+    () => () => {
+      sessionActiveRef.current = false;
+      releaseMedia({ abandonRecording: true });
+    },
+    [releaseMedia],
+  );
 
   useEffect(() => {
     if (phase !== "recording") {
@@ -202,13 +230,16 @@ export function InterviewContainer() {
 
       try {
         await playPlaybackSequence(items, (item) => {
+          if (!sessionActiveRef.current) return;
           handlePlaybackSegment(item);
         });
+        if (!sessionActiveRef.current) return;
         pendingPlaybackRef.current = null;
         setIsAudioPlaying(false);
         setIsPlayingWelcome(false);
         setPhase("ready_to_record");
       } catch (e) {
+        if (!sessionActiveRef.current || isSessionAbortedError(e)) return;
         setIsAudioPlaying(false);
         if (isAutoplayBlockedError(e)) {
           pendingPlaybackRef.current = items;
@@ -243,10 +274,12 @@ export function InterviewContainer() {
 
       try {
         await playAudioUrl(question.question_audio_url);
+        if (!sessionActiveRef.current) return;
         pendingSingleAudioRef.current = null;
         setIsAudioPlaying(false);
         setPhase("ready_to_record");
       } catch (e) {
+        if (!sessionActiveRef.current || isSessionAbortedError(e)) return;
         setIsAudioPlaying(false);
         if (isAutoplayBlockedError(e)) {
           pendingSingleAudioRef.current = question.question_audio_url;
@@ -275,20 +308,25 @@ export function InterviewContainer() {
     try {
       if (playback?.length) {
         await playPlaybackSequence(playback, (item) => {
+          if (!sessionActiveRef.current) return;
           handlePlaybackSegment(item);
         });
+        if (!sessionActiveRef.current) return;
         pendingPlaybackRef.current = null;
         setIsPlayingWelcome(false);
         setPhase("ready_to_record");
       } else if (singleUrl) {
         await playAudioUrl(singleUrl);
+        if (!sessionActiveRef.current) return;
         pendingSingleAudioRef.current = null;
         setPhase("ready_to_record");
       } else if (currentQuestionRef.current?.question_audio_url) {
         await playAudioUrl(currentQuestionRef.current.question_audio_url);
+        if (!sessionActiveRef.current) return;
         setPhase("ready_to_record");
       }
     } catch (e) {
+      if (!sessionActiveRef.current || isSessionAbortedError(e)) return;
       if (isAutoplayBlockedError(e)) {
         setNeedsManualPlay(true);
       } else {
@@ -298,7 +336,9 @@ export function InterviewContainer() {
         setPhase("ready_to_record");
       }
     } finally {
-      setIsAudioPlaying(false);
+      if (sessionActiveRef.current) {
+        setIsAudioPlaying(false);
+      }
     }
   }, [handlePlaybackSegment]);
 
@@ -320,8 +360,12 @@ export function InterviewContainer() {
       setNeedsManualPlay(false);
 
       try {
-        await attachStream();
-        const response = await interviewApi.startInterview(params);
+        if (!sessionActiveRef.current) return;
+        const [, response] = await Promise.all([
+          attachStream(),
+          interviewApi.startInterview(params),
+        ]);
+        if (!sessionActiveRef.current) return;
         setInterviewId(response.interview.id);
         setJobPosition(
           response.interview.job_position ||
@@ -357,8 +401,11 @@ export function InterviewContainer() {
           setIsPlayingWelcome(firstSegment.type === "welcome");
         }
 
+        setIsStarting(false);
+        setPhase("playing_audio");
         await runPlaybackSequenceLocal(playback);
       } catch (e) {
+        if (!sessionActiveRef.current || isSessionAbortedError(e)) return;
         stopMedia();
         setError(
           e instanceof Error
@@ -367,7 +414,9 @@ export function InterviewContainer() {
         );
         setPhase("setup");
       } finally {
-        setIsStarting(false);
+        if (sessionActiveRef.current) {
+          setIsStarting(false);
+        }
       }
     },
     [
@@ -380,6 +429,7 @@ export function InterviewContainer() {
   );
 
   const resetSession = useCallback(() => {
+    sessionActiveRef.current = true;
     stopMedia();
     setInterviewId(null);
     setCurrentQuestion(null);
@@ -397,6 +447,11 @@ export function InterviewContainer() {
       void handleStartInterview(startParams);
     }
   }, [handleStartInterview, startParams, stopMedia]);
+
+  useEffect(() => {
+    if (!hasJobContext) return;
+    void attachStream().catch(() => undefined);
+  }, [attachStream, hasJobContext]);
 
   useEffect(() => {
     if (!hasJobContext || autoStartTriggeredRef.current || !startParams) {
@@ -445,6 +500,7 @@ export function InterviewContainer() {
     };
 
     recorder.onstop = () => {
+      if (!sessionActiveRef.current) return;
       void handleSubmitRecordingRef.current();
     };
 
@@ -492,6 +548,8 @@ export function InterviewContainer() {
   };
 
   const handleSubmitRecording = async () => {
+    if (!sessionActiveRef.current) return;
+
     const question = currentQuestionRef.current;
     if (!question) return;
 
@@ -522,6 +580,7 @@ export function InterviewContainer() {
 
     try {
       const result = await interviewApi.submitInterviewAudio(question.id, blob);
+      if (!sessionActiveRef.current) return;
       setPerQuestionResults((prev) => [...prev, result]);
       setLastFeedback(result);
 
@@ -535,6 +594,7 @@ export function InterviewContainer() {
         setPhase("question_feedback");
       }
     } catch (e) {
+      if (!sessionActiveRef.current) return;
       setError(
         e instanceof Error
           ? e.message
@@ -546,6 +606,8 @@ export function InterviewContainer() {
   handleSubmitRecordingRef.current = handleSubmitRecording;
 
   const handleNextQuestion = useCallback(async () => {
+    if (!sessionActiveRef.current) return;
+
     const next = lastFeedback?.next_question;
     if (!next) return;
 

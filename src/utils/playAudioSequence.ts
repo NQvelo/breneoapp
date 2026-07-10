@@ -1,12 +1,29 @@
 import type { InterviewPlaybackItem } from "@/api/interview/types";
 
 let activeAudio: HTMLAudioElement | null = null;
+let interviewAudioMuted = false;
+let activeAudioReject: ((error: Error) => void) | null = null;
 
 export function stopActiveAudio(): void {
   if (!activeAudio) return;
-  activeAudio.pause();
-  activeAudio.removeAttribute("src");
+  const audio = activeAudio;
+  const reject = activeAudioReject;
   activeAudio = null;
+  activeAudioReject = null;
+  audio.pause();
+  audio.removeAttribute("src");
+  reject?.(new Error("Audio stopped"));
+}
+
+export function setInterviewAudioMuted(muted: boolean): void {
+  interviewAudioMuted = muted;
+  if (activeAudio) {
+    activeAudio.volume = muted ? 0 : 1;
+  }
+}
+
+export function isInterviewAudioMuted(): boolean {
+  return interviewAudioMuted;
 }
 
 export function isAutoplayBlockedError(error: unknown): boolean {
@@ -24,12 +41,18 @@ export function playAudioUrl(
     stopActiveAudio();
     const audio = new Audio(url);
     activeAudio = audio;
-    audio.volume = options?.volume ?? 1;
+    audio.volume = interviewAudioMuted ? 0 : (options?.volume ?? 1);
 
     const cleanup = () => {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
       if (activeAudio === audio) activeAudio = null;
+      if (activeAudioReject === rejectPlayback) activeAudioReject = null;
+    };
+
+    const rejectPlayback = (error: Error) => {
+      cleanup();
+      reject(error);
     };
 
     const onEnded = () => {
@@ -38,9 +61,10 @@ export function playAudioUrl(
     };
 
     const onError = () => {
-      cleanup();
-      reject(new Error(`Audio failed: ${url}`));
+      rejectPlayback(new Error(`Audio failed: ${url}`));
     };
+
+    activeAudioReject = rejectPlayback;
 
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
@@ -48,8 +72,7 @@ export function playAudioUrl(
     const playPromise = audio.play();
     if (playPromise) {
       playPromise.catch((err) => {
-        cleanup();
-        reject(err);
+        rejectPlayback(err instanceof Error ? err : new Error("Audio play failed"));
       });
     }
   });
