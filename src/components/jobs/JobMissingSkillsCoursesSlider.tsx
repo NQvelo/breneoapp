@@ -5,9 +5,9 @@ import { ChevronLeft, ChevronRight, Clock, GraduationCap, CheckCircle2 } from "l
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { courseMatchesMissingSkills } from "@/utils/courseSkillMatch";
 
 export type JobCourseRecommendation = {
@@ -59,10 +59,12 @@ async function fetchCoursesForJobPage(): Promise<JobCourseRecommendation[]> {
 
 export interface JobMissingSkillsCoursesSliderProps {
   missingSkills: string[];
+  className?: string;
 }
 
 export function JobMissingSkillsCoursesSlider({
   missingSkills,
+  className,
 }: JobMissingSkillsCoursesSliderProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +99,12 @@ export function JobMissingSkillsCoursesSlider({
   };
 
   return (
-    <div className="mt-8 border-t border-gray-100 pt-6 dark:border-gray-800">
+    <div
+      className={cn(
+        "rounded-3xl border-0 bg-white p-6 shadow-none dark:bg-card",
+        className,
+      )}
+    >
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-foreground">
@@ -140,7 +147,7 @@ export function JobMissingSkillsCoursesSlider({
       </div>
 
       {allSkillsCovered ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 px-6 py-10 text-center dark:border-emerald-900/40 dark:bg-emerald-950/20">
+        <div className="flex flex-col items-center justify-center px-2 py-8 text-center">
           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
             <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
           </div>
@@ -153,24 +160,22 @@ export function JobMissingSkillsCoursesSlider({
           </p>
         </div>
       ) : isLoading ? (
-        <div className="-mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto px-2 pb-2 scrollbar-hide">
+        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 scrollbar-hide">
           {[0, 1, 2].map((i) => (
-            <Card
+            <div
               key={i}
-              className="min-w-[280px] flex-shrink-0 snap-start rounded-3xl"
+              className="min-w-[280px] flex-shrink-0 snap-start overflow-hidden rounded-3xl"
             >
-              <CardContent className="p-0">
-                <Skeleton className="h-36 w-full rounded-t-3xl" />
-                <div className="space-y-2 p-4">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              </CardContent>
-            </Card>
+              <Skeleton className="h-36 w-full rounded-t-3xl" />
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            </div>
           ))}
         </div>
       ) : matchedCourses.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
+        <div className="flex flex-col items-center justify-center px-2 py-8 text-center">
           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
             <GraduationCap className="h-10 w-10 text-muted-foreground/70" />
           </div>
@@ -183,7 +188,7 @@ export function JobMissingSkillsCoursesSlider({
       ) : (
         <div
           ref={scrollRef}
-          className="-mx-2 flex snap-x snap-mandatory gap-4 overflow-x-auto px-2 pb-2 scrollbar-hide"
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 scrollbar-hide"
         >
           {matchedCourses.map((course) => (
             <Link
@@ -191,50 +196,48 @@ export function JobMissingSkillsCoursesSlider({
               to={`/course/${course.id}`}
               className="block min-w-[280px] flex-shrink-0 snap-start"
             >
-              <Card className="group h-full overflow-hidden rounded-3xl transition-shadow hover:shadow-md">
-                <CardContent className="flex h-full flex-col p-0">
-                  <div className="relative h-36 w-full overflow-hidden">
-                    <img
-                      src={course.image}
-                      alt={course.title}
-                      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "/lovable-uploads/no_photo.png";
-                      }}
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col p-4">
-                    <h4 className="mb-1 line-clamp-2 text-sm font-semibold group-hover:text-breneo-blue">
-                      {course.title}
-                    </h4>
-                    {course.provider ? (
-                      <p className="mb-3 line-clamp-1 text-xs text-muted-foreground">
-                        {course.provider}
-                      </p>
+              <div className="group h-full overflow-hidden rounded-3xl transition-shadow hover:shadow-md">
+                <div className="relative h-36 w-full overflow-hidden">
+                  <img
+                    src={course.image}
+                    alt={course.title}
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "/lovable-uploads/no_photo.png";
+                    }}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col p-4">
+                  <h4 className="mb-1 line-clamp-2 text-sm font-semibold group-hover:text-breneo-blue">
+                    {course.title}
+                  </h4>
+                  {course.provider ? (
+                    <p className="mb-3 line-clamp-1 text-xs text-muted-foreground">
+                      {course.provider}
+                    </p>
+                  ) : null}
+                  <div className="mt-auto flex flex-wrap items-center gap-2">
+                    {course.duration ? (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 rounded-[10px] px-2.5 py-0.5 text-xs font-normal"
+                      >
+                        <Clock className="h-3 w-3" />
+                        {course.duration}
+                      </Badge>
                     ) : null}
-                    <div className="mt-auto flex flex-wrap items-center gap-2">
-                      {course.duration ? (
-                        <Badge
-                          variant="secondary"
-                          className="gap-1 rounded-[10px] px-2.5 py-0.5 text-xs font-normal"
-                        >
-                          <Clock className="h-3 w-3" />
-                          {course.duration}
-                        </Badge>
-                      ) : null}
-                      {course.level ? (
-                        <Badge
-                          variant="outline"
-                          className="rounded-[10px] px-2.5 py-0.5 text-xs font-normal capitalize"
-                        >
-                          {course.level}
-                        </Badge>
-                      ) : null}
-                    </div>
+                    {course.level ? (
+                      <Badge
+                        variant="outline"
+                        className="rounded-[10px] px-2.5 py-0.5 text-xs font-normal capitalize"
+                      >
+                        {course.level}
+                      </Badge>
+                    ) : null}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </Link>
           ))}
         </div>

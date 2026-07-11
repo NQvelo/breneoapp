@@ -1,0 +1,4 @@
+#!/bin/sh
+
+node scripts/bump-patch-version.mjs || exit 1
+git add package.json package-lock.json

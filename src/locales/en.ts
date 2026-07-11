@@ -403,7 +403,7 @@ export const en = {
     description:
       "Practice for this role with a virtual HR interviewer — 3 tailored questions, live camera, and instant feedback on every answer.",
     roleHint: "Interview practice for: {role}",
-    startButton: "Start mock interview",
+    startButton: "Start interview now",
     headerButton: "AI Interview",
   },
   // Webinars

@@ -82,7 +82,6 @@ import {
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
 import { JobMockInterviewPromo } from "@/components/jobs/JobMockInterviewPromo";
-import { JobStartAiInterviewButton } from "@/components/jobs/JobStartAiInterviewButton";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
@@ -1758,14 +1757,6 @@ const JobDetailPage = () => {
                         </DropdownMenu>
                       </div>
                     )}
-                    {user ? (
-                      <JobStartAiInterviewButton
-                        jobTitle={getJobTitle()}
-                        jobId={applicationJobId}
-                        size="sm"
-                        className="shrink-0"
-                      />
-                    ) : null}
                     <JobApplyButton
                       jobId={applicationJobId}
                       supportsInAppApply={supportsInAppApply}
@@ -1944,9 +1935,6 @@ const JobDetailPage = () => {
                           );
                         })}
                       </div>
-                      <JobMissingSkillsCoursesSlider
-                        missingSkills={missingJobSkills}
-                      />
                     </div>
                   ) : null}
 
@@ -2052,6 +2040,13 @@ const JobDetailPage = () => {
                   </div>
                 </div>
               )}
+
+              {user && requiredSkillsList.length > 0 ? (
+                <JobMissingSkillsCoursesSlider
+                  missingSkills={missingJobSkills}
+                  className="mt-6"
+                />
+              ) : null}
 
               {user ? (
                 <JobMockInterviewPromo
