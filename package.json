@@ -1,12 +1,12 @@
 {
   "name": "breneoapp",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "type": "module",
   "homepage": "https://dashboard.breneo.app",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"node server/employer-jobs-proxy.mjs\"",
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "dev:vite": "vite",
     "build": "vite build && npm run copy404",
     "test": "vitest run",
