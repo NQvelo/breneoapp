@@ -81,7 +81,12 @@ export async function startInterview(
     typeof params === "string"
       ? { job_position: params.trim() }
       : "job_id" in params && params.job_id != null
-        ? { job_id: params.job_id }
+        ? {
+            job_id: params.job_id,
+            ...(params.job_position?.trim()
+              ? { job_position: params.job_position.trim() }
+              : {}),
+          }
         : { job_position: String(params.job_position ?? "").trim() };
 
   if ("job_id" in body && body.job_id != null) {

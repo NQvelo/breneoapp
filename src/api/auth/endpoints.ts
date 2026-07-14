@@ -82,6 +82,8 @@ export const API_ENDPOINTS = {
     READ_ALL: "/api/me/notifications/read-all/",
     MARK_READ: (id: string) =>
       `/api/me/notifications/${encodeURIComponent(id)}/read/`,
+    DELETE: (id: string) =>
+      `/api/me/notifications/${encodeURIComponent(id)}/`,
     JOB_IDS: "/api/me/job-notifications/",
     JOB_MARK: "/api/me/job-notifications/",
   },

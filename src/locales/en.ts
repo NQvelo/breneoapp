@@ -320,15 +320,17 @@ export const en = {
     noNotifications: "No notifications",
     markAsRead: "Mark as read",
     markAllAsRead: "Mark all as read",
+    removeSelected: "Remove selected",
+    selectedCount: "{count} selected",
     browserNotifications: "Browser Notifications",
     enableBrowserNotifications: "Enable Browser Notifications",
     browserNotificationsDescription:
-      "Get notified when new jobs matching your skills are posted. You'll receive browser notifications even when you're not on the site.",
+      "Get browser alerts when you receive new notifications, including job matches and account updates.",
     notificationPermissionGranted: "Browser notifications are enabled",
     notificationPermissionDenied:
       "Browser notifications are blocked. Please enable them in your browser settings.",
     notificationPermissionDefault:
-      "Click the button below to enable browser notifications for new job matches.",
+      "Click the button below to enable browser notifications.",
     requestPermission: "Enable Notifications",
     checkingForJobs: "Checking for new jobs...",
     notificationsEnabled: "Notifications Enabled",

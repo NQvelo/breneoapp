@@ -163,6 +163,52 @@ export async function markAllNotificationsRead(): Promise<void> {
   }
 }
 
+export async function markNotificationsRead(
+  notificationIds: string[],
+): Promise<void> {
+  const ids = notificationIds.map((id) => id.trim()).filter(Boolean);
+  if (ids.length === 0) return;
+  await Promise.all(ids.map((id) => markNotificationRead(id)));
+}
+
+export async function deleteMyNotification(
+  notificationId: string,
+): Promise<boolean> {
+  const id = notificationId.trim();
+  if (!id) throw new Error("Notification id is required.");
+
+  try {
+    await apiClient.delete(API_ENDPOINTS.NOTIFICATIONS.DELETE(id));
+    return true;
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
+      if (status === 404 || status === 405 || status === 501) {
+        return false;
+      }
+    }
+    throw new Error(
+      extractApiErrorMessage(err, "Could not remove notification."),
+    );
+  }
+}
+
+export async function removeNotifications(
+  notificationIds: string[],
+): Promise<void> {
+  const ids = notificationIds.map((id) => id.trim()).filter(Boolean);
+  if (ids.length === 0) return;
+
+  await Promise.all(
+    ids.map(async (id) => {
+      const deleted = await deleteMyNotification(id);
+      if (!deleted) {
+        await markNotificationRead(id);
+      }
+    }),
+  );
+}
+
 export async function markJoinRequestNotificationsRead(
   requestId: string,
 ): Promise<void> {

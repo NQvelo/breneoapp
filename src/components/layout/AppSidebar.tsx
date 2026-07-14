@@ -36,6 +36,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
+import { NotificationCountBadge } from "@/components/notifications/NotificationCountBadge";
 
 const EMPLOYER_SIDEBAR_CACHE_KEY = "employerSidebarIdentity";
 
@@ -110,6 +112,7 @@ export function AppSidebar({
   const notificationsPath = isEmployer
     ? "/employer/notifications"
     : "/notifications";
+  const { count: unreadNotificationCount } = useUnreadNotificationCount();
 
   // Handle mounted state to avoid hydration mismatch
   React.useEffect(() => {
@@ -379,10 +382,11 @@ export function AppSidebar({
             </button>
             <LocalizedLink
               to={notificationsPath}
-              className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
+              className="relative h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
                          bg-black/[0.06] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.05] transition-colors rounded-full"
             >
               <Bell size={20} />
+              <NotificationCountBadge count={unreadNotificationCount} />
             </LocalizedLink>
           </div>
         </div>
@@ -428,21 +432,29 @@ export function AppSidebar({
                   key={index}
                   to={item.href}
                   className={cn(
-                    "group flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-2 transition-all duration-200",
+                    "group relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-2 transition-all duration-200",
                     isActive
                       ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
                       : "text-[#6B7280] hover:bg-black/[0.04] hover:text-[#111827] dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white",
                   )}
                 >
-                  <item.icon
-                    size={20}
-                    className={cn(
-                      "mb-0.5 transition-colors duration-200",
-                      isActive
-                        ? "text-breneo-blue"
-                        : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
+                  <div className="relative mb-0.5">
+                    <item.icon
+                      size={20}
+                      className={cn(
+                        "transition-colors duration-200",
+                        isActive
+                          ? "text-breneo-blue"
+                          : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
+                      )}
+                    />
+                    {item.href === notificationsPath && (
+                      <NotificationCountBadge
+                        count={unreadNotificationCount}
+                        className="-top-1.5 -right-2"
+                      />
                     )}
-                  />
+                  </div>
                   <span
                     className={cn(
                       "text-center text-[11px] font-semibold leading-tight transition-colors duration-200",

@@ -49,14 +49,16 @@ function resolveStartParams(
   jobIdRaw: string,
   position: string,
 ): StartInterviewParams | null {
+  const trimmedPosition = position.trim();
   const trimmedId = jobIdRaw.trim();
   if (trimmedId) {
     const numericId = Number(trimmedId);
     if (Number.isFinite(numericId) && trimmedId === String(numericId)) {
-      return { job_id: numericId };
+      return trimmedPosition
+        ? { job_id: numericId, job_position: trimmedPosition }
+        : { job_id: numericId };
     }
   }
-  const trimmedPosition = position.trim();
   if (trimmedPosition) return { job_position: trimmedPosition };
   return null;
 }

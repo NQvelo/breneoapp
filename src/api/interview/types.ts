@@ -49,5 +49,5 @@ export type InterviewEvaluation = Omit<
 >;
 
 export type StartInterviewParams =
-  | { job_id: number; job_position?: never }
+  | { job_id: number; job_position?: string }
   | { job_position: string; job_id?: never };

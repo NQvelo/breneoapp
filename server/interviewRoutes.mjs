@@ -37,9 +37,25 @@ export function registerInterviewRoutes(app, deps) {
           ? /** @type {Record<string, unknown>} */ (req.body)
           : {};
       const jobPosition = String(raw.job_position ?? "").trim();
-      if (!jobPosition) {
-        return res.status(400).json({ detail: "job_position is required" });
+      const jobIdRaw = raw.job_id;
+      const jobId =
+        jobIdRaw != null &&
+        jobIdRaw !== "" &&
+        Number.isFinite(Number(jobIdRaw))
+          ? Number(jobIdRaw)
+          : null;
+
+      if (jobId == null && !jobPosition) {
+        return res.status(400).json({
+          detail: "job_id or job_position is required",
+        });
       }
+
+      const upstreamBody = {
+        user_id: ctx.userId,
+        ...(jobId != null ? { job_id: jobId } : {}),
+        ...(jobPosition ? { job_position: jobPosition } : {}),
+      };
 
       const upstream = await fetch(`${base}/api/v1/interview/start/`, {
         method: "POST",
@@ -48,10 +64,7 @@ export function registerInterviewRoutes(app, deps) {
           Accept: "application/json",
           "X-Employer-Key": deps.aggregatorKey,
         },
-        body: JSON.stringify({
-          job_position: jobPosition,
-          user_id: ctx.userId,
-        }),
+        body: JSON.stringify(upstreamBody),
       });
 
       const text = await upstream.text();

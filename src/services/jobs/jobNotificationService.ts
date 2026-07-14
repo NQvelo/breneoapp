@@ -158,13 +158,23 @@ export const createJobNotification = async (
     const companyName =
       job.employer_name || job.company_name || job.company || "Company";
     const jobId = String(job.job_id || job.id || "");
+    const companyLogo =
+      job.employer_logo ||
+      job.company_logo ||
+      job.logo_url ||
+      job.company_logo_url ||
+      "";
 
     await createMyNotification({
       title: "New Job Match! 🎯",
       message: `${jobTitle} at ${companyName} matches your skills`,
       type: "info",
       kind: "job_match",
-      metadata: jobId ? { job_id: jobId } : {},
+      metadata: {
+        ...(jobId ? { job_id: jobId } : {}),
+        ...(companyName ? { company_name: companyName } : {}),
+        ...(companyLogo ? { company_logo: companyLogo } : {}),
+      },
     });
   } catch (error) {
     console.error("Error creating notification:", error);

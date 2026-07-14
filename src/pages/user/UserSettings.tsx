@@ -47,6 +47,11 @@ import {
 } from "lucide-react";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import {
+  requestBrowserNotificationPermission,
+  setPushNotificationsPreference,
+  notifyPushNotificationsChanged,
+} from "@/lib/browserNotifications";
 import { bogService } from "@/api/bog/bogService";
 import { PaymentTransaction } from "@/api/bog/bogService";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -470,6 +475,25 @@ export default function SettingsPage() {
     setTheme(value);
     localStorage.setItem("theme", value);
   };
+
+  const handlePushNotificationsChange = async (checked: boolean) => {
+    if (checked) {
+      const result = await requestBrowserNotificationPermission();
+      if (result !== "granted") {
+        toast.error(t.notifications.notificationPermissionDenied);
+        return;
+      }
+      setPushNotifications(true);
+      setPushNotificationsPreference(true);
+      notifyPushNotificationsChanged();
+      return;
+    }
+
+    setPushNotifications(false);
+    setPushNotificationsPreference(false);
+    notifyPushNotificationsChanged();
+  };
+
   useEffect(() => {
     if (mounted) {
       localStorage.setItem("accessibility_language", JSON.stringify(language));
@@ -774,7 +798,9 @@ export default function SettingsPage() {
                   >
                     <Switch
                       checked={pushNotifications}
-                      onCheckedChange={setPushNotifications}
+                      onCheckedChange={(checked) =>
+                        void handlePushNotificationsChange(checked)
+                      }
                     />
                   </SettingsToggleRow>
                 </SettingsSubsection>

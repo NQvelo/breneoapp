@@ -14,6 +14,8 @@ import {
   isSettingsPath,
   isValidSettingsSection,
 } from "@/constants/settingsSections";
+import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
+import { NotificationCountBadge } from "@/components/notifications/NotificationCountBadge";
 
 interface DashboardHeaderProps {
   sidebarCollapsed: boolean;
@@ -200,6 +202,7 @@ export function DashboardHeader({
 
   const notificationsPath =
     getRole() === "employer" ? "/employer/notifications" : "/notifications";
+  const { count: unreadNotificationCount } = useUnreadNotificationCount();
 
   React.useEffect(() => {
     setMounted(true);
@@ -295,7 +298,13 @@ export function DashboardHeader({
                          text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
             >
               <Bell className="h-5 w-5" />
-              <span className="sr-only">Notifications</span>
+              <NotificationCountBadge count={unreadNotificationCount} />
+              <span className="sr-only">
+                Notifications
+                {unreadNotificationCount > 0
+                  ? `, ${unreadNotificationCount} unread`
+                  : ""}
+              </span>
             </Button>
           </LocalizedLink>
         </div>
