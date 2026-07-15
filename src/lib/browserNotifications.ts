@@ -162,16 +162,24 @@ export async function enableBrowserNotifications(): Promise<boolean> {
     const { initPwaUpdate } = await import("@/lib/pwaUpdate");
     initPwaUpdate();
     const { registerFcmToken } = await import("@/lib/fcmClient");
-    await registerFcmToken();
+    const fcmOk = await registerFcmToken();
+    if (!fcmOk) {
+      console.warn(
+        "[notifications] Browser permission granted, but FCM token was not registered. Background push will not work until this succeeds.",
+      );
+    }
     const { requestNotificationBootstrap } = await import(
       "@/lib/notificationAlerts"
     );
+    const { TokenManager } = await import("@/api/auth/tokenManager");
     const token = TokenManager.getAccessToken();
     if (token) {
       const parts = token.split(".");
       if (parts.length >= 2) {
         try {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+          const payload = JSON.parse(
+            atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")),
+          );
           const userId =
             payload.user_id ?? payload.sub ?? payload.id ?? payload.userId;
           if (userId != null) {
@@ -182,8 +190,8 @@ export async function enableBrowserNotifications(): Promise<boolean> {
         }
       }
     }
-  } catch {
-    // FCM is optional; polling alerts still work when the app is open.
+  } catch (error) {
+    console.warn("[notifications] FCM setup failed:", error);
   }
 
   return true;

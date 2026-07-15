@@ -14,8 +14,23 @@ import { initPwaUpdate } from "@/lib/pwaUpdate";
 
 const FCM_SW_PATH = "/firebase-messaging-sw.js";
 
-/** FCM token routes live on the employer-jobs BFF (`/api/me/fcm-tokens`), not the static SPA host. */
+/** FCM token routes live on the BFF (`/api/me/fcm-tokens`). Prefer same-origin so Vite proxy / production.mjs receive them. */
 function getFcmApiBaseUrl(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const host = window.location.hostname;
+    const local =
+      /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    // Local Vite: always hit same-origin → proxy → employer-jobs-proxy :8787
+    if (local || import.meta.env.DEV) {
+      return window.location.origin.replace(/\/$/, "");
+    }
+    // Static dashboard SPA has no same-origin BFF — use configured employer BFF.
+    if (host === "dashboard.breneo.app") {
+      return getEmployerJobsApiBaseUrl().replace(/\/$/, "");
+    }
+    // Hosts that run production.mjs (e.g. Railway app) expose /api/me/fcm-tokens same-origin.
+    return window.location.origin.replace(/\/$/, "");
+  }
   return getEmployerJobsApiBaseUrl().replace(/\/$/, "");
 }
 
@@ -31,6 +46,15 @@ function authHeaders(): HeadersInit {
   return headers;
 }
 
+function scriptUrlOf(registration: ServiceWorkerRegistration): string {
+  return (
+    registration.active?.scriptURL ??
+    registration.waiting?.scriptURL ??
+    registration.installing?.scriptURL ??
+    ""
+  );
+}
+
 function isFirebaseMessagingSw(scriptUrl: string): boolean {
   return scriptUrl.includes("firebase-messaging-sw.js");
 }
@@ -43,53 +67,101 @@ function isPwaServiceWorker(scriptUrl: string): boolean {
   );
 }
 
+function hasPushManager(
+  registration: ServiceWorkerRegistration | null | undefined,
+): registration is ServiceWorkerRegistration {
+  return Boolean(registration && registration.pushManager);
+}
+
+async function waitForActiveWorker(
+  registration: ServiceWorkerRegistration,
+  timeoutMs = 10_000,
+): Promise<ServiceWorkerRegistration> {
+  if (registration.active) {
+    return registration;
+  }
+
+  const worker = registration.installing || registration.waiting;
+  if (worker) {
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        reject(new Error("Service worker activate timeout"));
+      }, timeoutMs);
+
+      worker.addEventListener("statechange", () => {
+        if (worker.state === "activated") {
+          window.clearTimeout(timer);
+          resolve();
+        }
+        if (worker.state === "redundant") {
+          window.clearTimeout(timer);
+          reject(new Error("Service worker became redundant"));
+        }
+      });
+    });
+  }
+
+  const ready = await navigator.serviceWorker.ready;
+  return ready;
+}
+
+/**
+ * Resolve a ServiceWorkerRegistration that Firebase getToken() can use.
+ * Must expose pushManager (secure context: localhost / HTTPS).
+ */
 async function getFcmServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
   if (!("serviceWorker" in navigator)) {
-    throw new Error("Service workers are not supported");
+    throw new Error("Service workers are not supported in this browser");
   }
 
-  initPwaUpdate();
-
-  const deadline = Date.now() + 12_000;
-  while (Date.now() < deadline) {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-
-    const pwaRegistration = registrations.find((registration) => {
-      const scriptUrl =
-        registration.active?.scriptURL ??
-        registration.waiting?.scriptURL ??
-        registration.installing?.scriptURL ??
-        "";
-      return scriptUrl && isPwaServiceWorker(scriptUrl);
-    });
-    if (pwaRegistration?.active) {
-      return pwaRegistration;
-    }
-
-    const firebaseRegistration = registrations.find((registration) => {
-      const scriptUrl =
-        registration.active?.scriptURL ??
-        registration.waiting?.scriptURL ??
-        registration.installing?.scriptURL ??
-        "";
-      return scriptUrl && isFirebaseMessagingSw(scriptUrl);
-    });
-    if (firebaseRegistration?.active) {
-      return firebaseRegistration;
-    }
-
-    if (import.meta.env.DEV && registrations.length === 0) {
-      const registration = await navigator.serviceWorker.register(FCM_SW_PATH);
-      await navigator.serviceWorker.ready;
-      return registration;
-    }
-
-    await navigator.serviceWorker.ready;
-    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    throw new Error(
+      "Push requires a secure context. Open the app via http://localhost:8080 (not a LAN IP like http://192.168.x.x).",
+    );
   }
 
-  const fallback = await navigator.serviceWorker.ready;
-  return fallback;
+  // Production PWA SW (importScripts firebase-messaging-sw.js) is preferred when active.
+  if (!import.meta.env.DEV) {
+    initPwaUpdate();
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+
+  const pwaRegistration = registrations.find((registration) => {
+    const scriptUrl = scriptUrlOf(registration);
+    return scriptUrl && isPwaServiceWorker(scriptUrl);
+  });
+  if (pwaRegistration) {
+    const active = await waitForActiveWorker(pwaRegistration);
+    if (hasPushManager(active)) {
+      return active;
+    }
+  }
+
+  const existingFirebase = registrations.find((registration) => {
+    const scriptUrl = scriptUrlOf(registration);
+    return scriptUrl && isFirebaseMessagingSw(scriptUrl);
+  });
+  if (existingFirebase) {
+    const active = await waitForActiveWorker(existingFirebase);
+    if (hasPushManager(active)) {
+      return active;
+    }
+  }
+
+  // Dev (PWA SW disabled) and fallback: register the dedicated FCM service worker.
+  const registration = await navigator.serviceWorker.register(FCM_SW_PATH, {
+    scope: "/",
+  });
+  const active = await waitForActiveWorker(registration);
+
+  if (!hasPushManager(active)) {
+    throw new Error(
+      "Service worker has no pushManager. Use https:// or http://localhost (not a raw LAN IP).",
+    );
+  }
+
+  return active;
 }
 
 async function getMessagingInstance(): Promise<Messaging | null> {
@@ -146,10 +218,31 @@ export async function registerFcmToken(): Promise<boolean> {
       return false;
     }
 
-    const token = await getToken(messaging, {
-      vapidKey,
-      serviceWorkerRegistration: registration,
-    });
+    if (!registration.pushManager) {
+      console.error(
+        "[fcm] registration.pushManager is missing. Open http://localhost:8080 (secure context).",
+      );
+      return false;
+    }
+
+    // Passing the same registration Firebase will use avoids an internal
+    // deleteToken race (pushManager of undefined in token-manager.ts).
+    await navigator.serviceWorker.ready;
+
+    let token: string | null = null;
+    try {
+      token = await getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: registration,
+      });
+    } catch (tokenError) {
+      // Firebase may throw during old-token cleanup while still returning a usable subscription.
+      console.warn("[fcm] getToken warning (retrying once):", tokenError);
+      token = await getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: registration,
+      });
+    }
 
     if (!token) {
       console.warn(
