@@ -43,6 +43,72 @@ export function isFcmConfigured() {
   return Boolean(readServiceAccount());
 }
 
+/** Firebase Console can target this topic for web/PWA broadcasts. */
+export const FCM_BROADCAST_TOPIC =
+  process.env.FCM_BROADCAST_TOPIC?.trim() || "breneo_all";
+
+/**
+ * @param {string} token
+ */
+export async function subscribeTokenToBroadcastTopic(token) {
+  const tok = String(token ?? "").trim();
+  if (!tok) {
+    return { ok: false, reason: "missing_token" };
+  }
+
+  const app = getFirebaseAdmin();
+  if (!app) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const messaging = admin.messaging(app);
+    const response = await messaging.subscribeToTopic([tok], FCM_BROADCAST_TOPIC);
+    if (response.failureCount > 0) {
+      const first = response.errors?.[0];
+      console.warn(
+        "[fcm] subscribeToTopic failed:",
+        FCM_BROADCAST_TOPIC,
+        first?.error?.message || response.errors,
+      );
+      return {
+        ok: false,
+        reason: "subscribe_failed",
+        topic: FCM_BROADCAST_TOPIC,
+        errors: response.errors,
+      };
+    }
+    return { ok: true, topic: FCM_BROADCAST_TOPIC };
+  } catch (e) {
+    console.warn("[fcm] subscribeToTopic error:", e);
+    return { ok: false, reason: "subscribe_error" };
+  }
+}
+
+/**
+ * @param {string} token
+ */
+export async function unsubscribeTokenFromBroadcastTopic(token) {
+  const tok = String(token ?? "").trim();
+  if (!tok) {
+    return { ok: false, reason: "missing_token" };
+  }
+
+  const app = getFirebaseAdmin();
+  if (!app) {
+    return { ok: false, reason: "not_configured" };
+  }
+
+  try {
+    const messaging = admin.messaging(app);
+    await messaging.unsubscribeFromTopic([tok], FCM_BROADCAST_TOPIC);
+    return { ok: true, topic: FCM_BROADCAST_TOPIC };
+  } catch (e) {
+    console.warn("[fcm] unsubscribeFromTopic error:", e);
+    return { ok: false, reason: "unsubscribe_error" };
+  }
+}
+
 function getFirebaseAdmin() {
   if (firebaseApp) {
     return firebaseApp;

@@ -8,6 +8,7 @@ import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { FCM_BROADCAST_TOPIC } from "../server/fcmNotifications.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -130,3 +131,9 @@ if (process.env.NOTIFICATIONS_INTERNAL_KEY?.trim()) {
 }
 
 console.log("\n=== done ===\n");
+
+console.log("Firebase Console (web push):");
+console.log("  1) Users must enable notifications in Breneo Settings (FCM token registered).");
+console.log(`  2) Topic broadcast: run node scripts/subscribe-fcm-topics.mjs, then target topic "${FCM_BROADCAST_TOPIC}" in Console.`);
+console.log("  3) Test one device: node scripts/list-fcm-tokens.mjs → paste token in Console → Send test message.");
+console.log("  Note: Console 'All users' often shows 0 web recipients — use Topic or test token instead.\n");

@@ -33,10 +33,21 @@ export function registerFcmRoutes(app, deps) {
       const { upsertFcmToken } = await import("./fcmTokenStore.mjs");
       await upsertFcmToken(ctx.userId, token, platform);
 
+      const { isFcmConfigured, subscribeTokenToBroadcastTopic } = await import(
+        "./fcmNotifications.mjs"
+      );
+      let topic = null;
+      if (isFcmConfigured()) {
+        const sub = await subscribeTokenToBroadcastTopic(token);
+        if (sub.ok) {
+          topic = sub.topic;
+        }
+      }
+
       return res.status(200).json({
         success: true,
         message: "FCM token registered",
-        data: { registered: true },
+        data: { registered: true, topic },
       });
     } catch (e) {
       console.error("[fcm] register token error:", e);
@@ -65,6 +76,12 @@ export function registerFcmRoutes(app, deps) {
       }
 
       const { removeFcmToken } = await import("./fcmTokenStore.mjs");
+      const { isFcmConfigured, unsubscribeTokenFromBroadcastTopic } = await import(
+        "./fcmNotifications.mjs"
+      );
+      if (isFcmConfigured()) {
+        await unsubscribeTokenFromBroadcastTopic(token);
+      }
       await removeFcmToken(token);
 
       return res.status(200).json({

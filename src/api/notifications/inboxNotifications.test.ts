@@ -22,13 +22,20 @@ function notification(
 }
 
 describe("inboxNotifications", () => {
-  it("shows manual, broadcast, and job_match notifications", () => {
+  it("shows manual and broadcast notifications", () => {
     expect(isInboxNotification(notification({ kind: "manual" }))).toBe(true);
     expect(isInboxNotification(notification({ kind: "broadcast" }))).toBe(true);
-    expect(isInboxNotification(notification({ kind: "job_match" }))).toBe(true);
+    expect(
+      isInboxNotification(
+        notification({ kind: "", recipient_id: null }),
+      ),
+    ).toBe(true);
   });
 
-  it("hides employer join requests from the general inbox", () => {
+  it("hides job matches and join requests from the Notifications tab", () => {
+    expect(isInboxNotification(notification({ kind: "job_match" }))).toBe(
+      false,
+    );
     expect(
       isInboxNotification(
         notification({
@@ -44,11 +51,12 @@ describe("inboxNotifications", () => {
       notification({ id: "1", kind: "manual" }),
       notification({ id: "2", kind: "employer_join_request" }),
       notification({ id: "3", kind: "job_match" }),
+      notification({ id: "4", kind: "broadcast", recipient_id: null }),
     ];
 
     expect(filterInboxNotifications(items).map((item) => item.id)).toEqual([
       "1",
-      "3",
+      "4",
     ]);
   });
 });

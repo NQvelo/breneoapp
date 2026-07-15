@@ -49,9 +49,16 @@ function normalizeNotification(row: NotificationRow): Notification {
   const kindFromMeta =
     typeof metadata.kind === "string" ? metadata.kind.trim() : "";
   const kind = String(row.kind ?? kindFromMeta ?? "").trim();
+  const record = row as NotificationRow & Record<string, unknown>;
+  const id =
+    row.id ??
+    record.pk ??
+    record.uuid ??
+    record.notification_id ??
+    "";
 
   return {
-    id: String(row.id ?? ""),
+    id: String(id),
     title: String(row.title ?? ""),
     message: String(row.message ?? ""),
     type: allowed.includes(type as NotificationType)
@@ -61,10 +68,16 @@ function normalizeNotification(row: NotificationRow): Notification {
       row.recipient_id == null || row.recipient_id === ""
         ? null
         : String(row.recipient_id),
-    is_read: Boolean(row.is_read),
+    is_read: Boolean(row.is_read ?? record.isRead),
     kind,
-    created_at: String(row.created_at ?? new Date().toISOString()),
-    updated_at: row.updated_at ? String(row.updated_at) : undefined,
+    created_at: String(
+      row.created_at ?? record.createdAt ?? new Date().toISOString(),
+    ),
+    updated_at: row.updated_at
+      ? String(row.updated_at)
+      : record.updatedAt
+        ? String(record.updatedAt)
+        : undefined,
     metadata,
   };
 }
@@ -75,11 +88,24 @@ function extractNotificationList(data: unknown): Notification[] {
   }
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
-    const results = o.results ?? o.notifications ?? o.data;
-    if (Array.isArray(results)) {
-      return results.map((row) =>
-        normalizeNotification(row as NotificationRow),
-      );
+    const candidates = [o.results, o.notifications, o.data, o.items];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate.map((row) =>
+          normalizeNotification(row as NotificationRow),
+        );
+      }
+      // Nested: { data: { results: [...] } }
+      if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+        const nested = candidate as Record<string, unknown>;
+        const nestedList =
+          nested.results ?? nested.notifications ?? nested.items;
+        if (Array.isArray(nestedList)) {
+          return nestedList.map((row) =>
+            normalizeNotification(row as NotificationRow),
+          );
+        }
+      }
     }
   }
   return [];
