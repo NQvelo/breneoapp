@@ -4,13 +4,26 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
     <meta name="apple-mobile-web-app-title" content="Breneo" />
-    <meta name="theme-color" content="#F3F3F4" />
+    <meta name="theme-color" content="transparent" />
+    <meta
+      name="theme-color"
+      content="#F3F3F4"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#181818"
+      media="(prefers-color-scheme: dark)"
+    />
     <meta name="msapplication-TileColor" content="#F3F3F4" />
     <script>
       (function () {
@@ -20,21 +33,25 @@
             "(prefers-color-scheme: dark)",
           ).matches;
           var isDark =
-            theme === "dark" || (!theme || theme === "system") && systemDark;
+            theme === "dark" || ((!theme || theme === "system") && systemDark);
           var color = isDark ? "#181818" : "#F3F3F4";
-          var themeMeta = document.querySelector('meta[name="theme-color"]');
-          if (themeMeta) themeMeta.setAttribute("content", color);
+          var themeMeta = document.querySelector(
+            'meta[name="theme-color"]:not([media])',
+          );
+          if (themeMeta) themeMeta.setAttribute("content", "transparent");
           var appleMeta = document.querySelector(
             'meta[name="apple-mobile-web-app-status-bar-style"]',
           );
           if (appleMeta) {
-            appleMeta.setAttribute("content", isDark ? "black" : "default");
+            appleMeta.setAttribute("content", "black-translucent");
           }
           var tileMeta = document.querySelector(
             'meta[name="msapplication-TileColor"]',
           );
           if (tileMeta) tileMeta.setAttribute("content", color);
           document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+          document.documentElement.style.backgroundColor = color;
+          document.body.style.backgroundColor = color;
         } catch (e) {
           console.warn("PWA theme-color bootstrap failed:", e);
         }

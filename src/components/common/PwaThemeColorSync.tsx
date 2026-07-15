@@ -1,16 +1,24 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   applyPwaThemeColor,
   readStoredThemePreference,
+  syncPwaThemeColorFromPreference,
 } from "@/lib/pwaThemeColor";
 
 export function PwaThemeColorSync() {
   const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+    syncPwaThemeColorFromPreference();
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !resolvedTheme) return;
     applyPwaThemeColor(resolvedTheme === "dark");
-  }, [resolvedTheme]);
+  }, [mounted, resolvedTheme]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");

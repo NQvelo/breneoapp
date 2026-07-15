@@ -213,6 +213,7 @@ export function DashboardHeader({
       className={cn(
         "fixed top-0 right-0 z-30",
         "bg-gradient-to-b from-breneo-lightgray dark:from-background to-transparent",
+        "pt-[env(safe-area-inset-top,0px)]",
         "transition-opacity duration-300 ease-in-out",
         showSidebar
           ? sidebarCollapsed
