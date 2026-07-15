@@ -7,17 +7,16 @@ import {
   type Messaging,
 } from "firebase/messaging";
 import { TokenManager } from "@/api/auth/tokenManager";
+import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 import { getFirebaseApp, getFirebaseWebConfig } from "@/lib/firebase";
 import { showBrowserNotification } from "@/lib/browserNotifications";
 import { initPwaUpdate } from "@/lib/pwaUpdate";
 
 const FCM_SW_PATH = "/firebase-messaging-sw.js";
 
-function getApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    return window.location.origin.replace(/\/$/, "");
-  }
-  return "";
+/** FCM token routes live on the employer-jobs BFF (`/api/me/fcm-tokens`), not the static SPA host. */
+function getFcmApiBaseUrl(): string {
+  return getEmployerJobsApiBaseUrl().replace(/\/$/, "");
 }
 
 function authHeaders(): HeadersInit {
@@ -136,13 +135,23 @@ export async function registerFcmToken(): Promise<boolean> {
       return false;
     }
 
-    const res = await fetch(`${getApiBaseUrl()}/api/me/fcm-tokens/`, {
+    const res = await fetch(`${getFcmApiBaseUrl()}/api/me/fcm-tokens/`, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ token, platform: "web" }),
     });
 
-    return res.ok;
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.warn(
+        "[fcm] register token failed:",
+        res.status,
+        detail || res.statusText,
+      );
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.warn("[fcm] register token failed:", error);
     return false;
@@ -162,7 +171,7 @@ export async function unregisterFcmToken(): Promise<void> {
       serviceWorkerRegistration: registration,
     });
     if (token) {
-      await fetch(`${getApiBaseUrl()}/api/me/fcm-tokens/`, {
+      await fetch(`${getFcmApiBaseUrl()}/api/me/fcm-tokens/`, {
         method: "DELETE",
         headers: authHeaders(),
         body: JSON.stringify({ token }),

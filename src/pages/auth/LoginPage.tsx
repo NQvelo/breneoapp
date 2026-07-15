@@ -13,6 +13,7 @@ import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
 import { getLocalizedPath, getLanguageFromPath } from "@/utils/localeUtils";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { AuthLoadingScreen } from "@/components/auth/AuthLoadingScreen";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -227,6 +228,16 @@ const LoginPage: React.FC = () => {
       // ✅ END: Improved error handling
     }
   };
+
+  const hasStoredSession = Boolean(TokenManager.getAccessToken());
+
+  if (authLoading && hasStoredSession) {
+    return <AuthLoadingScreen message="Restoring your session..." />;
+  }
+
+  if (user) {
+    return <AuthLoadingScreen message="Opening your dashboard..." />;
+  }
 
   const isLoading = authLoading;
 

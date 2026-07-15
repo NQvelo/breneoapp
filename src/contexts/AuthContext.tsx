@@ -274,6 +274,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // console.log("✅ Found stored role in localStorage:", storedRole);
         }
 
+        const hydrateOptimisticUser = (candidate: User | null): User | null => {
+          if (!candidate || (!candidate.id && !candidate.email)) {
+            return null;
+          }
+
+          const optimisticUser = { ...candidate };
+          if (storedRole) {
+            optimisticUser.user_type = storedRole;
+          }
+          return optimisticUser;
+        };
+
         // First, decode JWT to get basic user info
         let jwtUserData: User | null = null;
         try {
@@ -334,6 +346,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // If API call fails with 401, the interceptor will handle it
           // Set jwtUserData to null so we rely on API response
           jwtUserData = null;
+        }
+
+        const optimisticUser = hydrateOptimisticUser(jwtUserData);
+        if (optimisticUser) {
+          setUser(optimisticUser);
+          setLoading(false);
         }
 
         // Try to fetch profile from API (skip for academy / employer — /api/profile/ may be forbidden)

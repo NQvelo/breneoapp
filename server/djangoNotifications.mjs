@@ -54,7 +54,9 @@ function extractCreatedNotificationId(data) {
 function shouldSendPushForNotification(params, broadcast) {
   if (broadcast) return true;
   const kind = String(params.metadata?.kind ?? "").trim();
-  return kind === "manual" || kind === "broadcast";
+  // Join requests have a dedicated employer inbox; skip noisy admin pushes.
+  if (kind === "employer_join_request") return false;
+  return true;
 }
 
 /**

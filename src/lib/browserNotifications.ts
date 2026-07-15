@@ -1,3 +1,5 @@
+import { TokenManager } from "@/api/auth/tokenManager";
+
 const DEFAULT_ICON = "/lovable-uploads/Breneo-logo.png";
 
 export const PUSH_NOTIFICATIONS_PREF_KEY = "notif_push";
