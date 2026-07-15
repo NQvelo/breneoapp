@@ -57,10 +57,12 @@ import cors from "cors";
 import { extractJobSectionsFromDescription } from "./geminiJobParser.mjs";
 import { resolveJobSectionsAfterAi } from "./jobSectionsDedup.mjs";
 import { createDjangoNotification } from "./djangoNotifications.mjs";
+import { isFcmConfigured, sendFcmToUser } from "./fcmNotifications.mjs";
 import { registerEmployerJoinRequestRoutes } from "./employerJoinRequests.mjs";
 import { registerCourseAnalyticsRoutes } from "./courseAnalytics.mjs";
 import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
 import { registerInterviewRoutes } from "./interviewRoutes.mjs";
+import { registerFcmRoutes } from "./fcmRoutes.mjs";
 import {
   dedupeSkillNames,
   scheduleSkillsCatalogSync,
@@ -2727,13 +2729,82 @@ async function forwardAppApplicantCvViews(req, res, opts) {
 /** POST /api/app/jobs/:jobId/applicants/:applicantUserId/cv-view */
 async function handleAppRecordApplicantCvView(req, res) {
   try {
-    const jobId = encodeURIComponent(String(req.params.jobId || "").trim());
-    const applicantUserId = encodeURIComponent(
-      String(req.params.applicantUserId || "").trim(),
+    const ctx = await requireEmployerAuth(req, res);
+    if (!ctx) return;
+    if (!AGGREGATOR_KEY) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "EMPLOYER_POST_SECRET is not set. Add it to .env and restart the BFF.",
+        data: null,
+        error: "server_config",
+      });
+    }
+
+    const jobId = String(req.params.jobId || "").trim();
+    const applicantUserId = String(req.params.applicantUserId || "").trim();
+    if (!jobId || !applicantUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "job id and applicant user id are required",
+        data: null,
+        error: "invalid_request",
+      });
+    }
+
+    const upstreamUrl = new URL(
+      `${AGGREGATOR_BASE_URL.replace(/\/$/, "")}/api/jobs/${encodeURIComponent(jobId)}/applicants/${encodeURIComponent(applicantUserId)}/cv-view`,
     );
-    await forwardAppEmployerAggregator(req, res, {
+    if (!upstreamUrl.searchParams.has("external_user_id") && ctx.userId) {
+      upstreamUrl.searchParams.set("external_user_id", ctx.userId);
+    }
+
+    const upstream = await fetch(upstreamUrl.toString(), {
       method: "POST",
-      upstreamPath: `/api/jobs/${jobId}/applicants/${applicantUserId}/cv-view`,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Employer-Key": AGGREGATOR_KEY,
+      },
+    });
+    const text = await upstream.text();
+    const normalized = normalizeAppBffJson(text, upstream.status, upstream.ok);
+
+    if (normalized.success && isFcmConfigured()) {
+      const data =
+        normalized.data && typeof normalized.data === "object"
+          ? /** @type {Record<string, unknown>} */ (normalized.data)
+          : {};
+      const jobTitle =
+        typeof data.job_title === "string" && data.job_title.trim()
+          ? data.job_title.trim()
+          : "your application";
+      const companyName =
+        typeof data.company_name === "string" && data.company_name.trim()
+          ? data.company_name.trim()
+          : "An employer";
+      const viewCount =
+        typeof data.view_count === "number" ? data.view_count : undefined;
+      const viewSuffix =
+        viewCount != null && viewCount > 1 ? ` (${viewCount} views)` : "";
+      const cvViewId = data.id != null ? String(data.id) : `${jobId}:${applicantUserId}`;
+
+      sendFcmToUser({
+        recipientId: applicantUserId,
+        title: "Employer viewed your CV",
+        message: `${companyName} — ${jobTitle}${viewSuffix}`,
+        tag: `cv_view:${cvViewId}`,
+        url: "/notifications",
+      }).catch((e) => {
+        console.warn("[fcm] CV view push failed:", e);
+      });
+    }
+
+    return res.status(normalized.httpStatus).json({
+      success: normalized.success,
+      message: normalized.message,
+      data: normalized.data,
+      ...(normalized.error ? { error: normalized.error } : {}),
     });
   } catch (e) {
     console.error(e);
@@ -2793,6 +2864,8 @@ async function handleAppAcknowledgeCvView(req, res) {
     });
   }
 }
+
+registerFcmRoutes(app, { requireUserAuth });
 
 app.get("/api/app/users/me/cv-views", handleAppMyCvViews);
 app.get("/api/app/users/me/cv-views/", handleAppMyCvViews);

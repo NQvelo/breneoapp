@@ -58,6 +58,10 @@ export default defineConfig(({ mode }) => ({
               target: "http://127.0.0.1:8787",
               changeOrigin: true,
             },
+            "/api/me/fcm-tokens": {
+              target: "http://127.0.0.1:8787",
+              changeOrigin: true,
+            },
             // Mock interview BFF: start + submit-audio (Breneo JWT + X-Employer-Key server-side).
             "/api/v1/interview": {
               target: "http://127.0.0.1:8787",
@@ -162,6 +166,7 @@ export default defineConfig(({ mode }) => ({
         // Skip waiting and claim clients for faster updates
         skipWaiting: true,
         clientsClaim: true,
+        importScripts: ["/push-sw-handler.js", "/firebase-messaging-sw.js"],
         // Don't precache routes - handle them at runtime
         dontCacheBustURLsMatching: /\.\w{8}\./,
         runtimeCaching: [

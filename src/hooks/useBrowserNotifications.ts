@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getBrowserNotificationPermission,
   getPushNotificationsPreference,
-  notifyPushNotificationsChanged,
-  requestBrowserNotificationPermission,
-  setPushNotificationsPreference,
+  enableBrowserNotifications,
+  disableBrowserNotifications,
   showBrowserNotification,
   type BrowserNotificationPayload,
   PUSH_NOTIFICATIONS_PREF_KEY,
@@ -42,27 +41,20 @@ export function useBrowserNotifications() {
   const isEnabled = permission === "granted" && pushEnabled;
 
   const enable = useCallback(async (): Promise<boolean> => {
-    const result = await requestBrowserNotificationPermission();
-    setPermission(result);
-
-    if (result === "granted") {
-      setPushNotificationsPreference(true);
-      setPushEnabled(true);
-      notifyPushNotificationsChanged();
-      return true;
-    }
-
-    return false;
+    const result = await enableBrowserNotifications();
+    setPermission(getBrowserNotificationPermission());
+    setPushEnabled(result);
+    return result;
   }, []);
 
-  const disable = useCallback(() => {
-    setPushNotificationsPreference(false);
+  const disable = useCallback(async () => {
+    await disableBrowserNotifications();
+    setPermission(getBrowserNotificationPermission());
     setPushEnabled(false);
-    notifyPushNotificationsChanged();
   }, []);
 
   const notify = useCallback((payload: BrowserNotificationPayload) => {
-    showBrowserNotification(payload);
+    void showBrowserNotification(payload);
   }, []);
 
   return {

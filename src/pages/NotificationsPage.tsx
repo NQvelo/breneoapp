@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Loader2, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useJobNotifications } from "@/hooks/useJobNotifications";
-import { useNotificationBrowserAlerts } from "@/hooks/useNotificationBrowserAlerts";
 import { useMyCvViews, MY_CV_VIEWS_QUERY_KEY } from "@/hooks/useMyCvViews";
 import { useMyApplications } from "@/hooks/useMyApplications";
 import { BrowserNotificationsBanner } from "@/components/notifications/BrowserNotificationsBanner";
@@ -108,10 +107,6 @@ const NotificationsPage = () => {
     enabled: !!user?.id,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-  });
-
-  useNotificationBrowserAlerts(notifications, user?.id, {
-    enabled: !!user?.id,
   });
 
   const items = useMemo(

@@ -2,6 +2,8 @@
  * Create in-app notifications via Django internal API (replaces Supabase inserts).
  */
 
+import { isFcmConfigured, sendFcmToUser } from "./fcmNotifications.mjs";
+
 function readMainApiBaseUrl() {
   if (process.env.MAIN_API_BASE_URL?.trim()) {
     return process.env.MAIN_API_BASE_URL.trim().replace(/\/$/, "");
@@ -73,7 +75,21 @@ export async function createDjangoNotification(params) {
         res.status,
         data,
       );
+      return { ok: res.ok, status: res.status, data };
     }
+
+    if (isFcmConfigured()) {
+      sendFcmToUser({
+        recipientId,
+        title: params.title,
+        message: params.message,
+        tag: `breneo-notif-${recipientId}`,
+        url: "/notifications",
+      }).catch((e) => {
+        console.warn("[notifications] FCM send failed:", e);
+      });
+    }
+
     return { ok: res.ok, status: res.status, data };
   } catch (e) {
     console.warn("[notifications] Django internal create error:", e);

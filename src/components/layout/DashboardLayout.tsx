@@ -8,6 +8,8 @@ import { TokenManager } from "@/api/auth/tokenManager";
 import { AcademyVerifiedCongratsModal } from "@/components/common/AcademyVerifiedCongratsModal";
 import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
 import { cn } from "@/lib/utils";
+import { useGlobalNotificationAlerts } from "@/hooks/useGlobalNotificationAlerts";
+import { useFcmNotifications } from "@/hooks/useFcmNotifications";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -36,6 +38,8 @@ export function DashboardLayout({
   const location = useLocation();
   const pathWithoutLang = removeLanguagePrefix(location.pathname);
   const { user, employerDisplay } = useAuth();
+  useGlobalNotificationAlerts();
+  useFcmNotifications();
 
   const resolvedContainMainScroll =
     containMainScroll &&

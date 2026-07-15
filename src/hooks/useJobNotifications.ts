@@ -62,6 +62,8 @@ export const useJobNotifications = (
       onClick: () => {
         window.location.href = "/jobs";
       },
+    }).catch((error) => {
+      console.warn("[notifications] Failed to show job notification:", error);
     });
   }, []);
 

@@ -48,9 +48,8 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
-  requestBrowserNotificationPermission,
-  setPushNotificationsPreference,
-  notifyPushNotificationsChanged,
+  enableBrowserNotifications,
+  disableBrowserNotifications,
 } from "@/lib/browserNotifications";
 import { bogService } from "@/api/bog/bogService";
 import { PaymentTransaction } from "@/api/bog/bogService";
@@ -478,20 +477,17 @@ export default function SettingsPage() {
 
   const handlePushNotificationsChange = async (checked: boolean) => {
     if (checked) {
-      const result = await requestBrowserNotificationPermission();
-      if (result !== "granted") {
+      const granted = await enableBrowserNotifications();
+      if (!granted) {
         toast.error(t.notifications.notificationPermissionDenied);
         return;
       }
       setPushNotifications(true);
-      setPushNotificationsPreference(true);
-      notifyPushNotificationsChanged();
       return;
     }
 
+    await disableBrowserNotifications();
     setPushNotifications(false);
-    setPushNotificationsPreference(false);
-    notifyPushNotificationsChanged();
   };
 
   useEffect(() => {
