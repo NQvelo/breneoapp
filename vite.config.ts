@@ -166,7 +166,7 @@ export default defineConfig(({ mode }) => ({
         // Skip waiting and claim clients for faster updates
         skipWaiting: true,
         clientsClaim: true,
-        importScripts: ["/push-sw-handler.js", "/firebase-messaging-sw.js"],
+        importScripts: ["/push-sw-handler.js"],
         // Don't precache routes - handle them at runtime
         dontCacheBustURLsMatching: /\.\w{8}\./,
         runtimeCaching: [

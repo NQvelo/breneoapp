@@ -326,6 +326,9 @@ export const ka = {
     markAllAsRead: "ყველას წაკითხულად მონიშვნა",
     removeSelected: "არჩეულის წაშლა",
     selectedCount: "არჩეულია {count}",
+    tabNotifications: "შეტყობინებები",
+    tabCvViews: "CV ნახვები",
+    noCvViews: "CV ნახვები ჯერ არ არის",
     browserNotifications: "ბრაუზერის შეტყობინებები",
     enableBrowserNotifications: "ბრაუზერის შეტყობინებების ჩართვა",
     browserNotificationsDescription:

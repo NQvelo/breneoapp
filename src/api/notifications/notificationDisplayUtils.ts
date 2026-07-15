@@ -139,7 +139,8 @@ export function isNotificationItemUnread(
   const userIdStr = userId != null ? String(userId) : "";
   return (
     !item.notification.is_read &&
-    item.notification.recipient_id === userIdStr
+    (item.notification.recipient_id === userIdStr ||
+      item.notification.recipient_id === null)
   );
 }
 
@@ -221,21 +222,39 @@ export function mergeNotificationListItems(
   cvViews: ApplicantCvView[],
   includeCvViews: boolean,
 ): NotificationListItem[] {
-  const items: NotificationListItem[] = [
-    ...notifications.map(
+  return sortNotificationListItems([
+    ...listDjangoNotificationItems(notifications),
+    ...(includeCvViews ? listCvViewNotificationItems(cvViews, true) : []),
+  ]);
+}
+
+export function listDjangoNotificationItems(
+  notifications: Notification[],
+): NotificationListItem[] {
+  return sortNotificationListItems(
+    notifications.map(
       (notification) =>
         ({ kind: "django", notification }) satisfies NotificationListItem,
     ),
-  ];
+  );
+}
 
-  if (includeCvViews) {
-    for (const view of cvViews) {
-      if (cvViewIsUnacknowledged(view)) {
-        items.push({ kind: "cv_view", view });
-      }
-    }
-  }
+export function listCvViewNotificationItems(
+  cvViews: ApplicantCvView[],
+  onlyUnacknowledged = false,
+): NotificationListItem[] {
+  const views = onlyUnacknowledged
+    ? cvViews.filter((view) => cvViewIsUnacknowledged(view))
+    : cvViews;
 
+  return sortNotificationListItems(
+    views.map((view) => ({ kind: "cv_view", view }) satisfies NotificationListItem),
+  );
+}
+
+function sortNotificationListItems(
+  items: NotificationListItem[],
+): NotificationListItem[] {
   return items.sort((a, b) => {
     const aTime = new Date(getNotificationItemDate(a)).getTime();
     const bTime = new Date(getNotificationItemDate(b)).getTime();

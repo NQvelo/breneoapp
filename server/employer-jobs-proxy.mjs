@@ -2794,7 +2794,7 @@ async function handleAppRecordApplicantCvView(req, res) {
         title: "Employer viewed your CV",
         message: `${companyName} — ${jobTitle}${viewSuffix}`,
         tag: `cv_view:${cvViewId}`,
-        url: "/notifications",
+        url: "/notifications?tab=cv_views",
       }).catch((e) => {
         console.warn("[fcm] CV view push failed:", e);
       });

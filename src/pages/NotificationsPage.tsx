@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +13,10 @@ import { useMyCvViews, MY_CV_VIEWS_QUERY_KEY } from "@/hooks/useMyCvViews";
 import { useMyApplications } from "@/hooks/useMyApplications";
 import { BrowserNotificationsBanner } from "@/components/notifications/BrowserNotificationsBanner";
 import { NotificationCompanyLogo } from "@/components/notifications/NotificationCompanyLogo";
+import {
+  NotificationsTabSwitcher,
+  type NotificationsTab,
+} from "@/components/notifications/NotificationsTabSwitcher";
 import {
   fetchMyNotifications,
   markNotificationsRead,
@@ -27,7 +32,8 @@ import {
   getNotificationItemLogo,
   getNotificationItemMessage,
   getNotificationItemTitle,
-  mergeNotificationListItems,
+  listCvViewNotificationItems,
+  listDjangoNotificationItems,
   normalizeNotificationLogoUrl,
   type JobBrandLookup,
   type NotificationListItem,
@@ -74,10 +80,15 @@ const NotificationsPage = () => {
   const { user } = useAuth();
   const t = useTranslation();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryKey = ["user-notifications", user?.id];
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const isRegularUser = user?.user_type !== "academy";
+  const activeTab: NotificationsTab =
+    searchParams.get("tab") === "cv_views" && isRegularUser
+      ? "cv_views"
+      : "notifications";
   useJobNotifications({
     enabled: isRegularUser && !!user?.id,
     checkInterval: 30 * 60 * 1000,
@@ -109,15 +120,22 @@ const NotificationsPage = () => {
     refetchOnWindowFocus: true,
   });
 
-  const items = useMemo(
-    () =>
-      mergeNotificationListItems(
-        notifications,
-        cvViews,
-        isRegularUser && !!user?.id,
-      ),
-    [notifications, cvViews, isRegularUser, user?.id],
+  const djangoItems = useMemo(
+    () => listDjangoNotificationItems(notifications),
+    [notifications],
   );
+
+  const cvViewItems = useMemo(
+    () => listCvViewNotificationItems(cvViews),
+    [cvViews],
+  );
+
+  const items =
+    activeTab === "cv_views" && isRegularUser ? cvViewItems : djangoItems;
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [activeTab]);
 
   const missingJobIds = useMemo(() => {
     const ids = new Set<string>();
@@ -173,7 +191,25 @@ const NotificationsPage = () => {
   }, [jobBrandLookup, fetchedJobBrands]);
 
   const selectedCount = selectedIds.size;
-  const listLoading = isLoading || (isRegularUser && cvViewsLoading);
+  const listLoading =
+    activeTab === "cv_views"
+      ? isRegularUser && cvViewsLoading
+      : isLoading;
+
+  const setActiveTab = (tab: NotificationsTab) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === "notifications") {
+          next.delete("tab");
+        } else {
+          next.set("tab", tab);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   const toggleSelected = (itemId: string, checked: boolean) => {
     setSelectedIds((current) => {
@@ -272,8 +308,19 @@ const NotificationsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-6 pb-28 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="space-y-4">
+          {isRegularUser ? (
+            <NotificationsTabSwitcher
+              activeTab={activeTab}
+              notificationsCount={djangoItems.length}
+              cvViewsCount={cvViewItems.length}
+              notificationsLabel={t.notifications.tabNotifications}
+              cvViewsLabel={t.notifications.tabCvViews}
+              onTabChange={setActiveTab}
+            />
+          ) : null}
+
           <BrowserNotificationsBanner />
 
           <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
@@ -347,7 +394,11 @@ const NotificationsPage = () => {
                   alt="No notifications"
                   className="mx-auto h-40 w-40 mb-4 object-contain"
                 />
-                <p>{t.notifications.noNotifications}</p>
+                <p>
+                  {activeTab === "cv_views"
+                    ? t.notifications.noCvViews
+                    : t.notifications.noNotifications}
+                </p>
               </div>
             ) : (
               <ul className="divide-y divide-gray-200 dark:divide-gray-700">

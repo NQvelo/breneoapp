@@ -9,6 +9,7 @@ import {
 import { TokenManager } from "@/api/auth/tokenManager";
 import { getFirebaseApp, getFirebaseWebConfig } from "@/lib/firebase";
 import { showBrowserNotification } from "@/lib/browserNotifications";
+import { initPwaUpdate } from "@/lib/pwaUpdate";
 
 const FCM_SW_PATH = "/firebase-messaging-sw.js";
 
@@ -31,20 +32,65 @@ function authHeaders(): HeadersInit {
   return headers;
 }
 
-async function getFcmServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
-  if (import.meta.env.DEV) {
-    const existing = await navigator.serviceWorker.getRegistration("/");
-    if (existing?.active?.scriptURL?.includes("firebase-messaging-sw.js")) {
-      await navigator.serviceWorker.ready;
-      return existing;
-    }
+function isFirebaseMessagingSw(scriptUrl: string): boolean {
+  return scriptUrl.includes("firebase-messaging-sw.js");
+}
 
-    const registration = await navigator.serviceWorker.register(FCM_SW_PATH);
-    await navigator.serviceWorker.ready;
-    return registration;
+function isPwaServiceWorker(scriptUrl: string): boolean {
+  return (
+    scriptUrl.includes("/sw.js") ||
+    scriptUrl.includes("workbox") ||
+    scriptUrl.includes("dev-sw.js")
+  );
+}
+
+async function getFcmServiceWorkerRegistration(): Promise<ServiceWorkerRegistration> {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("Service workers are not supported");
   }
 
-  return navigator.serviceWorker.ready;
+  initPwaUpdate();
+
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+
+    const pwaRegistration = registrations.find((registration) => {
+      const scriptUrl =
+        registration.active?.scriptURL ??
+        registration.waiting?.scriptURL ??
+        registration.installing?.scriptURL ??
+        "";
+      return scriptUrl && isPwaServiceWorker(scriptUrl);
+    });
+    if (pwaRegistration?.active) {
+      return pwaRegistration;
+    }
+
+    const firebaseRegistration = registrations.find((registration) => {
+      const scriptUrl =
+        registration.active?.scriptURL ??
+        registration.waiting?.scriptURL ??
+        registration.installing?.scriptURL ??
+        "";
+      return scriptUrl && isFirebaseMessagingSw(scriptUrl);
+    });
+    if (firebaseRegistration?.active) {
+      return firebaseRegistration;
+    }
+
+    if (import.meta.env.DEV && registrations.length === 0) {
+      const registration = await navigator.serviceWorker.register(FCM_SW_PATH);
+      await navigator.serviceWorker.ready;
+      return registration;
+    }
+
+    await navigator.serviceWorker.ready;
+    await new Promise((resolve) => window.setTimeout(resolve, 250));
+  }
+
+  const fallback = await navigator.serviceWorker.ready;
+  return fallback;
 }
 
 async function getMessagingInstance(): Promise<Messaging | null> {
@@ -75,7 +121,6 @@ export async function registerFcmToken(): Promise<boolean> {
 
   try {
     const registration = await getFcmServiceWorkerRegistration();
-    await navigator.serviceWorker.ready;
 
     const messaging = await getMessagingInstance();
     if (!messaging) {
@@ -111,7 +156,11 @@ export async function unregisterFcmToken(): Promise<void> {
       return;
     }
 
-    const token = await getToken(messaging);
+    const registration = await getFcmServiceWorkerRegistration();
+    const token = await getToken(messaging, {
+      vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim(),
+      serviceWorkerRegistration: registration,
+    });
     if (token) {
       await fetch(`${getApiBaseUrl()}/api/me/fcm-tokens/`, {
         method: "DELETE",

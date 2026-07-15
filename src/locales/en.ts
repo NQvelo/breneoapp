@@ -322,6 +322,9 @@ export const en = {
     markAllAsRead: "Mark all as read",
     removeSelected: "Remove selected",
     selectedCount: "{count} selected",
+    tabNotifications: "Notifications",
+    tabCvViews: "CV views",
+    noCvViews: "No CV views yet",
     browserNotifications: "Browser Notifications",
     enableBrowserNotifications: "Enable Browser Notifications",
     browserNotificationsDescription:

@@ -157,6 +157,8 @@ export async function enableBrowserNotifications(): Promise<boolean> {
   notifyPushNotificationsChanged();
 
   try {
+    const { initPwaUpdate } = await import("@/lib/pwaUpdate");
+    initPwaUpdate();
     const { registerFcmToken } = await import("@/lib/fcmClient");
     await registerFcmToken();
   } catch {

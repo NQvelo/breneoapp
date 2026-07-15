@@ -1,4 +1,5 @@
-/* Service worker notification handlers for Breneo PWA (no VAPID / server push) */
+/* Service worker notification handlers for Breneo PWA */
+importScripts("/firebase-messaging-sw.js");
 
 self.addEventListener("notificationclick", function (event) {
   event.notification.close();

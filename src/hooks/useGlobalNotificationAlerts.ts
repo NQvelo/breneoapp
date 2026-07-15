@@ -77,7 +77,9 @@ export function useGlobalNotificationAlerts() {
         body: getNotificationItemMessage(item),
         tag: itemId,
         onClick: () => {
-          window.location.href = "/notifications";
+          const tab =
+            item.kind === "cv_view" ? "cv_views" : "notifications";
+          window.location.href = `/notifications?tab=${tab}`;
         },
       });
     }

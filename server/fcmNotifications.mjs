@@ -1,6 +1,10 @@
 import fs from "fs";
 import admin from "firebase-admin";
-import { listFcmTokensForUser, removeFcmToken } from "./fcmTokenStore.mjs";
+import {
+  listAllFcmTokens,
+  listFcmTokensForUser,
+  removeFcmToken,
+} from "./fcmTokenStore.mjs";
 
 const DEFAULT_ICON = "/lovable-uploads/Breneo-logo.png";
 
@@ -51,6 +55,80 @@ function getFirebaseAdmin() {
   return firebaseApp;
 }
 
+const FCM_MULTICAST_BATCH_SIZE = 500;
+
+/**
+ * @param {{
+ *   title: string;
+ *   message: string;
+ *   tag?: string;
+ *   url?: string;
+ *   tokens: string[];
+ * }} params
+ */
+async function sendFcmMulticast(params) {
+  const app = getFirebaseAdmin();
+  if (!app) {
+    return { ok: false, sent: 0, failed: 0, reason: "not_configured" };
+  }
+
+  const tokens = params.tokens.filter(Boolean);
+  if (tokens.length === 0) {
+    return { ok: true, sent: 0, failed: 0, reason: "no_tokens" };
+  }
+
+  const title = String(params.title ?? "Breneo").trim() || "Breneo";
+  const body = String(params.message ?? "").trim();
+  const tag = String(params.tag ?? "breneo-broadcast").trim();
+  const url = String(params.url ?? "/notifications").trim() || "/notifications";
+  const messaging = admin.messaging(app);
+
+  let sent = 0;
+  let failed = 0;
+  const stale = [];
+
+  for (let i = 0; i < tokens.length; i += FCM_MULTICAST_BATCH_SIZE) {
+    const batch = tokens.slice(i, i + FCM_MULTICAST_BATCH_SIZE);
+    const response = await messaging.sendEachForMulticast({
+      tokens: batch,
+      notification: { title, body },
+      data: { title, body, tag, url, icon: DEFAULT_ICON },
+      webpush: {
+        fcmOptions: {
+          link: url.startsWith("http") ? url : undefined,
+        },
+        notification: {
+          icon: DEFAULT_ICON,
+          badge: DEFAULT_ICON,
+          tag,
+        },
+      },
+    });
+
+    sent += response.successCount;
+    failed += response.failureCount;
+    response.responses.forEach((item, index) => {
+      if (item.success) return;
+      const code = item.error?.code || "";
+      if (
+        code === "messaging/registration-token-not-registered" ||
+        code === "messaging/invalid-registration-token"
+      ) {
+        stale.push(batch[index]);
+      }
+    });
+  }
+
+  await Promise.all(stale.map((token) => removeFcmToken(token)));
+
+  return {
+    ok: true,
+    sent,
+    failed,
+    staleRemoved: stale.length,
+  };
+}
+
 /**
  * @param {{
  *   recipientId: string;
@@ -61,70 +139,36 @@ function getFirebaseAdmin() {
  * }} params
  */
 export async function sendFcmToUser(params) {
-  const app = getFirebaseAdmin();
-  if (!app) {
-    return { ok: false, sent: 0, reason: "not_configured" };
-  }
-
   const recipientId = String(params.recipientId ?? "").trim();
   if (!recipientId) {
     return { ok: false, sent: 0, reason: "missing_recipient" };
   }
 
   const tokens = await listFcmTokensForUser(recipientId);
-  if (tokens.length === 0) {
-    return { ok: true, sent: 0, reason: "no_tokens" };
-  }
-
-  const title = String(params.title ?? "Breneo").trim() || "Breneo";
-  const body = String(params.message ?? "").trim();
-  const tag = String(params.tag ?? `breneo-${recipientId}`).trim();
-  const url = String(params.url ?? "/notifications").trim() || "/notifications";
-
-  const messaging = admin.messaging(app);
-  const response = await messaging.sendEachForMulticast({
+  return sendFcmMulticast({
     tokens,
-    notification: {
-      title,
-      body,
-    },
-    data: {
-      title,
-      body,
-      tag,
-      url,
-      icon: DEFAULT_ICON,
-    },
-    webpush: {
-      fcmOptions: {
-        link: url.startsWith("http") ? url : undefined,
-      },
-      notification: {
-        icon: DEFAULT_ICON,
-        badge: DEFAULT_ICON,
-        tag,
-      },
-    },
+    title: params.title,
+    message: params.message,
+    tag: params.tag ?? `breneo-${recipientId}`,
+    url: params.url,
   });
+}
 
-  const stale = [];
-  response.responses.forEach((item, index) => {
-    if (item.success) return;
-    const code = item.error?.code || "";
-    if (
-      code === "messaging/registration-token-not-registered" ||
-      code === "messaging/invalid-registration-token"
-    ) {
-      stale.push(tokens[index]);
-    }
+/**
+ * @param {{
+ *   title: string;
+ *   message: string;
+ *   tag?: string;
+ *   url?: string;
+ * }} params
+ */
+export async function sendFcmBroadcast(params) {
+  const tokens = await listAllFcmTokens();
+  return sendFcmMulticast({
+    tokens,
+    title: params.title,
+    message: params.message,
+    tag: params.tag ?? "breneo-broadcast",
+    url: params.url,
   });
-
-  await Promise.all(stale.map((token) => removeFcmToken(token)));
-
-  return {
-    ok: true,
-    sent: response.successCount,
-    failed: response.failureCount,
-    staleRemoved: stale.length,
-  };
 }

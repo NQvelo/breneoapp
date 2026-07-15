@@ -46,7 +46,9 @@ export function useUnreadNotificationCount() {
     const userIdStr = userId != null ? String(userId) : "";
     const unreadNotifications = (notificationsQuery.data ?? []).filter(
       (notification) =>
-        !notification.is_read && notification.recipient_id === userIdStr,
+        !notification.is_read &&
+        (notification.recipient_id === userIdStr ||
+          notification.recipient_id === null),
     ).length;
     const unacknowledgedCvViews = isRegularUser
       ? cvViews.filter(cvViewIsUnacknowledged).length

@@ -96,6 +96,19 @@ export async function removeFcmToken(token) {
 }
 
 /**
+ * @returns {Promise<string[]>}
+ */
+export async function listAllFcmTokens() {
+  const rows = await readAll();
+  const tokens = new Set();
+  for (const row of rows) {
+    const tok = String(row.token ?? "").trim();
+    if (tok) tokens.add(tok);
+  }
+  return Array.from(tokens);
+}
+
+/**
  * @param {string} userId
  * @returns {Promise<string[]>}
  */
