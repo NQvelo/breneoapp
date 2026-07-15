@@ -242,7 +242,7 @@ const LoginPage: React.FC = () => {
   const isLoading = authLoading;
 
   return (
-      <div className="min-h-screen flex flex-col bg-background pt-[env(safe-area-inset-top,0px)]">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Mobile Header */}
       <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
         <div className="flex items-center">
