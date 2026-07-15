@@ -313,6 +313,13 @@ export const ka = {
       installUnavailable:
         "ინსტალაცია ახლა ხელმისაწვდომი არ არის. გახსენით ეს გვერდი Safari-ში ან Chrome-ში და სცადეთ თავიდან.",
     },
+    updateApp: {
+      title: "ხელმისაწვდომია განახლება",
+      description:
+        "ხელმისაწვდომია ვერსია {version}. განაახლეთ ახლა, რომ მიიღოთ უახლესი ფუნქციები და გასწორებები.",
+      updateApp: "აპის განახლება",
+      updating: "ახლდება...",
+    },
     appVersion: {
       version: "ვერსია {version}",
       updateApp: "აპის განახლება",

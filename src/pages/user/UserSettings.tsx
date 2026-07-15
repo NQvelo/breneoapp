@@ -59,7 +59,7 @@ import {
   SettingsGroupList,
   type SettingsListItemConfig,
 } from "@/components/settings/SettingsGroupList";
-import { SettingsDownloadAppCard } from "@/components/settings/SettingsDownloadAppCard";
+import { SettingsPwaAppCard } from "@/components/settings/SettingsPwaAppCard";
 import { SettingsAppVersionFooter } from "@/components/settings/SettingsAppVersionFooter";
 import { SettingsMobileHeader } from "@/components/settings/SettingsMobileHeader";
 import {
@@ -1105,12 +1105,12 @@ export default function SettingsPage() {
               footerItem={logoutItem}
               beforeFooter={
                 <div className="lg:hidden">
-                  <SettingsDownloadAppCard variant="compact" />
+                  <SettingsPwaAppCard variant="compact" />
                 </div>
               }
             />
             <div className="hidden lg:block lg:sticky lg:top-28">
-              <SettingsDownloadAppCard variant="sidebar" />
+              <SettingsPwaAppCard variant="sidebar" />
             </div>
           </div>
         ) : (

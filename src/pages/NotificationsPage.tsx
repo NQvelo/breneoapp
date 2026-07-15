@@ -8,7 +8,6 @@ import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
 import { Loader2, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useJobNotifications } from "@/hooks/useJobNotifications";
 import { useMyCvViews, MY_CV_VIEWS_QUERY_KEY } from "@/hooks/useMyCvViews";
 import { useMyApplications } from "@/hooks/useMyApplications";
 import { BrowserNotificationsBanner } from "@/components/notifications/BrowserNotificationsBanner";
@@ -23,6 +22,7 @@ import {
   removeNotifications,
   type Notification,
 } from "@/api/notifications/notificationsApi";
+import { filterInboxNotifications } from "@/api/notifications/inboxNotifications";
 import {
   buildJobBrandLookup,
   getNotificationItemCompanyName,
@@ -89,10 +89,6 @@ const NotificationsPage = () => {
     searchParams.get("tab") === "cv_views" && isRegularUser
       ? "cv_views"
       : "notifications";
-  useJobNotifications({
-    enabled: isRegularUser && !!user?.id,
-    checkInterval: 30 * 60 * 1000,
-  });
 
   const { data: cvViews = [], isLoading: cvViewsLoading } = useMyCvViews(
     isRegularUser && !!user?.id,
@@ -121,7 +117,7 @@ const NotificationsPage = () => {
   });
 
   const djangoItems = useMemo(
-    () => listDjangoNotificationItems(notifications),
+    () => listDjangoNotificationItems(filterInboxNotifications(notifications)),
     [notifications],
   );
 

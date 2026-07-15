@@ -1,4 +1,5 @@
 import { registerSW } from "virtual:pwa-register";
+import { isAppVersionNewer } from "./appVersion";
 import { isPwaInstalled } from "./pwaInstall";
 
 type PwaUpdateListener = () => void;
@@ -6,8 +7,10 @@ type PwaUpdateListener = () => void;
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 let initialized = false;
-let updateAvailable = false;
+let serviceWorkerUpdateAvailable = false;
+let remoteVersionAvailable: string | null = null;
 let applyUpdateFn: ((reloadPage?: boolean) => Promise<void>) | null = null;
+let swRegistration: ServiceWorkerRegistration | undefined;
 const listeners = new Set<PwaUpdateListener>();
 
 function notifyListeners() {
@@ -19,10 +22,13 @@ function scheduleUpdateChecks(
 ) {
   if (!registration) return;
 
+  swRegistration = registration;
+
   const checkForUpdate = () => {
     void registration.update().catch((error) => {
       console.warn("[pwaUpdate] Update check failed:", error);
     });
+    void checkRemoteAppVersion();
   };
 
   window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS);
@@ -32,6 +38,36 @@ function scheduleUpdateChecks(
       checkForUpdate();
     }
   });
+
+  void checkRemoteAppVersion();
+}
+
+export async function checkRemoteAppVersion(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  try {
+    const response = await fetch(`/version.json?_=${Date.now()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { version?: string };
+    const remoteVersion = payload.version?.trim();
+    if (!remoteVersion || !isAppVersionNewer(remoteVersion)) {
+      return;
+    }
+
+    remoteVersionAvailable = remoteVersion;
+    notifyListeners();
+
+    if (swRegistration) {
+      await swRegistration.update().catch((error) => {
+        console.warn("[pwaUpdate] Service worker refresh failed:", error);
+      });
+    }
+  } catch (error) {
+    console.warn("[pwaUpdate] Remote version check failed:", error);
+  }
 }
 
 export function initPwaUpdate(): void {
@@ -43,7 +79,7 @@ export function initPwaUpdate(): void {
   const updateSW = registerSW({
     immediate: true,
     onNeedRefresh() {
-      updateAvailable = true;
+      serviceWorkerUpdateAvailable = true;
       applyUpdateFn = updateSW;
       notifyListeners();
     },
@@ -57,12 +93,56 @@ export function initPwaUpdate(): void {
 }
 
 export function isPwaUpdateAvailable(): boolean {
-  return isPwaInstalled() && updateAvailable;
+  return (
+    isPwaInstalled() &&
+    (serviceWorkerUpdateAvailable || remoteVersionAvailable !== null)
+  );
 }
 
-export function applyPwaUpdate(): Promise<void> {
-  if (!applyUpdateFn) return Promise.resolve();
-  return applyUpdateFn(true);
+export function getRemoteAppVersion(): string | null {
+  return remoteVersionAvailable;
+}
+
+async function reloadAfterServiceWorkerActivation(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (!navigator.serviceWorker.controller) {
+      resolve();
+      return;
+    }
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => resolve(), {
+      once: true,
+    });
+  });
+
+  window.location.reload();
+}
+
+export async function applyPwaUpdate(): Promise<void> {
+  if (applyUpdateFn && serviceWorkerUpdateAvailable) {
+    await applyUpdateFn(true);
+    return;
+  }
+
+  if ("serviceWorker" in navigator) {
+    const registration =
+      swRegistration ?? (await navigator.serviceWorker.getRegistration());
+
+    if (registration) {
+      await registration.update().catch((error) => {
+        console.warn("[pwaUpdate] Update apply failed:", error);
+      });
+
+      const waitingWorker = registration.waiting;
+      if (waitingWorker) {
+        waitingWorker.postMessage({ type: "SKIP_WAITING" });
+        await reloadAfterServiceWorkerActivation();
+        return;
+      }
+    }
+  }
+
+  window.location.reload();
 }
 
 export function subscribePwaUpdate(listener: PwaUpdateListener): () => void {

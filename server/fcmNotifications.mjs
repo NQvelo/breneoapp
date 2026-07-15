@@ -5,6 +5,10 @@ import {
   listFcmTokensForUser,
   removeFcmToken,
 } from "./fcmTokenStore.mjs";
+import {
+  recordFcmPushSent,
+  shouldSendFcmPush,
+} from "./fcmPushDedup.mjs";
 
 const DEFAULT_ICON = "/lovable-uploads/Breneo-logo.png";
 
@@ -58,6 +62,9 @@ function getFirebaseAdmin() {
 const FCM_MULTICAST_BATCH_SIZE = 500;
 
 /**
+ * Data-only web push so the service worker onBackgroundMessage always runs
+ * when the app/PWA is closed.
+ *
  * @param {{
  *   title: string;
  *   message: string;
@@ -81,6 +88,12 @@ async function sendFcmMulticast(params) {
   const body = String(params.message ?? "").trim();
   const tag = String(params.tag ?? "breneo-broadcast").trim();
   const url = String(params.url ?? "/notifications").trim() || "/notifications";
+
+  const canSend = await shouldSendFcmPush(tag);
+  if (!canSend) {
+    return { ok: true, sent: 0, failed: 0, reason: "deduped", tag };
+  }
+
   const messaging = admin.messaging(app);
 
   let sent = 0;
@@ -91,16 +104,19 @@ async function sendFcmMulticast(params) {
     const batch = tokens.slice(i, i + FCM_MULTICAST_BATCH_SIZE);
     const response = await messaging.sendEachForMulticast({
       tokens: batch,
-      notification: { title, body },
-      data: { title, body, tag, url, icon: DEFAULT_ICON },
+      data: {
+        title,
+        body,
+        tag,
+        url,
+        icon: DEFAULT_ICON,
+      },
       webpush: {
+        headers: {
+          Urgency: "high",
+        },
         fcmOptions: {
           link: url.startsWith("http") ? url : undefined,
-        },
-        notification: {
-          icon: DEFAULT_ICON,
-          badge: DEFAULT_ICON,
-          tag,
         },
       },
     });
@@ -119,6 +135,10 @@ async function sendFcmMulticast(params) {
     });
   }
 
+  if (sent > 0) {
+    await recordFcmPushSent(tag);
+  }
+
   await Promise.all(stale.map((token) => removeFcmToken(token)));
 
   return {
@@ -126,6 +146,7 @@ async function sendFcmMulticast(params) {
     sent,
     failed,
     staleRemoved: stale.length,
+    tag,
   };
 }
 

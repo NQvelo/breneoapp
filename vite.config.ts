@@ -92,6 +92,15 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    {
+      name: "write-version-json",
+      closeBundle() {
+        fs.writeFileSync(
+          path.resolve(__dirname, "dist/version.json"),
+          `${JSON.stringify({ version: packageJson.version || "0.0.0" })}\n`,
+        );
+      },
+    },
     VitePWA({
       registerType: "prompt",
       includeAssets: ["robots.txt", "lovable-uploads/*.png"],
@@ -163,8 +172,8 @@ export default defineConfig(({ mode }) => ({
           // Don't fallback for static assets
           /\.(?:png|jpg|jpeg|svg|gif|webp|ico|woff|woff2|ttf|eot)$/,
         ],
-        // Skip waiting and claim clients for faster updates
-        skipWaiting: true,
+        // Wait for the user to tap "Update app" before activating a new service worker.
+        skipWaiting: false,
         clientsClaim: true,
         importScripts: ["/push-sw-handler.js"],
         // Don't precache routes - handle them at runtime

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   applyPwaUpdate,
+  getRemoteAppVersion,
   initPwaUpdate,
   isPwaUpdateAvailable,
   subscribePwaUpdate,
@@ -10,9 +11,11 @@ export function usePwaUpdate() {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(
     isPwaUpdateAvailable,
   );
+  const [remoteVersion, setRemoteVersion] = useState(getRemoteAppVersion);
 
   const syncState = useCallback(() => {
     setIsUpdateAvailable(isPwaUpdateAvailable());
+    setRemoteVersion(getRemoteAppVersion());
   }, []);
 
   useEffect(() => {
@@ -25,5 +28,5 @@ export function usePwaUpdate() {
     await applyPwaUpdate();
   }, []);
 
-  return { isUpdateAvailable, applyUpdate };
+  return { isUpdateAvailable, remoteVersion, applyUpdate };
 }

@@ -37,6 +37,7 @@ import axios, { AxiosError } from "axios";
 import { Link, useLocation } from "react-router-dom";
 import { Camera } from "lucide-react";
 import { PWAInstallCard } from "@/components/common/PWAInstallCard";
+import { PWAUpdateCard } from "@/components/common/PWAUpdateCard";
 import {
   Dialog,
   DialogContent,
@@ -802,6 +803,7 @@ export default function AcademySettingsPage() {
 
           {/* Right Column - Sidebar Navigation */}
           <div className="space-y-4">
+            <PWAUpdateCard />
             <PWAInstallCard />
 
             {/* Account Section */}

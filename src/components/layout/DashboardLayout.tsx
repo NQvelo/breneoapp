@@ -129,6 +129,7 @@ export function DashboardLayout({
 
       <main
         ref={mainContentRef}
+        data-dashboard-main=""
         className={cn(
           "transition-all duration-300",
           resolvedContainMainScroll

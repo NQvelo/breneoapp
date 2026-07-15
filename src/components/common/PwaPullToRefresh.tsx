@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
-import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { Loader2 } from "lucide-react";
 import { isPwaInstalled, subscribePwaInstall } from "@/lib/pwaInstall";
 import { cn } from "@/lib/utils";
 
 const PULL_THRESHOLD_PX = 72;
-const MAX_PULL_PX = 120;
-const REFRESH_INDICATOR_HEIGHT_PX = 88;
+const MAX_PULL_PX = 112;
 
 function useIsPwaStandalone(): boolean {
   const [isPwa, setIsPwa] = useState(isPwaInstalled);
@@ -29,62 +27,59 @@ function useIsPwaStandalone(): boolean {
   return isPwa;
 }
 
-function getPrimaryScrollContainer(): HTMLElement | null {
-  const mainEl = document.querySelector("main");
-  if (!(mainEl instanceof HTMLElement)) return null;
+const AT_TOP_THRESHOLD_PX = 2;
 
-  const style = window.getComputedStyle(mainEl);
-  const isScrollable =
-    mainEl.scrollHeight > mainEl.clientHeight &&
-    (style.overflowY === "auto" || style.overflowY === "scroll");
-
-  return isScrollable ? mainEl : null;
+function isElementAtTop(element: Element): boolean {
+  return (element as HTMLElement).scrollTop <= AT_TOP_THRESHOLD_PX;
 }
 
-function getPrimaryScrollTop(): number {
-  const mainEl = getPrimaryScrollContainer();
-  if (mainEl) return mainEl.scrollTop;
-
+function isWindowAtTop(): boolean {
   return (
-    window.scrollY ||
-    document.documentElement.scrollTop ||
-    document.body.scrollTop ||
-    0
+    (window.scrollY ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0) <= AT_TOP_THRESHOLD_PX
   );
 }
 
-function isPageAtTop(): boolean {
-  return getPrimaryScrollTop() <= 2;
-}
-
-function findScrollableAncestor(element: Element | null): HTMLElement | null {
-  let current = element;
-
-  while (current && current !== document.body) {
-    if (!(current instanceof HTMLElement)) break;
-
-    const style = window.getComputedStyle(current);
-    const overflowY = style.overflowY;
-    const isScrollable =
-      (overflowY === "auto" || overflowY === "scroll") &&
-      current.scrollHeight > current.clientHeight;
-
-    if (isScrollable) return current;
-    current = current.parentElement;
+function isScrollableElement(element: Element): boolean {
+  const { overflowY } = window.getComputedStyle(element);
+  if (overflowY !== "auto" && overflowY !== "scroll" && overflowY !== "overlay") {
+    return false;
   }
 
-  return null;
+  const el = element as HTMLElement;
+  return el.scrollHeight > el.clientHeight + 1;
 }
 
-function isTouchScrollAtTop(target: EventTarget | null): boolean {
-  if (!isPageAtTop()) return false;
+function getDashboardMain(): HTMLElement | null {
+  return (
+    document.querySelector("[data-dashboard-main]") ??
+    document.querySelector("main.overflow-y-auto, main[class*='overflow-y-auto']")
+  );
+}
 
-  if (!(target instanceof Element)) return true;
+function isPageAtTop(touchTarget?: EventTarget | null): boolean {
+  if (!isWindowAtTop()) return false;
 
-  const scrollable = findScrollableAncestor(target);
-  if (!scrollable) return true;
+  const dashboardMain = getDashboardMain();
+  if (dashboardMain && !isElementAtTop(dashboardMain)) return false;
 
-  return scrollable.scrollTop <= 2;
+  if (!(touchTarget instanceof Element)) return true;
+
+  let element: Element | null = touchTarget;
+  while (
+    element &&
+    element !== document.body &&
+    element !== document.documentElement
+  ) {
+    if (isScrollableElement(element) && !isElementAtTop(element)) {
+      return false;
+    }
+    element = element.parentElement;
+  }
+
+  return true;
 }
 
 function isInterviewRoute(pathname: string): boolean {
@@ -100,7 +95,6 @@ export function PwaPullToRefresh() {
   const startYRef = useRef(0);
   const pullingRef = useRef(false);
   const pullDistanceRef = useRef(0);
-  const touchTargetRef = useRef<EventTarget | null>(null);
 
   const enabled = isPwa && !isInterviewRoute(pathname);
 
@@ -108,32 +102,27 @@ export function PwaPullToRefresh() {
     if (!enabled) {
       pullingRef.current = false;
       pullDistanceRef.current = 0;
-      touchTargetRef.current = null;
       setPullDistance(0);
       return;
     }
 
-    const resetPull = () => {
-      pullingRef.current = false;
-      touchTargetRef.current = null;
-      pullDistanceRef.current = 0;
-      setPullDistance(0);
-    };
+    const previousOverscrollBehavior = document.documentElement.style.overscrollBehaviorY;
+    document.documentElement.style.overscrollBehaviorY = "none";
 
     const onTouchStart = (event: TouchEvent) => {
-      if (refreshing || !isTouchScrollAtTop(event.target)) return;
+      if (refreshing || !isPageAtTop(event.target)) return;
       if (event.touches.length !== 1) return;
 
       startYRef.current = event.touches[0].clientY;
-      touchTargetRef.current = event.target;
       pullingRef.current = true;
     };
 
     const onTouchMove = (event: TouchEvent) => {
       if (!pullingRef.current || refreshing) return;
-
-      if (!isTouchScrollAtTop(touchTargetRef.current)) {
-        resetPull();
+      if (!isPageAtTop(event.target)) {
+        pullingRef.current = false;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
         return;
       }
 
@@ -145,7 +134,7 @@ export function PwaPullToRefresh() {
       }
 
       event.preventDefault();
-      const next = Math.min(deltaY * 0.5, MAX_PULL_PX);
+      const next = Math.min(deltaY * 0.45, MAX_PULL_PX);
       pullDistanceRef.current = next;
       setPullDistance(next);
     };
@@ -153,12 +142,11 @@ export function PwaPullToRefresh() {
     const finishPull = () => {
       if (!pullingRef.current) return;
       pullingRef.current = false;
-      touchTargetRef.current = null;
 
       if (pullDistanceRef.current >= PULL_THRESHOLD_PX) {
         setRefreshing(true);
-        pullDistanceRef.current = REFRESH_INDICATOR_HEIGHT_PX;
-        setPullDistance(REFRESH_INDICATOR_HEIGHT_PX);
+        pullDistanceRef.current = PULL_THRESHOLD_PX;
+        setPullDistance(PULL_THRESHOLD_PX);
         window.location.reload();
         return;
       }
@@ -176,6 +164,7 @@ export function PwaPullToRefresh() {
     document.addEventListener("touchcancel", onTouchCancel);
 
     return () => {
+      document.documentElement.style.overscrollBehaviorY = previousOverscrollBehavior;
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
@@ -187,56 +176,39 @@ export function PwaPullToRefresh() {
 
   const progress = Math.min(pullDistance / PULL_THRESHOLD_PX, 1);
   const visible = refreshing || pullDistance > 4;
-  const indicatorHeight = refreshing
-    ? REFRESH_INDICATOR_HEIGHT_PX
-    : pullDistance;
 
   return (
     <div
       aria-hidden
       className={cn(
-        "pointer-events-none fixed inset-x-0 top-0 z-[300] overflow-hidden transition-[height] duration-200 ease-out",
+        "pointer-events-none fixed inset-x-0 top-0 z-[300] flex justify-center transition-opacity duration-150",
         visible ? "opacity-100" : "opacity-0",
       )}
       style={{
-        height: indicatorHeight,
-        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingTop: "max(0.5rem, env(safe-area-inset-top, 0px))",
+        transform: `translateY(${refreshing ? PULL_THRESHOLD_PX * 0.35 : pullDistance * 0.35}px)`,
       }}
     >
-      <div className="flex h-full items-end justify-center pb-3">
-        {refreshing ? (
-          <div className="flex flex-col items-center gap-2">
-            <BreneoLogo className="h-7 w-auto animate-pulse" />
-            <span className="text-xs font-medium text-muted-foreground">
-              Loading
-            </span>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-background/95 shadow-md ring-1 ring-border/60 backdrop-blur-sm"
-              style={{
-                transform: `scale(${0.75 + progress * 0.25})`,
-              }}
-            >
-              <ChevronDown
-                className="h-5 w-5 text-breneo-blue transition-transform duration-150"
-                style={{
-                  transform: `rotate(${progress * 180}deg)`,
-                  opacity: 0.45 + progress * 0.55,
-                }}
-              />
-            </div>
-            <span
-              className={cn(
-                "text-[11px] font-medium text-muted-foreground transition-opacity duration-150",
-                progress >= 1 ? "opacity-100" : "opacity-0",
-              )}
-            >
-              Release to refresh
-            </span>
-          </div>
+      <div
+        className={cn(
+          "flex h-9 w-9 items-center justify-center rounded-full bg-background/95 shadow-md ring-1 ring-border/60 backdrop-blur-sm",
+          refreshing && "scale-100",
         )}
+        style={{
+          transform: refreshing ? undefined : `scale(${0.7 + progress * 0.3})`,
+        }}
+      >
+        <Loader2
+          className={cn(
+            "h-5 w-5 text-breneo-blue",
+            refreshing ? "animate-spin" : "transition-transform duration-150",
+          )}
+          style={
+            refreshing
+              ? undefined
+              : { transform: `rotate(${progress * 180}deg)` }
+          }
+        />
       </div>
     </div>
   );

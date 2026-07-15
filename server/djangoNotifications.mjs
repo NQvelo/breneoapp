@@ -33,6 +33,30 @@ function isBroadcastRecipient(recipientId) {
   return value === "" || value === "all" || value === "*" || value === "everyone";
 }
 
+function extractCreatedNotificationId(data) {
+  if (!data || typeof data !== "object") return null;
+  const row = /** @type {Record<string, unknown>} */ (data);
+  if (row.id != null && String(row.id).trim()) return String(row.id).trim();
+  const nested = row.notification;
+  if (
+    nested &&
+    typeof nested === "object" &&
+    !Array.isArray(nested) &&
+    "id" in nested &&
+    nested.id != null &&
+    String(nested.id).trim()
+  ) {
+    return String(nested.id).trim();
+  }
+  return null;
+}
+
+function shouldSendPushForNotification(params, broadcast) {
+  if (broadcast) return true;
+  const kind = String(params.metadata?.kind ?? "").trim();
+  return kind === "manual" || kind === "broadcast";
+}
+
 /**
  * @param {{
  *   recipientId?: string;
@@ -93,11 +117,20 @@ export async function createDjangoNotification(params) {
       return { ok: res.ok, status: res.status, data };
     }
 
-    if (isFcmConfigured()) {
+    if (isFcmConfigured() && shouldSendPushForNotification(params, broadcast)) {
+      const notificationId = extractCreatedNotificationId(data);
+      const pushTag = broadcast
+        ? notificationId
+          ? `broadcast:${notificationId}`
+          : `broadcast:${params.title}:${params.message}`
+        : notificationId
+          ? `django:${notificationId}`
+          : `breneo-notif-${recipientId}:${params.title}:${params.message}`;
+
       const pushPayload = {
         title: params.title,
         message: params.message,
-        tag: broadcast ? "breneo-broadcast" : `breneo-notif-${recipientId}`,
+        tag: pushTag,
         url: "/notifications?tab=notifications",
       };
 

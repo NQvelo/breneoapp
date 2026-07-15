@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchMyNotifications } from "@/api/notifications/notificationsApi";
+import { filterInboxNotifications } from "@/api/notifications/inboxNotifications";
 import { fetchEmployerJoinRequestInbox } from "@/api/employer/employerJoinRequests";
 import { cvViewIsUnacknowledged } from "@/api/jobs/cvViewsApi";
 import { useMyCvViews } from "@/hooks/useMyCvViews";
@@ -44,7 +45,9 @@ export function useUnreadNotificationCount() {
     }
 
     const userIdStr = userId != null ? String(userId) : "";
-    const unreadNotifications = (notificationsQuery.data ?? []).filter(
+    const unreadNotifications = filterInboxNotifications(
+      notificationsQuery.data ?? [],
+    ).filter(
       (notification) =>
         !notification.is_read &&
         (notification.recipient_id === userIdStr ||

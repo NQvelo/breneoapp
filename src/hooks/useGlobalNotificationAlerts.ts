@@ -3,16 +3,22 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { useMyCvViews } from "@/hooks/useMyCvViews";
-import {
-  fetchMyNotifications,
-} from "@/api/notifications/notificationsApi";
+import { fetchMyNotifications } from "@/api/notifications/notificationsApi";
+import { filterInboxNotifications } from "@/api/notifications/inboxNotifications";
 import {
   getNotificationItemId,
   getNotificationItemMessage,
   getNotificationItemTitle,
   isNotificationItemUnread,
-  mergeNotificationListItems,
+  listCvViewNotificationItems,
+  listDjangoNotificationItems,
 } from "@/api/notifications/notificationDisplayUtils";
+import {
+  consumeNotificationBootstrap,
+  loadAlertedNotificationIds,
+  markNotificationAlerted,
+  markNotificationsAlerted,
+} from "@/lib/notificationAlerts";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -20,7 +26,7 @@ export function useGlobalNotificationAlerts() {
   const { user } = useAuth();
   const userId = user?.id;
   const { isEnabled, notify } = useBrowserNotifications();
-  const seenIdsRef = useRef<Set<string> | null>(null);
+  const bootstrapDoneRef = useRef(false);
   const isRegularUser = user?.user_type !== "academy";
 
   const { data: notifications = [] } = useQuery({
@@ -36,18 +42,28 @@ export function useGlobalNotificationAlerts() {
     { refetchInterval: POLL_INTERVAL_MS },
   );
 
-  const items = useMemo(
+  const inboxItems = useMemo(
     () =>
-      mergeNotificationListItems(
-        notifications,
+      listDjangoNotificationItems(filterInboxNotifications(notifications)),
+    [notifications],
+  );
+
+  const cvItems = useMemo(
+    () =>
+      listCvViewNotificationItems(
         cvViews,
         isRegularUser && Boolean(userId),
       ),
-    [notifications, cvViews, isRegularUser, userId],
+    [cvViews, isRegularUser, userId],
+  );
+
+  const alertItems = useMemo(
+    () => [...inboxItems, ...cvItems],
+    [inboxItems, cvItems],
   );
 
   useEffect(() => {
-    seenIdsRef.current = null;
+    bootstrapDoneRef.current = false;
   }, [userId]);
 
   useEffect(() => {
@@ -55,22 +71,32 @@ export function useGlobalNotificationAlerts() {
       return;
     }
 
-    if (seenIdsRef.current === null) {
-      seenIdsRef.current = new Set(items.map((item) => getNotificationItemId(item)));
-      return;
+    if (!bootstrapDoneRef.current) {
+      bootstrapDoneRef.current = true;
+
+      if (consumeNotificationBootstrap(userId)) {
+        markNotificationsAlerted(
+          userId,
+          alertItems.map((item) => getNotificationItemId(item)),
+        );
+        return;
+      }
     }
 
-    for (const item of items) {
+    const alertedIds = loadAlertedNotificationIds(userId);
+
+    for (const item of alertItems) {
       const itemId = getNotificationItemId(item);
-      if (seenIdsRef.current.has(itemId)) {
+      if (alertedIds.has(itemId)) {
         continue;
       }
-
-      seenIdsRef.current.add(itemId);
 
       if (!isNotificationItemUnread(item, userId)) {
+        markNotificationAlerted(userId, itemId);
         continue;
       }
+
+      markNotificationAlerted(userId, itemId);
 
       notify({
         title: getNotificationItemTitle(item),
@@ -83,5 +109,5 @@ export function useGlobalNotificationAlerts() {
         },
       });
     }
-  }, [items, userId, isEnabled, notify]);
+  }, [alertItems, userId, isEnabled, notify]);
 }

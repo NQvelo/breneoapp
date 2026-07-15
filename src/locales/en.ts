@@ -309,6 +309,13 @@ export const en = {
       installUnavailable:
         "Install is not available right now. Open this page in Safari or Chrome and try again.",
     },
+    updateApp: {
+      title: "Update available",
+      description:
+        "Version {version} is available. Update now to get the latest features and fixes.",
+      updateApp: "Update app",
+      updating: "Updating...",
+    },
     appVersion: {
       version: "Version {version}",
       updateApp: "Update app",
