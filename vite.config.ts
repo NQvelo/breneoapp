@@ -110,8 +110,8 @@ export default defineConfig(({ mode }) => ({
         short_name: "Breneo",
         description:
           "Breneo helps users assess their skills, explore job offers, and follow personalized learning paths with AI technology.",
-        theme_color: "#ffffff",
-        background_color: "#ffffff",
+        theme_color: "#F3F3F4",
+        background_color: "#F3F3F4",
         display: "standalone",
         orientation: "portrait",
         scope: "/",

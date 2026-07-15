@@ -10,8 +10,36 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Breneo" />
-    <meta name="theme-color" content="#ffffff" />
-    <meta name="msapplication-TileColor" content="#ffffff" />
+    <meta name="theme-color" content="#F3F3F4" />
+    <meta name="msapplication-TileColor" content="#F3F3F4" />
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem("theme");
+          var systemDark = window.matchMedia(
+            "(prefers-color-scheme: dark)",
+          ).matches;
+          var isDark =
+            theme === "dark" || (!theme || theme === "system") && systemDark;
+          var color = isDark ? "#181818" : "#F3F3F4";
+          var themeMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeMeta) themeMeta.setAttribute("content", color);
+          var appleMeta = document.querySelector(
+            'meta[name="apple-mobile-web-app-status-bar-style"]',
+          );
+          if (appleMeta) {
+            appleMeta.setAttribute("content", isDark ? "black" : "default");
+          }
+          var tileMeta = document.querySelector(
+            'meta[name="msapplication-TileColor"]',
+          );
+          if (tileMeta) tileMeta.setAttribute("content", color);
+          document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+        } catch (e) {
+          console.warn("PWA theme-color bootstrap failed:", e);
+        }
+      })();
+    </script>
     <meta name="msapplication-config" content="/browserconfig.xml" />
 
     <!-- Favicons - Must be early in head for best browser support -->

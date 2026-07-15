@@ -1,6 +1,7 @@
 import React from "react";
 import { ThemeProvider } from "next-themes";
 import App from "./App";
+import { PwaThemeColorSync } from "@/components/common/PwaThemeColorSync";
 
 function isIosWebKitBrowser(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -31,6 +32,7 @@ const appTree = (
     enableSystem={true}
     disableTransitionOnChange
   >
+    <PwaThemeColorSync />
     <div suppressHydrationWarning>
       <App />
     </div>
