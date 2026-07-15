@@ -105,24 +105,44 @@ async function getMessagingInstance(): Promise<Messaging | null> {
   return getMessaging(app);
 }
 
+/** Firebase Web Push public keys are ~87 chars (base64url). Shorter values are usually wrong. */
+function isLikelyValidVapidKey(vapidKey: string): boolean {
+  return /^[A-Za-z0-9_-]{80,}$/.test(vapidKey);
+}
+
 export async function registerFcmToken(): Promise<boolean> {
   if (!getFirebaseWebConfig()) {
+    console.warn("[fcm] Firebase web config missing (VITE_FIREBASE_*).");
     return false;
   }
 
   const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim();
   if (!vapidKey) {
     console.warn(
-      "[fcm] VITE_FIREBASE_VAPID_KEY is missing. Add it from Firebase Console → Cloud Messaging → Web Push certificates.",
+      "[fcm] VITE_FIREBASE_VAPID_KEY is missing. Add it from Firebase Console → Project settings → Cloud Messaging → Web Push certificates → Key pair.",
+    );
+    return false;
+  }
+
+  if (!isLikelyValidVapidKey(vapidKey)) {
+    console.error(
+      `[fcm] VITE_FIREBASE_VAPID_KEY looks invalid (length ${vapidKey.length}). ` +
+        "Copy the full Web Push certificate Key pair from Firebase Console " +
+        '(usually ~87 characters, often starts with "B").',
     );
     return false;
   }
 
   try {
     const registration = await getFcmServiceWorkerRegistration();
+    console.info(
+      "[fcm] Using service worker:",
+      registration.active?.scriptURL || registration.scope,
+    );
 
     const messaging = await getMessagingInstance();
     if (!messaging) {
+      console.warn("[fcm] Firebase Messaging not supported in this browser.");
       return false;
     }
 
@@ -132,10 +152,14 @@ export async function registerFcmToken(): Promise<boolean> {
     });
 
     if (!token) {
+      console.warn(
+        "[fcm] getToken() returned empty — check notification permission and VAPID key.",
+      );
       return false;
     }
 
-    const res = await fetch(`${getFcmApiBaseUrl()}/api/me/fcm-tokens/`, {
+    const endpoint = `${getFcmApiBaseUrl()}/api/me/fcm-tokens/`;
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ token, platform: "web" }),
@@ -144,13 +168,15 @@ export async function registerFcmToken(): Promise<boolean> {
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
       console.warn(
-        "[fcm] register token failed:",
+        "[fcm] register token API failed:",
+        endpoint,
         res.status,
         detail || res.statusText,
       );
       return false;
     }
 
+    console.info("[fcm] Token registered successfully");
     return true;
   } catch (error) {
     console.warn("[fcm] register token failed:", error);
