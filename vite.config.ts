@@ -118,20 +118,20 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         icons: [
           {
-            src: "/lovable-uploads/pwa-icon-192.png",
+            src: "/lovable-uploads/breneo-favicon.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/lovable-uploads/pwa-icon-512.png",
-            sizes: "512x512",
+            src: "/lovable-uploads/breneo-favicon.png",
+            sizes: "490x490",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/lovable-uploads/pwa-icon-512.png",
-            sizes: "512x512",
+            src: "/lovable-uploads/breneo-favicon.png",
+            sizes: "490x490",
             type: "image/png",
             purpose: "maskable",
           },
@@ -145,7 +145,7 @@ export default defineConfig(({ mode }) => ({
             url: "/dashboard",
             icons: [
               {
-                src: "/lovable-uploads/pwa-icon-192.png",
+                src: "/lovable-uploads/breneo-favicon.png",
                 sizes: "96x96",
               },
             ],
