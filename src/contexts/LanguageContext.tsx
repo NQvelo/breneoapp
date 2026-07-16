@@ -75,12 +75,21 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("appLanguage", lang);
       document.documentElement.lang = lang;
 
-      // Update URL with new language prefix
+      // Keep the same page + query/hash (e.g. /settings?section=accessibility)
       const currentPath = removeLanguagePrefix(location.pathname);
       const newPath = addLanguagePrefix(currentPath, lang);
+      const nextLocation = {
+        pathname: newPath,
+        search: location.search,
+        hash: location.hash,
+      };
 
-      if (newPath !== location.pathname) {
-        navigate(newPath, { replace: true });
+      if (
+        nextLocation.pathname !== location.pathname ||
+        nextLocation.search !== location.search ||
+        nextLocation.hash !== location.hash
+      ) {
+        navigate(nextLocation, { replace: true });
       }
     }
   };
@@ -107,7 +116,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
               newPath !== location.pathname &&
               !location.pathname.includes("undefined")
             ) {
-              navigate(newPath, { replace: true });
+              navigate(
+                {
+                  pathname: newPath,
+                  search: location.search,
+                  hash: location.hash,
+                },
+                { replace: true },
+              );
             }
           }
         }
@@ -115,7 +131,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [language, mounted, location.pathname, navigate]);
+  }, [
+    language,
+    mounted,
+    location.pathname,
+    location.search,
+    location.hash,
+    navigate,
+  ]);
 
   const t = useMemo(() => translations[language], [language]);
 

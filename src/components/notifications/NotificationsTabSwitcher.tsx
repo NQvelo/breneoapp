@@ -1,14 +1,16 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export type NotificationsTab = "notifications" | "cv_views";
+export type NotificationsTab = "notifications" | "cv_views" | "join_requests";
+
+export type NotificationsTabOption = {
+  value: NotificationsTab;
+  label: string;
+};
 
 type NotificationsTabSwitcherProps = {
+  tabs: NotificationsTabOption[];
   activeTab: NotificationsTab;
-  notificationsCount: number;
-  cvViewsCount: number;
-  notificationsLabel: string;
-  cvViewsLabel: string;
   onTabChange: (tab: NotificationsTab) => void;
 };
 
@@ -20,24 +22,10 @@ const pillSpring = {
 };
 
 export function NotificationsTabSwitcher({
+  tabs,
   activeTab,
-  notificationsCount,
-  cvViewsCount,
-  notificationsLabel,
-  cvViewsLabel,
   onTabChange,
 }: NotificationsTabSwitcherProps) {
-  const tabs = [
-    {
-      value: "notifications" as const,
-      label: `${notificationsLabel} (${notificationsCount})`,
-    },
-    {
-      value: "cv_views" as const,
-      label: `${cvViewsLabel} (${cvViewsCount})`,
-    },
-  ];
-
   return (
     <div className="fixed bottom-above-mobile-nav left-1/2 z-40 -translate-x-1/2 md:static md:translate-x-0 md:left-auto md:flex md:justify-start md:mb-4 md:w-auto">
       <motion.div

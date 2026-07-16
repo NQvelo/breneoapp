@@ -10,12 +10,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreVertical, Briefcase, MapPin, Clock } from "lucide-react";
+import { Plus, MoreVertical, Briefcase, Users, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchEmployerJobsFiltered,
   type EmployerJob,
 } from "@/api/employer/jobsApi";
+import { fetchEmployerJobApplicants } from "@/api/employer/jobApplicantsApi";
 import { resolveEmployerJobsCompanyFilter } from "@/api/employer/aggregatorBffApi";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -27,6 +28,25 @@ import {
   deletePublishedEmployerJob,
   updatePublishedEmployerJob,
 } from "@/api/employer/publishJob";
+
+function formatPostedDate(value?: string): string {
+  if (!value) return "Date unavailable";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatApplicantsCount(count: number | undefined): string {
+  if (count == null || !Number.isFinite(count) || count < 0) {
+    return "0 registered";
+  }
+  const n = Math.floor(count);
+  return `${n} registered`;
+}
 
 export default function EmployerJobsPage() {
   const navigate = useNavigate();
@@ -79,6 +99,32 @@ export default function EmployerJobsPage() {
       });
       setJobs(list);
       setLoadError(null);
+      setLoading(false);
+
+      // Enrich applicant counts when the list payload does not include them.
+      const missingCount = list.filter(
+        (job) => job.id && job.applicants_count == null,
+      );
+      if (missingCount.length > 0) {
+        const counts = await Promise.all(
+          missingCount.map(async (job) => {
+            try {
+              const applicants = await fetchEmployerJobApplicants(job.id);
+              return { id: job.id, count: applicants.length };
+            } catch {
+              return { id: job.id, count: 0 };
+            }
+          }),
+        );
+        const byId = new Map(counts.map((row) => [row.id, row.count]));
+        setJobs((current) =>
+          current.map((job) =>
+            byId.has(job.id)
+              ? { ...job, applicants_count: byId.get(job.id) }
+              : job,
+          ),
+        );
+      }
     } catch (e: unknown) {
       const err = e as Error & { status?: number };
       let msg = "Could not load jobs.";
@@ -100,7 +146,6 @@ export default function EmployerJobsPage() {
         },
       });
       setJobs([]);
-    } finally {
       setLoading(false);
     }
   }, [authLoading, user, user?.email, user?.id]);
@@ -128,23 +173,6 @@ export default function EmployerJobsPage() {
           : jobs;
     return byStatus;
   }, [statusFilter, activeJobs, closedJobs, jobs]);
-
-  const relativePosted = (value?: string) => {
-    if (!value) return "Posted recently";
-    const ms = Date.now() - new Date(value).getTime();
-    if (!Number.isFinite(ms) || ms < 0) return "Posted recently";
-    const hours = Math.floor(ms / (1000 * 60 * 60));
-    if (hours < 1) return "Posted just now";
-    if (hours < 24) return `Posted ${hours} hour${hours === 1 ? "" : "s"} ago`;
-    const days = Math.floor(hours / 24);
-    return `Posted ${days} day${days === 1 ? "" : "s"} ago`;
-  };
-
-  const modeLabel = (job: EmployerJob) => {
-    if (job.remote) return "Remote";
-    if (!job.employment_type || job.employment_type === "—") return "Onsite";
-    return job.employment_type;
-  };
 
   const handleOpenJobStats = (job: EmployerJob) => {
     if (!job.id) return;
@@ -330,16 +358,14 @@ export default function EmployerJobsPage() {
                         </h4>
                         <div className="flex flex-wrap items-center justify-start gap-x-4 gap-y-2 min-w-0">
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4 shrink-0" />
-                              <span>{job.location || "N/A"}</span>
+                              <Users className="h-4 w-4 shrink-0" />
+                              <span>
+                                {formatApplicantsCount(job.applicants_count)}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Clock className="h-4 w-4 shrink-0" />
-                              <span>{modeLabel(job)}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                              <Briefcase className="h-4 w-4 shrink-0" />
-                              <span>{relativePosted(job.created_at)}</span>
+                              <Calendar className="h-4 w-4 shrink-0" />
+                              <span>{formatPostedDate(job.created_at)}</span>
                             </div>
                         </div>
                         <div className="flex shrink-0 items-center justify-self-end">

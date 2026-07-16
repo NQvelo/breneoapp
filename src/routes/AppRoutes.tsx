@@ -51,7 +51,6 @@ const AcademyCoursesPage = lazy(
   () => import("@/pages/academy/AcademyCoursesPage"),
 );
 const AcademyProfile = lazy(() => import("@/pages/academy/AcademyProfilePage"));
-const AcademySettings = lazy(() => import("@/pages/academy/AcademySettings"));
 const AcademyPage = lazy(() => import("@/pages/academy/AcademyPage"));
 const AcademyRegistrationPage = lazy(
   () => import("@/pages/academy/AcademyRegistrationPage"),
@@ -414,7 +413,7 @@ export const AppRoutes = () => {
         {createLocalizedRoute(
           "/academy/settings",
           <ProtectedRoute requiredRole="academy">
-            <AcademySettings />
+            <UserSettings />
           </ProtectedRoute>,
         )}
         {createLocalizedRoute(

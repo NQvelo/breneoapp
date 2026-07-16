@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea, type TextareaProps } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -44,19 +44,20 @@ import {
 import {
   Edit,
   Settings,
-  LogOut,
   Mail,
   Globe,
   Phone,
   Trash2,
-  Plus,
   Link2,
   Camera,
   Upload,
   Check,
+  Pencil,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
+import { useTranslation } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 
 // Academy data is fetched from api/academy/profile/ (backend links academy to User in auth/user table)
 interface AcademyProfile {
@@ -225,21 +226,104 @@ function normalizeAcademyAvatarSrc(
   return `/${v}`;
 }
 
+const aboutDashedShell =
+  "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
+
+const aboutReadOnlyTextClass =
+  "text-gray-600 dark:text-gray-300 leading-relaxed text-base whitespace-pre-wrap break-words";
+
+function AutoSizeTextarea({
+  minHeightPx = 80,
+  className,
+  onChange,
+  value,
+  ...props
+}: TextareaProps & { minHeightPx?: number }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const syncHeight = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.overflow = "hidden";
+    el.style.height = `${Math.max(minHeightPx, el.scrollHeight)}px`;
+  }, [minHeightPx]);
+
+  useEffect(() => {
+    syncHeight();
+  }, [value, syncHeight]);
+
+  return (
+    <Textarea
+      {...props}
+      ref={ref}
+      value={value}
+      rows={1}
+      onChange={(e) => {
+        onChange?.(e);
+        requestAnimationFrame(syncHeight);
+      }}
+      className={cn("resize-none overflow-hidden", className)}
+    />
+  );
+}
+
+function AboutSectionEditToggle({
+  isEditing,
+  onEdit,
+  onDone,
+  disabled,
+  editLabel,
+  doneLabel,
+}: {
+  isEditing: boolean;
+  onEdit: () => void;
+  onDone: () => void;
+  disabled?: boolean;
+  editLabel: string;
+  doneLabel: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      disabled={disabled}
+      className={cn(
+        "h-9 w-9 shrink-0 rounded-full",
+        "bg-muted/80 text-muted-foreground",
+        "hover:bg-muted hover:text-foreground",
+        "dark:bg-white/10 dark:hover:bg-white/15",
+      )}
+      onClick={isEditing ? onDone : onEdit}
+      aria-label={isEditing ? doneLabel : editLabel}
+    >
+      {isEditing ? (
+        <Check className="h-5 w-5" />
+      ) : (
+        <Pencil className="h-5 w-5" />
+      )}
+    </Button>
+  );
+}
+
 const AcademyProfilePage = () => {
   const {
     user,
-    logout,
     loading: authLoading,
     updateUser,
     updateAcademyDisplay,
   } = useAuth();
   const navigate = useNavigate();
+  const t = useTranslation();
   const isMobile = useMobile();
   const [academyProfile, setAcademyProfile] = useState<AcademyProfile | null>(
     null,
   );
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingAbout, setEditingAbout] = useState(false);
+  const [aboutDraft, setAboutDraft] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formState, setFormState] = useState({
     academy_name: "",
@@ -677,9 +761,72 @@ const AcademyProfilePage = () => {
     setFormState((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSignOut = () => {
-    logout();
-    navigate("/");
+  const startEditingAbout = () => {
+    setAboutDraft(academyProfile?.description || "");
+    setEditingAbout(true);
+  };
+
+  const handleSaveAbout = async () => {
+    if (!user || !academyProfile) {
+      setEditingAbout(false);
+      return;
+    }
+
+    const trimmed = aboutDraft.trim();
+    if (trimmed === (academyProfile.description || "").trim()) {
+      setEditingAbout(false);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await apiClient.patch(
+        API_ENDPOINTS.ACADEMY.PROFILE,
+        toAcademyProfilePayload({
+          academy_name: academyProfile.academy_name,
+          description: trimmed || null,
+          website_url: academyProfile.website_url || null,
+          contact_email: academyProfile.contact_email || null,
+        }),
+      );
+
+      const refresh = await apiClient.get(API_ENDPOINTS.ACADEMY.PROFILE);
+      const n = normalizeAcademyProfileApiResponse(
+        refresh.data as AcademyProfileApiRaw,
+        user.id != null ? String(user.id) : undefined,
+      );
+
+      setAcademyProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              description: n.description,
+              academy_name: n.academy_name || prev.academy_name,
+              website_url: n.website_url,
+              contact_email: n.contact_email,
+            }
+          : prev,
+      );
+      setFormState((prev) => ({
+        ...prev,
+        description: n.description,
+      }));
+      setEditingAbout(false);
+      toast.success("About section updated.");
+    } catch (error: unknown) {
+      console.error("Error updating about section:", error);
+      const axiosError = error as AxiosError<{
+        detail?: string;
+        message?: string;
+      }>;
+      toast.error(
+        axiosError.response?.data?.detail ||
+          axiosError.response?.data?.message ||
+          "Failed to update about section. Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteWebsite = async () => {
@@ -728,23 +875,6 @@ const AcademyProfilePage = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Handler to open social link modal (add new)
-  const handleOpenSocialLinkModal = () => {
-    setEditingPlatform(null);
-    setSocialLinkForm({ platform: "", url: "" });
-    setIsSocialLinkModalOpen(true);
-  };
-
-  // Handler to open website modal
-  const handleOpenWebsiteModal = () => {
-    setEditingPlatform("website");
-    setSocialLinkForm({
-      platform: "website",
-      url: academyProfile?.website_url || "",
-    });
-    setIsSocialLinkModalOpen(true);
   };
 
   // Handler to open social link modal (edit existing)
@@ -996,7 +1126,7 @@ const AcademyProfilePage = () => {
     }
   };
 
-  /** Photo lives on the academy row (`/api/academy/profile/`), same as AcademySettings — not `/api/profile/` (403 for academy). */
+  /** Photo lives on the academy row (`/api/academy/profile/`) — not `/api/profile/` (403 for academy). */
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -1370,37 +1500,6 @@ const AcademyProfilePage = () => {
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               Personal information
             </h3>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => navigate("/academy/settings")}
-                aria-label="Settings"
-              >
-                <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={handleSignOut}
-                aria-label="Sign out"
-              >
-                <LogOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-              {academyProfile && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full"
-                  onClick={() => setIsEditing(true)}
-                  aria-label="Edit profile"
-                >
-                  <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                </Button>
-              )}
-            </div>
           </CardHeader>
           <CardContent className="px-6 pb-6">
             <div className="flex flex-row items-center gap-4 mb-4">
@@ -1537,60 +1636,65 @@ const AcademyProfilePage = () => {
                 ))}
             </div>
 
-            {academyProfile && (
+            <div className="mt-4 flex md:justify-end">
               <Button
-                variant="link"
-                className="text-breneo-blue p-0 h-auto mt-3 text-sm font-normal"
-                onClick={handleOpenSocialLinkModal}
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate("/academy/settings")}
+                className="w-full md:w-auto rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
+                aria-label={t.nav.settings}
               >
-                <Plus className="h-4 w-4 mr-1" />
-                Add social link or website
+                <Settings className="h-4 w-4" />
+                {t.nav.settings}
               </Button>
-            )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* About — same card pattern as user “About Me” */}
+        {/* About — inline edit like job posting description */}
         <Card className="border-0 rounded-3xl">
           <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               About
             </h3>
-            {academyProfile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => setIsEditing(true)}
-                aria-label="Edit about"
-              >
-                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-            )}
+            {academyProfile ? (
+              <AboutSectionEditToggle
+                isEditing={editingAbout}
+                onEdit={startEditingAbout}
+                onDone={() => void handleSaveAbout()}
+                disabled={isSubmitting}
+                editLabel="Edit about"
+                doneLabel="Save about"
+              />
+            ) : null}
           </CardHeader>
           <CardContent className="px-6 py-4">
-            {academyProfile?.description?.trim() ? (
-              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
-                {academyProfile.description.length > 200
-                  ? `${academyProfile.description.substring(0, 200)}...`
-                  : academyProfile.description}
-              </p>
+            {editingAbout ? (
+              <div className={cn(aboutDashedShell)}>
+                <AutoSizeTextarea
+                  id="academy-about-description"
+                  value={aboutDraft}
+                  onChange={(e) => setAboutDraft(e.target.value)}
+                  minHeightPx={160}
+                  disabled={isSubmitting}
+                  className="min-h-[160px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none focus-visible:ring-0 dark:text-white"
+                  placeholder="Tell students about your academy…"
+                />
+              </div>
+            ) : academyProfile?.description?.trim() ? (
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
+                <div className={aboutReadOnlyTextClass}>
+                  {academyProfile.description}
+                </div>
+              </div>
             ) : (
-              <p className="text-sm text-gray-500 italic">
-                No description yet. Use Edit to tell students about your
-                academy.
-              </p>
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
+                <p className="text-sm text-muted-foreground">
+                  No description yet. Tap edit to tell students about your
+                  academy.
+                </p>
+              </div>
             )}
-            {academyProfile &&
-              (academyProfile.description?.trim().length ?? 0) > 200 && (
-                <Button
-                  variant="link"
-                  className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
-                  onClick={() => setIsEditing(true)}
-                >
-                  View more
-                </Button>
-              )}
           </CardContent>
         </Card>
 

@@ -41,8 +41,8 @@ export function usePwaInstall() {
         case "redirected":
           toast.info(t.settings.downloadApp.openingBrowser);
           break;
-        case "ios-share":
-          toast.info(t.settings.downloadApp.iosShareOpened);
+        case "ios-manual":
+          // Guide is opened by installPwa()
           break;
         case "dismissed":
           toast.info(t.settings.downloadApp.installCancelled);

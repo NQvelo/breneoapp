@@ -148,10 +148,19 @@ export function DashboardHeader({
   const { user, academyDisplay } = useAuth();
   const { theme, setTheme } = useTheme();
   const t = useTranslation();
-  // TODO: wire up to real gamification XP source once available
+  // TODO: wire up to real gamification XP source once available (job seekers only)
   const xp = 0;
   const [mounted, setMounted] = React.useState(false);
   const currentPath = removeLanguagePrefix(location.pathname);
+  const isEmployer =
+    user?.user_type === "employer" ||
+    (typeof window !== "undefined" &&
+      localStorage.getItem("userRole") === "employer");
+  const isAcademy =
+    user?.user_type === "academy" ||
+    (typeof window !== "undefined" &&
+      localStorage.getItem("userRole") === "academy");
+  const isRegularUser = !isEmployer && !isAcademy;
   const username =
     (currentPath.startsWith("/academy/") ? academyDisplay?.name : undefined) ||
     user?.first_name ||
@@ -267,15 +276,17 @@ export function DashboardHeader({
 
         {/* Right side icons - hidden on mobile */}
         <div className="hidden md:flex items-center gap-2">
-          <Button
-            variant="ghost"
-            className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
-                       text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
-                       text-sm font-medium flex items-center gap-2 transition-colors"
-          >
-            <Zap className="h-4 w-4" />
-            <span>{xp} XP</span>
-          </Button>
+          {isRegularUser ? (
+            <Button
+              variant="ghost"
+              className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                         text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
+                         text-sm font-medium flex items-center gap-2 transition-colors"
+            >
+              <Zap className="h-4 w-4" />
+              <span>{xp} XP</span>
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"

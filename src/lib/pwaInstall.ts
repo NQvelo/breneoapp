@@ -11,11 +11,12 @@ export type PwaInstallResult =
   | "accepted"
   | "dismissed"
   | "redirected"
-  | "ios-share"
+  | "ios-manual"
   | "unavailable"
   | "already-installed";
 
 type PwaInstallListener = () => void;
+type IosInstallGuideListener = (open: boolean) => void;
 
 const PWA_INSTALL_QUERY = "pwaInstall";
 
@@ -23,6 +24,7 @@ let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let installed = false;
 let initialized = false;
 const listeners = new Set<PwaInstallListener>();
+const iosGuideListeners = new Set<IosInstallGuideListener>();
 
 function notifyListeners() {
   listeners.forEach((listener) => listener());
@@ -42,7 +44,7 @@ function isAndroidDevice(): boolean {
   return /Android/i.test(navigator.userAgent);
 }
 
-function isIosSafari(): boolean {
+export function isIosSafari(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
   return (
@@ -91,6 +93,17 @@ export function canInstallPwa(): boolean {
 export function subscribePwaInstall(listener: PwaInstallListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+export function openIosInstallGuide(): void {
+  iosGuideListeners.forEach((listener) => listener(true));
+}
+
+export function subscribeIosInstallGuide(
+  listener: IosInstallGuideListener,
+): () => void {
+  iosGuideListeners.add(listener);
+  return () => iosGuideListeners.delete(listener);
 }
 
 async function ensureServiceWorkerReady(): Promise<void> {
@@ -174,27 +187,6 @@ async function promptNativeInstall(
   }
 }
 
-async function openIosShareSheet(): Promise<PwaInstallResult> {
-  if (!navigator.share) {
-    return "unavailable";
-  }
-
-  try {
-    await navigator.share({
-      title: document.title || "Breneo",
-      text: "Install Breneo",
-      url: window.location.href,
-    });
-    return "ios-share";
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return "dismissed";
-    }
-    console.error("[pwaInstall] iOS share sheet failed:", error);
-    return "unavailable";
-  }
-}
-
 function clearInstallQueryParam(): void {
   const params = new URLSearchParams(window.location.search);
   if (!params.has(PWA_INSTALL_QUERY)) return;
@@ -250,14 +242,23 @@ export async function installPwa(options?: {
     return "redirected";
   }
 
-  const prompt = await waitForDeferredPrompt(options?.fromRedirect ? 10000 : 8000);
+  // iOS never fires beforeinstallprompt — show manual install guide.
+  if (isIosDevice() && !deferredPrompt) {
+    openIosInstallGuide();
+    return "ios-manual";
+  }
+
+  const prompt = await waitForDeferredPrompt(
+    options?.fromRedirect ? 10000 : 8000,
+  );
 
   if (prompt) {
     return promptNativeInstall(prompt);
   }
 
-  if (isIosSafari()) {
-    return openIosShareSheet();
+  if (isIosDevice()) {
+    openIosInstallGuide();
+    return "ios-manual";
   }
 
   return "unavailable";

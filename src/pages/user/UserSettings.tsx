@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ import {
 import { SettingsPwaAppCard } from "@/components/settings/SettingsPwaAppCard";
 import { SettingsAppVersionFooter } from "@/components/settings/SettingsAppVersionFooter";
 import { SettingsMobileHeader } from "@/components/settings/SettingsMobileHeader";
+import { AcademyAccountInfoCard } from "@/components/settings/AcademyAccountInfoCard";
 import {
   SettingsActionRow,
   SettingsListRow,
@@ -75,6 +76,7 @@ import {
   type SettingsSection,
   isValidSettingsSection,
 } from "@/constants/settingsSections";
+import { removeLanguagePrefix } from "@/utils/localeUtils";
 
 export default function SettingsPage() {
   const { user, logout, refreshUser, employerDisplay, academyDisplay } =
@@ -86,6 +88,7 @@ export default function SettingsPage() {
     useLanguage();
   const t = useTranslation();
   const isMobile = useMobile();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -97,6 +100,16 @@ export default function SettingsPage() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
+  const pathWithoutLang = removeLanguagePrefix(location.pathname);
+  /** Employer shell already provides DashboardLayout — avoid nesting a second one. */
+  const isEmbeddedInEmployerShell = pathWithoutLang.startsWith(
+    "/employer/settings",
+  );
+  const isEmployerSettings = isEmbeddedInEmployerShell;
+  const isAcademySettings = pathWithoutLang.startsWith("/academy/settings");
+  /** Org accounts share account/notification/privacy UI (no job-seeker sections). */
+  const isOrgSettings = isEmployerSettings || isAcademySettings;
+
   /** Same email shown in AppSidebar (employer company / academy profile when applicable). */
   const recoveryEmail = useMemo(() => {
     const role =
@@ -105,10 +118,16 @@ export default function SettingsPage() {
         ? localStorage.getItem("userRole")
         : null) ||
       "";
-    if (role === "employer" && employerDisplay?.email?.trim()) {
+    if (
+      (role === "employer" || isEmployerSettings) &&
+      employerDisplay?.email?.trim()
+    ) {
       return employerDisplay.email.trim();
     }
-    if (role === "academy" && academyDisplay?.email?.trim()) {
+    if (
+      (role === "academy" || isAcademySettings) &&
+      academyDisplay?.email?.trim()
+    ) {
       return academyDisplay.email.trim();
     }
     return (user?.email ?? "").trim();
@@ -117,6 +136,8 @@ export default function SettingsPage() {
     user?.email,
     employerDisplay?.email,
     academyDisplay?.email,
+    isEmployerSettings,
+    isAcademySettings,
   ]);
 
   useEffect(() => {
@@ -298,8 +319,8 @@ export default function SettingsPage() {
   );
   const [language, setLanguage] = useState<"en" | "ka">(contextLanguage);
 
-  // Handler to change section
   const handleSectionChange = (section: SettingsSection) => {
+    if (isEmployerSettings && section === "subscription") return;
     setSearchParams({ section }, { replace: false });
   };
 
@@ -308,6 +329,12 @@ export default function SettingsPage() {
     nextParams.delete("section");
     setSearchParams(nextParams, { replace: true });
   };
+
+  useEffect(() => {
+    if (isEmployerSettings && activeSection === "subscription") {
+      handleBackToList();
+    }
+  }, [isEmployerSettings, activeSection]);
 
   // Sync fontSize and language with context
   useEffect(() => {
@@ -620,25 +647,29 @@ export default function SettingsPage() {
         ? t.settings.fontSize.large
         : t.settings.fontSize.medium;
 
-  const notificationsEnabled =
-    emailJobMatches ||
-    emailNewCourses ||
-    emailSkillUpdates ||
-    inAppMessages ||
-    inAppProgress ||
-    newsletter ||
-    pushNotifications;
+  const notificationsEnabled = isOrgSettings
+    ? pushNotifications
+    : emailJobMatches ||
+      emailNewCourses ||
+      emailSkillUpdates ||
+      inAppMessages ||
+      inAppProgress ||
+      newsletter ||
+      pushNotifications;
 
   const settingsGroups = useMemo((): SettingsListItemConfig[][] => {
     const openSection = (section: SettingsSection) => () =>
       handleSectionChange(section);
 
-    return [
+    const groups: SettingsListItemConfig[][] = [
       [
         {
           id: "account",
           title: getSettingsSectionLabel("account", t),
-          subtitle: recoveryEmail || t.settings.list.manageAccount,
+          subtitle:
+            isAcademySettings && academyDisplay?.name?.trim()
+              ? academyDisplay.name.trim()
+              : recoveryEmail || t.settings.list.manageAccount,
           icon: User,
           iconBgClass: "bg-sky-100 dark:bg-sky-950/50",
           iconColorClass: "text-sky-600 dark:text-sky-400",
@@ -678,7 +709,10 @@ export default function SettingsPage() {
           onClick: openSection("privacy"),
         },
       ],
-      [
+    ];
+
+    if (!isEmployerSettings) {
+      groups.push([
         {
           id: "subscription",
           title: getSettingsSectionLabel("subscription", t),
@@ -690,8 +724,10 @@ export default function SettingsPage() {
           iconColorClass: "text-emerald-600 dark:text-emerald-400",
           onClick: openSection("subscription"),
         },
-      ],
-    ];
+      ]);
+    }
+
+    return groups;
   }, [
     t,
     recoveryEmail,
@@ -701,6 +737,9 @@ export default function SettingsPage() {
     fontSizeLabel,
     subscriptionLoading,
     subscriptionInfo?.plan_name,
+    isEmployerSettings,
+    isAcademySettings,
+    academyDisplay?.name,
   ]);
 
   const logoutItem: SettingsListItemConfig = {
@@ -718,6 +757,55 @@ export default function SettingsPage() {
 
     switch (activeSection) {
       case "account":
+        if (isAcademySettings) {
+          return (
+            <div className="space-y-4">
+              <SettingsSectionCard>
+                <div className="space-y-6">
+                  <AcademyAccountInfoCard />
+                  <SettingsSubsection title={t.settings.privacyPage.security}>
+                    <SettingsListRow
+                      primary={t.settings.changePassword.email}
+                      secondary={recoveryEmail || "—"}
+                    />
+                    <SettingsActionRow
+                      label={t.settings.privacyPage.changePassword}
+                      description={t.settings.privacyPage.changePasswordDesc}
+                      onClick={() => setChangePasswordOpen(true)}
+                      trailing={
+                        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+                      }
+                    />
+                  </SettingsSubsection>
+                </div>
+              </SettingsSectionCard>
+            </div>
+          );
+        }
+        if (isEmployerSettings) {
+          return (
+            <div className="space-y-4">
+              <SettingsSectionCard>
+                <div className="space-y-6">
+                  <SettingsSubsection title={t.settings.sections.account}>
+                    <SettingsListRow
+                      primary={t.settings.changePassword.email}
+                      secondary={recoveryEmail || "—"}
+                    />
+                    <SettingsActionRow
+                      label={t.settings.privacyPage.changePassword}
+                      description={t.settings.privacyPage.changePasswordDesc}
+                      onClick={() => setChangePasswordOpen(true)}
+                      trailing={
+                        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+                      }
+                    />
+                  </SettingsSubsection>
+                </div>
+              </SettingsSectionCard>
+            </div>
+          );
+        }
         return <ResumeImportCard />;
 
       case "notifications":
@@ -725,67 +813,73 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <SettingsSectionCard>
               <div className="space-y-6">
-                <SettingsSubsection title={t.settings.notificationsPage.email}>
-                  <SettingsToggleRow
-                    label={t.settings.notificationsPage.jobMatches}
-                    description={t.settings.notificationsPage.jobMatchesDesc}
-                  >
-                    <Switch
-                      checked={emailJobMatches}
-                      onCheckedChange={setEmailJobMatches}
-                    />
-                  </SettingsToggleRow>
-                  <SettingsToggleRow
-                    label={t.settings.notificationsPage.newCourses}
-                    description={t.settings.notificationsPage.newCoursesDesc}
-                  >
-                    <Switch
-                      checked={emailNewCourses}
-                      onCheckedChange={setEmailNewCourses}
-                    />
-                  </SettingsToggleRow>
-                  <SettingsToggleRow
-                    label={t.settings.notificationsPage.skillUpdates}
-                    description={t.settings.notificationsPage.skillUpdatesDesc}
-                  >
-                    <Switch
-                      checked={emailSkillUpdates}
-                      onCheckedChange={setEmailSkillUpdates}
-                    />
-                  </SettingsToggleRow>
-                  <SettingsToggleRow
-                    label={t.settings.notificationsPage.newsletter}
-                    description={t.settings.notificationsPage.newsletterDesc}
-                  >
-                    <Switch
-                      checked={newsletter}
-                      onCheckedChange={setNewsletter}
-                    />
-                  </SettingsToggleRow>
-                </SettingsSubsection>
+                {!isOrgSettings ? (
+                  <>
+                    <SettingsSubsection title={t.settings.notificationsPage.email}>
+                      <SettingsToggleRow
+                        label={t.settings.notificationsPage.jobMatches}
+                        description={t.settings.notificationsPage.jobMatchesDesc}
+                      >
+                        <Switch
+                          checked={emailJobMatches}
+                          onCheckedChange={setEmailJobMatches}
+                        />
+                      </SettingsToggleRow>
+                      <SettingsToggleRow
+                        label={t.settings.notificationsPage.newCourses}
+                        description={t.settings.notificationsPage.newCoursesDesc}
+                      >
+                        <Switch
+                          checked={emailNewCourses}
+                          onCheckedChange={setEmailNewCourses}
+                        />
+                      </SettingsToggleRow>
+                      <SettingsToggleRow
+                        label={t.settings.notificationsPage.skillUpdates}
+                        description={
+                          t.settings.notificationsPage.skillUpdatesDesc
+                        }
+                      >
+                        <Switch
+                          checked={emailSkillUpdates}
+                          onCheckedChange={setEmailSkillUpdates}
+                        />
+                      </SettingsToggleRow>
+                      <SettingsToggleRow
+                        label={t.settings.notificationsPage.newsletter}
+                        description={t.settings.notificationsPage.newsletterDesc}
+                      >
+                        <Switch
+                          checked={newsletter}
+                          onCheckedChange={setNewsletter}
+                        />
+                      </SettingsToggleRow>
+                    </SettingsSubsection>
 
-                <SettingsSubsection title={t.settings.notificationsPage.inApp}>
-                  <SettingsToggleRow
-                    label={t.settings.notificationsPage.messages}
-                    description={t.settings.notificationsPage.messagesDesc}
-                  >
-                    <Switch
-                      checked={inAppMessages}
-                      onCheckedChange={setInAppMessages}
-                    />
-                  </SettingsToggleRow>
-                  <SettingsToggleRow
-                    label={t.settings.notificationsPage.progressReminders}
-                    description={
-                      t.settings.notificationsPage.progressRemindersDesc
-                    }
-                  >
-                    <Switch
-                      checked={inAppProgress}
-                      onCheckedChange={setInAppProgress}
-                    />
-                  </SettingsToggleRow>
-                </SettingsSubsection>
+                    <SettingsSubsection title={t.settings.notificationsPage.inApp}>
+                      <SettingsToggleRow
+                        label={t.settings.notificationsPage.messages}
+                        description={t.settings.notificationsPage.messagesDesc}
+                      >
+                        <Switch
+                          checked={inAppMessages}
+                          onCheckedChange={setInAppMessages}
+                        />
+                      </SettingsToggleRow>
+                      <SettingsToggleRow
+                        label={t.settings.notificationsPage.progressReminders}
+                        description={
+                          t.settings.notificationsPage.progressRemindersDesc
+                        }
+                      >
+                        <Switch
+                          checked={inAppProgress}
+                          onCheckedChange={setInAppProgress}
+                        />
+                      </SettingsToggleRow>
+                    </SettingsSubsection>
+                  </>
+                ) : null}
 
                 <SettingsSubsection title={t.settings.notificationsPage.push}>
                   <SettingsToggleRow
@@ -821,52 +915,39 @@ export default function SettingsPage() {
                   />
                 </SettingsSubsection>
 
-                <SettingsSubsection title={t.settings.privacyPage.dataVisibility}>
-                  <SettingsToggleRow
-                    label={t.settings.privacyPage.showSkills}
-                    description={t.settings.privacyPage.showSkillsDesc}
-                  >
-                    <Switch
-                      checked={showSkills}
-                      onCheckedChange={setShowSkills}
-                    />
-                  </SettingsToggleRow>
-                  <SettingsToggleRow
-                    label={t.settings.privacyPage.showTestResults}
-                    description={t.settings.privacyPage.showTestResultsDesc}
-                  >
-                    <Switch
-                      checked={showTestResults}
-                      onCheckedChange={setShowTestResults}
-                    />
-                  </SettingsToggleRow>
-                  <SettingsToggleRow
-                    label={t.settings.privacyPage.showCompletedCourses}
-                    description={t.settings.privacyPage.showCompletedCoursesDesc}
-                  >
-                    <Switch
-                      checked={showCompletedCourses}
-                      onCheckedChange={setShowCompletedCourses}
-                    />
-                  </SettingsToggleRow>
-                </SettingsSubsection>
-
-                {/* <SettingsSubsection title="Data management">
-                  <div className="rounded-2xl bg-gray-50/90 px-4 py-4 dark:bg-white/5">
-                    <Button
-                      onClick={handleExportData}
-                      variant="outline"
-                      className="rounded-full"
+                {!isOrgSettings ? (
+                  <SettingsSubsection title={t.settings.privacyPage.dataVisibility}>
+                    <SettingsToggleRow
+                      label={t.settings.privacyPage.showSkills}
+                      description={t.settings.privacyPage.showSkillsDesc}
                     >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download My Data
-                    </Button>
-                    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                      Request a copy of all your data. You&apos;ll receive an
-                      email with a download link.
-                    </p>
-                  </div>
-                </SettingsSubsection> */}
+                      <Switch
+                        checked={showSkills}
+                        onCheckedChange={setShowSkills}
+                      />
+                    </SettingsToggleRow>
+                    <SettingsToggleRow
+                      label={t.settings.privacyPage.showTestResults}
+                      description={t.settings.privacyPage.showTestResultsDesc}
+                    >
+                      <Switch
+                        checked={showTestResults}
+                        onCheckedChange={setShowTestResults}
+                      />
+                    </SettingsToggleRow>
+                    <SettingsToggleRow
+                      label={t.settings.privacyPage.showCompletedCourses}
+                      description={
+                        t.settings.privacyPage.showCompletedCoursesDesc
+                      }
+                    >
+                      <Switch
+                        checked={showCompletedCourses}
+                        onCheckedChange={setShowCompletedCourses}
+                      />
+                    </SettingsToggleRow>
+                  </SettingsSubsection>
+                ) : null}
               </div>
             </SettingsSectionCard>
           </div>
@@ -1091,8 +1172,8 @@ export default function SettingsPage() {
 
   const showListView = activeSection === null;
 
-  return (
-    <DashboardLayout>
+  const pageContent = (
+    <>
       <div className="mx-auto max-w-7xl px-2 pt-2 pb-32 sm:px-6 md:py-6 md:pb-6 lg:px-8">
         <SettingsMobileHeader
           activeSection={activeSection}
@@ -1214,6 +1295,12 @@ export default function SettingsPage() {
           </DialogContent>
         </Dialog>
       )}
-    </DashboardLayout>
+    </>
   );
+
+  if (isEmbeddedInEmployerShell) {
+    return pageContent;
+  }
+
+  return <DashboardLayout>{pageContent}</DashboardLayout>;
 }

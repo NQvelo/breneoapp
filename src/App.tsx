@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
+import { IosPwaInstallGuideModal } from "@/components/common/IosPwaInstallGuideModal";
 import { PwaPullToRefresh } from "@/components/common/PwaPullToRefresh";
 import { AuthProvider } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -24,6 +25,7 @@ function AppShell() {
     <>
       <PwaPullToRefresh />
       <AppRoutes />
+      <IosPwaInstallGuideModal />
     </>
   );
 }

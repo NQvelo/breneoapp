@@ -34,6 +34,8 @@ export type EmployerJob = {
   /** Short AI summary (2–3 sentences) when API returns it separately from full_description */
   job_description_summary?: string;
   required_skills?: string[];
+  /** Number of people who applied / registered for this job (when API provides it). */
+  applicants_count?: number;
 };
 
 export type EmployerJobsFilter = {
@@ -363,6 +365,29 @@ function parseEmployerJob(raw: Record<string, unknown>): EmployerJob {
         ? (raw.raw as Record<string, unknown>)
         : null,
     ),
+    applicants_count: (() => {
+      const candidates = [
+        raw.applicants_count,
+        raw.applicant_count,
+        raw.applications_count,
+        raw.application_count,
+        raw.total_applicants,
+        raw.num_applicants,
+        rawEnvelope?.applicants_count,
+        rawEnvelope?.applicant_count,
+        rawEnvelope?.applications_count,
+        employerSubmitted?.applicants_count,
+      ];
+      for (const c of candidates) {
+        if (typeof c === "number" && Number.isFinite(c) && c >= 0) {
+          return Math.floor(c);
+        }
+        if (typeof c === "string" && c.trim() !== "" && /^\d+$/.test(c.trim())) {
+          return Number(c.trim());
+        }
+      }
+      return undefined;
+    })(),
   };
 }
 

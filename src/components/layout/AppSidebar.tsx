@@ -58,7 +58,7 @@ export function AppSidebar({
   const { subscriptionInfo } = useSubscription();
   const { theme, setTheme } = useTheme();
   const t = useTranslation();
-  // TODO: wire up to real gamification XP source once available
+  // TODO: wire up to real gamification XP source once available (job seekers only)
   const xp = 0;
   const [mounted, setMounted] = React.useState(false);
   const readEmployerCache = React.useCallback(() => {
@@ -326,21 +326,17 @@ export function AppSidebar({
       ? "/employer/jobs"
       : "/home";
 
-  // Mobile navigation: keep exactly 5 items for every role.
+  // Mobile navigation: employers / academy get 3; job seekers keep 5.
   const mobileNavItems = isAcademy
     ? [
         { icon: Home, label: t.nav.home, href: "/academy/home" },
         { icon: LibraryBig, label: t.nav.courses, href: "/academy/courses" },
-        { icon: Bell, label: t.nav.notifications, href: notificationsPath },
-        { icon: Settings, label: t.nav.settings, href: settingsPath },
         { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
       ]
     : isEmployer
       ? [
           { icon: Briefcase, label: t.nav.yourJobs, href: "/employer/jobs" },
           { icon: Users, label: t.nav.members, href: "/employer/members" },
-          { icon: Bell, label: t.nav.notifications, href: notificationsPath },
-          { icon: Settings, label: t.nav.settings, href: settingsPath },
           { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
         ]
       : [
@@ -351,6 +347,8 @@ export function AppSidebar({
           { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
         ];
 
+  const isCompactMobileNav = isAcademy || isEmployer;
+
   return (
     <>
       {/* Mobile Header */}
@@ -360,15 +358,17 @@ export function AppSidebar({
             <BreneoLogo className="h-6 md:h-5" />
           </LocalizedLink>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              className="relative h-10 px-3 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 
-                         bg-black/[0.06] dark:bg-white/[0.03] hover:!bg-black/[0.08] dark:hover:!bg-white/[0.05] transition-colors
-                         text-sm font-medium flex items-center gap-2"
-            >
-              <Zap className="h-4 w-4" />
-              <span>{xp} XP</span>
-            </Button>
+            {isRegularUser ? (
+              <Button
+                variant="ghost"
+                className="relative h-10 px-3 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 
+                           bg-black/[0.06] dark:bg-white/[0.03] hover:!bg-black/[0.08] dark:hover:!bg-white/[0.05] transition-colors
+                           text-sm font-medium flex items-center gap-2"
+              >
+                <Zap className="h-4 w-4" />
+                <span>{xp} XP</span>
+              </Button>
+            ) : null}
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
@@ -399,8 +399,18 @@ export function AppSidebar({
           aria-hidden
         />
 
-        <div className="relative px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
-          <nav className="mx-auto flex max-w-xl items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]">
+        <div
+          className={cn(
+            "relative pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2",
+            isCompactMobileNav ? "flex justify-center px-6" : "px-4",
+          )}
+        >
+          <nav
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]",
+              isCompactMobileNav ? "w-fit" : "mx-auto max-w-xl",
+            )}
+          >
             {mobileNavItems.map((item, index) => {
               let isActive = currentPath === item.href;
               if (item.href === "/home") {
@@ -432,7 +442,10 @@ export function AppSidebar({
                   key={index}
                   to={item.href}
                   className={cn(
-                    "group relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-full px-1 py-2 transition-all duration-200",
+                    "group relative flex flex-col items-center justify-center rounded-full py-2 transition-all duration-200",
+                    isCompactMobileNav
+                      ? "min-w-[4.75rem] px-3"
+                      : "min-w-0 flex-1 px-1",
                     isActive
                       ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
                       : "text-[#6B7280] hover:bg-black/[0.04] hover:text-[#111827] dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white",

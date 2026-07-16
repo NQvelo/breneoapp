@@ -39,7 +39,6 @@ import {
   Building2,
   User,
   Settings,
-  LogOut,
 } from "lucide-react";
 import {
   extractBreneoEmailFromJwt,
@@ -60,7 +59,7 @@ import {
   type AggregatorIndustry,
 } from "@/api/employer/aggregatorBffApi";
 import { createPendingEmployerStaffMembership } from "@/api/employer/aggregatorBffApi";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 import { getLocalizedPath } from "@/utils/localeUtils";
 
 const EMP_AGG_EMPLOYEE_OPTIONS = [
@@ -75,10 +74,10 @@ const EMP_AGG_EMPLOYEE_OPTIONS = [
 export default function EmployerProfilePage() {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const t = useTranslation();
   const {
     user,
     loading: authLoading,
-    logout,
     updateUser,
     updateEmployerDisplay,
   } = useAuth();
@@ -497,31 +496,25 @@ export default function EmployerProfilePage() {
       <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
         <Card className="border-0 rounded-3xl">
           <CardHeader className="p-4 pb-3 border-b-0">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground min-w-0">
-              <User className="h-4 w-4 shrink-0" />
-              <span className="truncate flex-1">
-                Signed in as{" "}
-                <span className="text-foreground">{personDisplayName}</span>
-              </span>
+            <div className="flex flex-row flex-nowrap items-center gap-3 min-w-0">
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-muted-foreground">
+                <User className="h-4 w-4 shrink-0" />
+                <span className="truncate">
+                  Signed in as{" "}
+                  <span className="text-foreground">{personDisplayName}</span>
+                </span>
+              </div>
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full ml-auto"
+                variant="secondary"
+                size="sm"
                 onClick={() =>
                   navigate(getLocalizedPath("/employer/settings", language))
                 }
-                aria-label="Account settings"
+                className="shrink-0 rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
+                aria-label={t.nav.settings}
               >
-                <Settings className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={logout}
-                aria-label="Log out"
-              >
-                <LogOut className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                <Settings className="h-4 w-4" />
+                {t.nav.settings}
               </Button>
             </div>
           </CardHeader>

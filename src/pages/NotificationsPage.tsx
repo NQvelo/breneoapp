@@ -126,6 +126,20 @@ const NotificationsPage = () => {
     [cvViews],
   );
 
+  const notificationTabs = useMemo(
+    () => [
+      {
+        value: "notifications" as const,
+        label: `${t.notifications.tabNotifications} (${djangoItems.length})`,
+      },
+      {
+        value: "cv_views" as const,
+        label: `${t.notifications.tabCvViews} (${cvViewItems.length})`,
+      },
+    ],
+    [t, djangoItems.length, cvViewItems.length],
+  );
+
   const items =
     activeTab === "cv_views" && isRegularUser ? cvViewItems : djangoItems;
 
@@ -308,11 +322,8 @@ const NotificationsPage = () => {
         <div className="space-y-4">
           {isRegularUser ? (
             <NotificationsTabSwitcher
+              tabs={notificationTabs}
               activeTab={activeTab}
-              notificationsCount={djangoItems.length}
-              cvViewsCount={cvViewItems.length}
-              notificationsLabel={t.notifications.tabNotifications}
-              cvViewsLabel={t.notifications.tabCvViews}
               onTabChange={setActiveTab}
             />
           ) : null}
