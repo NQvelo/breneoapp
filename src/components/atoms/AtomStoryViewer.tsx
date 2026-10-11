@@ -20,7 +20,11 @@ export function AtomStoryViewer({
     <StoryContainer
       cards={atom.content_cards}
       quiz={{
-        options: atom.quiz.options,
+        options: [
+          atom.quiz.options[0] ?? "",
+          atom.quiz.options[1] ?? "",
+          atom.quiz.options[2] ?? "",
+        ],
         question: atom.title,
       }}
       atomTitle={atom.title}

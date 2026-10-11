@@ -60,6 +60,12 @@ import { cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import { toast } from "sonner";
 import { BetaVersionModal } from "@/components/common/BetaVersionModal";
+import {
+  DashboardAnalytics,
+  type ApplicationStats,
+  type DailyPickJob,
+} from "@/components/home/DashboardAnalytics";
+import { useMyApplications } from "@/hooks/useMyApplications";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
@@ -416,7 +422,6 @@ const UserHome = () => {
   const jobsScrollRef = useRef<HTMLDivElement>(null);
   const coursesScrollRef = useRef<HTMLDivElement>(null);
   const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
-  const [isSkillPathPressed, setIsSkillPathPressed] = useState(false);
   const extractSavedIds = (items: unknown, idKeys: string[]): string[] => {
     if (!Array.isArray(items)) return [];
     return items
@@ -939,6 +944,48 @@ const UserHome = () => {
     return { transformedGeorgianJobs, transformedWorldwideJobs };
   }, [georgianJobs, worldwideJobs, savedJobs, user, userSkillsForMatch]);
 
+  const { data: myApplications, isLoading: applicationsLoading } =
+    useMyApplications(!!user);
+
+  const applicationStats: ApplicationStats = useMemo(() => {
+    const applications = myApplications?.applications ?? [];
+    const statusOf = (status?: string) => (status ?? "").toLowerCase();
+    return {
+      applied: myApplications?.pagination?.total ?? applications.length,
+      inReview: applications.filter(
+        (app) =>
+          app.employer_viewed_cv === true ||
+          statusOf(app.status).includes("review"),
+      ).length,
+      interviews: applications.filter((app) =>
+        statusOf(app.status).includes("interview"),
+      ).length,
+    };
+  }, [myApplications]);
+
+  const dailyPickJob: DailyPickJob | null = useMemo(() => {
+    const candidates = [
+      ...transformedGeorgianJobs,
+      ...transformedWorldwideJobs,
+    ];
+    if (candidates.length === 0) return null;
+    const best = candidates.reduce((top, job) =>
+      (job.matchPercentage ?? 0) > (top.matchPercentage ?? 0) ? job : top,
+    );
+    return {
+      id: best.id,
+      title: best.title,
+      company:
+        best.company_name ||
+        (typeof best.company === "string"
+          ? best.company
+          : best.company?.name || "Company"),
+      location: best.location,
+      logo: best.company_logo,
+      matchPercentage: best.matchPercentage,
+    };
+  }, [transformedGeorgianJobs, transformedWorldwideJobs]);
+
   const scrollGeorgiaJobs = (direction: "left" | "right") => {
     if (georgiaJobsScrollRef.current) {
       const scrollAmount = 400;
@@ -1256,10 +1303,9 @@ const UserHome = () => {
       )}
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="space-y-6">
-          {/* Top Section - Widgets */}
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
-            {!hasCompletedTest && !loadingSkills && (
+          {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
+          {!hasCompletedTest && !loadingSkills && (
+            <div className="flex">
               <Card
                 className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in hover:shadow-soft transition-shadow cursor-pointer"
                 style={{
@@ -1298,54 +1344,15 @@ const UserHome = () => {
                   </Link>
                 </CardContent>
               </Card>
-            )}
+            </div>
+          )}
 
-            {/* Skill Path CTA Widget - Only show if user has completed the test */}
-            {hasCompletedTest && !loadingSkills && (
-              <Card
-                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in hover:shadow-soft transition-shadow cursor-pointer"
-                style={{
-                  boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
-                  transform: isSkillPathPressed ? "scale(0.95)" : "scale(1)",
-                  transition: "transform 0.1s ease-in-out",
-                }}
-                onMouseDown={() => setIsSkillPathPressed(true)}
-                onMouseUp={() => setIsSkillPathPressed(false)}
-                onMouseLeave={() => setIsSkillPathPressed(false)}
-                onTouchStart={() => setIsSkillPathPressed(true)}
-                onTouchEnd={() => setIsSkillPathPressed(false)}
-              >
-                <CardContent className="p-4 md:p-4 flex items-center justify-center md:block">
-                  <Link to="/skill-path" className="block cursor-pointer group">
-                    <div className="flex items-center gap-3 md:gap-4">
-                      {/* Left side - Content */}
-                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                        <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
-                          {t.home.skillPathTitle}
-                        </h3>
-                        <p className="text-sm md:text-sm text-gray-900">
-                          {t.home.skillPathSubtitle}
-                        </p>
-                      </div>
-
-                      {/* Right side - Illustration */}
-                      <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
-                        <img
-                          src="/lovable-uploads/3dicons-explorer-front-color.png"
-                          alt="Coding A Website"
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display =
-                              "none";
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </Link>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          <DashboardAnalytics
+            applicationStats={applicationStats}
+            applicationStatsLoading={applicationsLoading}
+            dailyPick={dailyPickJob}
+            dailyPickLoading={georgianJobsLoading && worldwideJobsLoading}
+          />
 
           {/* Main Content - Top Jobs and Courses */}
           <div className="space-y-6 pt-6 md:pt-8">

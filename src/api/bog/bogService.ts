@@ -8,6 +8,8 @@ export interface UserSubscriptionInfo {
   card_type?: string;
 }
 
+export type PlanAudience = "user" | "academy" | "company";
+
 export interface PaymentTransaction {
   id: number;
   order_id: string;
@@ -58,7 +60,8 @@ export const bogService = {
   },
 
   /**
-   * Confirm and save the card for recurring payments
+   * Confirm and save the card for recurring payments.
+   * Does not activate the paid plan — activation requires a confirmed BOG payment.
    * @param orderId The order ID returned from createOrder
    * @param planId Optional plan ID to associate with the subscription
    * @returns Promise with success message and parent_order_id

@@ -3,29 +3,67 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { bogService } from "@/api";
+
+const POLL_INTERVAL_MS = 1500;
+const MAX_ATTEMPTS = 10;
 
 export default function PaymentSuccessPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [message, setMessage] = useState("Activating your premium subscription...");
+  const [message, setMessage] = useState("Confirming your payment...");
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
 
   useEffect(() => {
-    const finalizePayment = async () => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const confirmPayment = async () => {
       try {
-        localStorage.removeItem("bog_order_id");
-        localStorage.removeItem("selected_plan_id");
         await refreshUser();
-        setStatus("success");
-        setMessage("Your monthly subscription is now active. Welcome to Premium!");
+
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          if (cancelled) return;
+
+          const subscription = await bogService.fetchSubscription();
+          if (subscription?.is_active) {
+            localStorage.removeItem("bog_order_id");
+            localStorage.removeItem("selected_plan_id");
+            setStatus("success");
+            setMessage("Your subscription is now active. Welcome to Premium!");
+            return;
+          }
+
+          if (attempt < MAX_ATTEMPTS - 1) {
+            await new Promise<void>((resolve) => {
+              timeoutId = setTimeout(resolve, POLL_INTERVAL_MS);
+            });
+          }
+        }
+
+        if (!cancelled) {
+          setStatus("error");
+          setMessage(
+            "Payment was received, but your plan is not active yet. Please wait a moment and refresh, or contact support if this continues."
+          );
+        }
       } catch (error) {
-        console.error("Failed to save card:", error);
-        setStatus("error");
-        setMessage("We couldn't activate your subscription. Please try again or contact support.");
+        console.error("Failed to confirm payment:", error);
+        if (!cancelled) {
+          setStatus("error");
+          setMessage(
+            "We couldn't confirm your subscription. Please try again or contact support."
+          );
+        }
       }
     };
 
-    finalizePayment();
+    confirmPayment();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [refreshUser]);
 
   return (
@@ -42,9 +80,9 @@ export default function PaymentSuccessPage() {
         )}
 
         <h1 className="text-2xl font-bold">
-          {status === "loading" && "Processing Payment"}
+          {status === "loading" && "Confirming Payment"}
           {status === "success" && "Payment Successful!"}
-          {status === "error" && "Payment Error"}
+          {status === "error" && "Activation Pending"}
         </h1>
         <p className="text-muted-foreground">{message}</p>
 

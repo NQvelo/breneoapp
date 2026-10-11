@@ -15,6 +15,7 @@ import {
   isValidSettingsSection,
 } from "@/constants/settingsSections";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
+import { useUserXp } from "@/hooks/useUserXp";
 import { NotificationCountBadge } from "@/components/notifications/NotificationCountBadge";
 
 interface DashboardHeaderProps {
@@ -148,8 +149,6 @@ export function DashboardHeader({
   const { user, academyDisplay } = useAuth();
   const { theme, setTheme } = useTheme();
   const t = useTranslation();
-  // TODO: wire up to real gamification XP source once available (job seekers only)
-  const xp = 0;
   const [mounted, setMounted] = React.useState(false);
   const currentPath = removeLanguagePrefix(location.pathname);
   const isEmployer =
@@ -161,6 +160,7 @@ export function DashboardHeader({
     (typeof window !== "undefined" &&
       localStorage.getItem("userRole") === "academy");
   const isRegularUser = !isEmployer && !isAcademy;
+  const { xp } = useUserXp(!!user && isRegularUser, user?.id);
   const username =
     (currentPath.startsWith("/academy/") ? academyDisplay?.name : undefined) ||
     user?.first_name ||

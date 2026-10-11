@@ -21,7 +21,6 @@ import {
   DollarSign,
   Clock,
   Calendar,
-  Calendar as CalendarIcon,
   Building2,
   ExternalLink,
   AlertCircle,
@@ -48,6 +47,7 @@ import {
   Linkedin,
   Loader2,
   ThumbsUp,
+  Hourglass,
 } from "lucide-react";
 
 import { numericIdToUuid, cn } from "@/lib/utils";
@@ -97,6 +97,10 @@ import {
   getExplicitEmployerApplyUrl,
   jobSupportsInAppApply,
 } from "@/api/jobs/applicationAuth";
+import {
+  resolveApplicationDeadline,
+  resolveExternalApplyUrl,
+} from "@/api/jobs/externalJobFields";
 import { resolveJobSectionsAfterAi } from "@/utils/jobSectionsDedup";
 import {
   JobDescriptionParagraphs,
@@ -389,6 +393,11 @@ const JobDetailPage = () => {
       jobDetail.application_link ||
       jobDetail.link ||
       "";
+
+    if (!applyUrl) {
+      const externalApplyUrl = resolveExternalApplyUrl(jobDetailAny);
+      if (externalApplyUrl) return externalApplyUrl;
+    }
 
     // Also check company_info object
     if (!applyUrl && jobDetail.company_info) {
@@ -1326,16 +1335,18 @@ const JobDetailPage = () => {
       .join(" ");
   };
 
-  // Get application deadline
-  const getApplicationDeadline = () => {
+  const getApplicationDeadline = (): string | undefined => {
     if (!jobDetail) return undefined;
-    return (
-      jobDetail.application_deadline ||
-      jobDetail.deadline ||
-      jobDetail.expires_at ||
-      jobDetail.expiration_date ||
-      undefined
+    const deadline = resolveApplicationDeadline(
+      jobDetail as Record<string, unknown>,
     );
+    if (!deadline) return undefined;
+    if (!deadline.date) return deadline.raw;
+    return deadline.date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   // Format date for display
@@ -1694,6 +1705,14 @@ const JobDetailPage = () => {
                           </span>
                         </div>
                       ) : null}
+                      {getApplicationDeadline() ? (
+                        <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                          <Hourglass className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+                          <span>
+                            {t.jobs.deadline}: {getApplicationDeadline()}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
@@ -1973,8 +1992,7 @@ const JobDetailPage = () => {
               {/* Job Details Grid */}
               {(getRequiredExperience() ||
                 getEducationRequired() ||
-                getJobCategory() ||
-                getApplicationDeadline()) && (
+                getJobCategory()) && (
                 <div className="rounded-3xl p-6 shadow-none border-0 mt-6">
                   <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
                     <CheckCircle2 className="h-5 w-5" />
@@ -2023,20 +2041,6 @@ const JobDetailPage = () => {
                       </div>
                     )}
 
-                    {getApplicationDeadline() && (
-                      <div className="flex items-start gap-3">
-                        <CalendarIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Application Deadline
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                            {formatDate(getApplicationDeadline()) ||
-                              getApplicationDeadline()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

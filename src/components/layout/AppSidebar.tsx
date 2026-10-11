@@ -12,7 +12,6 @@ import {
   Moon,
   Sun,
   LibraryBig,
-  Atom,
   ArrowRight,
   Zap,
   Sparkles,
@@ -34,9 +33,9 @@ import {
   fetchEmployerAggregatorCompanies,
 } from "@/api/employer/aggregatorBffApi";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 import { useUnreadNotificationCount } from "@/hooks/useUnreadNotificationCount";
+import { useUserXp } from "@/hooks/useUserXp";
 import { NotificationCountBadge } from "@/components/notifications/NotificationCountBadge";
 
 const EMPLOYER_SIDEBAR_CACHE_KEY = "employerSidebarIdentity";
@@ -58,8 +57,6 @@ export function AppSidebar({
   const { subscriptionInfo } = useSubscription();
   const { theme, setTheme } = useTheme();
   const t = useTranslation();
-  // TODO: wire up to real gamification XP source once available (job seekers only)
-  const xp = 0;
   const [mounted, setMounted] = React.useState(false);
   const readEmployerCache = React.useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -113,6 +110,7 @@ export function AppSidebar({
     ? "/employer/notifications"
     : "/notifications";
   const { count: unreadNotificationCount } = useUnreadNotificationCount();
+  const { xp } = useUserXp(!!user && !isEmployer && !isAcademy, user?.id);
 
   // Handle mounted state to avoid hydration mismatch
   React.useEffect(() => {
@@ -307,7 +305,6 @@ export function AppSidebar({
           { icon: Home, label: t.nav.home, href: "/home" },
           { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
           { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
-          { icon: Atom, label: t.nav.atoms, href: "/webinars" },
         ];
 
   const profilePath = isAcademy
@@ -326,7 +323,7 @@ export function AppSidebar({
       ? "/employer/jobs"
       : "/home";
 
-  // Mobile navigation: employers / academy get 3; job seekers keep 5.
+  // Mobile navigation: employers / academy get 3; job seekers keep 4.
   const mobileNavItems = isAcademy
     ? [
         { icon: Home, label: t.nav.home, href: "/academy/home" },
@@ -343,7 +340,6 @@ export function AppSidebar({
           { icon: Home, label: t.nav.home, href: "/home" },
           { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
           { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
-          { icon: Atom, label: t.nav.atoms, href: "/webinars" },
           { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
         ];
 
@@ -572,11 +568,6 @@ export function AppSidebar({
                         )}
                       >
                         {item.label}
-                        {item.href === "/webinars" && (
-                          <Badge className="bg-breneo-blue text-white border-0 px-3 py-0.8 text-[12px] font-semibold hidden md:inline-flex">
-                            Soon
-                          </Badge>
-                        )}
                       </span>
                     )}
                   </LocalizedLink>
@@ -614,8 +605,8 @@ export function AppSidebar({
                 )}
               </LocalizedLink>
 
-              {!isEmployer && (
-                <>
+              {/* Help + plan upgrade for all account types */}
+              <>
                   <LocalizedLink
                     to="/help"
                     className={cn(
@@ -641,9 +632,8 @@ export function AppSidebar({
                     )}
                   </LocalizedLink>
 
-                  {/* Breneo Pro Plan Widget - Desktop Only */}
-                  {!isAcademy && (
-                    <button
+                  {/* Plan widget — shows audience-specific plans from API */}
+                  <button
                       onClick={onUpgradeClick}
                       className={cn(
                         "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
@@ -670,9 +660,7 @@ export function AppSidebar({
                         </span>
                       )}
                     </button>
-                  )}
-                </>
-              )}
+              </>
             </div>
 
             {/* Profile / employer company */}

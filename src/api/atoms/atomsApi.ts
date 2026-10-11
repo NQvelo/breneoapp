@@ -268,6 +268,23 @@ function catalogFromPathItems(atoms: AtomPathItem[]): AtomCatalogItem[] {
   }));
 }
 
+function normalizeAtomPayload(data: Atom): Atom {
+  const options = Array.isArray(data.quiz?.options)
+    ? data.quiz.options.filter((option): option is string => typeof option === "string")
+    : [];
+
+  return {
+    ...data,
+    content_cards: Array.isArray(data.content_cards) ? data.content_cards : [],
+    quiz: { options },
+    total_atoms:
+      typeof data.total_atoms === "number" && data.total_atoms > 0
+        ? data.total_atoms
+        : undefined,
+    path_atoms: Array.isArray(data.path_atoms) ? data.path_atoms : undefined,
+  };
+}
+
 function pathNeedsProgressMerge(path: ProfessionAtomPath): boolean {
   return (
     path.completed_count < path.total_count &&
@@ -428,7 +445,7 @@ export const atomsApi = {
 
   async getAtom(atomId: number): Promise<Atom> {
     const { data } = await apiClient.get<Atom>(API_ENDPOINTS.ATOMS.DETAIL(atomId));
-    return data;
+    return normalizeAtomPayload(data);
   },
 
   async getNextAtom(professionId: number): Promise<NextAtomResult> {
@@ -436,19 +453,20 @@ export const atomsApi = {
       const { data } = await apiClient.get<Atom>(
         API_ENDPOINTS.ATOMS.NEXT_ATOM(professionId),
       );
+      const atom = normalizeAtomPayload(data);
       writePathCache(professionId, [
         {
-          id: data.id,
-          title: data.title,
-          sequence_order: data.sequence_order,
-        },
-        ...(data.path_atoms?.map((atom) => ({
           id: atom.id,
           title: atom.title,
           sequence_order: atom.sequence_order,
+        },
+        ...(atom.path_atoms?.map((pathAtom) => ({
+          id: pathAtom.id,
+          title: pathAtom.title,
+          sequence_order: pathAtom.sequence_order,
         })) ?? []),
       ]);
-      return { atom: data };
+      return { atom };
     } catch (error: unknown) {
       const axiosError = error as {
         response?: { status?: number; data?: { detail?: unknown } };

@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { recordCoursePageView } from "@/api/academy/courseAnalyticsApi";
+import { ENROLLED_COURSES_QUERY_KEY } from "@/hooks/useEnrolledCourses";
 
 interface AcademyProfile {
   id: string;
@@ -521,6 +522,7 @@ const CoursePage = () => {
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["home-courses"] });
       queryClient.invalidateQueries({ queryKey: ["academy-courses"] });
+      queryClient.invalidateQueries({ queryKey: ENROLLED_COURSES_QUERY_KEY });
       toast.success(t.courses.enrollSuccess);
     },
     onError: (error: unknown) => {

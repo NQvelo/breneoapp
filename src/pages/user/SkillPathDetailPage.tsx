@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
 import { supabase } from "@/integrations/supabase/client";
 import { jobService, ApiJob, JobFilters } from "@/api/jobs";
+import { resolveExternalApplyUrl } from "@/api/jobs/externalJobFields";
 import { filterATSJobs } from "@/utils/jobFilterUtils";
 import { profileApi } from "@/api/profile";
 import { normalizeSkillName } from "@/services/matching";
@@ -938,6 +939,7 @@ const SkillPathDetailPage = () => {
                     jobListing.job_apply_link ||
                     jobListing.apply_link ||
                     jobListing.url ||
+                    resolveExternalApplyUrl(jobListing) ||
                     "#";
                   const companyLogo =
                     jobListing.employer_logo ||

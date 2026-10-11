@@ -263,26 +263,40 @@ export default function SettingsPage() {
     </div>
   );
 
-  // Handle payment redirect status
+  // Handle payment redirect status — only celebrate when plan is actually active
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
-    if (paymentStatus === "success") {
-      toast.success(
-        "Payment successful! Your subscription has been activated.",
-      );
-      // Clean up URL
+    if (!paymentStatus) return;
+
+    const verifyAndNotify = async () => {
+      if (paymentStatus === "success") {
+        try {
+          const subscription = await bogService.fetchSubscription();
+          if (subscription?.is_active) {
+            toast.success(
+              "Payment successful! Your subscription has been activated.",
+            );
+          } else {
+            toast.message(
+              "Payment received. Your plan will activate shortly — refresh if it doesn't update.",
+            );
+          }
+        } catch {
+          toast.message(
+            "Payment received. Checking subscription status — please refresh shortly.",
+          );
+        }
+      } else if (paymentStatus === "failed") {
+        toast.error("Payment failed. Please try again.");
+      }
+
       setSearchParams((prev) => {
         prev.delete("payment");
         return prev;
       });
-    } else if (paymentStatus === "failed") {
-      toast.error("Payment failed. Please try again.");
-      // Clean up URL
-      setSearchParams((prev) => {
-        prev.delete("payment");
-        return prev;
-      });
-    }
+    };
+
+    verifyAndNotify();
   }, [searchParams, setSearchParams]);
 
   // Password reset
@@ -320,7 +334,6 @@ export default function SettingsPage() {
   const [language, setLanguage] = useState<"en" | "ka">(contextLanguage);
 
   const handleSectionChange = (section: SettingsSection) => {
-    if (isEmployerSettings && section === "subscription") return;
     setSearchParams({ section }, { replace: false });
   };
 
@@ -329,12 +342,6 @@ export default function SettingsPage() {
     nextParams.delete("section");
     setSearchParams(nextParams, { replace: true });
   };
-
-  useEffect(() => {
-    if (isEmployerSettings && activeSection === "subscription") {
-      handleBackToList();
-    }
-  }, [isEmployerSettings, activeSection]);
 
   // Sync fontSize and language with context
   useEffect(() => {
@@ -711,21 +718,19 @@ export default function SettingsPage() {
       ],
     ];
 
-    if (!isEmployerSettings) {
-      groups.push([
-        {
-          id: "subscription",
-          title: getSettingsSectionLabel("subscription", t),
-          subtitle: subscriptionLoading
-            ? t.settings.list.loading
-            : subscriptionInfo?.plan_name || t.settings.list.freePlan,
-          icon: CreditCard,
-          iconBgClass: "bg-emerald-100 dark:bg-emerald-950/40",
-          iconColorClass: "text-emerald-600 dark:text-emerald-400",
-          onClick: openSection("subscription"),
-        },
-      ]);
-    }
+    groups.push([
+      {
+        id: "subscription",
+        title: getSettingsSectionLabel("subscription", t),
+        subtitle: subscriptionLoading
+          ? t.settings.list.loading
+          : subscriptionInfo?.plan_name || t.settings.list.freePlan,
+        icon: CreditCard,
+        iconBgClass: "bg-emerald-100 dark:bg-emerald-950/40",
+        iconColorClass: "text-emerald-600 dark:text-emerald-400",
+        onClick: openSection("subscription"),
+      },
+    ]);
 
     return groups;
   }, [
@@ -737,7 +742,6 @@ export default function SettingsPage() {
     fontSizeLabel,
     subscriptionLoading,
     subscriptionInfo?.plan_name,
-    isEmployerSettings,
     isAcademySettings,
     academyDisplay?.name,
   ]);
