@@ -92,8 +92,6 @@ export default function CvViewsPage() {
     [cvViews, myApps?.applications],
   );
 
-  const unacknowledgedCount = cvViews.filter(cvViewIsUnacknowledged).length;
-
   const acknowledgeMutation = useMutation({
     mutationFn: (cvViewId: string | number) => acknowledgeCvView(cvViewId),
     onSuccess: () => {
@@ -109,37 +107,19 @@ export default function CvViewsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-3xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
-          <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  CV views
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  See when employers opened your CV for jobs you applied to.
-                </p>
-              </div>
-              {unacknowledgedCount > 0 ? (
-                <Badge className="rounded-[10px] border-0 bg-breneo-blue/10 text-breneo-blue">
-                  {unacknowledgedCount} new
-                </Badge>
-              ) : null}
-            </div>
-          </div>
-
+      <div className="mx-auto flex min-h-full max-w-7xl flex-col px-2 py-6 pb-28 sm:px-6 md:pb-6 lg:px-8">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-3xl bg-white dark:bg-[#242424]">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
+            <div className="flex flex-1 flex-col items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
               <p className="text-sm text-gray-500">Loading CV activity…</p>
             </div>
           ) : viewsError ? (
-            <div className="p-8 text-center text-sm text-destructive">
+            <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-destructive">
               {(viewsError as Error).message || "Could not load CV views."}
             </div>
           ) : items.length === 0 ? (
-            <div className="p-12 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center p-12 text-center">
               <Eye className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-2">No CV views yet</h2>
               <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">

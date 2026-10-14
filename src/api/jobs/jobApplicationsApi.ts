@@ -246,5 +246,38 @@ export async function withdrawJobApplication(jobId: string): Promise<unknown> {
   return requestApplicationsApi(path, { method: "DELETE" }, query);
 }
 
+/** Job details saved with a self-reported external application (shown in Applied Jobs). */
+export interface ExternalJobSnapshot {
+  title?: string;
+  company_name?: string;
+  location?: string;
+  logo?: string;
+  apply_url?: string;
+}
+
+/** POST self-reported apply for a fetched (external) job — BFF only. */
+export async function recordExternalJobApplication(
+  jobId: string,
+  snapshot: ExternalJobSnapshot,
+): Promise<JobApplicationItem> {
+  const id = encodeURIComponent(String(jobId).trim());
+  return requestApplicationsApi<JobApplicationItem>(
+    `/api/app/jobs/${id}/external-application`,
+    { method: "POST", body: JSON.stringify(snapshot) },
+  );
+}
+
+/** GET self-reported external applications — BFF only; empty when not on a BFF base. */
+export async function fetchMyExternalApplications(): Promise<
+  JobApplicationItem[]
+> {
+  if (!jobApplicationsUseBffPaths()) return [];
+  const data = await requestApplicationsApi<unknown>(
+    "/api/app/users/me/external-applications",
+    { method: "GET" },
+  );
+  return extractApplicationsPage(data).items;
+}
+
 /** @deprecated Use `JobApplicationItem` */
 export type JobApplicationRecord = JobApplicationItem;

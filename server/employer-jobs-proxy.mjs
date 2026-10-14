@@ -28,6 +28,8 @@
  * - POST /api/app/jobs/:jobId/applicants/:applicantUserId/cv-view — record/increment CV view
  * - GET /api/app/users/me/cv-views — applicant JWT → list CV views on my profile
  * - PATCH /api/app/users/me/cv-views/:cvViewId — applicant acknowledge CV view
+ * - GET /api/app/users/me/external-applications, POST /api/app/jobs/:jobId/external-application —
+ *   self-reported applications to fetched jobs (Supabase / file; see externalJobApplications.mjs)
  *
  * Run: node server/employer-jobs-proxy.mjs (see npm run dev).
  *
@@ -63,6 +65,7 @@ import { registerCourseAnalyticsRoutes } from "./courseAnalytics.mjs";
 import { registerEmployerMemberInviteRoutes } from "./employerMemberInvites.mjs";
 import { registerInterviewRoutes } from "./interviewRoutes.mjs";
 import { registerFcmRoutes } from "./fcmRoutes.mjs";
+import { registerExternalJobApplicationRoutes } from "./externalJobApplications.mjs";
 import {
   dedupeSkillNames,
   scheduleSkillsCatalogSync,
@@ -2866,6 +2869,7 @@ async function handleAppAcknowledgeCvView(req, res) {
 }
 
 registerFcmRoutes(app, { requireUserAuth });
+registerExternalJobApplicationRoutes(app, { requireUserAuth });
 
 app.get("/api/app/users/me/cv-views", handleAppMyCvViews);
 app.get("/api/app/users/me/cv-views/", handleAppMyCvViews);

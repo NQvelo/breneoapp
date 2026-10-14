@@ -88,10 +88,10 @@ const DailyPickSection: React.FC<{
   <div className={sectionClass}>
     <div className="flex items-center gap-2">
       <h3 className={sectionTitleClass}>Daily Pick</h3>
-      <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/90 px-2 py-0.5 text-[11px] font-semibold text-white">
+      {/* <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/90 px-2 py-0.5 text-[11px] font-semibold text-white">
         <Flame className="h-3 w-3" />
         Hot
-      </span>
+      </span> */}
     </div>
 
     {isLoading ? (

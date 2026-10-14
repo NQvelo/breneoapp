@@ -73,6 +73,10 @@ export const en = {
     noJobs: "No jobs found",
     apply: "Apply",
     applied: "Applied",
+    didYouApplyTitle: "Did you apply for this job?",
+    didYouApplyDescription:
+      "If you sent your application, we'll add this job to Applied Jobs in your profile.",
+    markApplyFailed: "Could not save your application. Please try again.",
     save: "Save",
     saved: "Saved",
     location: "Location",

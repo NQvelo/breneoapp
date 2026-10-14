@@ -92,7 +92,10 @@ import {
   computeIndustryMatchPercent,
 } from "@/utils/industryMatch";
 import { JobApplyButton } from "@/components/jobs/JobApplyButton";
+import { ExternalApplyConfirmDialog } from "@/components/jobs/ExternalApplyConfirmDialog";
 import { useMyApplications } from "@/hooks/useMyApplications";
+import type { ExternalJobSnapshot } from "@/api/jobs/jobApplicationsApi";
+import { markExternalApplyStarted } from "@/lib/pendingExternalApply";
 import {
   getExplicitEmployerApplyUrl,
   jobSupportsInAppApply,
@@ -231,7 +234,8 @@ const JobDetailPage = () => {
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
 
-  const { data: myApplications } = useMyApplications(!!user);
+  const { data: myApplications, isFetched: myApplicationsFetched } =
+    useMyApplications(!!user);
   const appliedJobIds = myApplications?.appliedJobIds;
   const applicationJobId = jobDetail?.id ?? jobDetail?.job_id ?? jobId ?? "";
 
@@ -1516,8 +1520,38 @@ const JobDetailPage = () => {
     [jobDetail],
   );
 
+  const externalApplyUrl = getApplyUrl();
+  const isExternalApplyJob =
+    !!jobDetail && !supportsInAppApply && !!externalApplyUrl.trim();
+  const applicationJobIdStr = String(applicationJobId);
+  const isAppliedToThisJob = !!appliedJobIds?.has(applicationJobIdStr);
+
+  const handleExternalApplyClick = () => {
+    if (user && isExternalApplyJob) {
+      markExternalApplyStarted(applicationJobIdStr);
+    }
+  };
+
+  const getExternalJobSnapshot = (): ExternalJobSnapshot => {
+    const location = getLocation();
+    return {
+      title: getJobTitle(),
+      company_name: getCompanyName() || undefined,
+      location:
+        location && location !== "Location not specified" ? location : undefined,
+      logo: getCompanyLogo(),
+      apply_url: externalApplyUrl || undefined,
+    };
+  };
+
   return (
     <DashboardLayout>
+      <ExternalApplyConfirmDialog
+        jobId={applicationJobIdStr}
+        enabled={!!user && isExternalApplyJob && myApplicationsFetched}
+        alreadyApplied={isAppliedToThisJob}
+        getSnapshot={getExternalJobSnapshot}
+      />
       <div
         ref={mainContentRef}
         className="max-w-7xl mx-auto w-full py-6 pb-40 sm:pb-32 md:pb-24 px-2 sm:px-6 lg:px-8"
@@ -1780,7 +1814,8 @@ const JobDetailPage = () => {
                       jobId={applicationJobId}
                       supportsInAppApply={supportsInAppApply}
                       appliedJobIds={appliedJobIds}
-                      externalApplyUrl={getApplyUrl()}
+                      externalApplyUrl={externalApplyUrl}
+                      onExternalApplyClick={handleExternalApplyClick}
                       userLoggedIn={!!user}
                       size="sm"
                       className="shrink-0"
@@ -2251,7 +2286,8 @@ const JobDetailPage = () => {
                   jobId={applicationJobId}
                   supportsInAppApply={supportsInAppApply}
                   appliedJobIds={appliedJobIds}
-                  externalApplyUrl={getApplyUrl()}
+                  externalApplyUrl={externalApplyUrl}
+                  onExternalApplyClick={handleExternalApplyClick}
                   userLoggedIn={!!user}
                   size="sm"
                   className="whitespace-nowrap"

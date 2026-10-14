@@ -31,6 +31,8 @@ export interface JobApplyButtonProps {
   supportsInAppApply: boolean;
   appliedJobIds?: ReadonlySet<string> | readonly string[];
   externalApplyUrl?: string;
+  /** Called when the user opens the external apply link. */
+  onExternalApplyClick?: () => void;
   userLoggedIn: boolean;
   className?: string;
   size?: ButtonProps["size"];
@@ -41,6 +43,7 @@ export function JobApplyButton({
   supportsInAppApply,
   appliedJobIds: appliedJobIdsProp,
   externalApplyUrl,
+  onExternalApplyClick,
   userLoggedIn,
   className,
   size = "sm",
@@ -97,7 +100,12 @@ export function JobApplyButton({
   if (externalUrl) {
     return (
       <Button size={size} className={className} asChild>
-        <a href={externalUrl} target="_blank" rel="noopener noreferrer">
+        <a
+          href={externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onExternalApplyClick}
+        >
           {t.jobs.apply}
           <ExternalLink
             className="ml-1 h-3.5 w-3.5 max-md:hidden"

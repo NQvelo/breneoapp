@@ -113,7 +113,7 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
         <EmptyState
           icon={Briefcase}
           title="No applied jobs"
-          description="Apply to employer jobs in Breneo to see them here."
+          description="Jobs you apply to will show up here."
           actionLabel="Browse Jobs"
           onAction={() => navigate("/jobs")}
         />
