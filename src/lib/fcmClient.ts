@@ -24,9 +24,14 @@ function getFcmApiBaseUrl(): string {
     if (local || import.meta.env.DEV) {
       return window.location.origin.replace(/\/$/, "");
     }
-    // Static dashboard SPA has no same-origin BFF — use configured employer BFF.
-    if (host === "dashboard.breneo.app") {
-      return getEmployerJobsApiBaseUrl().replace(/\/$/, "");
+    // Static SPA (GitHub Pages) has no same-origin BFF — POST there is a 405 HTML page.
+    const employerBase = getEmployerJobsApiBaseUrl().replace(/\/$/, "");
+    try {
+      if (new URL(employerBase).origin !== window.location.origin) {
+        return employerBase;
+      }
+    } catch {
+      return employerBase;
     }
     // Hosts that run production.mjs (e.g. Railway app) expose /api/me/fcm-tokens same-origin.
     return window.location.origin.replace(/\/$/, "");

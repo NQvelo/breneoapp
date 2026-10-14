@@ -76,12 +76,14 @@ function getBreneoApiOrigin(): string {
 }
 
 /**
- * Hostnames where the SPA is static (no same-origin Node `/api/employer/*` proxy).
- * These hosts require an explicit BFF URL in env.
+ * Hostnames where the SPA is static (no same-origin Node `/api/*` proxy).
+ * GitHub Pages (app.breneo.ge, dashboard.breneo.app) answers POST with a 405 HTML page.
+ * These hosts must call the deployed BFF, not `window.location.origin`.
  */
 function isStaticEmployerDashboardHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  if (h === "dashboard.breneo.app") return true;
+  if (h === "dashboard.breneo.app" || h === "app.breneo.ge") return true;
+  if (h.endsWith(".github.io")) return true;
   const extra = (
     import.meta.env.VITE_STATIC_EMPLOYER_DASHBOARD_HOSTS as string | undefined
   )
@@ -90,6 +92,14 @@ function isStaticEmployerDashboardHost(hostname: string): boolean {
     .filter(Boolean);
   if (extra?.length) return extra.includes(h);
   return false;
+}
+
+/** Employer BFF only — never `VITE_API_BASE_URL` (main API has no `/api/app/jobs/:id/apply`). */
+function explicitEmployerBffBase(): string | undefined {
+  return trimBase(
+    (import.meta.env.VITE_EMPLOYER_JOBS_API_BASE_URL ||
+      import.meta.env.VITE_EMPLOYER_BFF_URL) as string | undefined,
+  );
 }
 
 function resolveBaseFromEnvOrBrowser(): string {
@@ -180,32 +190,35 @@ export function getEmployerJobsApiBaseUrl(): string {
 
 /**
  * Base URL for job seeker apply / list / withdraw (`jobApplicationsApi.ts`).
- * - Static hosts (e.g. dashboard.breneo.app): `JOB_AGGREGATOR_BASE_URL` (not the SPA origin).
- * - Local dev / same-origin BFF: `window.location.origin` (Vite → employer-jobs-proxy).
+ * - Localhost: `window.location.origin` (Vite proxy or local `production.mjs`).
+ * - Static hosts (app.breneo.ge, dashboard.breneo.app, GitHub Pages): explicit employer BFF.
+ *   Same-origin POST is rejected by GitHub Pages with an HTML 405 page.
+ * - Host that is the BFF itself: same origin.
  */
 export function getJobApplicationsApiBaseUrl(): string {
   const aggregator = JOB_AGGREGATOR_BASE_URL.replace(/\/$/, "");
 
   if (typeof window !== "undefined" && window.location?.origin) {
     const host = window.location.hostname;
+    const pageOrigin = window.location.origin.replace(/\/$/, "");
+    const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
+    if (local) return pageOrigin;
+
+    const explicitBff = explicitEmployerBffBase();
     if (isStaticEmployerDashboardHost(host)) {
-      const bff = employerBffBaseFromEnv();
-      if (bff) return bff;
+      if (explicitBff) return explicitBff;
       return aggregator;
     }
-    const local = /^localhost$|^127\.0\.0\.1$/i.test(host) || host === "[::1]";
-    if (import.meta.env.DEV && local) {
-      return window.location.origin.replace(/\/$/, "");
-    }
-    try {
-      const pageOrigin = window.location.origin.replace(/\/$/, "");
-      const aggOrigin = new URL(aggregator).origin;
-      if (pageOrigin !== aggOrigin) {
-        return pageOrigin;
+
+    if (explicitBff) {
+      try {
+        if (new URL(explicitBff).origin !== pageOrigin) return explicitBff;
+      } catch {
+        return explicitBff;
       }
-    } catch {
-      return window.location.origin.replace(/\/$/, "");
     }
+
+    return pageOrigin;
   }
 
   return aggregator;

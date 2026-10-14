@@ -210,6 +210,29 @@ export async function fetchMyApplications(
   return extractApplicationsPage(data);
 }
 
+const MAX_APPLICATION_PAGES = 50;
+
+/** Walks every page of {@link fetchMyApplications} using `pagination.total`. */
+export async function fetchAllMyApplications(): Promise<MyApplicationsPage> {
+  const first = await fetchMyApplications(1);
+  const items = [...first.items];
+  const total = first.pagination?.total;
+
+  if (typeof total === "number") {
+    for (
+      let page = 2;
+      items.length < total && page <= MAX_APPLICATION_PAGES;
+      page++
+    ) {
+      const next = await fetchMyApplications(page);
+      if (next.items.length === 0) break;
+      items.push(...next.items);
+    }
+  }
+
+  return { items, pagination: first.pagination };
+}
+
 /** DELETE withdraw — BFF `/api/app/jobs/{id}/application` or aggregator `/api/jobs/{id}/application`. */
 export async function withdrawJobApplication(jobId: string): Promise<unknown> {
   const id = encodeURIComponent(String(jobId).trim());

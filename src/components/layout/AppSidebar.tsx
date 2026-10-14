@@ -398,13 +398,13 @@ export function AppSidebar({
         <div
           className={cn(
             "relative pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2",
-            isCompactMobileNav ? "flex justify-center px-6" : "px-4",
+            isCompactMobileNav ? "flex justify-center px-8" : "px-8",
           )}
         >
           <nav
             className={cn(
               "flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]",
-              isCompactMobileNav ? "w-fit" : "mx-auto max-w-xl",
+              isCompactMobileNav ? "w-fit" : "mx-auto w-full max-w-xs",
             )}
           >
             {mobileNavItems.map((item, index) => {
@@ -440,7 +440,7 @@ export function AppSidebar({
                   className={cn(
                     "group relative flex flex-col items-center justify-center rounded-full py-2 transition-all duration-200",
                     isCompactMobileNav
-                      ? "min-w-[4.75rem] px-3"
+                      ? "min-w-[4.25rem] px-2.5"
                       : "min-w-0 flex-1 px-1",
                     isActive
                       ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
@@ -607,59 +607,57 @@ export function AppSidebar({
 
               {/* Help + plan upgrade for all account types */}
               <>
-                  <LocalizedLink
-                    to="/help"
+                <LocalizedLink
+                  to="/help"
+                  className={cn(
+                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                    currentPath === "/help"
+                      ? "bg-breneo-blue/10 text-breneo-blue"
+                      : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
+                  )}
+                >
+                  <HelpCircle
+                    size={22}
                     className={cn(
-                      "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                      "flex-shrink-0 transition-colors duration-200",
                       currentPath === "/help"
-                        ? "bg-breneo-blue/10 text-breneo-blue"
-                        : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
+                        ? "text-breneo-blue"
+                        : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
                     )}
-                  >
-                    <HelpCircle
-                      size={22}
-                      className={cn(
-                        "flex-shrink-0 transition-colors duration-200",
-                        currentPath === "/help"
-                          ? "text-breneo-blue"
-                          : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
-                      )}
-                    />
-                    {!collapsed && (
-                      <span className="font-medium text-base">
-                        {t.nav.help}
-                      </span>
-                    )}
-                  </LocalizedLink>
+                  />
+                  {!collapsed && (
+                    <span className="font-medium text-base">{t.nav.help}</span>
+                  )}
+                </LocalizedLink>
 
-                  {/* Plan widget — shows audience-specific plans from API */}
-                  <button
-                      onClick={onUpgradeClick}
-                      className={cn(
-                        "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                        "bg-primary/20 hover:bg-primary/30 text-left",
-                        collapsed && "justify-center px-4",
-                      )}
-                    >
-                      {subscriptionInfo?.is_active ? (
-                        <Sparkles
-                          size={22}
-                          className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
-                        />
-                      ) : (
-                        <ArrowRight
-                          size={22}
-                          className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
-                        />
-                      )}
-                      {!collapsed && (
-                        <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
-                          {subscriptionInfo?.is_active
-                            ? subscriptionInfo.plan_name || "Pro Plan"
-                            : t.subscription.upgrade}
-                        </span>
-                      )}
-                    </button>
+                {/* Plan widget — shows audience-specific plans from API */}
+                <button
+                  onClick={onUpgradeClick}
+                  className={cn(
+                    "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                    "bg-primary/20 hover:bg-primary/30 text-left",
+                    collapsed && "justify-center px-4",
+                  )}
+                >
+                  {subscriptionInfo?.is_active ? (
+                    <Sparkles
+                      size={22}
+                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
+                    />
+                  ) : (
+                    <ArrowRight
+                      size={22}
+                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                    />
+                  )}
+                  {!collapsed && (
+                    <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
+                      {subscriptionInfo?.is_active
+                        ? subscriptionInfo.plan_name || "Pro Plan"
+                        : t.subscription.upgrade}
+                    </span>
+                  )}
+                </button>
               </>
             </div>
 

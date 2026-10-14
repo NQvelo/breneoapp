@@ -65,7 +65,7 @@ import {
   type ApplicationStats,
   type DailyPickJob,
 } from "@/components/home/DashboardAnalytics";
-import { useMyApplications } from "@/hooks/useMyApplications";
+import { useMyApplicationCounts } from "@/hooks/useMyApplications";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
@@ -944,24 +944,14 @@ const UserHome = () => {
     return { transformedGeorgianJobs, transformedWorldwideJobs };
   }, [georgianJobs, worldwideJobs, savedJobs, user, userSkillsForMatch]);
 
-  const { data: myApplications, isLoading: applicationsLoading } =
-    useMyApplications(!!user);
+  const { data: applicationCounts, isLoading: applicationsLoading } =
+    useMyApplicationCounts(!!user);
 
-  const applicationStats: ApplicationStats = useMemo(() => {
-    const applications = myApplications?.applications ?? [];
-    const statusOf = (status?: string) => (status ?? "").toLowerCase();
-    return {
-      applied: myApplications?.pagination?.total ?? applications.length,
-      inReview: applications.filter(
-        (app) =>
-          app.employer_viewed_cv === true ||
-          statusOf(app.status).includes("review"),
-      ).length,
-      interviews: applications.filter((app) =>
-        statusOf(app.status).includes("interview"),
-      ).length,
-    };
-  }, [myApplications]);
+  const applicationStats: ApplicationStats = {
+    applied: applicationCounts?.applied ?? 0,
+    inReview: applicationCounts?.viewedByEmployer ?? 0,
+    interviews: applicationCounts?.interviews ?? 0,
+  };
 
   const dailyPickJob: DailyPickJob | null = useMemo(() => {
     const candidates = [

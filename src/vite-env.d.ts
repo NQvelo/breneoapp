@@ -27,7 +27,7 @@ interface ImportMetaEnv {
   readonly VITE_EMPLOYER_BFF_URL?: string;
   /**
    * Comma-separated hostnames (no scheme) that serve a static SPA without `/api/employer/*`.
-   * Those hosts use `JOB_AGGREGATOR_BASE_URL` for employer APIs. `dashboard.breneo.app` is built in.
+   * Those hosts use the employer BFF for `/api/app/*`. `app.breneo.ge`, `dashboard.breneo.app`, and `*.github.io` are built in.
    */
   readonly VITE_STATIC_EMPLOYER_DASHBOARD_HOSTS?: string;
   readonly VITE_FIREBASE_API_KEY?: string;
