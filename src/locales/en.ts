@@ -291,7 +291,7 @@ export const en = {
     },
     changePassword: {
       title: "Change password",
-      description: "We'll send a verification code to your email address.",
+      description: "We'll send a verification code to {email}.",
       email: "Email",
       verificationCode: "Verification code",
       verificationCodePlaceholder: "Enter 6-digit code",

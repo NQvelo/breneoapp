@@ -1,9 +1,9 @@
 {
   "name": "breneoapp",
-  "version": "0.3.23",
+  "version": "0.3.24",
   "private": true,
   "type": "module",
-  "homepage": "https://dashboard.breneo.app",
+  "homepage": "https://dashboard.breneo.ge",
   "scripts": {
     "dev": "node scripts/write-firebase-sw.mjs && concurrently -k \"vite\" \"node server/employer-jobs-proxy.mjs\"",
     "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",

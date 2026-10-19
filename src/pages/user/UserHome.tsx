@@ -417,11 +417,9 @@ const UserHome = () => {
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
   const [userHardSkills, setUserHardSkills] = useState<string[]>([]); // Only tech/hard skills
   const [loadingSkills, setLoadingSkills] = useState(true);
-  const [hasCompletedTest, setHasCompletedTest] = useState(false);
   const georgiaJobsScrollRef = useRef<HTMLDivElement>(null);
   const jobsScrollRef = useRef<HTMLDivElement>(null);
   const coursesScrollRef = useRef<HTMLDivElement>(null);
-  const [isSkillTestPressed, setIsSkillTestPressed] = useState(false);
   const extractSavedIds = (items: unknown, idKeys: string[]): string[] => {
     if (!Array.isArray(items)) return [];
     return items
@@ -462,7 +460,6 @@ const UserHome = () => {
     const fetchUserSkills = async () => {
       if (!user) {
         setLoadingSkills(false);
-        setHasCompletedTest(false);
         return;
       }
 
@@ -490,9 +487,6 @@ const UserHome = () => {
             skillTestData &&
             (skillTestData.final_role || skillTestData.skills_json)
           ) {
-            // console.log("✅ Found skill test results from Django API");
-            setHasCompletedTest(true);
-
             // Extract skills from skills_json
             const skillsJson = skillTestData.skills_json || {};
             const techSkills = Object.keys(skillsJson.tech || {});
@@ -517,7 +511,6 @@ const UserHome = () => {
             setUserTopSkills(topSkills);
             // Assume all skills from this endpoint are tech skills
             setUserHardSkills(topSkills);
-            setHasCompletedTest(topSkills.length > 0);
             setLoadingSkills(false);
             return;
           }
@@ -536,8 +529,6 @@ const UserHome = () => {
         // });
 
         if (answers && answers.length > 0) {
-          // console.log("✅ User has completed skill test (from Supabase)");
-          setHasCompletedTest(true);
           const skillScores = calculateSkillScores(answers);
           const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
           const topSkills = topSkillsData.map((s) => s.skill);
@@ -592,13 +583,9 @@ const UserHome = () => {
             ),
           );
           setUserHardSkills(hardSkills.length > 0 ? hardSkills : topSkills); // Fallback to all if no match
-        } else {
-          // console.log("❌ User has not completed skill test");
-          setHasCompletedTest(false);
         }
       } catch (error) {
         console.error("Error fetching user skills:", error);
-        setHasCompletedTest(false);
       } finally {
         setLoadingSkills(false);
       }
@@ -1094,7 +1081,7 @@ const UserHome = () => {
               </div>
             </div>
 
-            <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+            <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
               {job.title}
             </h4>
 
@@ -1238,7 +1225,6 @@ const UserHome = () => {
   //   user: !!user,
   //   userId: user?.id,
   //   loadingSkills,
-  //   hasCompletedTest,
   //   jobsCount: displayJobs.length,
   //   coursesCount: courses.length,
   // });
@@ -1293,50 +1279,6 @@ const UserHome = () => {
       )}
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="space-y-6">
-          {/* Skill Test CTA Widget - Only show if user hasn't completed the test */}
-          {!hasCompletedTest && !loadingSkills && (
-            <div className="flex">
-              <Card
-                className="bg-white transition-all w-auto flex-shrink-0 max-w-sm md:max-w-md rounded-3xl border-0 animate-shrink-in hover:shadow-soft transition-shadow cursor-pointer"
-                style={{
-                  boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)",
-                  transform: isSkillTestPressed ? "scale(0.95)" : "scale(1)",
-                  transition: "transform 0.1s ease-in-out",
-                }}
-                onMouseDown={() => setIsSkillTestPressed(true)}
-                onMouseUp={() => setIsSkillTestPressed(false)}
-                onMouseLeave={() => setIsSkillTestPressed(false)}
-                onTouchStart={() => setIsSkillTestPressed(true)}
-                onTouchEnd={() => setIsSkillTestPressed(false)}
-              >
-                <CardContent className="p-4 md:p-4">
-                  <Link to="/skill-test" className="block cursor-pointer group">
-                    <div className="flex items-center gap-3 md:gap-4">
-                      {/* Left side - Content */}
-                      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
-                        <h3 className="font-bold text-lg md:text-xl text-gray-900 group-hover:text-breneo-blue transition-colors leading-tight line-clamp-2 min-h-[3rem]">
-                          {t.home.skillTestTitle}
-                        </h3>
-                        <p className="text-sm md:text-sm text-gray-900">
-                          {t.home.skillTestSubtitle}
-                        </p>
-                      </div>
-
-                      {/* Right side - Illustration / Icon */}
-                      <div className="flex-shrink-0 w-28 h-28 md:w-32 md:h-32 flex items-center justify-center">
-                        <img
-                          src="/lovable-uploads/3dicons-target-front-color.png"
-                          alt="Skill test target"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    </div>
-                  </Link>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
           <DashboardAnalytics
             applicationStats={applicationStats}
             applicationStatsLoading={applicationsLoading}

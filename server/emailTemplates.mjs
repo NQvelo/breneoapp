@@ -48,7 +48,7 @@ export function readBreneoEmailLogoUrl() {
 
   const productionDefault =
     process.env.BRENEO_EMAIL_LOGO_BASE_URL?.trim() ||
-    "https://dashboard.breneo.app";
+    "https://dashboard.breneo.ge";
   return `${productionDefault.replace(/\/$/, "")}${logoPath}`;
 }
 

@@ -1569,7 +1569,7 @@ export default function EmployerAddJobPage() {
                             setTimeout(() => setCountryOpen(false), 120);
                           }}
                           placeholder="Select country"
-                          className="bg-white dark:bg-background"
+                          className="bg-input"
                         />
                         {countryOpen ? (
                           <EmployerLocationSelectDropdown
@@ -1652,7 +1652,7 @@ export default function EmployerAddJobPage() {
                             setTimeout(() => setCityOpen(false), 120);
                           }}
                           placeholder="Select city"
-                          className="bg-white dark:bg-background"
+                          className="bg-input"
                           disabled={!selectedCountryIsoCode}
                         />
                         {cityOpen && selectedCountryIsoCode ? (
@@ -1691,7 +1691,7 @@ export default function EmployerAddJobPage() {
                     value={workMode}
                     onValueChange={(v) => setWorkMode(v as AggregatorWorkMode)}
                   >
-                    <SelectTrigger className="bg-white dark:bg-background">
+                    <SelectTrigger className="bg-input">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1713,7 +1713,7 @@ export default function EmployerAddJobPage() {
                     value={employmentType}
                     onValueChange={setEmploymentType}
                   >
-                    <SelectTrigger className="bg-white dark:bg-background">
+                    <SelectTrigger className="bg-input">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1735,7 +1735,7 @@ export default function EmployerAddJobPage() {
                     value={applyUrl}
                     onChange={(e) => setApplyUrl(e.target.value)}
                     placeholder="https://…"
-                    className="bg-white dark:bg-background"
+                    className="bg-input"
                   />
                   {fieldErrors.apply_url?.[0] ? (
                     <p className="text-sm text-destructive">
@@ -1757,7 +1757,7 @@ export default function EmployerAddJobPage() {
                     inputMode="numeric"
                     autoComplete="off"
                     placeholder="e.g. 3500 or 3000-5000"
-                    className="bg-white dark:bg-background"
+                    className="bg-input"
                     aria-required
                   />
                   {fieldErrors.salary?.[0] ? (

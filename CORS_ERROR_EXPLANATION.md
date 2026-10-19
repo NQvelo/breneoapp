@@ -2,11 +2,11 @@
 
 ## What's Happening?
 
-When you try to log in from `https://dashboard.breneo.app`, your browser makes a request to `https://breneo.onrender.com/api/login/`.
+When you try to log in from `https://dashboard.breneo.ge`, your browser makes a request to `https://breneo.onrender.com/api/login/`.
 
 The browser enforces CORS (Cross-Origin Resource Sharing) policy, which means:
 
-- **Frontend Origin**: `https://dashboard.breneo.app`
+- **Frontend Origin**: `https://dashboard.breneo.ge`
 - **Backend API**: `https://breneo.onrender.com`
 - **Problem**: The backend is NOT configured to accept requests from your frontend domain
 
@@ -14,7 +14,7 @@ The browser enforces CORS (Cross-Origin Resource Sharing) policy, which means:
 
 ```
 Access to XMLHttpRequest at 'https://breneo.onrender.com/api/login/'
-from origin 'https://dashboard.breneo.app' has been blocked by CORS policy:
+from origin 'https://dashboard.breneo.ge' has been blocked by CORS policy:
 Response to preflight request doesn't pass access control check:
 No 'Access-Control-Allow-Origin' header is present on the requested resource.
 ```
@@ -34,7 +34,7 @@ No 'Access-Control-Allow-Origin' header is present on the requested resource.
 The backend needs to return these headers for ALL OPTIONS requests and the actual API responses:
 
 ```http
-Access-Control-Allow-Origin: https://dashboard.breneo.app
+Access-Control-Allow-Origin: https://dashboard.breneo.ge
 Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH
 Access-Control-Allow-Headers: Content-Type, Authorization
 Access-Control-Allow-Credentials: true
@@ -53,7 +53,7 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "https://dashboard.breneo.app",
+    "https://dashboard.breneo.ge",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -77,7 +77,7 @@ const cors = require("cors");
 
 app.use(
   cors({
-    origin: "https://dashboard.breneo.app",
+    origin: "https://dashboard.breneo.ge",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -91,7 +91,7 @@ app.use(
 from flask_cors import CORS
 
 CORS(app,
-     origins=["https://dashboard.breneo.app"],
+     origins=["https://dashboard.breneo.ge"],
      supports_credentials=True,
      allow_headers=["Content-Type", "Authorization"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
@@ -129,7 +129,7 @@ The axios client is properly set up. The issue is **100% on the backend side**.
 
 After fixing, you should see these headers in the browser's Network tab:
 
-- `Access-Control-Allow-Origin: https://dashboard.breneo.app`
+- `Access-Control-Allow-Origin: https://dashboard.breneo.ge`
 - `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH`
 - `Access-Control-Allow-Headers: Content-Type, Authorization`
 

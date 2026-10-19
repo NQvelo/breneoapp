@@ -54,7 +54,7 @@ function DegreeTypeDropdown({
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
-          "flex h-[3.2rem] w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm",
+          "flex h-[3.2rem] w-full items-center justify-between rounded-md border border-input bg-input px-3 py-2 text-base md:text-sm",
           "focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50",
           open && "bg-gray-100 border-gray-300 dark:bg-gray-700 dark:border-gray-600",
           !label && "text-muted-foreground",

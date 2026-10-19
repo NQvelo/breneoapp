@@ -295,8 +295,7 @@ export const ka = {
     },
     changePassword: {
       title: "პაროლის შეცვლა",
-      description:
-        "გამოგიგზავნით დადასტურების კოდს თქვენს ელფოსტის მისამართზე.",
+      description: "დადასტურების კოდს გამოგიგზავნით ამ მისამართზე: {email}.",
       email: "ელფოსტა",
       verificationCode: "დადასტურების კოდი",
       verificationCodePlaceholder: "შეიყვანეთ 6-ნიშნა კოდი",

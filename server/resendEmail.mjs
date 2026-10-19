@@ -19,7 +19,7 @@ export async function sendResendEmail(params) {
     process.env.RESEND_FROM_EMAIL?.trim() ||
     process.env.DEFAULT_FROM_EMAIL?.trim() ||
     process.env.RESEND_FROM?.trim() ||
-    "noreply@breneo.app";
+    "noreply@breneo.ge";
   const from = fromRaw.includes("<")
     ? fromRaw
     : `Breneo <${fromRaw}>`;

@@ -89,7 +89,7 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 89%;
+    --input: 210 16.67% 88.24%; /* #dce1e6 light mode input fill */
     --ring: 197 80% 50%;
     --radius: 0.5rem;
     --sidebar-background: 0 0% 100%;

@@ -242,7 +242,7 @@ const AcademyRegistrationPage = () => {
 
                   <div>
                     <Label htmlFor="phone">Phone Number</Label>
-                    <div className="phone-input-container mt-1 flex items-center rounded-md border border-input transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                    <div className="phone-input-container mt-1 flex items-center rounded-md border border-input bg-input transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
                       <CountrySelector
                         value={selectedCountry}
                         onChange={setSelectedCountry}
@@ -299,7 +299,7 @@ const AcademyRegistrationPage = () => {
                     <textarea
                       id="description"
                       placeholder="Describe your academy"
-                      className="mt-1 w-full h-24 px-3 py-2 text-base border border-input bg-background text-foreground placeholder:text-muted-foreground rounded-md resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="mt-1 w-full h-24 px-3 py-2 text-base border border-input bg-input text-foreground placeholder:text-muted-foreground rounded-md resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       required

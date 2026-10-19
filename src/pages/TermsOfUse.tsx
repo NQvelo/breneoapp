@@ -199,8 +199,8 @@ const TermsOfUse = () => {
                 დაგვიკავშირდეთ:
               </p>
               <div className="space-y-2 text-lg">
-                <p>📩 support@breneo.app</p>
-                <p>🌐 www.breneo.app</p>
+                <p>📩 support@breneo.ge</p>
+                <p>🌐 www.breneo.ge</p>
               </div>
             </section>
           </div>

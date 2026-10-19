@@ -6,7 +6,6 @@ import {
   Briefcase,
   Home,
   Settings,
-  HelpCircle,
   CircleUserRound,
   Bell,
   Moon,
@@ -576,9 +575,9 @@ export function AppSidebar({
             </nav>
           </div>
 
-          {/* Bottom section: settings / help / pro, then profile (split line above profile) */}
+          {/* Bottom section: settings / pro, then profile (split line above profile) */}
           <div className="px-4 pb-4">
-            {/* Settings (all roles); Help + Pro for learners/academy only */}
+            {/* Settings (all roles); plan upgrade for all account types */}
             <div className="mb-4 space-y-1">
               <LocalizedLink
                 to={settingsPath}
@@ -605,60 +604,34 @@ export function AppSidebar({
                 )}
               </LocalizedLink>
 
-              {/* Help + plan upgrade for all account types */}
-              <>
-                <LocalizedLink
-                  to="/help"
-                  className={cn(
-                    "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                    currentPath === "/help"
-                      ? "bg-breneo-blue/10 text-breneo-blue"
-                      : "text-gray-600 hover:bg-gray-50 dark:hover:bg-[#2d2d2d] hover:text-breneo-blue",
-                  )}
-                >
-                  <HelpCircle
+              {/* Plan widget — shows audience-specific plans from API */}
+              <button
+                onClick={onUpgradeClick}
+                className={cn(
+                  "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
+                  "bg-primary/20 hover:bg-primary/30 text-left",
+                  collapsed && "justify-center px-4",
+                )}
+              >
+                {subscriptionInfo?.is_active ? (
+                  <Sparkles
                     size={22}
-                    className={cn(
-                      "flex-shrink-0 transition-colors duration-200",
-                      currentPath === "/help"
-                        ? "text-breneo-blue"
-                        : "text-gray-400 group-hover:text-breneo-blue dark:text-gray-400 dark:group-hover:text-breneo-blue",
-                    )}
+                    className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
                   />
-                  {!collapsed && (
-                    <span className="font-medium text-base">{t.nav.help}</span>
-                  )}
-                </LocalizedLink>
-
-                {/* Plan widget — shows audience-specific plans from API */}
-                <button
-                  onClick={onUpgradeClick}
-                  className={cn(
-                    "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
-                    "bg-primary/20 hover:bg-primary/30 text-left",
-                    collapsed && "justify-center px-4",
-                  )}
-                >
-                  {subscriptionInfo?.is_active ? (
-                    <Sparkles
-                      size={22}
-                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
-                    />
-                  ) : (
-                    <ArrowRight
-                      size={22}
-                      className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
-                    />
-                  )}
-                  {!collapsed && (
-                    <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
-                      {subscriptionInfo?.is_active
-                        ? subscriptionInfo.plan_name || "Pro Plan"
-                        : t.subscription.upgrade}
-                    </span>
-                  )}
-                </button>
-              </>
+                ) : (
+                  <ArrowRight
+                    size={22}
+                    className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
+                  />
+                )}
+                {!collapsed && (
+                  <span className="font-medium text-base text-gray-700 dark:text-gray-200 truncate">
+                    {subscriptionInfo?.is_active
+                      ? subscriptionInfo.plan_name || "Pro Plan"
+                      : t.subscription.upgrade}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* Profile / employer company */}

@@ -1339,7 +1339,7 @@ const JobSearchResultsPage = () => {
                       </div>
 
                       {/* Job Title (same as JobsPage) */}
-                      <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+                      <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
                         {job.title}
                       </h4>
 

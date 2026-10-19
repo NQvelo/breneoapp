@@ -542,7 +542,7 @@ const CompanyJobsPage = () => {
                     </div>
 
                     {/* Job Title */}
-                    <h4 className="font-bold text-lg mb-4 line-clamp-2">
+                    <h4 className="font-bold text-lg mb-4 line-clamp-2 leading-7 min-h-[3.5rem]">
                       {job.title}
                     </h4>
 

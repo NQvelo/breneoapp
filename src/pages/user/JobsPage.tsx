@@ -2694,7 +2694,7 @@ const JobsPage = () => {
                         </p>
                       </div>
                     </div>
-                    <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+                    <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
                       {job.title}
                     </h4>
                     <JobListingMetaBadges
@@ -2817,7 +2817,7 @@ const JobsPage = () => {
                     </div>
 
                     {/* Job Title */}
-                    <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem]">
+                    <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
                       {job.title}
                     </h4>
 

@@ -5,7 +5,7 @@
  * `X-Employer-Key` server-side before forwarding to `JOB_AGGREGATOR_BASE_URL`.
  *
  * - **Local dev / same-origin BFF:** `window.location.origin` (`vite` proxy or `production.mjs`).
- * - **Static dashboards (e.g. dashboard.breneo.app):** must set `VITE_EMPLOYER_JOBS_API_BASE_URL`
+ * - **Static dashboards (e.g. dashboard.breneo.ge):** must set `VITE_EMPLOYER_JOBS_API_BASE_URL`
  *   or `VITE_EMPLOYER_BFF_URL` to a deployed BFF URL (do NOT call raw aggregator directly).
  * - **Override:** `VITE_EMPLOYER_JOBS_API_BASE_URL` / `VITE_EMPLOYER_BFF_URL`.
  *
@@ -77,12 +77,12 @@ function getBreneoApiOrigin(): string {
 
 /**
  * Hostnames where the SPA is static (no same-origin Node `/api/*` proxy).
- * GitHub Pages (app.breneo.ge, dashboard.breneo.app) answers POST with a 405 HTML page.
+ * GitHub Pages (app.breneo.ge, dashboard.breneo.ge) answers POST with a 405 HTML page.
  * These hosts must call the deployed BFF, not `window.location.origin`.
  */
 function isStaticEmployerDashboardHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
-  if (h === "dashboard.breneo.app" || h === "app.breneo.ge") return true;
+  if (h === "dashboard.breneo.ge" || h === "app.breneo.ge") return true;
   if (h.endsWith(".github.io")) return true;
   const extra = (
     import.meta.env.VITE_STATIC_EMPLOYER_DASHBOARD_HOSTS as string | undefined
@@ -191,7 +191,7 @@ export function getEmployerJobsApiBaseUrl(): string {
 /**
  * Base URL for job seeker apply / list / withdraw (`jobApplicationsApi.ts`).
  * - Localhost: `window.location.origin` (Vite proxy or local `production.mjs`).
- * - Static hosts (app.breneo.ge, dashboard.breneo.app, GitHub Pages): explicit employer BFF.
+ * - Static hosts (app.breneo.ge, dashboard.breneo.ge, GitHub Pages): explicit employer BFF.
  *   Same-origin POST is rejected by GitHub Pages with an HTML 405 page.
  * - Host that is the BFF itself: same origin.
  */

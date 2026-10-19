@@ -2337,7 +2337,7 @@ const ProfilePage = () => {
                               </div>
 
                               {/* Course Title */}
-                              <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem] text-gray-900 dark:text-gray-100">
+                              <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem] text-gray-900 dark:text-gray-100">
                                 {course.title}
                               </h4>
 
@@ -2589,7 +2589,7 @@ const ProfilePage = () => {
                               </div>
 
                               {/* Job Title */}
-                              <h4 className="font-bold text-base mb-2 line-clamp-2 min-h-[2.5rem] text-gray-900 dark:text-gray-100">
+                              <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem] text-gray-900 dark:text-gray-100">
                                 {job.title}
                               </h4>
 

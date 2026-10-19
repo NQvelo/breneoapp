@@ -160,7 +160,7 @@ const HelpCenter = () => {
                   <Mail className="text-breneo-blue" size={24} />
                 </div>
                 <CardTitle className="text-base">Email Support</CardTitle>
-                <CardDescription>support@breneo.app</CardDescription>
+                <CardDescription>support@breneo.ge</CardDescription>
               </CardHeader>
             </Card>
 
@@ -237,7 +237,7 @@ const HelpCenter = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <a
-                    href="mailto:support@breneo.app"
+                    href="mailto:support@breneo.ge"
                     className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-breneo-blue text-white rounded-3xl hover:bg-breneo-blue/90 transition-colors"
                   >
                     <Mail size={18} />

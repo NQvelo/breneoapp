@@ -207,7 +207,7 @@ const AuthPage: React.FC = () => {
 
               <div>
                 <Label htmlFor="phone">Phone Number</Label>
-                <div className="phone-input-container mt-1 flex items-center rounded-md border border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                <div className="phone-input-container mt-1 flex items-center rounded-md border border-input bg-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
                   <CountrySelector
                     value={selectedCountry}
                     onChange={setSelectedCountry}

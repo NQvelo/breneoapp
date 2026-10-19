@@ -27,7 +27,7 @@ export const BRENEO_API_BASE_URL = resolveBreneoApiBaseUrl();
 /**
  * Job aggregator (public jobs, search, applications).
  * Prefer `VITE_NEXT_PUBLIC_JOB_AGGREGATOR_URL` (maps to NEXT_PUBLIC_JOB_AGGREGATOR_URL in deploy docs).
- * Public job reads and in-app apply/list/withdraw on static hosts (e.g. dashboard.breneo.app).
+ * Public job reads and in-app apply/list/withdraw on static hosts (e.g. dashboard.breneo.ge).
  * Local dev apply/list/withdraw use same-origin `/api/app/*` BFF (Breneo JWT → aggregator).
  * Employer CRUD from the browser still uses the employer BFF base, not this origin alone.
  */

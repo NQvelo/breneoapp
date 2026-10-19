@@ -309,7 +309,7 @@ function JobRow({
         <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
           {company || "Company"}
         </p>
-        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-2 mt-0.5">
+        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-2 leading-6 min-h-[3rem] mt-0.5">
           {title}
         </h3>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">

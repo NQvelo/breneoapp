@@ -614,7 +614,7 @@ const SavedPage = () => {
                             <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1 line-clamp-1">
                               {job.company}
                             </h3>
-                            <h4 className="font-bold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
+                            <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem] group-hover:text-breneo-blue transition-colors">
                               {job.title}
                             </h4>
                           </div>

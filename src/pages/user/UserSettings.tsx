@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -150,7 +150,7 @@ export default function SettingsPage() {
     if (!open) {
       setPasswordStep(1);
       setPasswordModalEmail(recoveryEmail);
-      setCode("");
+      setCode(["", "", "", "", "", ""]);
       setNewPassword("");
       setConfirmPassword("");
     }
@@ -160,21 +160,6 @@ export default function SettingsPage() {
     <div className="space-y-4">
       {passwordStep === 1 && (
         <form onSubmit={handleSendCode} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="change-password-email">
-              {t.settings.changePassword.email}
-            </Label>
-            <Input
-              id="change-password-email"
-              type="email"
-              value={passwordModalEmail}
-              readOnly
-              aria-readonly="true"
-              placeholder={t.auth.email}
-              className="h-[3.2rem] cursor-default bg-muted/50 text-foreground"
-              autoComplete="email"
-            />
-          </div>
           <Button
             type="submit"
             className="w-full"
@@ -189,29 +174,45 @@ export default function SettingsPage() {
       {passwordStep === 2 && (
         <form onSubmit={handleVerifyCode} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="change-password-code">
-              {t.settings.changePassword.verificationCode}
-            </Label>
-            <Input
-              id="change-password-code"
-              placeholder={t.settings.changePassword.verificationCodePlaceholder}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="h-[3.2rem]"
-            />
+            <Label>{t.settings.changePassword.verificationCode}</Label>
+            <div className="flex gap-2">
+              {code.map((digit, index) => (
+                <Input
+                  key={index}
+                  ref={(el) => {
+                    passwordCodeInputRefs.current[index] = el;
+                  }}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete={index === 0 ? "one-time-code" : "off"}
+                  className="h-12 w-0 flex-1 text-center text-xl font-semibold sm:h-14 sm:w-14 sm:flex-none sm:text-2xl"
+                  value={digit}
+                  onChange={(e) =>
+                    handlePasswordCodeChange(index, e.target.value)
+                  }
+                  onKeyDown={(e) => handlePasswordCodeKeyDown(index, e)}
+                  onPaste={index === 0 ? handlePasswordCodePaste : undefined}
+                  maxLength={1}
+                  required
+                  disabled={passwordLoading}
+                  autoFocus={index === 0}
+                  aria-label={`${t.settings.changePassword.verificationCode} ${index + 1}`}
+                />
+              ))}
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button type="submit" className="flex-1" disabled={passwordLoading}>
-              {passwordLoading
-                ? t.settings.changePassword.verifying
-                : t.settings.changePassword.verifyCode}
-            </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => setPasswordStep(1)}
             >
               {t.common.back}
+            </Button>
+            <Button type="submit" className="flex-1" disabled={passwordLoading}>
+              {passwordLoading
+                ? t.settings.changePassword.verifying
+                : t.settings.changePassword.verifyCode}
             </Button>
           </div>
         </form>
@@ -245,17 +246,17 @@ export default function SettingsPage() {
             />
           </div>
           <div className="flex gap-2">
-            <Button type="submit" className="flex-1" disabled={passwordLoading}>
-              {passwordLoading
-                ? t.settings.changePassword.updating
-                : t.settings.changePassword.updatePassword}
-            </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => setPasswordStep(2)}
             >
               {t.common.back}
+            </Button>
+            <Button type="submit" className="flex-1" disabled={passwordLoading}>
+              {passwordLoading
+                ? t.settings.changePassword.updating
+                : t.settings.changePassword.updatePassword}
             </Button>
           </div>
         </form>
@@ -302,7 +303,8 @@ export default function SettingsPage() {
   // Password reset
   const [passwordStep, setPasswordStep] = useState(1);
   const [passwordModalEmail, setPasswordModalEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState<string[]>(["", "", "", "", "", ""]);
+  const passwordCodeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
@@ -545,6 +547,7 @@ export default function SettingsPage() {
         email,
       });
       toast.success(res.data.message || "Code sent to your email!");
+      setCode(["", "", "", "", "", ""]);
       setPasswordStep(2);
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
@@ -557,11 +560,50 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePasswordCodeChange = (index: number, value: string) => {
+    if (value && !/^\d$/.test(value)) return;
+
+    const nextCode = [...code];
+    nextCode[index] = value;
+    setCode(nextCode);
+
+    if (value && index < 5) {
+      passwordCodeInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePasswordCodeKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      passwordCodeInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handlePasswordCodePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").trim();
+
+    if (/^\d{6}$/.test(pastedData)) {
+      setCode(pastedData.split(""));
+      passwordCodeInputRefs.current[5]?.focus();
+      return;
+    }
+
+    toast.error("Please paste a valid 6-digit code");
+  };
+
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = passwordModalEmail.trim();
     if (!email) {
       toast.error("Email not found. Please log in again.");
+      return;
+    }
+    const codeString = code.join("");
+    if (codeString.length !== 6) {
+      toast.error("Please enter a 6-digit code.");
       return;
     }
     setPasswordLoading(true);
@@ -570,7 +612,7 @@ export default function SettingsPage() {
         API_ENDPOINTS.AUTH.PASSWORD_RESET_VERIFY,
         {
           email,
-          code: code,
+          code: codeString,
         },
       );
       toast.success(res.data.message || "Code verified!");
@@ -607,7 +649,7 @@ export default function SettingsPage() {
         API_ENDPOINTS.AUTH.PASSWORD_RESET_CONFIRM,
         {
           email,
-          code: code,
+          code: code.join(""),
           new_password: newPassword,
           confirm_password: confirmPassword,
         },
@@ -1204,39 +1246,37 @@ export default function SettingsPage() {
         <SettingsAppVersionFooter />
       </div>
 
-      {isMobile ? (
-        <Drawer
-          open={changePasswordOpen}
-          onOpenChange={handleChangePasswordOpenChange}
-        >
-          <DrawerContent className="border-none bg-white dark:bg-background">
-            <DrawerHeader>
-              <DrawerTitle>{t.settings.changePassword.title}</DrawerTitle>
-              <DrawerDescription>
-                {t.settings.changePassword.description}
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="px-6 pb-6">
+      <Dialog
+        open={changePasswordOpen}
+        onOpenChange={handleChangePasswordOpenChange}
+      >
+        <DialogContent className="!inset-0 !left-0 !top-0 !block !h-[100dvh] !max-h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 !overflow-y-auto !rounded-none !border-0 !bg-background !p-0 !shadow-none !backdrop-blur-none">
+          <div className="flex min-h-full items-center justify-center px-4 py-16 sm:px-8">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-none dark:bg-card sm:p-8">
+              <DialogHeader className="mb-6 space-y-2 text-left">
+                <DialogTitle className="text-2xl">
+                  {t.settings.changePassword.title}
+                </DialogTitle>
+                <DialogDescription>
+                  {t.settings.changePassword.description
+                    .split("{email}")
+                    .map((part, index, parts) => (
+                      <React.Fragment key={index}>
+                        {part}
+                        {index < parts.length - 1 ? (
+                          <span className="font-medium text-foreground">
+                            {passwordModalEmail}
+                          </span>
+                        ) : null}
+                      </React.Fragment>
+                    ))}
+                </DialogDescription>
+              </DialogHeader>
               {renderChangePasswordModalContent()}
             </div>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog
-          open={changePasswordOpen}
-          onOpenChange={handleChangePasswordOpenChange}
-        >
-          <DialogContent className="max-w-sm">
-            <DialogHeader>
-              <DialogTitle>{t.settings.changePassword.title}</DialogTitle>
-              <DialogDescription>
-                {t.settings.changePassword.description}
-              </DialogDescription>
-            </DialogHeader>
-            {renderChangePasswordModalContent()}
-          </DialogContent>
-        </Dialog>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {isMobile ? (
         <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
