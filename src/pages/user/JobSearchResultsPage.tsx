@@ -12,7 +12,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RadialProgress } from "@/components/ui/radial-progress";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
@@ -22,11 +27,8 @@ import {
   Clock,
   Briefcase,
   Tag,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUpDown,
+  Loader2,
   ArrowDown,
-  ArrowUp,
   SlidersHorizontal,
   ExternalLink,
   X,
@@ -34,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { profileApi } from "@/api/profile";
@@ -44,6 +47,7 @@ import {
 } from "@/services/matching";
 import type { JobDetail } from "@/api/jobs/types";
 import { useMobile } from "@/hooks/use-mobile";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { georgianCityLabelById } from "@/data/georgian-cities";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -97,8 +101,6 @@ const jobTypeLabels: Record<string, string> = {
   INTERN: "Intern",
 };
 
-const JOBS_PER_PAGE = 20; // Matches API pagination
-
 // extractJobSkills is now imported from @/utils/jobMatchUtils
 
 // calculateMatchPercentage and getMatchQualityLabel are now imported from @/utils/jobMatchUtils
@@ -151,7 +153,6 @@ const JobSearchResultsPage = () => {
   const isMobile = useMobile();
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
-  const [dateSortOrder, setDateSortOrder] = useState<"desc" | "asc">("desc");
   const t = useTranslation();
   const { language } = useLanguage();
 
@@ -437,37 +438,46 @@ const JobSearchResultsPage = () => {
   }, [activeFilters]);
 
   const {
-    data: jobsData = { jobs: [], hasMore: false, total: 0 },
+    data: jobsPages,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: [
-      "job-search",
-      searchTerm,
-      filtersKey,
-      page,
-      userTopSkills.join(","),
-      dateSortOrder,
-    ],
-    queryFn: () =>
-      fetchJobs(
-        searchTerm,
-        activeFilters,
-        page,
-        userTopSkills,
-        dateSortOrder === "desc" ? "newest" : "oldest",
-      ),
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["job-search", searchTerm, filtersKey, userTopSkills.join(",")],
+    queryFn: ({ pageParam }) =>
+      fetchJobs(searchTerm, activeFilters, pageParam, userTopSkills, "newest"),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.length + 1 : undefined,
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
-  // No filtering - display all jobs from API
   const jobs = useMemo(() => {
-    return jobsData.jobs || [];
-  }, [jobsData.jobs]);
-  const hasMore = jobsData.hasMore || false;
-  const totalJobs = jobsData.total || jobs.length; // Use API total if available
+    const seen = new Set<string>();
+    const merged: ApiJob[] = [];
+    for (const pageData of jobsPages?.pages ?? []) {
+      for (const job of pageData.jobs) {
+        const id = String(job.id || "");
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        merged.push(job);
+      }
+    }
+    return merged;
+  }, [jobsPages]);
+  const totalJobs = jobsPages?.pages[0]?.total || jobs.length;
+
+  const loadMoreRef = useInfiniteScroll({
+    hasMore: !!hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore: () => {
+      void fetchNextPage();
+    },
+  });
 
   // Transform jobs
   const transformedJobs: Job[] = useMemo(() => {
@@ -665,8 +675,14 @@ const JobSearchResultsPage = () => {
       .filter((job): job is Job => job !== null);
   }, [jobs, savedJobs, user, userSkillsForMatch]);
 
-  // Order comes from GET /api/search `sort` (refetch when dateSortOrder changes)
-  const regularJobs = transformedJobs;
+  // Match % is computed client-side, so order the loaded results here.
+  const regularJobs = useMemo(
+    () =>
+      [...transformedJobs].sort(
+        (a, b) => (b.matchPercentage ?? -1) - (a.matchPercentage ?? -1),
+      ),
+    [transformedJobs],
+  );
 
   // Save job mutation
   const saveJobMutation = useMutation({
@@ -825,21 +841,6 @@ const JobSearchResultsPage = () => {
     setTempFilters(newFilters);
     updateUrlWithFilters(newFilters, searchTerm, 1);
   }, [activeFilters, searchTerm, updateUrlWithFilters]);
-
-  const handleNextPage = () => {
-    const newPage = page + 1;
-    updateUrlWithFilters(activeFilters, searchTerm, newPage);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handlePrevPage = () => {
-    const newPage = Math.max(1, page - 1);
-    updateUrlWithFilters(activeFilters, searchTerm, newPage);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const isNextPagePossible = hasMore && transformedJobs.length > 0;
-  const isPrevPagePossible = page > 1;
 
   // Build array of all filter items for active filters display
   const allFilters = useMemo(() => {
@@ -1061,22 +1062,6 @@ const JobSearchResultsPage = () => {
       window.removeEventListener("resize", checkHeight);
     };
   }, [allFilters]);
-  const itemsBefore = (page - 1) * JOBS_PER_PAGE;
-  const startIndex = totalJobs > 0 ? Math.min(itemsBefore + 1, totalJobs) : 1;
-  const endIndex =
-    totalJobs > 0
-      ? Math.min(itemsBefore + transformedJobs.length, totalJobs)
-      : transformedJobs.length;
-
-  let estimatedTotalPages: number | null = null;
-  if (totalJobs > 0) {
-    estimatedTotalPages = Math.ceil(totalJobs / JOBS_PER_PAGE);
-  } else if (hasMore) {
-    estimatedTotalPages = page + 1;
-  } else if (transformedJobs.length > 0) {
-    estimatedTotalPages = page;
-  }
-
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
@@ -1218,25 +1203,14 @@ const JobSearchResultsPage = () => {
             <Button
               variant="outline"
               size="sm"
-              className="h-9 px-2 md:px-3"
-              onClick={() => {
-                setDateSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
-              }}
+              className="h-9 px-2 md:px-3 pointer-events-none"
+              tabIndex={-1}
+              aria-label={t.jobs.matchDescendingFull}
             >
               <span className="text-xs md:text-sm whitespace-nowrap">
-                {isMobile
-                  ? dateSortOrder === "desc"
-                    ? t.jobs.dateDescending
-                    : t.jobs.dateAscending
-                  : dateSortOrder === "desc"
-                    ? t.jobs.dateDescendingFull
-                    : t.jobs.dateAscendingFull}
+                {isMobile ? t.jobs.matchDescending : t.jobs.matchDescendingFull}
               </span>
-              {dateSortOrder === "desc" ? (
-                <ArrowDown className="h-4 w-4 ml-1 md:ml-2" />
-              ) : (
-                <ArrowUp className="h-4 w-4 ml-1 md:ml-2" />
-              )}
+              <ArrowDown className="h-4 w-4 ml-1 md:ml-2" />
             </Button>
           </div>
         </div>
@@ -1287,7 +1261,6 @@ const JobSearchResultsPage = () => {
                 >
                   {isMobile ? (
                     <>
-                      {/* Top row: logo + company info + save button (top right) */}
                       <div className="flex items-start gap-3 mb-3">
                         {job.company_logo ? (
                           <div className="flex-shrink-0 relative w-10 h-10">
@@ -1305,12 +1278,42 @@ const JobSearchResultsPage = () => {
                           </div>
                         ) : null}
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-sm truncate">
-                            {job.company_name || job.company}
+                          <h3 className="font-semibold text-sm min-w-0">
+                            <CompanyNameLink
+                              name={job.company_name || job.company}
+                              className="font-semibold text-sm"
+                            />
                           </h3>
                           <p className="mt-0.5 text-xs text-gray-500 truncate">
                             {job.location}
                           </p>
+                        </div>
+                      </div>
+
+                      <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6">
+                        {job.title}
+                      </h4>
+
+                      <JobListingMetaBadges
+                        className="mt-1"
+                        employmentType={job.employment_type}
+                        workArrangement={job.work_arrangement}
+                        salary={job.salary}
+                      />
+
+                      <div className="mt-5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <RadialProgress
+                            value={job.matchPercentage ?? 0}
+                            size={40}
+                            strokeWidth={4}
+                            showLabel={false}
+                            percentageTextSize="sm"
+                            className="text-breneo-blue flex-shrink-0"
+                          />
+                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-100 whitespace-nowrap">
+                            {getMatchQualityLabel(job.matchPercentage)}
+                          </span>
                         </div>
                         <Button
                           variant="secondary"
@@ -1337,34 +1340,6 @@ const JobSearchResultsPage = () => {
                           />
                         </Button>
                       </div>
-
-                      {/* Job Title (same as JobsPage) */}
-                      <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
-                        {job.title}
-                      </h4>
-
-                      {/* Chips left; matching bar + text on the right, under save button */}
-                      <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                        <JobListingMetaBadges
-                          className="mt-0"
-                          employmentType={job.employment_type}
-                          workArrangement={job.work_arrangement}
-                          salary={job.salary}
-                        />
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <RadialProgress
-                            value={job.matchPercentage ?? 0}
-                            size={40}
-                            strokeWidth={4}
-                            showLabel={false}
-                            percentageTextSize="sm"
-                            className="text-breneo-blue flex-shrink-0"
-                          />
-                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-100 whitespace-nowrap">
-                            {getMatchQualityLabel(job.matchPercentage)}
-                          </span>
-                        </div>
-                      </div>
                     </>
                   ) : (
                     <div className="flex gap-4">
@@ -1390,8 +1365,11 @@ const JobSearchResultsPage = () => {
                           {/* Job Info */}
                           <div className="flex-1 min-w-0">
                             <div className="mb-1 md:mb-2">
-                              <h3 className="font-normal text-sm text-gray-600 mb-1 line-clamp-1">
-                                {job.company_name || job.company}
+                              <h3 className="font-normal text-sm text-gray-600 mb-1 min-w-0">
+                                <CompanyNameLink
+                                  name={job.company_name || job.company}
+                                  className="font-normal text-sm text-gray-600"
+                                />
                               </h3>
                               <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
                                 {job.title}
@@ -1474,55 +1452,29 @@ const JobSearchResultsPage = () => {
           </div>
         )}
 
-        {/* Pagination */}
-        {!isLoading && transformedJobs.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 ">
-            <div className="text-sm text-gray-600">
-              {totalJobs > 0 ? (
-                <>
-                  {t.jobs.showing} {startIndex}-{Math.min(endIndex, totalJobs)}{" "}
-                  {t.jobs.of} {totalJobs} {t.jobs.vacancies}
-                </>
-              ) : (
-                <>
-                  {t.jobs.showing} {transformedJobs.length} {t.jobs.vacancies}
-                </>
-              )}
+        {!isLoading && transformedJobs.length > 0 ? (
+          hasNextPage ? (
+            <div
+              ref={loadMoreRef}
+              className="flex justify-center py-6"
+              aria-live="polite"
+            >
+              {isFetchingNextPage ? (
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              ) : null}
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-4"
-                onClick={handlePrevPage}
-                disabled={!isPrevPagePossible || isLoading}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                {t.jobs.previous}
-              </Button>
-              <div className="flex items-center gap-1 px-2">
-                <span className="text-sm text-gray-600 font-medium">
-                  {t.jobs.page} {page}
-                </span>
-                {estimatedTotalPages && (
-                  <span className="text-sm text-gray-400">
-                    / {estimatedTotalPages}
-                  </span>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 px-4"
-                onClick={handleNextPage}
-                disabled={!isNextPagePossible || isLoading}
-              >
-                {t.jobs.next}
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-base font-semibold text-foreground">
+                You're all caught up! ✨
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                You've seen everything for now. Check back soon for new
+                opportunities.
+              </p>
             </div>
-          </div>
-        )}
+          )
+        ) : null}
 
         <JobFilterModal
           isOpen={isFilterModalOpen}

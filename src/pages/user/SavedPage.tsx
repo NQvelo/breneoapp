@@ -22,6 +22,7 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
 import {
   resolveJobEmploymentType,
@@ -611,8 +612,11 @@ const SavedPage = () => {
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1 line-clamp-1">
-                              {job.company}
+                            <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1 min-w-0">
+                              <CompanyNameLink
+                                name={job.company}
+                                className="font-semibold text-sm text-gray-600 dark:text-gray-400"
+                              />
                             </h3>
                             <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem] group-hover:text-breneo-blue transition-colors">
                               {job.title}

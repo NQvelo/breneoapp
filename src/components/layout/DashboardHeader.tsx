@@ -24,6 +24,13 @@ interface DashboardHeaderProps {
   showSidebar: boolean;
 }
 
+const isCompanyPage = (pathname: string): boolean => {
+  return (
+    /^\/companies\/[^/]+$/.test(pathname) ||
+    /^\/jobs\/company\/[^/]+$/.test(pathname)
+  );
+};
+
 // Helper function to check if current path is a job detail page
 const isJobDetailPage = (pathname: string): boolean => {
   // Match patterns like /jobs/:jobId, /en/jobs/:jobId, /ka/jobs/:jobId
@@ -86,7 +93,12 @@ const getPageTitle = (
   if (!t) return "Home";
 
   // Don't show title for job detail pages or course detail pages
-  if (isJobDetailPage(pathname) || isCourseDetailPage(pathname)) return null;
+  if (
+    isJobDetailPage(pathname) ||
+    isCourseDetailPage(pathname) ||
+    isCompanyPage(pathname)
+  )
+    return null;
 
   if (isSettingsPath(pathname)) {
     if (isValidSettingsSection(settingsSection ?? null)) return null;
@@ -181,6 +193,7 @@ export function DashboardHeader({
     ? null
     : getPageTitle(currentPath, username, t, settingsSectionParam);
   const isJobDetail = isJobDetailPage(currentPath);
+  const isCompany = isCompanyPage(currentPath);
   const isCourseDetail = isCourseDetailPage(currentPath);
   const isSkillPath = isSkillPathPage(currentPath);
   const isCourseAddEdit = isCourseAddEditPage(currentPath);
@@ -200,6 +213,7 @@ export function DashboardHeader({
   const courseAddEditTitle = getCourseAddEditTitle();
   const showBackHeader =
     isJobDetail ||
+    isCompany ||
     isCourseDetail ||
     isSkillPath ||
     isCourseAddEdit ||

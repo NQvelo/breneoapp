@@ -120,6 +120,8 @@ export const en = {
     dateAscending: "Date Ascending",
     dateDescendingFull: "Date Descending",
     dateAscendingFull: "Date Ascending",
+    matchDescending: "Best match",
+    matchDescendingFull: "Best match",
     tryAdjustingFilters: "Try adjusting your search terms or filters",
     showing: "Showing",
     of: "of",

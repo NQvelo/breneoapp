@@ -82,6 +82,7 @@ import {
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
 import { JobMockInterviewPromo } from "@/components/jobs/JobMockInterviewPromo";
+import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "lucide-react";
@@ -1649,9 +1650,10 @@ const JobDetailPage = () => {
                               <div className="flex items-center gap-3 min-w-0">
                                 {renderLogo()}
                                 {companyLabel ? (
-                                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 truncate min-w-0 flex-1 leading-tight">
-                                    {companyLabel}
-                                  </p>
+                                  <CompanyNameLink
+                                    name={companyLabel}
+                                    className="text-sm font-medium text-gray-600 dark:text-gray-400 leading-tight underline decoration-gray-300 underline-offset-2"
+                                  />
                                 ) : null}
                               </div>
                               <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1663,9 +1665,10 @@ const JobDetailPage = () => {
                               {renderLogo()}
                               <div className="flex flex-col min-w-0 gap-1">
                                 {companyLabel ? (
-                                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
-                                    {companyLabel}
-                                  </p>
+                                  <CompanyNameLink
+                                    name={companyLabel}
+                                    className="text-sm font-medium text-gray-600 dark:text-gray-400 underline decoration-gray-300 underline-offset-2"
+                                  />
                                 ) : null}
                                 <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
                                   {getJobTitle()}
@@ -2127,8 +2130,16 @@ const JobDetailPage = () => {
                         </div>
                       ) : null}
 
-                      <h3 className="text-xl md:text-xl font-bold text-gray-900 dark:text-white break-words">
-                        {getCompanyName() || "Company Name"}
+                      <h3 className="min-w-0 text-xl font-bold text-gray-900 dark:text-white">
+                        {getCompanyName() ? (
+                          <CompanyNameLink
+                            name={getCompanyName()}
+                            truncate={false}
+                            className="text-xl font-bold text-gray-900 dark:text-white underline decoration-gray-300 underline-offset-4"
+                          />
+                        ) : (
+                          "Company Name"
+                        )}
                       </h3>
                     </div>
 
@@ -2248,9 +2259,10 @@ const JobDetailPage = () => {
                   return (
                     <>
                       {barCompany ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {barCompany}
-                        </p>
+                        <CompanyNameLink
+                          name={barCompany}
+                          className="text-xs text-gray-500 dark:text-gray-400"
+                        />
                       ) : null}
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                         {getJobTitle()}

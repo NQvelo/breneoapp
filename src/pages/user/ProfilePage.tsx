@@ -78,6 +78,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
 import {
@@ -2553,8 +2554,11 @@ const ProfilePage = () => {
                                   </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="font-semibold text-sm truncate text-gray-900 dark:text-gray-100">
-                                    {job.company}
+                                  <h3 className="font-semibold text-sm min-w-0 text-gray-900 dark:text-gray-100">
+                                    <CompanyNameLink
+                                      name={job.company}
+                                      className="font-semibold text-sm text-gray-900 dark:text-gray-100"
+                                    />
                                   </h3>
                                   <p className="mt-0.5 text-xs text-gray-500 truncate">
                                     {job.location}
@@ -2661,8 +2665,11 @@ const ProfilePage = () => {
                                   {/* Job Info */}
                                   <div className="flex-1 min-w-0">
                                     <div className="mb-1 md:mb-2">
-                                      <h3 className="font-normal text-sm text-gray-600 dark:text-gray-400 mb-1 line-clamp-1">
-                                        {job.company}
+                                      <h3 className="font-normal text-sm text-gray-600 dark:text-gray-400 mb-1 min-w-0">
+                                        <CompanyNameLink
+                                          name={job.company}
+                                          className="font-normal text-sm text-gray-600 dark:text-gray-400"
+                                        />
                                       </h3>
                                       <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3 text-gray-900 dark:text-gray-100">
                                         {job.title}

@@ -28,7 +28,7 @@ export const RadialProgress = React.forwardRef<
       percentageTextSize = "lg",
       centerLabel,
     },
-    ref
+    ref,
   ) => {
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -89,26 +89,18 @@ export const RadialProgress = React.forwardRef<
             <span
               className={cn(
                 "font-bold text-gray-700 dark:text-gray-300",
-                textSizeClasses[percentageTextSize]
+                textSizeClasses[percentageTextSize],
               )}
             >
-              {centerLabel !== undefined ? centerLabel : `${Math.round(value)}%`}
+              {centerLabel !== undefined
+                ? centerLabel
+                : `${Math.round(value)}%`}
             </span>
           </div>
         </div>
       </div>
     );
-  }
+  },
 );
 
 RadialProgress.displayName = "RadialProgress";
-
-
-
-
-
-
-
-
-
-

@@ -69,6 +69,7 @@ import {
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { georgianCityLabelById } from "@/data/georgian-cities";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
@@ -2686,8 +2687,11 @@ const JobsPage = () => {
                         </div>
                       ) : null}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm truncate">
-                          {job.company_name || job.company}
+                        <h3 className="font-semibold text-sm min-w-0">
+                          <CompanyNameLink
+                            name={job.company_name || job.company}
+                            className="font-semibold text-sm"
+                          />
                         </h3>
                         <p className="mt-0.5 text-xs text-gray-500 truncate">
                           {job.location}
@@ -2807,8 +2811,11 @@ const JobsPage = () => {
                         </div>
                       ) : null}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm truncate">
-                          {job.company_name || job.company}
+                        <h3 className="font-semibold text-sm min-w-0">
+                          <CompanyNameLink
+                            name={job.company_name || job.company}
+                            className="font-semibold text-sm"
+                          />
                         </h3>
                         <p className="mt-0.5 text-xs text-gray-500 truncate">
                           {job.location}

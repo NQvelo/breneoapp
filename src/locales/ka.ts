@@ -120,6 +120,8 @@ export const ka = {
     dateAscending: "თარიღი ზრდადი",
     dateDescendingFull: "თარიღი კლებადი",
     dateAscendingFull: "თარიღი ზრდადი",
+    matchDescending: "საუკეთესო შესაბამისობა",
+    matchDescendingFull: "საუკეთესო შესაბამისობა",
     tryAdjustingFilters: "სცადეთ ძიების პარამეტრების ან ფილტრების შეცვლა",
     showing: "ნაჩვენებია",
     of: "დან",

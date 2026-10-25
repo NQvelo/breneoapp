@@ -33,7 +33,7 @@ const JobSearchResultsPage = lazy(
   () => import("@/pages/user/JobSearchResultsPage"),
 );
 const JobDetailPage = lazy(() => import("@/pages/user/JobDetailPage"));
-const CompanyJobsPage = lazy(() => import("@/pages/user/CompanyJobsPage"));
+const CompanyPage = lazy(() => import("@/pages/user/CompanyPage"));
 const CoursesPage = lazy(() => import("@/pages/CoursesPage"));
 const CoursePage = lazy(() => import("@/pages/CoursePage"));
 const SkillTestPage = lazy(() => import("@/pages/user/SkillTestPage"));
@@ -305,15 +305,21 @@ export const AppRoutes = () => {
           </ProtectedRoute>,
         )}
         {createLocalizedRoute(
-          "/jobs/:jobId",
+          "/companies/:companyName",
           <ProtectedRoute requiredRole="user">
-            <JobDetailPage />
+            <CompanyPage />
           </ProtectedRoute>,
         )}
         {createLocalizedRoute(
           "/jobs/company/:companyName",
           <ProtectedRoute requiredRole="user">
-            <CompanyJobsPage />
+            <CompanyPage />
+          </ProtectedRoute>,
+        )}
+        {createLocalizedRoute(
+          "/jobs/:jobId",
+          <ProtectedRoute requiredRole="user">
+            <JobDetailPage />
           </ProtectedRoute>,
         )}
         {createLocalizedRoute(
