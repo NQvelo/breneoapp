@@ -8,8 +8,8 @@ import { Eye, EyeOff, ImageIcon, X } from "lucide-react";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { AuthPageHeader } from "@/components/auth/AuthPageHeader";
+import { AuthLegalNotice } from "@/components/auth/AuthLegalNotice";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { isCompanyWorkEmail } from "@/utils/companyEmail";
@@ -168,7 +168,7 @@ function parseLocations(raw: string): string[] {
 
 const EmployerRegistrationPage = () => {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
@@ -209,7 +209,6 @@ const EmployerRegistrationPage = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
 
-  const [logoLoaded, setLogoLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -232,9 +231,7 @@ const EmployerRegistrationPage = () => {
         const list = await fetchAggregatorIndustries();
         setIndustries(list);
       } catch {
-        toast.error(
-          "Could not load industries. Check your connection or try again in a moment.",
-        );
+        toast.error(t.employerRegistration.industriesLoadFailed);
       }
     };
     loadIndustries();
@@ -269,10 +266,10 @@ const EmployerRegistrationPage = () => {
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
-    const t = window.setInterval(() => {
+    const timer = window.setInterval(() => {
       setResendCooldown((s) => (s <= 1 ? 0 : s - 1));
     }, 1000);
-    return () => window.clearInterval(t);
+    return () => window.clearInterval(timer);
   }, [resendCooldown]);
 
   /** Step 3 company search needs a JWT; restore session after refresh or if post-verify login failed. */
@@ -314,21 +311,19 @@ const EmployerRegistrationPage = () => {
     const first = firstName.trim();
     const last = lastName.trim();
     if (!first || !last) {
-      toast.error("First name and last name are required.");
+      toast.error(t.employerRegistration.namesRequired);
       return;
     }
     if (!email.trim() || !password) {
-      toast.error("Enter your work email and password.");
+      toast.error(t.employerRegistration.emailPasswordRequired);
       return;
     }
     if (!isCompanyWorkEmail(email)) {
-      toast.error(
-        "Use your company email address (personal addresses like Gmail or Yahoo are not accepted).",
-      );
+      toast.error(t.employerRegistration.useCompanyEmail);
       return;
     }
     if (password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+      toast.error(t.employerRegistration.passwordTooShort);
       return;
     }
 
@@ -347,7 +342,7 @@ const EmployerRegistrationPage = () => {
           "message" in res.data &&
           typeof (res.data as { message?: string }).message === "string" &&
           (res.data as { message: string }).message) ||
-        "Verification code sent to your email.";
+        t.employerRegistration.codeSent;
 
       if (res.status === 202) {
         toast.warning(msg);
@@ -400,9 +395,9 @@ const EmployerRegistrationPage = () => {
     if (/^\d{6}$/.test(pastedData)) {
       setCode(pastedData.split(""));
       inputRefs.current[5]?.focus();
-      toast.success("Code pasted");
+      toast.success(t.employerRegistration.codePasted);
     } else {
-      toast.error("Paste a valid 6-digit code");
+      toast.error(t.employerRegistration.invalidPastedCode);
     }
   };
 
@@ -412,9 +407,7 @@ const EmployerRegistrationPage = () => {
     const fn = sessionStorage.getItem(SESSION_EMPLOYER_FIRST);
     const ln = sessionStorage.getItem(SESSION_EMPLOYER_LAST);
     if (!emailStored || !passwordStored || !fn || !ln) {
-      toast.error(
-        "Session expired. Go back to step 1 and submit the form again to receive a code.",
-      );
+      toast.error(t.employerRegistration.sessionExpiredResend);
       return;
     }
     if (resendCooldown > 0 || isResending) return;
@@ -438,7 +431,7 @@ const EmployerRegistrationPage = () => {
           "message" in res.data &&
           typeof (res.data as { message?: string }).message === "string" &&
           (res.data as { message: string }).message) ||
-        "Verification code sent. Check your inbox and spam folder.";
+        t.employerRegistration.codeResent;
       if (res.status === 202) {
         toast.warning(msg);
       } else {
@@ -465,7 +458,7 @@ const EmployerRegistrationPage = () => {
       .toLowerCase();
     const codeString = code.join("").replace(/\D/g, "");
     if (codeString.length !== 6) {
-      toast.error("Enter the 6-digit code.");
+      toast.error(t.employerRegistration.enterCode);
       return;
     }
 
@@ -485,7 +478,7 @@ const EmployerRegistrationPage = () => {
           "message" in res.data &&
           typeof (res.data as { message?: string }).message === "string" &&
           (res.data as { message: string }).message) ||
-        "Email verified.";
+        t.employerRegistration.emailVerified;
       toast.success(msg);
 
       const passwordStored = sessionStorage.getItem("tempEmployerPassword");
@@ -507,9 +500,7 @@ const EmployerRegistrationPage = () => {
             localStorage.setItem("userRole", "employer");
           }
         } catch {
-          toast.warning(
-            "Session for company search could not start. Submit this step to sign in, or refresh and verify again.",
-          );
+          toast.warning(t.employerRegistration.searchSessionFailed);
         }
       }
 
@@ -539,12 +530,12 @@ const EmployerRegistrationPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file (PNG, JPG, SVG, etc.).");
+      toast.error(t.employerRegistration.chooseImageFile);
       e.target.value = "";
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Logo image must be 5MB or smaller.");
+      toast.error(t.employerRegistration.logoTooLarge);
       e.target.value = "";
       return;
     }
@@ -569,25 +560,21 @@ const EmployerRegistrationPage = () => {
       ? String(selectedDirectoryCompany.name ?? "").trim() || companyName.trim()
       : companyName.trim();
     if (!breneoCompanyName.trim()) {
-      toast.error("Company name is required.");
+      toast.error(t.employerRegistration.companyNameRequired);
       return;
     }
     if (!selectedDirectoryCompany && !showNewCompanyDetails) {
-      toast.error(
-        "Choose an existing company from the list or click Create new company.",
-      );
+      toast.error(t.employerRegistration.chooseOrCreateCompany);
       return;
     }
     if (showNewCompanyDetails && !description.trim()) {
-      toast.error("Description is required for a new company.");
+      toast.error(t.employerRegistration.descriptionRequired);
       return;
     }
     if (selectedDirectoryCompany) {
       const cid = selectedDirectoryCompany.id;
       if (cid == null || String(cid).trim() === "") {
-        toast.error(
-          "This company cannot be linked (missing id). Create a new company instead.",
-        );
+        toast.error(t.employerRegistration.companyCannotBeLinked);
         return;
       }
     }
@@ -595,7 +582,7 @@ const EmployerRegistrationPage = () => {
     const emailStored = sessionStorage.getItem("tempEmployerEmail");
     const passwordStored = sessionStorage.getItem("tempEmployerPassword");
     if (!emailStored || !passwordStored) {
-      toast.error("Session expired. Start registration again.");
+      toast.error(t.employerRegistration.sessionExpiredRestart);
       navigate("/employer/register");
       return;
     }
@@ -615,9 +602,7 @@ const EmployerRegistrationPage = () => {
         token = loginRes.data?.access || loginRes.data?.token;
         refresh = loginRes.data?.refresh || loginRes.data?.refresh_token || "";
         if (!token) {
-          toast.error(
-            "Could not sign you in. Please try logging in from the login page.",
-          );
+          toast.error(t.employerRegistration.signInFailed);
           return;
         }
         TokenManager.setTokens(token, refresh || "");
@@ -634,9 +619,7 @@ const EmployerRegistrationPage = () => {
         extractBreneoUserIdFromEmployerProfileRaw(profileRes.data) ||
         extractBreneoUserIdFromJwt(token);
       if (!breneoUserId) {
-        toast.error(
-          "Could not resolve your user id for the job directory. Contact support.",
-        );
+        toast.error(t.employerRegistration.userIdMissing);
         return;
       }
 
@@ -778,7 +761,10 @@ const EmployerRegistrationPage = () => {
         const msg =
           aggErr instanceof Error ? aggErr.message : "Aggregator error";
         toast.error(
-          `Breneo profile saved, but the job directory company was not created: ${msg}. You can retry from your company profile.`,
+          t.employerRegistration.directoryCompanyFailed.replace(
+            "{message}",
+            msg,
+          ),
         );
       }
 
@@ -789,9 +775,7 @@ const EmployerRegistrationPage = () => {
 
       if (aggregatorCompanyOk) {
         if (pendingJoinApproval) {
-          toast.success(
-            "Profile saved. Your join request was sent — a company admin must approve you.",
-          );
+          toast.success(t.employerRegistration.joinRequestSent);
           window.location.href = getLocalizedPath(
             "/employer/pending-approval",
             language,
@@ -799,11 +783,9 @@ const EmployerRegistrationPage = () => {
           return;
         }
         if (joinedAsAdmin) {
-          toast.success(
-            "Profile saved. You are the company admin — as the first member, you manage team access.",
-          );
+          toast.success(t.employerRegistration.savedAsAdmin);
         } else {
-          toast.success("Profile saved. Welcome!");
+          toast.success(t.employerRegistration.savedWelcome);
         }
       }
       window.location.href = getLocalizedPath("/employer/jobs", language);
@@ -819,7 +801,7 @@ const EmployerRegistrationPage = () => {
       } else if (err instanceof Error && err.message) {
         toast.error(err.message);
       } else {
-        toast.error("Something went wrong.");
+        toast.error(t.employerRegistration.somethingWentWrong);
       }
     } finally {
       setIsLoading(false);
@@ -830,482 +812,490 @@ const EmployerRegistrationPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden bg-background">
-      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
-        <div className="flex items-center">
-          {!logoLoaded && !imageError && (
-            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-              <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
-            </div>
-          )}
-          <BreneoLogo
-            className={`h-6 lg:h-5 transition-opacity duration-300 ${
-              logoLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setLogoLoaded(true)}
-            onError={() => {
-              setImageError(true);
-              setLogoLoaded(true);
-            }}
-          />
-        </div>
-        <ThemeToggle />
-      </div>
-
       <div className="flex min-w-0 flex-1">
-        <div className="flex w-full items-center justify-center bg-background p-8 lg:w-1/2">
-          <div className="w-full min-w-0 max-w-md">
-            <div className="mb-8 hidden lg:flex items-center justify-between">
-              <BreneoLogo
-                className={`h-8 transition-opacity duration-300 ${
-                  logoLoaded ? "opacity-100" : "opacity-0"
-                }`}
-                onLoad={() => setLogoLoaded(true)}
-                onError={() => {
-                  setImageError(true);
-                  setLogoLoaded(true);
-                }}
-              />
-              <ThemeToggle />
-            </div>
-
-            <div className="w-full bg-gray-200 dark:bg-secondary rounded-full h-2 mb-8">
-              <div
-                className="bg-[#00BFFF] h-2 rounded-full transition-all duration-500 ease-in-out"
-                style={{ width: progressPct }}
-              />
-            </div>
-
-            <h1 className="mb-2 text-3xl font-semibold text-foreground">
-              Employer registration
-            </h1>
-            <p className="mb-8 text-muted-foreground">
-              {step === 1
-                ? "Insert your details & sign up"
-                : step === 2
-                  ? "Verify your email"
-                  : "Insert company details"}
-            </p>
-
-            {step === 1 && (
-              <form onSubmit={handleStep1} className="space-y-6">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="emp-first-name">First name</Label>
-                    <Input
-                      id="emp-first-name"
-                      type="text"
-                      autoComplete="given-name"
-                      className="mt-1 h-[3.2rem]"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      placeholder="Jane"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="emp-last-name">Last name</Label>
-                    <Input
-                      id="emp-last-name"
-                      type="text"
-                      autoComplete="family-name"
-                      className="mt-1 h-[3.2rem]"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      placeholder="Doe"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="emp-email">Work email</Label>
-                  <Input
-                    id="emp-email"
-                    type="email"
-                    autoComplete="email"
-                    className="mt-1 h-[3.2rem]"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    placeholder="you@yourcompany.com"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Use your company domain — personal email providers are not
-                    accepted.
-                  </p>
-                </div>
-                <div className="min-w-0">
-                  <Label htmlFor="emp-password">Password</Label>
-                  <div className="relative mt-1 min-w-0">
-                    <Input
-                      id="emp-password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      className="h-[3.2rem] pr-10"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                      onClick={() => setShowPassword(!showPassword)}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  className="h-14 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Sending code…" : "Continue"}
-                </Button>
-              </form>
-            )}
-
-            {step === 2 && (
-              <form onSubmit={handleStep2} className="space-y-6">
-                <p className="break-words text-sm text-muted-foreground">
-                  Enter the 6-digit code we sent to{" "}
-                  <strong className="break-all">
-                    {sessionStorage.getItem("tempEmployerEmail") || email}
-                  </strong>
-                  . It may take a minute; check spam or promotions folders.
-                </p>
-                <div className="w-full sm:w-[23.5rem]">
-                  <div className="flex gap-2 sm:gap-2">
-                    {code.map((digit, index) => (
-                      <Input
-                        key={index}
-                        ref={(el) => {
-                          inputRefs.current[index] = el;
-                        }}
-                        type="text"
-                        inputMode="numeric"
-                        className="h-12 w-0 flex-1 text-center text-xl font-semibold sm:h-14 sm:w-14 sm:flex-none sm:text-2xl"
-                        value={digit}
-                        onChange={(e) =>
-                          handleCodeChange(index, e.target.value)
-                        }
-                        onKeyDown={(e) => handleKeyDown(index, e)}
-                        onPaste={index === 0 ? handlePaste : undefined}
-                        maxLength={1}
-                        disabled={isLoading}
-                        autoFocus={index === 0}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  className="h-12 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 sm:h-14 sm:w-[23.5rem]"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Verifying…" : "Verify & continue"}
-                </Button>
-                <button
-                  type="button"
-                  className="w-full text-center text-sm text-primary hover:underline sm:w-[23.5rem]"
-                  onClick={() => setStep(1)}
-                >
-                  Back
-                </button>
-                <div className="space-y-2 border-t border-border/60 pt-2 text-center sm:w-[23.5rem]">
-                  <p className="text-sm text-muted-foreground">
-                    Didn&apos;t get the code?
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={resendCooldown > 0 || isResending || isLoading}
-                    onClick={handleResendVerification}
-                  >
-                    {isResending
-                      ? "Sending…"
-                      : resendCooldown > 0
-                        ? `Resend code (${resendCooldown}s)`
-                        : "Resend verification code"}
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            {step === 3 && (
-              <form onSubmit={handleStep3Company} className="space-y-6">
-                <EmployerCompanySearchField
-                  disabled={isLoading}
-                  selected={selectedDirectoryCompany}
-                  selectedCreateNewName={selectedCreateNewCompanyName}
-                  onSelectExisting={(c) => {
-                    setSelectedDirectoryCompany(c);
-                    setSelectedCreateNewCompanyName("");
-                    setShowNewCompanyDetails(false);
-                    resetUploadedCompanyLogo();
-                    setCompanyLogoUrl("");
-                    if (c?.name) setCompanyName(String(c.name));
-                    else setCompanyName("");
-                  }}
-                  companyName={companyName}
-                  onCompanyNameChange={(value) => {
-                    setCompanyName(value);
-                    if (selectedDirectoryCompany) {
-                      setSelectedDirectoryCompany(null);
-                    }
-                    if (selectedCreateNewCompanyName) {
-                      setSelectedCreateNewCompanyName("");
-                    }
-                    setShowNewCompanyDetails(false);
-                  }}
-                  onSelectCreateNew={(value) => {
-                    setSelectedDirectoryCompany(null);
-                    setCompanyName(value);
-                    setSelectedCreateNewCompanyName(value);
-                    setShowNewCompanyDetails(true);
-                  }}
-                  onClearCreateNewSelection={() => {
-                    setSelectedCreateNewCompanyName("");
-                    setShowNewCompanyDetails(false);
-                  }}
+        <div className="flex w-full flex-col bg-background lg:w-1/2">
+          <AuthPageHeader />
+          <div className="flex flex-1 items-center justify-center px-8 pb-8">
+            <div className="w-full min-w-0 max-w-md">
+              <div className="w-full bg-gray-200 dark:bg-secondary rounded-full h-2 mb-8">
+                <div
+                  className="bg-[#00BFFF] h-2 rounded-full transition-all duration-500 ease-in-out"
+                  style={{ width: progressPct }}
                 />
-                {showNewCompanyDetails && !selectedDirectoryCompany ? (
-                  <>
+              </div>
+
+              <h1 className="mb-2 text-3xl font-semibold text-foreground">
+                {t.employerRegistration.title}
+              </h1>
+              <p className="mb-8 text-muted-foreground">
+                {step === 1
+                  ? t.employerRegistration.step1Subtitle
+                  : step === 2
+                    ? t.employerRegistration.step2Subtitle
+                    : t.employerRegistration.step3Subtitle}
+              </p>
+
+              {step === 1 && (
+                <form onSubmit={handleStep1} className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <Label htmlFor="co-domain">Domain</Label>
-                      <Input
-                        id="co-domain"
-                        className="mt-1 h-[3.2rem]"
-                        value={companyDomain}
-                        onChange={(e) => setCompanyDomain(e.target.value)}
-                        disabled={isLoading}
-                        placeholder="e.g. acme.com"
-                        autoComplete="off"
-                      />
-                    </div>
-                  </>
-                ) : null}
-                {showNewCompanyDetails ? (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="co-logo-file">
-                        Company logo (optional)
+                      <Label htmlFor="emp-first-name">
+                        {t.employerRegistration.firstName}
                       </Label>
-                      <input
-                        ref={companyLogoInputRef}
-                        id="co-logo-file"
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        disabled={isLoading}
-                        onChange={handleCompanyLogoFileChange}
-                      />
-                      <div className="relative inline-block">
-                        <label
-                          htmlFor="co-logo-file"
-                          className={
-                            "group relative flex h-32 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted transition-colors hover:border-muted-foreground/40 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 " +
-                            (isLoading ? "pointer-events-none opacity-50" : "")
-                          }
-                        >
-                          {companyLogoPreview ? (
-                            <>
-                              <img
-                                src={companyLogoPreview}
-                                alt=""
-                                className="h-full w-full object-contain p-1"
-                              />
-                              <div
-                                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                                aria-hidden
-                              >
-                                <span className="text-sm font-medium text-background">
-                                  Replace
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex h-full w-full items-center justify-center">
-                                <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                              </div>
-                              <div
-                                className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                                aria-hidden
-                              >
-                                <span className="text-sm font-medium text-background">
-                                  Upload
-                                </span>
-                              </div>
-                            </>
-                          )}
-                        </label>
-                        {companyLogoFile ? (
-                          <button
-                            type="button"
-                            className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-                            disabled={isLoading}
-                            aria-label="Remove logo"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              resetUploadedCompanyLogo();
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        PNG or JPG recommended. You can also paste a public URL
-                        below.
-                      </p>
-                      <div>
-                        <Label
-                          htmlFor="co-logo-url"
-                          className="text-muted-foreground"
-                        >
-                          Or logo URL
-                        </Label>
-                        <Input
-                          id="co-logo-url"
-                          type="url"
-                          className="mt-1 h-[3.2rem]"
-                          value={companyLogoUrl}
-                          onChange={(e) =>
-                            handleCompanyLogoUrlInput(e.target.value)
-                          }
-                          disabled={isLoading || !!companyLogoFile}
-                          placeholder="https://…"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="co-desc">Description</Label>
-                      <Textarea
-                        id="co-desc"
-                        className="mt-1 min-h-[100px]"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+                      <Input
+                        id="emp-first-name"
+                        type="text"
+                        autoComplete="given-name"
+                        className="mt-1 h-[3.2rem]"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
                         required
                         disabled={isLoading}
-                        placeholder="Short description of your company"
+                        placeholder={
+                          t.employerRegistration.firstNamePlaceholder
+                        }
                       />
                     </div>
                     <div>
-                      <Label>Phone number</Label>
-                      <div className="mt-1 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
-                        <CountrySelector
-                          value={selectedCountry}
-                          onChange={setSelectedCountry}
-                          className="h-[3.2rem] w-full shrink-0 sm:w-auto"
-                        />
+                      <Label htmlFor="emp-last-name">
+                        {t.employerRegistration.lastName}
+                      </Label>
+                      <Input
+                        id="emp-last-name"
+                        type="text"
+                        autoComplete="family-name"
+                        className="mt-1 h-[3.2rem]"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        placeholder={t.employerRegistration.lastNamePlaceholder}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="emp-email">
+                      {t.employerRegistration.workEmail}
+                    </Label>
+                    <Input
+                      id="emp-email"
+                      type="email"
+                      autoComplete="email"
+                      className="mt-1 h-[3.2rem]"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      placeholder="you@yourcompany.com"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t.employerRegistration.workEmailHint}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <Label htmlFor="emp-password">
+                      {t.employerRegistration.password}
+                    </Label>
+                    <div className="relative mt-1 min-w-0">
+                      <Input
+                        id="emp-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        className="h-[3.2rem] pr-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        onClick={() => setShowPassword(!showPassword)}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="!mt-8 h-14 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                    disabled={isLoading}
+                  >
+                    {isLoading
+                      ? t.employerRegistration.sendingCode
+                      : t.employerRegistration.continue}
+                  </Button>
+                </form>
+              )}
+
+              {step === 2 && (
+                <form onSubmit={handleStep2} className="space-y-4">
+                  <p className="break-words text-sm text-muted-foreground">
+                    {t.employerRegistration.codeSentTo}{" "}
+                    <strong className="break-all">
+                      {sessionStorage.getItem("tempEmployerEmail") || email}
+                    </strong>
+                    . {t.employerRegistration.codeDelayHint}
+                  </p>
+                  <div className="w-full sm:w-[23.5rem]">
+                    <div className="flex gap-2 sm:gap-2">
+                      {code.map((digit, index) => (
                         <Input
-                          className="h-[3.2rem] min-w-0 w-full flex-1 sm:min-w-[8rem]"
-                          value={phoneLocal}
-                          onChange={(e) => setPhoneLocal(e.target.value)}
+                          key={index}
+                          ref={(el) => {
+                            inputRefs.current[index] = el;
+                          }}
+                          type="text"
+                          inputMode="numeric"
+                          className="h-12 w-0 flex-1 text-center text-xl font-semibold sm:h-14 sm:w-14 sm:flex-none sm:text-2xl"
+                          value={digit}
+                          onChange={(e) =>
+                            handleCodeChange(index, e.target.value)
+                          }
+                          onKeyDown={(e) => handleKeyDown(index, e)}
+                          onPaste={index === 0 ? handlePaste : undefined}
+                          maxLength={1}
                           disabled={isLoading}
-                          placeholder="Phone"
+                          autoFocus={index === 0}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="!mt-8 h-12 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90 sm:h-14 sm:w-[23.5rem]"
+                    disabled={isLoading}
+                  >
+                    {isLoading
+                      ? t.employerRegistration.verifying
+                      : t.employerRegistration.verifyAndContinue}
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-center text-sm text-primary hover:underline sm:w-[23.5rem]"
+                    onClick={() => setStep(1)}
+                  >
+                    {t.employerRegistration.back}
+                  </button>
+                  <div className="space-y-2 border-t border-border/60 pt-2 text-center sm:w-[23.5rem]">
+                    <p className="text-sm text-muted-foreground">
+                      {t.employerRegistration.didntGetCode}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={resendCooldown > 0 || isResending || isLoading}
+                      onClick={handleResendVerification}
+                    >
+                      {isResending
+                        ? t.employerRegistration.sending
+                        : resendCooldown > 0
+                          ? t.employerRegistration.resendCodeIn.replace(
+                              "{seconds}",
+                              String(resendCooldown),
+                            )
+                          : t.employerRegistration.resendCode}
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {step === 3 && (
+                <form onSubmit={handleStep3Company} className="space-y-4">
+                  <EmployerCompanySearchField
+                    disabled={isLoading}
+                    selected={selectedDirectoryCompany}
+                    selectedCreateNewName={selectedCreateNewCompanyName}
+                    onSelectExisting={(c) => {
+                      setSelectedDirectoryCompany(c);
+                      setSelectedCreateNewCompanyName("");
+                      setShowNewCompanyDetails(false);
+                      resetUploadedCompanyLogo();
+                      setCompanyLogoUrl("");
+                      if (c?.name) setCompanyName(String(c.name));
+                      else setCompanyName("");
+                    }}
+                    companyName={companyName}
+                    onCompanyNameChange={(value) => {
+                      setCompanyName(value);
+                      if (selectedDirectoryCompany) {
+                        setSelectedDirectoryCompany(null);
+                      }
+                      if (selectedCreateNewCompanyName) {
+                        setSelectedCreateNewCompanyName("");
+                      }
+                      setShowNewCompanyDetails(false);
+                    }}
+                    onSelectCreateNew={(value) => {
+                      setSelectedDirectoryCompany(null);
+                      setCompanyName(value);
+                      setSelectedCreateNewCompanyName(value);
+                      setShowNewCompanyDetails(true);
+                    }}
+                    onClearCreateNewSelection={() => {
+                      setSelectedCreateNewCompanyName("");
+                      setShowNewCompanyDetails(false);
+                    }}
+                  />
+                  {showNewCompanyDetails && !selectedDirectoryCompany ? (
+                    <>
+                      <div>
+                        <Label htmlFor="co-domain">
+                          {t.employerRegistration.domain}
+                        </Label>
+                        <Input
+                          id="co-domain"
+                          className="mt-1 h-[3.2rem]"
+                          value={companyDomain}
+                          onChange={(e) => setCompanyDomain(e.target.value)}
+                          disabled={isLoading}
+                          placeholder={t.employerRegistration.domainPlaceholder}
+                          autoComplete="off"
                         />
                       </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="co-web">Website</Label>
-                      <Input
-                        id="co-web"
-                        type="url"
-                        className="mt-1 h-[3.2rem]"
-                        value={website}
-                        onChange={(e) => setWebsite(e.target.value)}
-                        disabled={isLoading}
-                        placeholder="https://"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="co-loc">Locations</Label>
-                      <Textarea
-                        id="co-loc"
-                        className="mt-1 min-h-[72px]"
-                        value={locationsRaw}
-                        onChange={(e) => setLocationsRaw(e.target.value)}
-                        disabled={isLoading}
-                        placeholder="One per line or comma-separated (e.g. Tbilisi, Remote)"
-                      />
-                    </div>
-                    <div>
-                      <Label>Number of employees</Label>
-                      <Select
-                        value={numberOfEmployees}
-                        onValueChange={setNumberOfEmployees}
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger className="mt-1 h-[3.2rem] w-full">
-                          <SelectValue placeholder="Select range" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
-                            <SelectItem key={opt} value={opt}>
-                              {opt}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Industries</Label>
-                      {industries.length === 0 ? (
-                        <p className="text-sm text-muted-foreground border rounded-md p-3">
-                          No industries loaded yet.
-                        </p>
-                      ) : (
-                        <IndustryMultiSelect
-                          industries={industries}
-                          value={selectedIndustryIds}
-                          onChange={setSelectedIndustryIds}
+                    </>
+                  ) : null}
+                  {showNewCompanyDetails ? (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="co-logo-file">
+                          {t.employerRegistration.companyLogo}
+                        </Label>
+                        <input
+                          ref={companyLogoInputRef}
+                          id="co-logo-file"
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
                           disabled={isLoading}
+                          onChange={handleCompanyLogoFileChange}
                         />
-                      )}
-                    </div>
-                  </>
-                ) : null}
-                <Button
-                  type="submit"
-                  className="h-14 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-                  disabled={isLoading || isLogoUploading}
-                >
-                  {isLoading || isLogoUploading
-                    ? isLogoUploading
-                      ? "Uploading logo…"
-                      : "Saving…"
-                    : "Finish & go to dashboard"}
-                </Button>
+                        <div className="relative inline-block">
+                          <label
+                            htmlFor="co-logo-file"
+                            className={
+                              "group relative flex h-32 w-32 shrink-0 cursor-pointer flex-col overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted transition-colors hover:border-muted-foreground/40 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 " +
+                              (isLoading
+                                ? "pointer-events-none opacity-50"
+                                : "")
+                            }
+                          >
+                            {companyLogoPreview ? (
+                              <>
+                                <img
+                                  src={companyLogoPreview}
+                                  alt=""
+                                  className="h-full w-full object-contain p-1"
+                                />
+                                <div
+                                  className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                                  aria-hidden
+                                >
+                                  <span className="text-sm font-medium text-background">
+                                    {t.employerRegistration.replace}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex h-full w-full items-center justify-center">
+                                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                                </div>
+                                <div
+                                  className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                                  aria-hidden
+                                >
+                                  <span className="text-sm font-medium text-background">
+                                    {t.employerRegistration.upload}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </label>
+                          {companyLogoFile ? (
+                            <button
+                              type="button"
+                              className="absolute right-1 top-1 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/95 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
+                              disabled={isLoading}
+                              aria-label={t.employerRegistration.removeLogo}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                resetUploadedCompanyLogo();
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {t.employerRegistration.logoHint}
+                        </p>
+                        <div>
+                          <Label
+                            htmlFor="co-logo-url"
+                            className="text-muted-foreground"
+                          >
+                            {t.employerRegistration.logoUrl}
+                          </Label>
+                          <Input
+                            id="co-logo-url"
+                            type="url"
+                            className="mt-1 h-[3.2rem]"
+                            value={companyLogoUrl}
+                            onChange={(e) =>
+                              handleCompanyLogoUrlInput(e.target.value)
+                            }
+                            disabled={isLoading || !!companyLogoFile}
+                            placeholder="https://…"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="co-desc">
+                          {t.employerRegistration.description}
+                        </Label>
+                        <Textarea
+                          id="co-desc"
+                          className="mt-1 min-h-[100px]"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          required
+                          disabled={isLoading}
+                          placeholder={
+                            t.employerRegistration.descriptionPlaceholder
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label>{t.employerRegistration.phoneNumber}</Label>
+                        <div className="mt-1 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
+                          <CountrySelector
+                            value={selectedCountry}
+                            onChange={setSelectedCountry}
+                            className="h-[3.2rem] w-full shrink-0 sm:w-auto"
+                          />
+                          <Input
+                            className="h-[3.2rem] min-w-0 w-full flex-1 sm:min-w-[8rem]"
+                            value={phoneLocal}
+                            onChange={(e) => setPhoneLocal(e.target.value)}
+                            disabled={isLoading}
+                            placeholder={
+                              t.employerRegistration.phonePlaceholder
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="co-web">
+                          {t.employerRegistration.website}
+                        </Label>
+                        <Input
+                          id="co-web"
+                          type="url"
+                          className="mt-1 h-[3.2rem]"
+                          value={website}
+                          onChange={(e) => setWebsite(e.target.value)}
+                          disabled={isLoading}
+                          placeholder="https://"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="co-loc">
+                          {t.employerRegistration.locations}
+                        </Label>
+                        <Textarea
+                          id="co-loc"
+                          className="mt-1 min-h-[72px]"
+                          value={locationsRaw}
+                          onChange={(e) => setLocationsRaw(e.target.value)}
+                          disabled={isLoading}
+                          placeholder={
+                            t.employerRegistration.locationsPlaceholder
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label>
+                          {t.employerRegistration.numberOfEmployees}
+                        </Label>
+                        <Select
+                          value={numberOfEmployees}
+                          onValueChange={setNumberOfEmployees}
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger className="mt-1 h-[3.2rem] w-full">
+                            <SelectValue
+                              placeholder={t.employerRegistration.selectRange}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EMPLOYEE_COUNT_OPTIONS.map((opt) => (
+                              <SelectItem key={opt} value={opt}>
+                                {opt}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>{t.employerRegistration.industries}</Label>
+                        {industries.length === 0 ? (
+                          <p className="text-sm text-muted-foreground border rounded-md p-3">
+                            {t.employerRegistration.noIndustries}
+                          </p>
+                        ) : (
+                          <IndustryMultiSelect
+                            industries={industries}
+                            value={selectedIndustryIds}
+                            onChange={setSelectedIndustryIds}
+                            disabled={isLoading}
+                          />
+                        )}
+                      </div>
+                    </>
+                  ) : null}
+                  <Button
+                    type="submit"
+                    className="!mt-8 h-14 w-full bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                    disabled={isLoading || isLogoUploading}
+                  >
+                    {isLoading || isLogoUploading
+                      ? isLogoUploading
+                        ? t.employerRegistration.uploadingLogo
+                        : t.employerRegistration.saving
+                      : t.employerRegistration.finish}
+                  </Button>
+                  <button
+                    type="button"
+                    className="text-sm text-primary hover:underline w-full text-center"
+                    onClick={() => setStep(2)}
+                    disabled={isLoading}
+                  >
+                    {t.employerRegistration.back}
+                  </button>
+                </form>
+              )}
+
+              <p className="mt-8 text-center text-muted-foreground">
+                {t.employerRegistration.alreadyHaveAccount}{" "}
                 <button
                   type="button"
-                  className="text-sm text-primary hover:underline w-full text-center"
-                  onClick={() => setStep(2)}
-                  disabled={isLoading}
+                  className="text-primary hover:underline"
+                  onClick={() => navigate("/auth/login")}
                 >
-                  Back
+                  {t.employerRegistration.signIn}
                 </button>
-              </form>
-            )}
-
-            <p className="mt-8 text-center text-muted-foreground">
-              Already have an account?{" "}
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => navigate("/auth/login")}
-              >
-                Sign in
-              </button>
-            </p>
+              </p>
+            </div>
           </div>
+          <AuthLegalNotice />
         </div>
 
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">

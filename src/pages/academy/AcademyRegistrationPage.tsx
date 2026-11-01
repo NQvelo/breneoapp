@@ -7,15 +7,14 @@ import { Eye, EyeOff, ImageIcon } from "lucide-react";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useTheme } from "next-themes";
-import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { AuthPageHeader } from "@/components/auth/AuthPageHeader";
+import { AuthLegalNotice } from "@/components/auth/AuthLegalNotice";
 import { API_BASE_URL } from "@/api/auth/config";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const AcademyRegistrationPage = () => {
   const navigate = useNavigate();
-  const { theme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const t = useTranslation();
 
   // State for form steps
   const [step, setStep] = useState(1);
@@ -36,16 +35,8 @@ const AcademyRegistrationPage = () => {
   );
 
   // Image loading states
-  const [logoLoaded, setLogoLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-
-  // Handle mounted state to avoid hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const isDark = mounted && theme === "dark";
 
   // Image preloading function
   const preloadImage = useCallback((src: string): Promise<void> => {
@@ -79,7 +70,7 @@ const AcademyRegistrationPage = () => {
   const handleNextStep = () => {
     // Basic validation for the first step
     if (!name || !email || !password || !phone) {
-      toast.error("Please fill out all fields to continue.");
+      toast.error(t.academyRegistration.fillStep1);
       return;
     }
     setStep(2);
@@ -90,36 +81,33 @@ const AcademyRegistrationPage = () => {
     e.preventDefault();
     // Final validation check
     if (step !== 2 || !description || !website) {
-      toast.error("Please complete all fields to register.");
+      toast.error(t.academyRegistration.fillStep2);
       return;
     }
 
     setIsLoading(true);
     const phoneNumber = `${selectedCountry?.dial_code}${phone}`;
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/academy/register/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name,
-            email,
-            password,
-            phone_number: phoneNumber,
-            description,
-            website,
-          }),
+      const response = await fetch(`${API_BASE_URL}/api/academy/register/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          phone_number: phoneNumber,
+          description,
+          website,
+        }),
+      });
 
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
         const data = await response.json();
         if (response.ok) {
-          toast.success("Registration successful! Please verify your email.");
+          toast.success(t.academyRegistration.success);
           // Store email for verification page
           sessionStorage.setItem("tempAcademyEmail", email);
           navigate("/email-verification", {
@@ -127,16 +115,16 @@ const AcademyRegistrationPage = () => {
           });
         } else {
           const errorMessages = Object.values(data).flat();
-          toast.error(errorMessages.join(" ") || "Registration failed.");
+          toast.error(errorMessages.join(" ") || t.academyRegistration.failed);
         }
       } else {
         const errorText = await response.text();
         console.error("Server returned non-JSON response:", errorText);
-        toast.error("A server error occurred. Please try again later.");
+        toast.error(t.academyRegistration.serverError);
       }
     } catch (error) {
       console.error("Registration error:", error);
-      toast.error("An unexpected error occurred. Please try again.");
+      toast.error(t.academyRegistration.unexpectedError);
     } finally {
       setIsLoading(false);
     }
@@ -144,228 +132,198 @@ const AcademyRegistrationPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
-        <div className="flex items-center">
-          {!logoLoaded && !imageError && (
-            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-              <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
-            </div>
-          )}
-          <BreneoLogo
-            className={`h-6 lg:h-5 transition-opacity duration-300 ${
-              logoLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setLogoLoaded(true)}
-            onError={() => {
-              setImageError(true);
-              setLogoLoaded(true);
-            }}
-          />
-        </div>
-        <ThemeToggle />
-      </div>
-
-      {/* Content Section */}
       <div className="flex flex-1">
-        {/* Left Section (Form) */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-          <div className="w-full max-w-md">
-            {/* Logo */}
-            <div className="mb-4 hidden lg:flex items-center justify-between">
-              <div className="flex items-center">
-                {!logoLoaded && !imageError && (
-                  <div className="h-8 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-                    <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
-                  </div>
-                )}
-                <BreneoLogo
-                  className={`h-8 transition-opacity duration-300 ${
-                    logoLoaded ? "opacity-100" : "opacity-0"
-                  }`}
-                  onLoad={() => setLogoLoaded(true)}
-                  onError={() => {
-                    setImageError(true);
-                    setLogoLoaded(true);
-                  }}
-                />
+        <div className="w-full lg:w-1/2 flex flex-col bg-background">
+          <AuthPageHeader />
+          <div className="flex flex-1 items-center justify-center px-8 pb-8">
+            <div className="w-full max-w-md">
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-200 dark:bg-secondary rounded-full h-2 mb-8">
+                <div
+                  className="bg-[#00BFFF] h-2 rounded-full transition-all duration-500 ease-in-out"
+                  style={{ width: step === 1 ? "50%" : "100%" }}
+                ></div>
               </div>
-              <ThemeToggle />
-            </div>
 
-            {/* Progress Bar */}
-            <div className="w-full bg-gray-200 dark:bg-secondary rounded-full h-2 mb-8">
-              <div
-                className="bg-[#00BFFF] h-2 rounded-full transition-all duration-500 ease-in-out"
-                style={{ width: step === 1 ? "50%" : "100%" }}
-              ></div>
-            </div>
+              <h1 className="text-3xl font-semibold text-foreground mb-2">
+                {t.academyRegistration.title}
+              </h1>
+              <p className="text-muted-foreground mb-8">
+                {step === 1
+                  ? t.academyRegistration.step1Subtitle
+                  : t.academyRegistration.step2Subtitle}
+              </p>
 
-            <h1 className="text-3xl font-semibold text-foreground mb-2">
-              Register Academy
-            </h1>
-            <p className="text-muted-foreground mb-8">
-              {step === 1
-                ? "Start by creating your account credentials."
-                : "Tell us more about your academy."}
-            </p>
-
-            {/* Registration Form */}
-            <form onSubmit={handleRegister} className="space-y-6">
-              {/* Step 1 Fields */}
-              {step === 1 && (
-                <>
-                  <div>
-                    <Label htmlFor="name">Academy Name</Label>
-                    <Input
-                      id="name"
-                      placeholder="Your academy's name"
-                      className="mt-1 h-[3.2rem]"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter contact email"
-                      className="mt-1 h-[3.2rem]"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <div className="phone-input-container mt-1 flex items-center rounded-md border border-input bg-input transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
-                      <CountrySelector
-                        value={selectedCountry}
-                        onChange={setSelectedCountry}
-                        className="max-w-fit px-3 h-[3.2rem] border-0 bg-transparent hover:bg-transparent rounded-r-none"
-                      />
-                      <div className="h-6 w-px bg-slate-200 dark:bg-border" />
+              {/* Registration Form */}
+              <form onSubmit={handleRegister} className="space-y-4">
+                {/* Step 1 Fields */}
+                {step === 1 && (
+                  <>
+                    <div>
+                      <Label htmlFor="name">
+                        {t.academyRegistration.academyName}
+                      </Label>
                       <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="Phone number"
-                        className="flex-1 h-[3.2rem] border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        id="name"
+                        placeholder={
+                          t.academyRegistration.academyNamePlaceholder
+                        }
+                        className="mt-1 h-[3.2rem]"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                         required
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative mt-1">
+                    <div>
+                      <Label htmlFor="email">{t.auth.emailAddress}</Label>
                       <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Create a password"
-                        className="pr-10 h-[3.2rem]"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        id="email"
+                        type="email"
+                        placeholder={t.academyRegistration.emailPlaceholder}
+                        className="mt-1 h-[3.2rem]"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                       />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="phone">{t.auth.phoneNumber}</Label>
+                      <div className="phone-input-container mt-1 flex items-center rounded-md border border-input bg-input transition-colors focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                        <CountrySelector
+                          value={selectedCountry}
+                          onChange={setSelectedCountry}
+                          className="max-w-fit px-3 h-[3.2rem] border-0 bg-transparent hover:bg-transparent rounded-r-none"
+                        />
+                        <div className="h-6 w-px bg-slate-200 dark:bg-border" />
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder={t.auth.phonePlaceholder}
+                          className="flex-1 h-[3.2rem] border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="password">{t.auth.password}</Label>
+                      <div className="relative mt-1">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder={t.auth.createPasswordPlaceholder}
+                          className="pr-10 h-[3.2rem]"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Step 2 Fields */}
+                {step === 2 && (
+                  <>
+                    <div>
+                      <Label htmlFor="description">
+                        {t.academyRegistration.description}
+                      </Label>
+                      <textarea
+                        id="description"
+                        placeholder={
+                          t.academyRegistration.descriptionPlaceholder
+                        }
+                        className="mt-1 w-full h-24 px-3 py-2 text-base border border-input bg-input text-foreground placeholder:text-muted-foreground rounded-md resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="website">
+                        {t.academyRegistration.website}
+                      </Label>
+                      <Input
+                        id="website"
+                        type="url"
+                        placeholder="https://your-academy.com"
+                        className="mt-1 h-[3.2rem]"
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Navigation Buttons */}
+                <div className="!mt-8">
+                  {step === 1 && (
+                    <Button
+                      type="button" // Use type="button" to prevent form submission
+                      onClick={handleNextStep}
+                      className="w-full h-14"
+                    >
+                      {t.academyRegistration.next}
+                    </Button>
+                  )}
+
+                  {step === 2 && (
+                    <div className="flex items-center gap-4">
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
+                        variant="outline"
+                        className="w-full h-14"
+                        onClick={() => setStep(1)}
                       >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
-                        )}
+                        {t.academyRegistration.back}
+                      </Button>
+                      <Button
+                        type="submit" // Use type="submit" for final submission
+                        className="w-full h-14"
+                        disabled={isLoading}
+                      >
+                        {isLoading
+                          ? t.academyRegistration.registering
+                          : t.academyRegistration.register}
                       </Button>
                     </div>
-                  </div>
-                </>
-              )}
+                  )}
+                </div>
+              </form>
 
-              {/* Step 2 Fields */}
-              {step === 2 && (
-                <>
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <textarea
-                      id="description"
-                      placeholder="Describe your academy"
-                      className="mt-1 w-full h-24 px-3 py-2 text-base border border-input bg-input text-foreground placeholder:text-muted-foreground rounded-md resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="website">Website</Label>
-                    <Input
-                      id="website"
-                      type="url"
-                      placeholder="https://your-academy.com"
-                      className="mt-1 h-[3.2rem]"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                      required
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Navigation Buttons */}
-              <div className="pt-2">
-                {step === 1 && (
-                  <Button
-                    type="button" // Use type="button" to prevent form submission
-                    onClick={handleNextStep}
-                    className="w-full h-14"
-                  >
-                    Next
-                  </Button>
-                )}
-
-                {step === 2 && (
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full h-14"
-                      onClick={() => setStep(1)}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      type="submit" // Use type="submit" for final submission
-                      className="w-full h-14"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Registering..." : "Register"}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </form>
-
-            <p className="text-center text-muted-foreground mt-8">
-              Already have an account?{" "}
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => navigate("/auth/login")}
-              >
-                Sign In
-              </button>
-            </p>
+              <p className="text-center text-muted-foreground mt-8">
+                {t.auth.alreadyHaveAccount}{" "}
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => navigate("/auth/login")}
+                >
+                  {t.auth.signIn}
+                </button>
+              </p>
+            </div>
           </div>
+          <AuthLegalNotice />
         </div>
 
         {/* Right Section (Image) */}

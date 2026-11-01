@@ -316,6 +316,30 @@ const fetchJobsFromSearchAPI = async (
 };
 
 /**
+ * Home-page country rail: GET /api/search?country=<name> and nothing else.
+ * Does not add page, sort, or location_country, and does not fall back to /api/v1/jobs/.
+ */
+export const fetchJobsByCountry = async (country: string): Promise<ApiJob[]> => {
+  const url = `${JOB_SEARCH_API}?country=${encodeURIComponent(country)}`;
+  const response = await rateLimitedFetch(url, {
+    method: "GET",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Search API ${response.status}: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as {
+    results?: Record<string, unknown>[];
+  };
+
+  return (data.results || [])
+    .map(mapSearchJobToApiJob)
+    .filter((job) => job.is_active !== false);
+};
+
+/**
  * Fetch jobs from Breneo Job Aggregator API (v1/jobs, single-value filters)
  * The API returns filtered jobs based on query parameters
  * Returns jobs and pagination info from the API
@@ -1164,6 +1188,7 @@ if (typeof window !== "undefined") {
 // Default export
 const jobService = {
   fetchActiveJobs,
+  fetchJobsByCountry,
   fetchJobDetail,
   fetchJobsFromBreneoAPI,
   fetchJobsFromJSearch,

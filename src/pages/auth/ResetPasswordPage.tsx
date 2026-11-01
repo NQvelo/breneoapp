@@ -7,12 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { ImageIcon } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { BreneoLogo } from "@/components/common/BreneoLogo";
+import { AuthPageHeader } from "@/components/auth/AuthPageHeader";
+import { AuthLegalNotice } from "@/components/auth/AuthLegalNotice";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { API_BASE_URL } from "@/api/auth/config";
+
+const serverError = (err: unknown): string | undefined =>
+  axios.isAxiosError(err) ? err.response?.data?.error : undefined;
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
+  const t = useTranslation();
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState<string[]>(["", "", "", "", "", ""]);
@@ -24,7 +29,6 @@ const ResetPasswordPage: React.FC = () => {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Image loading states
-  const [logoLoaded, setLogoLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -58,8 +62,8 @@ const ResetPasswordPage: React.FC = () => {
 
   // Set page title
   useEffect(() => {
-    document.title = "Reset Password | Breneo";
-  }, []);
+    document.title = t.resetPassword.pageTitle;
+  }, [t]);
 
   // =========================
   // Step 1: Send Code
@@ -68,13 +72,13 @@ const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/password-reset/request/`, {
+      await axios.post(`${API_BASE_URL}/password-reset/request/`, {
         email,
       });
-      toast.success(res.data.message || "Code sent to your email!");
+      toast.success(t.resetPassword.codeSent);
       setStep(2);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Error sending code");
+    } catch (err: unknown) {
+      toast.error(serverError(err) || t.resetPassword.sendError);
     } finally {
       setIsLoading(false);
     }
@@ -87,20 +91,20 @@ const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     const codeString = code.join("");
     if (codeString.length !== 6) {
-      toast.error("Please enter a 6-digit code.");
+      toast.error(t.resetPassword.enterCode);
       return;
     }
 
     setIsLoading(true);
     try {
-      const res = await axios.post(`${API_BASE_URL}/password-reset/verify/`, {
+      await axios.post(`${API_BASE_URL}/password-reset/verify/`, {
         email,
         code: codeString,
       });
-      toast.success(res.data.message || "Code verified!");
+      toast.success(t.resetPassword.codeVerified);
       setStep(3);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Invalid code");
+    } catch (err: unknown) {
+      toast.error(serverError(err) || t.resetPassword.invalidCode);
     } finally {
       setIsLoading(false);
     }
@@ -136,257 +140,212 @@ const ResetPasswordPage: React.FC = () => {
   const setNewPasswordHandler = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords do not match");
+      toast.error(t.resetPassword.passwordsMismatch);
       return;
     }
     setIsLoading(true);
     try {
       const codeString = code.join("");
-      const res = await axios.post(`${API_BASE_URL}/password-reset/set-new/`, {
+      await axios.post(`${API_BASE_URL}/password-reset/set-new/`, {
         email,
         code: codeString,
         new_password: newPassword,
         confirm_password: confirmPassword,
       });
-      toast.success(res.data.message || "Password reset successfully!");
+      toast.success(t.resetPassword.resetSuccess);
       navigate("/auth/login"); // Redirect to login on success
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || "Error setting new password");
+    } catch (err: unknown) {
+      toast.error(serverError(err) || t.resetPassword.resetError);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
-        <div className="flex items-center">
-          {!logoLoaded && !imageError && (
-            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-              <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
-            </div>
-          )}
-          <BreneoLogo
-            className={`h-6 lg:h-5 transition-opacity duration-300 ${
-              logoLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setLogoLoaded(true)}
-            onError={() => {
-              setImageError(true);
-              setLogoLoaded(true);
-            }}
-          />
-          {imageError && (
-            <div className="h-5 w-16 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Breneo
-              </span>
-            </div>
-          )}
-        </div>
-        <ThemeToggle />
-      </div>
-
-      {/* Content Section */}
+    <div className="min-h-screen flex flex-col bg-background">
       <div className="flex flex-1">
-        {/* Left Section (Form) */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-          <div className="w-full max-w-md">
-            <div className="mb-8 hidden lg:flex items-center justify-between">
-              <div className="flex items-center">
-                {!logoLoaded && !imageError && (
-                  <div className="h-8 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-                    <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
-                  </div>
-                )}
-                <BreneoLogo
-                  className={`h-8 transition-opacity duration-300 ${
-                    logoLoaded ? "opacity-100" : "opacity-0"
-                  }`}
-                  onLoad={() => setLogoLoaded(true)}
-                  onError={() => {
-                    setImageError(true);
-                    setLogoLoaded(true);
-                  }}
-                />
-                {imageError && (
-                  <div className="h-8 w-24 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Breneo
-                    </span>
-                  </div>
-                )}
-              </div>
-              <ThemeToggle />
-            </div>
+        <div className="w-full lg:w-1/2 flex flex-col bg-background">
+          <AuthPageHeader />
+          <div className="flex flex-1 items-center justify-center px-8 pb-8">
+            <div className="w-full max-w-md">
+              <h1 className="text-3xl font-semibold text-foreground mb-2">
+                {t.resetPassword.title}
+              </h1>
 
-            <h1 className="text-3xl font-semibold text-foreground mb-2">
-              Reset Password
-            </h1>
-
-            {/* Step 1: Enter Email */}
-            {step === 1 && (
-              <>
-                <p className="text-muted-foreground mb-8">
-                  Enter your email to receive a verification code.
-                </p>
-                <form onSubmit={sendCode} className="space-y-6">
-                  <div>
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="mt-1 h-[3.2rem]"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
+              {/* Step 1: Enter Email */}
+              {step === 1 && (
+                <>
+                  <p className="text-muted-foreground mb-8">
+                    {t.resetPassword.step1Subtitle}
+                  </p>
+                  <form onSubmit={sendCode} className="space-y-4">
+                    <div>
+                      <Label htmlFor="email">{t.auth.emailAddress}</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder={t.resetPassword.emailPlaceholder}
+                        className="mt-1 h-[3.2rem]"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      className="!mt-8 w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
                       disabled={isLoading}
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Sending Code..." : "Send Code"}
-                  </Button>
-                </form>
-              </>
-            )}
+                    >
+                      {isLoading
+                        ? t.resetPassword.sendingCode
+                        : t.resetPassword.sendCode}
+                    </Button>
+                  </form>
+                </>
+              )}
 
-            {/* Step 2: Enter Code */}
-            {step === 2 && (
-              <>
-                <p className="text-muted-foreground mb-8">
-                  A code was sent to {email}. Please enter it below.
-                </p>
-                <form onSubmit={verifyCode} className="space-y-6">
-                  <div className="w-full sm:w-[23.5rem]">
-                    <div className="flex gap-2 sm:gap-2">
-                      {code.map((digit, index) => (
+              {/* Step 2: Enter Code */}
+              {step === 2 && (
+                <>
+                  <p className="text-muted-foreground mb-8">
+                    {t.resetPassword.step2Subtitle.replace("{email}", email)}
+                  </p>
+                  <form onSubmit={verifyCode} className="space-y-4">
+                    <div className="w-full sm:w-[23.5rem]">
+                      <div className="flex gap-2 sm:gap-2">
+                        {code.map((digit, index) => (
+                          <Input
+                            key={index}
+                            ref={(el) => (inputRefs.current[index] = el)}
+                            type="text"
+                            inputMode="numeric"
+                            className="flex-1 sm:flex-none h-[3.2rem] w-0 sm:w-14 text-center text-xl sm:text-2xl font-semibold"
+                            value={digit}
+                            onChange={(e) =>
+                              handleCodeChange(index, e.target.value)
+                            }
+                            onKeyDown={(e) => handleKeyDown(index, e)}
+                            maxLength={1}
+                            required
+                            disabled={isLoading}
+                            autoFocus={index === 0}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      type="submit"
+                      className="!mt-8 w-full sm:w-[23.5rem] h-12 sm:h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                      disabled={isLoading}
+                    >
+                      {isLoading
+                        ? t.resetPassword.verifying
+                        : t.resetPassword.verifyCode}
+                    </Button>
+                  </form>
+                </>
+              )}
+
+              {/* Step 3: Set New Password */}
+              {step === 3 && (
+                <>
+                  <p className="text-muted-foreground mb-8">
+                    {t.resetPassword.step3Subtitle}
+                  </p>
+                  <form onSubmit={setNewPasswordHandler} className="space-y-4">
+                    <div>
+                      <Label htmlFor="newPassword">
+                        {t.resetPassword.newPassword}
+                      </Label>
+                      <div className="relative mt-1">
                         <Input
-                          key={index}
-                          ref={(el) => (inputRefs.current[index] = el)}
-                          type="text"
-                          inputMode="numeric"
-                          className="flex-1 sm:flex-none h-[3.2rem] w-0 sm:w-14 text-center text-xl sm:text-2xl font-semibold"
-                          value={digit}
-                          onChange={(e) =>
-                            handleCodeChange(index, e.target.value)
-                          }
-                          onKeyDown={(e) => handleKeyDown(index, e)}
-                          maxLength={1}
+                          id="newPassword"
+                          type={showNewPassword ? "text" : "password"}
+                          placeholder={t.resetPassword.newPasswordPlaceholder}
+                          className="pr-10 h-[3.2rem]"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
                           required
                           disabled={isLoading}
-                          autoFocus={index === 0}
                         />
-                      ))}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          disabled={isLoading}
+                        >
+                          {showNewPassword ? (
+                            <EyeOff className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-gray-500" />
+                          )}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full sm:w-[23.5rem] h-12 sm:h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Verifying..." : "Verify Code"}
-                  </Button>
-                </form>
-              </>
-            )}
+                    <div>
+                      <Label htmlFor="confirmPassword">
+                        {t.resetPassword.confirmPassword}
+                      </Label>
+                      <div className="relative mt-1">
+                        <Input
+                          id="confirmPassword"
+                          type={showConfirmPassword ? "text" : "password"}
+                          placeholder={
+                            t.resetPassword.confirmPasswordPlaceholder
+                          }
+                          className="pr-10 h-[3.2rem]"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          required
+                          disabled={isLoading}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() =>
+                            setShowConfirmPassword(!showConfirmPassword)
+                          }
+                          disabled={isLoading}
+                        >
+                          {showConfirmPassword ? (
+                            <EyeOff className="h-4 w-4 text-gray-500" />
+                          ) : (
+                            <Eye className="h-4 w-4 text-gray-500" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      type="submit"
+                      className="!mt-8 w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+                      disabled={isLoading}
+                    >
+                      {isLoading
+                        ? t.resetPassword.setting
+                        : t.resetPassword.setNewPassword}
+                    </Button>
+                  </form>
+                </>
+              )}
 
-            {/* Step 3: Set New Password */}
-            {step === 3 && (
-              <>
-                <p className="text-muted-foreground mb-8">
-                  Enter your new password.
-                </p>
-                <form onSubmit={setNewPasswordHandler} className="space-y-6">
-                  <div>
-                    <Label htmlFor="newPassword">New Password</Label>
-                    <div className="relative mt-1">
-                      <Input
-                        id="newPassword"
-                        type={showNewPassword ? "text" : "password"}
-                        placeholder="Enter new password"
-                        className="pr-10 h-[3.2rem]"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        required
-                        disabled={isLoading}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                        disabled={isLoading}
-                      >
-                        {showNewPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-500" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">
-                      Confirm New Password
-                    </Label>
-                    <div className="relative mt-1">
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Confirm new password"
-                        className="pr-10 h-[3.2rem]"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        required
-                        disabled={isLoading}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        disabled={isLoading}
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-gray-500" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full h-14 bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Setting..." : "Set New Password"}
-                  </Button>
-                </form>
-              </>
-            )}
-
-            <p className="text-center text-muted-foreground mt-8">
-              Remembered your password?{" "}
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => navigate("/auth/login")}
-              >
-                Sign In
-              </button>
-            </p>
+              <p className="text-center text-muted-foreground mt-8">
+                {t.resetPassword.remembered}{" "}
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => navigate("/auth/login")}
+                >
+                  {t.auth.signIn}
+                </button>
+              </p>
+            </div>
           </div>
+          <AuthLegalNotice />
         </div>
 
         {/* Right Section (Image) */}

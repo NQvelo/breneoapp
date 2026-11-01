@@ -4,27 +4,38 @@ import axios from "axios"; // ✅ Required for error type checking
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Eye, EyeOff, ImageIcon } from "lucide-react";
 import { toast } from "sonner"; // ✅ Required for error toasts
 import { useAuth } from "@/contexts/AuthContext"; // ✅ IMPORT USEAUTH
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { AuthPageHeader } from "@/components/auth/AuthPageHeader";
+import { AuthLegalNotice } from "@/components/auth/AuthLegalNotice";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { TokenManager } from "@/api/auth/tokenManager";
 import { getLocalizedPath, getLanguageFromPath } from "@/utils/localeUtils";
-import { BreneoLogo } from "@/components/common/BreneoLogo";
 import { AuthLoadingScreen } from "@/components/auth/AuthLoadingScreen";
+import { useTranslation } from "@/contexts/LanguageContext";
+
+const SAVE_LOGIN_KEY = "saveLogin";
+const SAVED_EMAIL_KEY = "savedLoginEmail";
+
+const savePasswordInitial = () =>
+  localStorage.getItem(SAVE_LOGIN_KEY) !== "false";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login, loading: authLoading, user } = useAuth();
+  const t = useTranslation();
 
-  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [savePassword, setSavePassword] = useState(savePasswordInitial);
+  const [emailOrUsername, setEmailOrUsername] = useState(() =>
+    savePasswordInitial() ? localStorage.getItem(SAVED_EMAIL_KEY) || "" : "",
+  );
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // Image loading states
-  const [logoLoaded, setLogoLoaded] = useState(false);
   const [backgroundLoaded, setBackgroundLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
@@ -107,6 +118,13 @@ const LoginPage: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    localStorage.setItem(SAVE_LOGIN_KEY, String(savePassword));
+    if (savePassword) {
+      localStorage.setItem(SAVED_EMAIL_KEY, emailOrUsername.trim());
+    } else {
+      localStorage.removeItem(SAVED_EMAIL_KEY);
+    }
+
     try {
       const res = await apiClient.post(API_ENDPOINTS.AUTH.ACADEMY_LOGIN, {
         email: emailOrUsername,
@@ -163,7 +181,7 @@ const LoginPage: React.FC = () => {
       await login(emailOrUsername, password);
     } catch (err: unknown) {
       // ✅ START: Improved error handling
-      let errorMessage = "Login failed. Please try again.";
+      let errorMessage = t.auth.loginFailed;
       let needsVerification = false;
 
       if (axios.isAxiosError(err) && err.response && err.response.data) {
@@ -206,9 +224,7 @@ const LoginPage: React.FC = () => {
 
       if (needsVerification) {
         // This is the flow you requested
-        toast.info(
-          "Your account is not verified. Redirecting to verification...",
-        );
+        toast.info(t.auth.accountNotVerified);
         sessionStorage.setItem("tempEmail", emailOrUsername);
         sessionStorage.setItem("tempPassword", password);
         navigate("/auth/email-verification");
@@ -232,155 +248,119 @@ const LoginPage: React.FC = () => {
   const hasStoredSession = Boolean(TokenManager.getAccessToken());
 
   if (authLoading && hasStoredSession) {
-    return <AuthLoadingScreen message="Restoring your session..." />;
+    return <AuthLoadingScreen message={t.auth.restoringSession} />;
   }
 
   if (user) {
-    return <AuthLoadingScreen message="Opening your dashboard..." />;
+    return <AuthLoadingScreen message={t.auth.openingDashboard} />;
   }
 
   const isLoading = authLoading;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-transparent border-b border-gray-200 dark:border-border">
-        <div className="flex items-center">
-          {!logoLoaded && !imageError && (
-            <div className="h-5 w-16 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-              <ImageIcon className="h-3 w-3 text-gray-400 dark:text-gray-600" />
-            </div>
-          )}
-          <BreneoLogo
-            className={`h-6 lg:h-5 transition-opacity duration-300 ${
-              logoLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setLogoLoaded(true)}
-            onError={() => {
-              setImageError(true);
-              setLogoLoaded(true);
-            }}
-          />
-          {imageError && (
-            <div className="h-5 w-16 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-border rounded flex items-center justify-center">
-              <span className="text-xs text-gray-500 dark:text-muted-foreground">
-                Breneo
-              </span>
-            </div>
-          )}
-        </div>
-        <ThemeToggle />
-      </div>
-
-      {/* Content Section */}
       <div className="flex flex-1">
-        {/* Left Section (Form) */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-          <div className="w-full max-w-md">
-            <div className="mb-8 hidden lg:flex items-center justify-between">
-              <div className="flex items-center">
-                {!logoLoaded && !imageError && (
-                  <div className="h-8 w-24 bg-gray-200 dark:bg-[#242424] animate-pulse rounded flex items-center justify-center">
-                    <ImageIcon className="h-5 w-5 text-gray-400 dark:text-gray-600" />
-                  </div>
-                )}
-                <BreneoLogo
-                  className={`h-8 transition-opacity duration-300 ${
-                    logoLoaded ? "opacity-100" : "opacity-0"
-                  }`}
-                  onLoad={() => setLogoLoaded(true)}
-                  onError={() => {
-                    setImageError(true);
-                    setLogoLoaded(true);
-                  }}
-                />
-                {imageError && (
-                  <div className="h-8 w-24 bg-gray-100 dark:bg-[#242424] border border-gray-300 dark:border-border rounded flex items-center justify-center">
-                    <span className="text-sm text-gray-500 dark:text-muted-foreground">
-                      Breneo
-                    </span>
-                  </div>
-                )}
-              </div>
-              <ThemeToggle />
-            </div>
-            <h1 className="text-3xl font-semibold text-foreground mb-2">
-              Sign In
-            </h1>
-            <p className="text-muted-foreground mb-8">
-              Welcome back to your Breneo account
-            </p>
-            <form onSubmit={handleLogin} className="space-y-6">
-              <div>
-                <Label htmlFor="emailOrUsername">Email Address </Label>
-                <Input
-                  id="emailOrUsername"
-                  type="text"
-                  placeholder="you@example.com"
-                  className="mt-1 h-[3.2rem]"
-                  value={emailOrUsername}
-                  onChange={(e) => setEmailOrUsername(e.target.value)}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <div className="relative mt-1">
+        <div className="w-full lg:w-1/2 flex flex-col bg-background">
+          <AuthPageHeader />
+          <div className="flex flex-1 items-center justify-center px-8 pb-8">
+            <div className="w-full max-w-md">
+              <h1 className="text-3xl font-semibold text-foreground mb-2">
+                {t.auth.signIn}
+              </h1>
+              <p className="text-muted-foreground mb-8">
+                {t.auth.signInSubtitle}
+              </p>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <Label htmlFor="emailOrUsername">{t.auth.emailAddress}</Label>
                   <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    className="pr-10 h-[3.2rem]"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    id="emailOrUsername"
+                    type="text"
+                    autoComplete={savePassword ? "username" : "off"}
+                    placeholder="you@example.com"
+                    className="mt-1 h-[3.2rem]"
+                    value={emailOrUsername}
+                    onChange={(e) => setEmailOrUsername(e.target.value)}
                     required
                     disabled={isLoading}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
-                    )}
-                  </Button>
                 </div>
-                <div className="flex justify-end mt-2">
-                  <button
-                    type="button"
-                    className="text-sm text-primary hover:underline"
-                    onClick={() => navigate("/auth/reset-password")}
-                  >
-                    Forgot Password?
-                  </button>
+                <div>
+                  <Label htmlFor="password">{t.auth.password}</Label>
+                  <div className="relative mt-1">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={
+                        savePassword ? "current-password" : "new-password"
+                      }
+                      placeholder={t.auth.passwordPlaceholder}
+                      className="pr-10 h-[3.2rem]"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-500 dark:text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="savePassword"
+                        checked={savePassword}
+                        onCheckedChange={(checked) =>
+                          setSavePassword(checked === true)
+                        }
+                        disabled={isLoading}
+                      />
+                      <Label
+                        htmlFor="savePassword"
+                        className="text-sm font-normal text-muted-foreground cursor-pointer"
+                      >
+                        {t.auth.savePassword}
+                      </Label>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                      onClick={() => navigate("/auth/reset-password")}
+                    >
+                      {t.auth.forgotPassword}
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <Button
-                type="submit"
-                className="w-full h-14"
-                disabled={isLoading}
-              >
-                {isLoading ? "Signing In..." : "Sign In"}
-              </Button>
-            </form>
-            <p className="text-center text-muted-foreground mt-8">
-              Don't have an account?{" "}
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => navigate("/auth/signup")}
-              >
-                Sign Up
-              </button>
-            </p>
-            {/* <p className="text-center text-muted-foreground mt-3 text-sm">
+                <Button
+                  type="submit"
+                  className="!mt-8 w-full h-14"
+                  disabled={isLoading}
+                >
+                  {isLoading ? t.auth.signingIn : t.auth.signIn}
+                </Button>
+              </form>
+              <p className="text-center text-muted-foreground mt-8">
+                {t.auth.dontHaveAccount}{" "}
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => navigate("/auth/signup")}
+                >
+                  {t.auth.signup}
+                </button>
+              </p>
+              {/* <p className="text-center text-muted-foreground mt-3 text-sm">
               Hiring company?{" "}
               <button
                 type="button"
@@ -390,7 +370,9 @@ const LoginPage: React.FC = () => {
                 Register as employer
               </button>
             </p> */}
+            </div>
           </div>
+          <AuthLegalNotice />
         </div>
 
         {/* Right Section (Image) */}

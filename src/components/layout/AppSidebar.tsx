@@ -11,6 +11,7 @@ import {
   Moon,
   Sun,
   LibraryBig,
+  GraduationCap,
   ArrowRight,
   Zap,
   Sparkles,
@@ -303,7 +304,7 @@ export function AppSidebar({
       : [
           { icon: Home, label: t.nav.home, href: "/home" },
           { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
-          { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
+          { icon: GraduationCap, label: t.nav.growth, href: "/courses" },
         ];
 
   const profilePath = isAcademy
@@ -338,7 +339,7 @@ export function AppSidebar({
       : [
           { icon: Home, label: t.nav.home, href: "/home" },
           { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
-          { icon: LibraryBig, label: t.nav.courses, href: "/courses" },
+          { icon: GraduationCap, label: t.nav.growthShort, href: "/courses" },
           { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
         ];
 

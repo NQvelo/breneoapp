@@ -348,16 +348,6 @@ const EMPTY_JOB_FILTERS: JobFilters = {
   skills: [],
 };
 
-const GEORGIAN_JOB_FILTERS: JobFilters = {
-  country: "Georgia",
-  countries: [],
-  locationCountry: ["Georgia"],
-  jobTypes: [],
-  isRemote: false,
-  datePosted: undefined,
-  skills: [],
-};
-
 const dedupeApiJobs = (jobs: ApiJob[]): ApiJob[] => {
   const seen = new Set<string>();
   return jobs.filter((job) => {
@@ -373,13 +363,7 @@ const dedupeApiJobs = (jobs: ApiJob[]): ApiJob[] => {
 
 const fetchGeorgianJobs = async () => {
   try {
-    const response = await jobService.fetchActiveJobs({
-      query: "",
-      filters: GEORGIAN_JOB_FILTERS,
-      page: 1,
-      pageSize: 50,
-    });
-    return response.jobs || [];
+    return await jobService.fetchJobsByCountry("Georgia");
   } catch (error) {
     console.error("Error fetching Georgian jobs:", error);
     throw error;
@@ -790,12 +774,9 @@ const UserHome = () => {
     },
   });
 
-  // Georgian jobs from API (location_country=Georgia); merge worldwide fallback to avoid empty section
+  // Georgian jobs come only from GET /api/search?country=Georgia.
   const { transformedGeorgianJobs, transformedWorldwideJobs } = useMemo(() => {
-    const georgianSource = dedupeApiJobs([
-      ...(georgianJobs || []),
-      ...(worldwideJobs || []).filter(isGeorgianJob),
-    ]);
+    const georgianSource = dedupeApiJobs(georgianJobs || []);
     const worldwideSource = (worldwideJobs || []).filter(
       (j) => !isGeorgianJob(j),
     );
@@ -813,9 +794,9 @@ const UserHome = () => {
       });
 
       jobsWithMatchPercentage.sort((a, b) => {
-        if (a.matchPercentage !== b.matchPercentage) {
-          return b.matchPercentage - a.matchPercentage;
-        }
+        const matchDiff =
+          (b.matchPercentage ?? -1) - (a.matchPercentage ?? -1);
+        if (matchDiff !== 0) return matchDiff;
 
         const dateA =
           a.job.posted_at || a.job.fetched_at || a.job.date_posted || "";

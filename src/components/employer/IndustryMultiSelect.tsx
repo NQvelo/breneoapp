@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AggregatorIndustry } from "@/api/employer/aggregatorBffApi";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 type IndustryMultiSelectProps = {
   industries: AggregatorIndustry[];
@@ -28,12 +29,13 @@ export function IndustryMultiSelect({
   value,
   onChange,
   disabled,
-  searchPlaceholder = "Search industries…",
-  emptyHint = "Type to search and pick industries.",
+  searchPlaceholder,
+  emptyHint,
   className,
   searchInputClassName,
   chipClassName,
 }: IndustryMultiSelectProps) {
+  const t = useTranslation();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -54,9 +56,7 @@ export function IndustryMultiSelect({
     const q = normalizeSearch(query);
     const pool = industries.filter((i) => !selectedSet.has(i.id));
     if (!q) return pool.slice(0, 40);
-    return pool
-      .filter((i) => i.name.toLowerCase().includes(q))
-      .slice(0, 40);
+    return pool.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 40);
   }, [industries, selectedSet, query]);
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export function IndustryMultiSelect({
               disabled={disabled}
               className="rounded-full p-0.5 hover:bg-background/80 disabled:opacity-50"
               onClick={() => remove(ind.id)}
-              aria-label={`Remove ${ind.name}`}
+              aria-label={t.industrySelect.remove.replace("{name}", ind.name)}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -117,7 +117,7 @@ export function IndustryMultiSelect({
             className="h-10 px-5 rounded-md border border-input bg-gray-100 dark:bg-[#2d2d2d] text-foreground text-sm font-medium inline-flex items-center justify-center gap-2 hover:border-breneo-blue disabled:opacity-50"
           >
             <span className="text-lg leading-none">+</span>
-            Add
+            {t.industrySelect.add}
           </button>
         ) : (
           <div className="relative w-full min-w-0 max-w-full sm:max-w-[320px]">
@@ -129,7 +129,9 @@ export function IndustryMultiSelect({
                 setOpen(true);
               }}
               onFocus={() => setOpen(true)}
-              placeholder={searchPlaceholder}
+              placeholder={
+                searchPlaceholder ?? t.industrySelect.searchPlaceholder
+              }
               disabled={disabled}
               className={cn("h-10", searchInputClassName)}
               autoComplete="off"
@@ -140,7 +142,9 @@ export function IndustryMultiSelect({
                 role="listbox"
               >
                 {suggestions.length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">{emptyHint}</p>
+                  <p className="p-3 text-sm text-muted-foreground">
+                    {emptyHint ?? t.industrySelect.emptyHint}
+                  </p>
                 ) : (
                   suggestions.map((ind) => (
                     <button
@@ -163,7 +167,7 @@ export function IndustryMultiSelect({
 
       {selectedItems.length > 0 ? (
         <p className="text-xs text-muted-foreground">
-          Add another industry using the search field above.
+          {t.industrySelect.addAnother}
         </p>
       ) : null}
     </div>

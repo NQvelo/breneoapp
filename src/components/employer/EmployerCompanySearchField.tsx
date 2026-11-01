@@ -6,6 +6,7 @@ import {
   searchAggregatorCompanies,
   type AggregatorCompany,
 } from "@/api/employer/aggregatorBffApi";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 const MIN_SEARCH_CHARS = 3;
 const DEBOUNCE_MS = 280;
@@ -48,6 +49,7 @@ export function EmployerCompanySearchField({
   existingCompaniesOnly = false,
   onQuickCreateCompany,
 }: Props) {
+  const t = useTranslation();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [quickCreateLoading, setQuickCreateLoading] = useState(false);
@@ -62,8 +64,8 @@ export function EmployerCompanySearchField({
       setSearchError(null);
       return;
     }
-    const t = companyName.trim();
-    if (t.length < MIN_SEARCH_CHARS) {
+    const query = companyName.trim();
+    if (query.length < MIN_SEARCH_CHARS) {
       setResults([]);
       setSearchError(null);
       setLoading(false);
@@ -74,7 +76,7 @@ export function EmployerCompanySearchField({
       setLoading(true);
       setSearchError(null);
       try {
-        const list = await searchAggregatorCompanies(t);
+        const list = await searchAggregatorCompanies(query);
         if (!cancelled) {
           setResults(list.slice(0, 50));
           setSearchError(null);
@@ -83,7 +85,7 @@ export function EmployerCompanySearchField({
         if (!cancelled) {
           setResults([]);
           setSearchError(
-            e instanceof Error ? e.message : "Could not search companies.",
+            e instanceof Error ? e.message : t.companySearch.searchFailed,
           );
         }
       } finally {
@@ -94,7 +96,7 @@ export function EmployerCompanySearchField({
       cancelled = true;
       window.clearTimeout(id);
     };
-  }, [companyName, selected]);
+  }, [companyName, selected, t]);
 
   useEffect(() => {
     const onDocDown = (e: MouseEvent) => {
@@ -108,17 +110,19 @@ export function EmployerCompanySearchField({
 
   if (selected || selectedCreateNewName) {
     const selectedLabel = selected
-      ? selected.name ?? "Company"
-      : selectedCreateNewName ?? "Company";
+      ? (selected.name ?? t.companySearch.company)
+      : (selectedCreateNewName ?? t.companySearch.company);
     return (
       <div className="min-w-0 space-y-2">
-        <Label>Company</Label>
+        <Label>{t.companySearch.company}</Label>
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
           <span className="min-w-0 max-w-full break-words font-medium">
             {selectedLabel}
           </span>
           {!selected && selectedCreateNewName ? (
-            <span className="text-xs text-muted-foreground">(new)</span>
+            <span className="text-xs text-muted-foreground">
+              {t.companySearch.newBadge}
+            </span>
           ) : null}
           <Button
             type="button"
@@ -126,13 +130,14 @@ export function EmployerCompanySearchField({
             size="sm"
             onClick={() => {
               if (selected) onSelectExisting(null);
-              if (!selected && selectedCreateNewName) onClearCreateNewSelection?.();
+              if (!selected && selectedCreateNewName)
+                onClearCreateNewSelection?.();
               onCompanyNameChange("");
               setOpen(false);
             }}
             disabled={disabled}
           >
-            Change
+            {t.companySearch.change}
           </Button>
         </div>
       </div>
@@ -142,7 +147,10 @@ export function EmployerCompanySearchField({
   const trimmed = companyName.trim();
   const lower = trimmed.toLowerCase();
   const hasExactListMatch = results.some(
-    (r) => String(r.name ?? "").trim().toLowerCase() === lower,
+    (r) =>
+      String(r.name ?? "")
+        .trim()
+        .toLowerCase() === lower,
   );
 
   const showQuickCreateRow =
@@ -187,17 +195,19 @@ export function EmployerCompanySearchField({
 
   const helpText =
     existingCompaniesOnly && typeof onQuickCreateCompany === "function"
-      ? `Type at least ${MIN_SEARCH_CHARS} characters to search. If there is no match, use Create new company to add it to the directory.`
+      ? t.companySearch.helpExistingWithQuickCreate
       : typeof onQuickCreateCompany === "function"
-        ? `Type at least ${MIN_SEARCH_CHARS} characters to search. If nothing matches, you can create the company on the directory with one tap; otherwise pick a row or use Create new company to continue registration with your own name.`
+        ? t.companySearch.helpQuickCreate
         : existingCompaniesOnly
-          ? `Type at least ${MIN_SEARCH_CHARS} characters to search the directory; pick a company from the list.`
-          : `Type at least ${MIN_SEARCH_CHARS} characters to search existing companies, or choose "Create new company" and edit the name in this field.`;
+          ? t.companySearch.helpExistingOnly
+          : t.companySearch.helpDefault;
 
   return (
     <div ref={containerRef} className="relative min-w-0 space-y-2">
-      <Label htmlFor="co-combobox">Company name</Label>
-      <p className="text-xs text-muted-foreground">{helpText}</p>
+      <Label htmlFor="co-combobox">{t.companySearch.companyName}</Label>
+      <p className="text-xs text-muted-foreground">
+        {helpText.replace("{count}", String(MIN_SEARCH_CHARS))}
+      </p>
       <Input
         ref={inputRef}
         id="co-combobox"
@@ -210,8 +220,8 @@ export function EmployerCompanySearchField({
         disabled={disabled}
         placeholder={
           existingCompaniesOnly && !onQuickCreateCompany
-            ? "Search companies…"
-            : "Search companies or type a new name…"
+            ? t.companySearch.searchPlaceholder
+            : t.companySearch.searchOrTypePlaceholder
         }
         className="h-[3.2rem]"
         autoComplete="off"
@@ -231,17 +241,17 @@ export function EmployerCompanySearchField({
         >
           {loading ? (
             <li className="px-3 py-2.5 text-xs text-muted-foreground">
-              Searching…
+              {t.companySearch.searching}
             </li>
           ) : null}
           {quickCreateLoading ? (
             <li className="px-3 py-2.5 text-xs text-muted-foreground">
-              Creating company…
+              {t.companySearch.creating}
             </li>
           ) : null}
           {showEmptyApiMessage ? (
             <li className="px-3 py-2.5 text-xs text-muted-foreground">
-              No companies match &quot;{trimmed}&quot;.
+              {t.companySearch.noMatches.replace("{query}", trimmed)}
             </li>
           ) : null}
           {showQuickCreateRow ? (
@@ -270,10 +280,10 @@ export function EmployerCompanySearchField({
                 }}
               >
                 <span className="font-medium text-primary">
-                  Create new company
+                  {t.companySearch.createNew}
                 </span>
                 <span className="block text-xs text-muted-foreground mt-0.5">
-                  Add &quot;{trimmed}&quot; to the job directory
+                  {t.companySearch.addToDirectory.replace("{name}", trimmed)}
                 </span>
               </button>
             </li>
@@ -316,10 +326,10 @@ export function EmployerCompanySearchField({
                 disabled={disabled}
               >
                 <span className="font-medium text-primary">
-                  Create new company
+                  {t.companySearch.createNew}
                 </span>
                 <span className="block text-xs text-muted-foreground mt-0.5">
-                  Use name &quot;{trimmed}&quot; — fill details below and continue
+                  {t.companySearch.useName.replace("{name}", trimmed)}
                 </span>
               </button>
             </li>
