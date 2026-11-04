@@ -204,6 +204,12 @@
 /* Glisse mobile tab bar: platform font and smaller icons */
 .breneo-tab-bar.lg-tab-bar[data-icons] {
   --lg-tab-width: min(80px, calc((100vw - 40px) / var(--lg-tabs)));
+  --lg-glass: rgb(255 255 255 / 0.38);
+  --lg-rim-shine: 0.7;
+  --lg-glass-bend: 0.8;
+  --lg-glass-dispersion: 0.7;
+  --lg-blur: 2px;
+  --lg-tab-idle: #6b7280;
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.08),
     0 12px 40px rgba(0, 0, 0, 0.14),
@@ -211,10 +217,50 @@
 }
 
 .breneo-tab-bar.lg-tab-bar[data-theme="dark"] {
+  --lg-glass: rgb(40 40 40 / 0.42);
+  --lg-rim-shine: 0.4;
+  --lg-tab-idle: #9ca3af;
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.35),
     0 16px 48px rgba(0, 0, 0, 0.45),
     0 32px 80px rgba(0, 0, 0, 0.35);
+}
+
+/* Glossy top highlight, so the glass reads as glass where live refraction is unsupported (iOS WebKit) */
+.breneo-tab-bar .lg-tab-bar-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.55) 0%,
+    rgb(255 255 255 / 0.12) 45%,
+    rgb(255 255 255 / 0) 60%,
+    rgb(255 255 255 / 0.18) 100%
+  );
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.8),
+    inset 0 -1px 1px rgb(255 255 255 / 0.25);
+}
+
+.breneo-tab-bar[data-theme="dark"] .lg-tab-bar-glass::after {
+  background: linear-gradient(
+    180deg,
+    rgb(255 255 255 / 0.16) 0%,
+    rgb(255 255 255 / 0.04) 45%,
+    rgb(255 255 255 / 0) 60%,
+    rgb(255 255 255 / 0.06) 100%
+  );
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.22),
+    inset 0 -1px 1px rgb(255 255 255 / 0.08);
+}
+
+.breneo-tab-bar.lg-tab-bar[data-icons] .lg-tab,
+.breneo-tab-bar.lg-tab-bar[data-icons] .lg-tab:hover {
+  color: var(--lg-tab-idle);
 }
 
 .breneo-tab-bar.lg-tab-bar[data-icons] :is(.lg-tab, .lg-tab-copy) {
