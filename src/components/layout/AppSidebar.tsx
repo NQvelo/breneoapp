@@ -1,5 +1,6 @@
 import React from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, type LinkProps } from "react-router-dom";
+import { TabBar } from "glisse";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
 import {
@@ -40,6 +41,13 @@ import { NotificationCountBadge } from "@/components/notifications/NotificationC
 
 const EMPLOYER_SIDEBAR_CACHE_KEY = "employerSidebarIdentity";
 
+const TabBarLink = ({
+  href,
+  ...props
+}: Omit<LinkProps, "to"> & { href: string }) => (
+  <LocalizedLink to={href} {...props} />
+);
+
 interface AppSidebarProps {
   collapsed: boolean;
   toggleSidebar: () => void;
@@ -55,7 +63,7 @@ export function AppSidebar({
   // ✅ Get the user object directly from the context
   const { loading, user, academyDisplay, employerDisplay } = useAuth();
   const { subscriptionInfo } = useSubscription();
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
   const readEmployerCache = React.useCallback(() => {
@@ -94,6 +102,30 @@ export function AppSidebar({
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
   const rawPathname = location.pathname;
+
+  // Home and dashboard render the same page; employer sections include nested routes.
+  const isNavItemActive = (href: string) => {
+    if (href === "/home") {
+      return (
+        currentPath === "/home" ||
+        currentPath === "/dashboard" ||
+        rawPathname.includes("/home") ||
+        rawPathname.includes("/dashboard")
+      );
+    }
+    if (href === "/academy/home") {
+      return (
+        currentPath === "/academy/home" ||
+        currentPath === "/academy/dashboard" ||
+        rawPathname.includes("/academy/home") ||
+        rawPathname.includes("/academy/dashboard")
+      );
+    }
+    if (href === "/employer/jobs" || href === "/employer/members") {
+      return currentPath.startsWith(href) || rawPathname.includes(href);
+    }
+    return currentPath === href || rawPathname.endsWith(href);
+  };
 
   // Determine if user is an academy (same as AuthContext)
   const isAcademy =
@@ -343,7 +375,8 @@ export function AppSidebar({
           { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
         ];
 
-  const isCompactMobileNav = isAcademy || isEmployer;
+  const activeMobileNavHref =
+    mobileNavItems.find((item) => isNavItemActive(item.href))?.href ?? null;
 
   return (
     <>
@@ -395,89 +428,21 @@ export function AppSidebar({
           aria-hidden
         />
 
-        <div
-          className={cn(
-            "relative pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2",
-            isCompactMobileNav ? "flex justify-center px-8" : "px-8",
-          )}
-        >
-          <nav
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border border-black/[0.06] bg-white/95 px-1.5 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_12px_40px_rgba(0,0,0,0.14),0_24px_64px_rgba(0,0,0,0.1)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.08] dark:bg-[#1E1E1E]/95 dark:shadow-[0_4px_20px_rgba(0,0,0,0.35),0_16px_48px_rgba(0,0,0,0.45),0_32px_80px_rgba(0,0,0,0.35)]",
-              isCompactMobileNav ? "w-fit" : "mx-auto w-full max-w-xs",
-            )}
-          >
-            {mobileNavItems.map((item, index) => {
-              let isActive = currentPath === item.href;
-              if (item.href === "/home") {
-                isActive =
-                  currentPath === "/home" ||
-                  currentPath === "/dashboard" ||
-                  rawPathname.includes("/home") ||
-                  rawPathname.includes("/dashboard");
-              } else if (item.href === "/academy/home") {
-                isActive =
-                  currentPath === "/academy/home" ||
-                  currentPath === "/academy/dashboard" ||
-                  rawPathname.includes("/academy/home") ||
-                  rawPathname.includes("/academy/dashboard");
-              } else if (item.href === "/employer/jobs") {
-                isActive =
-                  currentPath.startsWith("/employer/jobs") ||
-                  rawPathname.includes("/employer/jobs");
-              } else if (item.href === "/employer/members") {
-                isActive =
-                  currentPath.startsWith("/employer/members") ||
-                  rawPathname.includes("/employer/members");
-              } else {
-                isActive =
-                  currentPath === item.href || rawPathname.endsWith(item.href);
-              }
-              return (
-                <LocalizedLink
-                  key={index}
-                  to={item.href}
-                  className={cn(
-                    "group relative flex flex-col items-center justify-center rounded-full py-2 transition-all duration-200",
-                    isCompactMobileNav
-                      ? "min-w-[4.25rem] px-2.5"
-                      : "min-w-0 flex-1 px-1",
-                    isActive
-                      ? "bg-[#F3F4F6] text-[#111827] dark:bg-white/[0.08] dark:text-white"
-                      : "text-[#6B7280] hover:bg-black/[0.04] hover:text-[#111827] dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white",
-                  )}
-                >
-                  <div className="relative mb-0.5">
-                    <item.icon
-                      size={20}
-                      className={cn(
-                        "transition-colors duration-200",
-                        isActive
-                          ? "text-breneo-blue"
-                          : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
-                      )}
-                    />
-                    {item.href === notificationsPath && (
-                      <NotificationCountBadge
-                        count={unreadNotificationCount}
-                        className="-top-1.5 -right-2"
-                      />
-                    )}
-                  </div>
-                  <span
-                    className={cn(
-                      "text-center text-[11px] font-semibold leading-tight transition-colors duration-200",
-                      isActive
-                        ? "text-[#111827] dark:text-white"
-                        : "text-[#6B7280] group-hover:text-[#111827] dark:text-gray-400 dark:group-hover:text-white",
-                    )}
-                  >
-                    {item.label}
-                  </span>
-                </LocalizedLink>
-              );
-            })}
-          </nav>
+        <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
+          <TabBar
+            aria-label="Main navigation"
+            className="breneo-tab-bar"
+            data-theme={resolvedTheme === "dark" ? "dark" : "light"}
+            link={TabBarLink}
+            value={activeMobileNavHref}
+            items={mobileNavItems.map((item) => ({
+              value: item.href,
+              href: item.href,
+              label: item.label,
+              icon: <item.icon strokeWidth={1.75} />,
+            }))}
+            style={{ "--lg-tab-selected": "#19B5FE" } as React.CSSProperties}
+          />
         </div>
       </div>
 
@@ -507,37 +472,7 @@ export function AppSidebar({
           <div className="flex-1 overflow-y-auto pt-8">
             <nav className="space-y-1 px-4">
               {navItems.map((item, index) => {
-                // Check if current path matches the item href
-                // Handle home/dashboard equivalence (both routes go to same page)
-                let isActive = currentPath === item.href;
-
-                // Special handling for home item - it should be active on both /home and /dashboard
-                if (item.href === "/home") {
-                  isActive =
-                    currentPath === "/home" ||
-                    currentPath === "/dashboard" ||
-                    rawPathname.includes("/home") ||
-                    rawPathname.includes("/dashboard");
-                } else if (item.href === "/academy/home") {
-                  isActive =
-                    currentPath === "/academy/home" ||
-                    currentPath === "/academy/dashboard" ||
-                    rawPathname.includes("/academy/home") ||
-                    rawPathname.includes("/academy/dashboard");
-                } else if (item.href === "/employer/jobs") {
-                  isActive =
-                    currentPath.startsWith("/employer/jobs") ||
-                    rawPathname.includes("/employer/jobs");
-                } else if (item.href === "/employer/members") {
-                  isActive =
-                    currentPath.startsWith("/employer/members") ||
-                    rawPathname.includes("/employer/members");
-                } else {
-                  // For other items, check if pathname ends with the href (handles language prefixes)
-                  isActive =
-                    currentPath === item.href ||
-                    rawPathname.endsWith(item.href);
-                }
+                const isActive = isNavItemActive(item.href);
                 return (
                   <LocalizedLink
                     key={index}

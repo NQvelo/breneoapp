@@ -12,11 +12,7 @@ import {
   filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ArrowUpRight,
-  Bookmark,
-  ChevronRight,
-} from "lucide-react";
+import { ArrowUpRight, Bookmark, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -502,10 +498,7 @@ const CoursesPage = () => {
               logo && !logo.startsWith("http") && !logo.startsWith("/")
                 ? `/${logo}`
                 : logo;
-            return [
-              academyId,
-              { logo: normalizedLogo, description },
-            ] as const;
+            return [academyId, { logo: normalizedLogo, description }] as const;
           } catch {
             return [academyId, { logo: null, description: null }] as const;
           }
@@ -637,9 +630,7 @@ const CoursesPage = () => {
                               </p>
                             </div>
                             <div>
-                              <p className="text-2xl font-bold">
-                                {bestMatch}%
-                              </p>
+                              <p className="text-2xl font-bold">{bestMatch}%</p>
                               <p className="text-xs text-gray-600 dark:text-gray-400">
                                 {t.courses.bestMatch}
                               </p>
