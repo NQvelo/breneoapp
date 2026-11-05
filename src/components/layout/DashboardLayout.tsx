@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+} from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { DashboardHeader } from "./DashboardHeader";
@@ -11,6 +18,10 @@ import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
 import { cn } from "@/lib/utils";
 import { useGlobalNotificationAlerts } from "@/hooks/useGlobalNotificationAlerts";
 import { useFcmNotifications } from "@/hooks/useFcmNotifications";
+import {
+  DashboardShellContext,
+  DEFAULT_DASHBOARD_LAYOUT_OPTIONS,
+} from "./dashboardShellContext";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -26,10 +37,40 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({
   children,
-  showSidebar = true,
-  showHeader = true,
-  background = "default",
-  containMainScroll = true,
+  showSidebar = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showSidebar,
+  showHeader = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showHeader,
+  background = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.background,
+  containMainScroll = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.containMainScroll,
+}: DashboardLayoutProps) {
+  const setShellOptions = useContext(DashboardShellContext);
+
+  useLayoutEffect(() => {
+    if (!setShellOptions) return;
+    setShellOptions({ showSidebar, showHeader, background, containMainScroll });
+    return () => setShellOptions(DEFAULT_DASHBOARD_LAYOUT_OPTIONS);
+  }, [setShellOptions, showSidebar, showHeader, background, containMainScroll]);
+
+  if (setShellOptions) return <>{children}</>;
+
+  return (
+    <DashboardChrome
+      showSidebar={showSidebar}
+      showHeader={showHeader}
+      background={background}
+      containMainScroll={containMainScroll}
+    >
+      {children}
+    </DashboardChrome>
+  );
+}
+
+/** The sidebar, header, mobile tab bar, scroll container and global dashboard modals. */
+export function DashboardChrome({
+  children,
+  showSidebar = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showSidebar,
+  showHeader = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showHeader,
+  background = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.background,
+  containMainScroll = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.containMainScroll,
 }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -74,13 +115,21 @@ export function DashboardLayout({
     }
   }, [searchParams, setSearchParams]);
 
-  const toggleSidebar = () => {
-    setSidebarCollapsed((prev) => !prev);
-  };
+  useLayoutEffect(() => {
+    if (resolvedContainMainScroll) {
+      mainContentRef.current?.scrollTo({ top: 0 });
+    } else {
+      window.scrollTo({ top: 0 });
+    }
+  }, [location.pathname, resolvedContainMainScroll]);
 
-  const openSubscriptionModal = () => {
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  const openSubscriptionModal = useCallback(() => {
     setIsSubscriptionModalOpen(true);
-  };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {

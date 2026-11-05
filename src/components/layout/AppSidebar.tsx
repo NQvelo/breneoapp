@@ -1,16 +1,9 @@
 import React from "react";
-import { useLocation, type LinkProps } from "react-router-dom";
-import { TabBar } from "glisse";
-import {
-  Book1,
-  Briefcase as BriefcaseCurved,
-  Home2,
-  People,
-  ProfileCircle,
-  Teacher,
-} from "iconsax-react";
+import { useLocation } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
+import { MobileTabBar } from "./MobileTabBar";
+import { isNavHrefActive } from "./navActive";
 import {
   Briefcase,
   Home,
@@ -48,20 +41,13 @@ import { NotificationCountBadge } from "@/components/notifications/NotificationC
 
 const EMPLOYER_SIDEBAR_CACHE_KEY = "employerSidebarIdentity";
 
-const TabBarLink = ({
-  href,
-  ...props
-}: Omit<LinkProps, "to"> & { href: string }) => (
-  <LocalizedLink to={href} {...props} />
-);
-
 interface AppSidebarProps {
   collapsed: boolean;
   toggleSidebar: () => void;
   onUpgradeClick?: () => void;
 }
 
-export function AppSidebar({
+export const AppSidebar = React.memo(function AppSidebar({
   collapsed,
   toggleSidebar,
   onUpgradeClick,
@@ -70,7 +56,7 @@ export function AppSidebar({
   // ✅ Get the user object directly from the context
   const { loading, user, academyDisplay, employerDisplay } = useAuth();
   const { subscriptionInfo } = useSubscription();
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
   const readEmployerCache = React.useCallback(() => {
@@ -108,31 +94,8 @@ export function AppSidebar({
 
   // Remove language prefix for pathname comparison
   const currentPath = removeLanguagePrefix(location.pathname);
-  const rawPathname = location.pathname;
-
-  // Home and dashboard render the same page; employer sections include nested routes.
-  const isNavItemActive = (href: string) => {
-    if (href === "/home") {
-      return (
-        currentPath === "/home" ||
-        currentPath === "/dashboard" ||
-        rawPathname.includes("/home") ||
-        rawPathname.includes("/dashboard")
-      );
-    }
-    if (href === "/academy/home") {
-      return (
-        currentPath === "/academy/home" ||
-        currentPath === "/academy/dashboard" ||
-        rawPathname.includes("/academy/home") ||
-        rawPathname.includes("/academy/dashboard")
-      );
-    }
-    if (href === "/employer/jobs" || href === "/employer/members") {
-      return currentPath.startsWith(href) || rawPathname.includes(href);
-    }
-    return currentPath === href || rawPathname.endsWith(href);
-  };
+  const isNavItemActive = (href: string) =>
+    isNavHrefActive(href, location.pathname);
 
   // Determine if user is an academy (same as AuthContext)
   const isAcademy =
@@ -252,8 +215,9 @@ export function AppSidebar({
     };
   }, [isEmployer, user?.id, user?.email, readEmployerCache]);
 
+  const employerCache = isEmployer ? readEmployerCache() : null;
   const hasEmployerSidebarCache = Boolean(
-    readEmployerCache()?.memberName || readEmployerCache()?.logo,
+    employerCache?.memberName || employerCache?.logo,
   );
 
   if (loading && !user && !(isEmployer && hasEmployerSidebarCache)) return null;
@@ -362,33 +326,6 @@ export function AppSidebar({
       ? "/employer/jobs"
       : "/home";
 
-  // Mobile navigation: employers / academy get 3; job seekers keep 4.
-  const mobileNavItems = isAcademy
-    ? [
-        { icon: Home2, label: t.nav.home, href: "/academy/home" },
-        { icon: Book1, label: t.nav.courses, href: "/academy/courses" },
-        { icon: ProfileCircle, label: t.nav.profile, href: profilePath },
-      ]
-    : isEmployer
-      ? [
-          {
-            icon: BriefcaseCurved,
-            label: t.nav.yourJobs,
-            href: "/employer/jobs",
-          },
-          { icon: People, label: t.nav.members, href: "/employer/members" },
-          { icon: ProfileCircle, label: t.nav.profile, href: profilePath },
-        ]
-      : [
-          { icon: Home2, label: t.nav.home, href: "/home" },
-          { icon: BriefcaseCurved, label: t.nav.jobs, href: "/jobs" },
-          { icon: Teacher, label: t.nav.growthShort, href: "/courses" },
-          { icon: ProfileCircle, label: t.nav.profile, href: profilePath },
-        ];
-
-  const activeMobileNavHref =
-    mobileNavItems.find((item) => isNavItemActive(item.href))?.href ?? null;
-
   return (
     <>
       {/* Mobile Header */}
@@ -432,45 +369,11 @@ export function AppSidebar({
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background/50 to-transparent"
-          aria-hidden
-        />
-
-        <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
-          <TabBar
-            aria-label="Main navigation"
-            className="breneo-tab-bar"
-            data-theme={resolvedTheme === "dark" ? "dark" : "light"}
-            link={TabBarLink}
-            value={activeMobileNavHref}
-            items={mobileNavItems.map((item) => ({
-              value: item.href,
-              href: item.href,
-              label: item.label,
-              icon:
-                item.href === profilePath && sidebarAvatarUrl ? (
-                  <img
-                    src={sidebarAvatarUrl}
-                    alt=""
-                    className="breneo-tab-avatar"
-                    data-square={isRegularUser ? undefined : ""}
-                    data-active={
-                      item.href === activeMobileNavHref ? "" : undefined
-                    }
-                  />
-                ) : (
-                  <item.icon
-                    variant={item.href === activeMobileNavHref ? "Bold" : "Linear"}
-                  />
-                ),
-            }))}
-            style={{ "--lg-tab-selected": "#19B5FE" } as React.CSSProperties}
-          />
-        </div>
-      </div>
+      <MobileTabBar
+        role={isAcademy ? "academy" : isEmployer ? "employer" : "user"}
+        profilePath={profilePath}
+        avatarUrl={sidebarAvatarUrl}
+      />
 
       {/* Desktop Sidebar */}
       <div
@@ -643,4 +546,4 @@ export function AppSidebar({
       </div>
     </>
   );
-}
+});

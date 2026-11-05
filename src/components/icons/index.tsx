@@ -96,7 +96,6 @@ import {
   SearchNormal1,
   Setting2,
   Setting4,
-  Share as IxShare,
   Shield as IxShield,
   Ship as IxShip,
   ShoppingCart as IxShoppingCart,
@@ -125,7 +124,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
-export { Bookmark, Sun } from "lucide-react";
+export { Bookmark, Share, Share2, Sun } from "lucide-react";
 
 export type IconProps = Omit<IconsaxProps, "ref"> & {
   strokeWidth?: number | string;
@@ -349,8 +348,6 @@ export const RotateCcw = fromIconsax(RotateLeft, "RotateCcw");
 export const Scale = fromIconsax(Judge, "Scale");
 export const Search = fromIconsax(SearchNormal1, "Search");
 export const Settings = fromIconsax(Setting2, "Settings");
-export const Share = fromIconsax(IxShare, "Share");
-export const Share2 = fromIconsax(IxShare, "Share2");
 export const Shield = fromIconsax(IxShield, "Shield");
 export const Ship = fromIconsax(IxShip, "Ship");
 export const ShoppingCart = fromIconsax(IxShoppingCart, "ShoppingCart");

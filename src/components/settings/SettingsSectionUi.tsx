@@ -1,4 +1,6 @@
 import React from "react";
+import { SegmentedControl } from "glisse";
+import { useTheme } from "next-themes";
 import {
   Card,
   CardContent,
@@ -199,37 +201,30 @@ export function SettingsSegmentedRow<T extends string>({
   options,
   onChange,
 }: SettingsSegmentedRowProps<T>) {
+  const { resolvedTheme } = useTheme();
   return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-gray-50/90 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:bg-white/5">
+    <div className="breneo-segmented-row flex flex-col gap-3 rounded-2xl bg-gray-50/90 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:bg-white/5">
       <Label className="shrink-0 text-sm font-semibold text-foreground">
         {label}
       </Label>
-      <div
-        className="inline-flex max-w-full rounded-full bg-white p-1 shadow-sm ring-1 ring-black/[0.04] dark:bg-[#1a1a1a] dark:ring-white/10"
-        role="group"
+      <SegmentedControl
         aria-label={label}
-      >
-        {options.map((option) => {
-          const isActive = value === option.value;
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onChange(option.value)}
-              aria-pressed={isActive}
-              className={cn(
-                "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200",
-                isActive
-                  ? "bg-sky-100 text-sky-950 shadow-sm dark:bg-gray-700 dark:text-gray-100"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
+        className="breneo-segmented"
+        data-theme={resolvedTheme === "dark" ? "dark" : "light"}
+        value={value}
+        onValueChange={(next) => onChange(next as T)}
+        items={options.map((option) => ({
+          value: option.value,
+          label: option.icon ? (
+            <span className="inline-flex items-center gap-1.5">
               {option.icon}
-              <span className="truncate">{option.label}</span>
-            </button>
-          );
-        })}
-      </div>
+              {option.label}
+            </span>
+          ) : (
+            option.label
+          ),
+        }))}
+      />
     </div>
   );
 }

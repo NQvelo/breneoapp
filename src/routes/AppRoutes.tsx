@@ -15,6 +15,7 @@ import React, { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { EmployerDashboardShell } from "@/layouts/employer/EmployerDashboardShell";
+import { DashboardShell } from "@/layouts/DashboardShell";
 
 // Auth pages (Public)
 const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
@@ -173,6 +174,35 @@ const createEmployerDashboardRoutes = (
   ));
 };
 
+/** Job seeker and academy dashboard pages share one layout so the sidebar and mobile tab bar do not remount on nav. */
+const createDashboardShellRoutes = (
+  routes: Array<{ path: string; element: React.ReactElement }>,
+): React.ReactElement[] => {
+  const prefixes = ["", "/en", "/ka"] as const;
+  return prefixes.map((prefix) => (
+    <Route
+      key={`dashboard-shell${prefix || "root"}`}
+      element={<DashboardShell />}
+    >
+      {routes.map(({ path, element }) => (
+        <Route
+          key={`${prefix}${path}`}
+          path={`${prefix}${path}`}
+          element={element}
+        />
+      ))}
+    </Route>
+  ));
+};
+
+const userOnly = (page: React.ReactElement) => (
+  <ProtectedRoute requiredRole="user">{page}</ProtectedRoute>
+);
+
+const academyOnly = (page: React.ReactElement) => (
+  <ProtectedRoute requiredRole="academy">{page}</ProtectedRoute>
+);
+
 /**
  * Main application routes component
  * Routes are completely separated by role to prevent mixing
@@ -226,48 +256,75 @@ export const AppRoutes = () => {
         {/* ==========================================
           USER-ONLY ROUTES - Require role "user"
           ========================================== */}
-        {createLocalizedRoute(
-          "/home",
-          <ProtectedRoute requiredRole="user">
-            <UserDashboard />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/dashboard",
-          <ProtectedRoute requiredRole="user">
-            <UserDashboard />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/profile",
-          <ProtectedRoute requiredRole="user">
-            <UserProfile />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/saved",
-          <ProtectedRoute requiredRole="user">
-            <SavedPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/settings",
-          <ProtectedRoute requiredRole="user">
-            <UserSettings />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/notifications",
-          <ProtectedRoute requiredRole="user">
-            <UserNotificationsPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/cv-views",
-          <ProtectedRoute requiredRole="user">
-            <CvViewsPage />
-          </ProtectedRoute>,
-        )}
+        {createDashboardShellRoutes([
+          { path: "/home", element: userOnly(<UserDashboard />) },
+          { path: "/dashboard", element: userOnly(<UserDashboard />) },
+          { path: "/profile", element: userOnly(<UserProfile />) },
+          { path: "/saved", element: userOnly(<SavedPage />) },
+          { path: "/settings", element: userOnly(<UserSettings />) },
+          {
+            path: "/notifications",
+            element: userOnly(<UserNotificationsPage />),
+          },
+          { path: "/cv-views", element: userOnly(<CvViewsPage />) },
+          {
+            path: "/skill-path/:skillName",
+            element: userOnly(<SkillPathDetailPage />),
+          },
+          { path: "/skill-path", element: userOnly(<SkillPathPage />) },
+          { path: "/jobs", element: userOnly(<JobsPage />) },
+          { path: "/jobs/search", element: userOnly(<JobSearchResultsPage />) },
+          {
+            path: "/companies/:companyName",
+            element: userOnly(<CompanyPage />),
+          },
+          {
+            path: "/jobs/company/:companyName",
+            element: userOnly(<CompanyPage />),
+          },
+          { path: "/jobs/:jobId", element: userOnly(<JobDetailPage />) },
+          { path: "/courses", element: userOnly(<CoursesPage />) },
+          { path: "/course/:courseId", element: userOnly(<CoursePage />) },
+          { path: "/webinars", element: userOnly(<WebinarsPage />) },
+          { path: "/academy/home", element: academyOnly(<AcademyHomePage />) },
+          {
+            path: "/academy/dashboard",
+            element: academyOnly(<AcademyHomePage />),
+          },
+          {
+            path: "/academy/courses",
+            element: academyOnly(<AcademyCoursesPage />),
+          },
+          {
+            path: "/academy/profile",
+            element: academyOnly(<AcademyProfile />),
+          },
+          {
+            path: "/academy/settings",
+            element: academyOnly(<UserSettings />),
+          },
+          {
+            path: "/academy/courses/add",
+            element: academyOnly(<AddCoursePage />),
+          },
+          {
+            path: "/academy/courses/edit/:courseId",
+            element: academyOnly(<AddCoursePage />),
+          },
+          {
+            path: "/academy/courses/:courseId",
+            element: academyOnly(<AcademyCourseStatsPage />),
+          },
+          // Academy public view (UUID or slug), open to all authenticated users
+          {
+            path: "/academy/:academySlug",
+            element: (
+              <ProtectedRoute>
+                <AcademyPage />
+              </ProtectedRoute>
+            ),
+          },
+        ])}
         {createLocalizedRoute(
           "/interests",
           <ProtectedRoute requiredRole="user">
@@ -278,66 +335,6 @@ export const AppRoutes = () => {
           "/skill-test",
           <ProtectedRoute requiredRole="user">
             <SkillTestPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/skill-path/:skillName",
-          <ProtectedRoute requiredRole="user">
-            <SkillPathDetailPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/skill-path",
-          <ProtectedRoute requiredRole="user">
-            <SkillPathPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/jobs",
-          <ProtectedRoute requiredRole="user">
-            <JobsPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/jobs/search",
-          <ProtectedRoute requiredRole="user">
-            <JobSearchResultsPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/companies/:companyName",
-          <ProtectedRoute requiredRole="user">
-            <CompanyPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/jobs/company/:companyName",
-          <ProtectedRoute requiredRole="user">
-            <CompanyPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/jobs/:jobId",
-          <ProtectedRoute requiredRole="user">
-            <JobDetailPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/courses",
-          <ProtectedRoute requiredRole="user">
-            <CoursesPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/course/:courseId",
-          <ProtectedRoute requiredRole="user">
-            <CoursePage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/webinars",
-          <ProtectedRoute requiredRole="user">
-            <WebinarsPage />
           </ProtectedRoute>,
         )}
         {createLocalizedRoute(
@@ -392,67 +389,9 @@ export const AppRoutes = () => {
           { path: "/employer/members", element: <EmployerMembersPage /> },
           { path: "/employer/settings", element: <UserSettings /> },
         ])}
-        {createLocalizedRoute(
-          "/academy/home",
-          <ProtectedRoute requiredRole="academy">
-            <AcademyHomePage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/dashboard",
-          <ProtectedRoute requiredRole="academy">
-            <AcademyHomePage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/courses",
-          <ProtectedRoute requiredRole="academy">
-            <AcademyCoursesPage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/profile",
-          <ProtectedRoute requiredRole="academy">
-            <AcademyProfile />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/settings",
-          <ProtectedRoute requiredRole="academy">
-            <UserSettings />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/courses/add",
-          <ProtectedRoute requiredRole="academy">
-            <AddCoursePage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/courses/edit/:courseId",
-          <ProtectedRoute requiredRole="academy">
-            <AddCoursePage />
-          </ProtectedRoute>,
-        )}
-        {createLocalizedRoute(
-          "/academy/courses/:courseId",
-          <ProtectedRoute requiredRole="academy">
-            <AcademyCourseStatsPage />
-          </ProtectedRoute>,
-        )}
-
         {/* ==========================================
           COMMON ROUTES - Available to all authenticated users
           ========================================== */}
-        {/* Academy public view page - accessible to all authenticated users
-          Accepts academy_id (UUID) or slug as parameter
-          Displays academy profile and courses from Supabase */}
-        {createLocalizedRoute(
-          "/academy/:academySlug",
-          <ProtectedRoute>
-            <AcademyPage />
-          </ProtectedRoute>,
-        )}
         {createLocalizedRoute(
           "/terms-of-use",
           <ProtectedRoute>

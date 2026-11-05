@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import {
@@ -7,15 +7,123 @@ import {
   XP_PER_JOB_APPLICATION,
 } from "@/hooks/useUserXp";
 import {
+  animate,
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useTransform,
+} from "framer-motion";
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Briefcase, GraduationCap, Zap } from "@/components/icons";
+import { useMobile } from "@/hooks/use-mobile";
+import { Briefcase, GraduationCap } from "@/components/icons";
 
 const STORAGE_KEY_PREFIX = "xp_last_seen_counts";
+
+const SPARKLES = Array.from({ length: 10 }, (_, i) => {
+  const angle = (i / 10) * Math.PI * 2;
+  const distance = i % 2 === 0 ? 62 : 48;
+  return {
+    x: Math.cos(angle) * distance,
+    y: Math.sin(angle) * distance,
+    size: i % 2 === 0 ? 8 : 5,
+    color: i % 3 === 0 ? "#19B5FE" : i % 3 === 1 ? "#FFC107" : "#F97316",
+  };
+});
+
+function XpBurstIllustration() {
+  const reduceMotion = useReducedMotion();
+
+  if (reduceMotion) {
+    return (
+      <img
+        src="/lovable-uploads/3dicons-flash-dynamic-color.png"
+        alt=""
+        className="h-28 w-28 object-contain"
+      />
+    );
+  }
+
+  return (
+    <div className="relative flex h-32 w-32 items-center justify-center">
+      {[0, 0.6].map((delay) => (
+        <motion.span
+          key={delay}
+          className="absolute h-24 w-24 rounded-full bg-orange-400/25"
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: [0.6, 1.5], opacity: [0.5, 0] }}
+          transition={{
+            duration: 1.8,
+            delay: 0.3 + delay,
+            repeat: Infinity,
+            ease: "easeOut",
+          }}
+        />
+      ))}
+
+      {SPARKLES.map((s, i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full"
+          style={{ width: s.size, height: s.size, backgroundColor: s.color }}
+          initial={{ x: 0, y: 0, scale: 0, opacity: 0 }}
+          animate={{
+            x: s.x,
+            y: s.y,
+            scale: [0, 1.2, 0],
+            opacity: [0, 1, 0],
+          }}
+          transition={{ duration: 0.9, delay: 0.25, ease: "easeOut" }}
+        />
+      ))}
+
+      <motion.img
+        src="/lovable-uploads/3dicons-flash-dynamic-color.png"
+        alt=""
+        className="relative h-28 w-28 object-contain drop-shadow-[0_8px_16px_rgba(249,115,22,0.35)]"
+        initial={{ scale: 0, rotate: -30, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 14 }}
+      />
+    </div>
+  );
+}
+
+function AnimatedXpValue({ value }: { value: number }) {
+  const reduceMotion = useReducedMotion();
+  const count = useMotionValue(reduceMotion ? value : 0);
+  const rounded = useTransform(count, (v) => Math.round(v));
+
+  useEffect(() => {
+    if (reduceMotion) {
+      count.set(value);
+      return;
+    }
+    const controls = animate(count, value, {
+      duration: 0.9,
+      delay: 0.3,
+      ease: "easeOut",
+    });
+    return () => controls.stop();
+  }, [count, value, reduceMotion]);
+
+  return <motion.span>{rounded}</motion.span>;
+}
 
 interface XpCounts {
   jobApplicationsCount: number;
@@ -55,7 +163,10 @@ const writeCounts = (key: string, counts: XpCounts) => {
 export function XpGainedModal() {
   const { user } = useAuth();
   const t = useTranslation();
+  const isMobile = useMobile();
   const [gained, setGained] = useState<XpCounts | null>(null);
+  const [open, setOpen] = useState(false);
+  const openRef = useRef(false);
 
   const isEmployer =
     user?.user_type === "employer" ||
@@ -91,10 +202,17 @@ export function XpGainedModal() {
     );
     if (newJobs === 0 && newCourses === 0) return;
 
-    setGained((prev) => ({
-      jobApplicationsCount: (prev?.jobApplicationsCount ?? 0) + newJobs,
-      courseEnrollmentsCount: (prev?.courseEnrollmentsCount ?? 0) + newCourses,
-    }));
+    const stillOpen = openRef.current;
+    setGained((prev) => {
+      const base = stillOpen ? prev : null;
+      return {
+        jobApplicationsCount: (base?.jobApplicationsCount ?? 0) + newJobs,
+        courseEnrollmentsCount:
+          (base?.courseEnrollmentsCount ?? 0) + newCourses,
+      };
+    });
+    openRef.current = true;
+    setOpen(true);
   }, [
     enabled,
     isReady,
@@ -141,58 +259,92 @@ export function XpGainedModal() {
       : null,
   ].filter((row): row is NonNullable<typeof row> => row !== null);
 
-  return (
-    <Dialog
-      open={gained !== null}
-      onOpenChange={(open) => {
-        if (!open) setGained(null);
-      }}
+  const title = t.xpGained.title.replace("{xp}", String(gainedXp));
+  const [totalBefore, totalAfter = ""] = t.xpGained.total.split("{xp}");
+
+  const close = () => {
+    openRef.current = false;
+    setOpen(false);
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) close();
+  };
+
+  const rewards = (
+    <div className="space-y-2">
+      {rows.map((row, i) => (
+        <motion.div
+          key={row.key}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.35 + i * 0.1 }}
+          className="flex items-center justify-between rounded-2xl bg-black/[0.04] px-4 py-3 dark:bg-white/[0.05]"
+        >
+          <span className="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+            <row.icon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            {row.label}
+          </span>
+          <span className="text-sm font-semibold text-breneo-blue">
+            +<AnimatedXpValue value={row.xp} /> XP
+          </span>
+        </motion.div>
+      ))}
+      <p className="pt-1 text-sm text-gray-500 dark:text-gray-400">
+        {totalBefore}
+        <AnimatedXpValue value={xp} />
+        {totalAfter}
+      </p>
+    </div>
+  );
+
+  const gotItButton = (
+    <Button
+      type="button"
+      className={isMobile ? "w-full" : "flex-1"}
+      onClick={close}
     >
-      <DialogContent className="sm:max-w-md rounded-3xl">
-        <DialogHeader>
-          <DialogTitle className="sr-only">
-            {t.xpGained.title.replace("{xp}", String(gainedXp))}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col items-center px-2 py-4 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-breneo-blue/10">
-            <Zap variant="Bold" className="h-9 w-9 text-breneo-blue" />
-          </div>
-          <h2 className="mb-2 text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {t.xpGained.title.replace("{xp}", String(gainedXp))}
-          </h2>
-          <p className="mb-5 text-gray-600 dark:text-gray-400">
-            {t.xpGained.subtitle}
-          </p>
+      {t.xpGained.gotIt}
+    </Button>
+  );
 
-          <div className="mb-4 w-full space-y-2">
-            {rows.map((row) => (
-              <div
-                key={row.key}
-                className="flex items-center justify-between rounded-2xl bg-black/[0.04] px-4 py-3 dark:bg-white/[0.05]"
-              >
-                <span className="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200">
-                  <row.icon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                  {row.label}
-                </span>
-                <span className="text-sm font-semibold text-breneo-blue">
-                  +{row.xp} XP
-                </span>
-              </div>
-            ))}
-          </div>
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={handleOpenChange}>
+        <DrawerContent className="border-none bg-white dark:bg-background">
+          <DrawerHeader className="items-start pb-2 text-left">
+            {/* pl-11 offsets the header's close button (h-7 + gap-4) so the image is centered in the drawer */}
+            <div className="mb-3 flex justify-center pl-11">
+              <XpBurstIllustration />
+            </div>
+            <DrawerTitle>{title}</DrawerTitle>
+            <DrawerDescription className="mt-1">
+              {t.xpGained.subtitle}
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="px-6 pt-2">{rewards}</div>
+          <DrawerFooter className="flex-col gap-2 pt-4">
+            {gotItButton}
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
 
-          <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
-            {t.xpGained.total.replace("{xp}", String(xp))}
-          </p>
-
-          <Button
-            onClick={() => setGained(null)}
-            className="min-w-[140px]"
-          >
-            {t.xpGained.gotIt}
-          </Button>
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-sm gap-3">
+        <div className="flex justify-center">
+          <XpBurstIllustration />
         </div>
+        <DialogHeader className="space-y-1 text-left sm:text-left">
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{t.xpGained.subtitle}</DialogDescription>
+        </DialogHeader>
+        {rewards}
+        <DialogFooter className="flex flex-row gap-2 sm:space-x-0">
+          {gotItButton}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

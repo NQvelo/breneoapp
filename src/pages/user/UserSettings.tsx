@@ -102,9 +102,8 @@ export default function SettingsPage() {
 
   const pathWithoutLang = removeLanguagePrefix(location.pathname);
   /** Employer shell already provides DashboardLayout — avoid nesting a second one. */
-  const isEmbeddedInEmployerShell = pathWithoutLang.startsWith(
-    "/employer/settings",
-  );
+  const isEmbeddedInEmployerShell =
+    pathWithoutLang.startsWith("/employer/settings");
   const isEmployerSettings = isEmbeddedInEmployerShell;
   const isAcademySettings = pathWithoutLang.startsWith("/academy/settings");
   /** Org accounts share account/notification/privacy UI (no job-seeker sections). */
@@ -861,21 +860,29 @@ export default function SettingsPage() {
               <div className="space-y-6">
                 {!isOrgSettings ? (
                   <>
-                    <SettingsSubsection title={t.settings.notificationsPage.email}>
+                    <SettingsSubsection
+                      title={t.settings.notificationsPage.email}
+                    >
                       <SettingsToggleRow
                         label={t.settings.notificationsPage.jobMatches}
-                        description={t.settings.notificationsPage.jobMatchesDesc}
+                        description={
+                          t.settings.notificationsPage.jobMatchesDesc
+                        }
                       >
                         <Switch
+                          aria-label={t.settings.notificationsPage.jobMatches}
                           checked={emailJobMatches}
                           onCheckedChange={setEmailJobMatches}
                         />
                       </SettingsToggleRow>
                       <SettingsToggleRow
                         label={t.settings.notificationsPage.newCourses}
-                        description={t.settings.notificationsPage.newCoursesDesc}
+                        description={
+                          t.settings.notificationsPage.newCoursesDesc
+                        }
                       >
                         <Switch
+                          aria-label={t.settings.notificationsPage.newCourses}
                           checked={emailNewCourses}
                           onCheckedChange={setEmailNewCourses}
                         />
@@ -887,27 +894,34 @@ export default function SettingsPage() {
                         }
                       >
                         <Switch
+                          aria-label={t.settings.notificationsPage.skillUpdates}
                           checked={emailSkillUpdates}
                           onCheckedChange={setEmailSkillUpdates}
                         />
                       </SettingsToggleRow>
                       <SettingsToggleRow
                         label={t.settings.notificationsPage.newsletter}
-                        description={t.settings.notificationsPage.newsletterDesc}
+                        description={
+                          t.settings.notificationsPage.newsletterDesc
+                        }
                       >
                         <Switch
+                          aria-label={t.settings.notificationsPage.newsletter}
                           checked={newsletter}
                           onCheckedChange={setNewsletter}
                         />
                       </SettingsToggleRow>
                     </SettingsSubsection>
 
-                    <SettingsSubsection title={t.settings.notificationsPage.inApp}>
+                    <SettingsSubsection
+                      title={t.settings.notificationsPage.inApp}
+                    >
                       <SettingsToggleRow
                         label={t.settings.notificationsPage.messages}
                         description={t.settings.notificationsPage.messagesDesc}
                       >
                         <Switch
+                          aria-label={t.settings.notificationsPage.messages}
                           checked={inAppMessages}
                           onCheckedChange={setInAppMessages}
                         />
@@ -919,6 +933,9 @@ export default function SettingsPage() {
                         }
                       >
                         <Switch
+                          aria-label={
+                            t.settings.notificationsPage.progressReminders
+                          }
                           checked={inAppProgress}
                           onCheckedChange={setInAppProgress}
                         />
@@ -933,6 +950,7 @@ export default function SettingsPage() {
                     description={t.settings.notificationsPage.pushEnabledDesc}
                   >
                     <Switch
+                      aria-label={t.settings.notificationsPage.pushEnabled}
                       checked={pushNotifications}
                       onCheckedChange={(checked) =>
                         void handlePushNotificationsChange(checked)
@@ -962,12 +980,15 @@ export default function SettingsPage() {
                 </SettingsSubsection>
 
                 {!isOrgSettings ? (
-                  <SettingsSubsection title={t.settings.privacyPage.dataVisibility}>
+                  <SettingsSubsection
+                    title={t.settings.privacyPage.dataVisibility}
+                  >
                     <SettingsToggleRow
                       label={t.settings.privacyPage.showSkills}
                       description={t.settings.privacyPage.showSkillsDesc}
                     >
                       <Switch
+                        aria-label={t.settings.privacyPage.showSkills}
                         checked={showSkills}
                         onCheckedChange={setShowSkills}
                       />
@@ -977,6 +998,7 @@ export default function SettingsPage() {
                       description={t.settings.privacyPage.showTestResultsDesc}
                     >
                       <Switch
+                        aria-label={t.settings.privacyPage.showTestResults}
                         checked={showTestResults}
                         onCheckedChange={setShowTestResults}
                       />
@@ -988,6 +1010,7 @@ export default function SettingsPage() {
                       }
                     >
                       <Switch
+                        aria-label={t.settings.privacyPage.showCompletedCourses}
                         checked={showCompletedCourses}
                         onCheckedChange={setShowCompletedCourses}
                       />
@@ -1014,7 +1037,9 @@ export default function SettingsPage() {
                   </Badge> */}
                 </div>
 
-                <SettingsSubsection title={t.settings.subscriptionPage.currentPlan}>
+                <SettingsSubsection
+                  title={t.settings.subscriptionPage.currentPlan}
+                >
                   <div className="rounded-2xl bg-gradient-to-br from-sky-50 to-sky-100/70 p-5 dark:from-sky-950/30 dark:to-sky-900/10">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -1074,7 +1099,9 @@ export default function SettingsPage() {
                   </div>
                 </SettingsSubsection>
 
-                <SettingsSubsection title={t.settings.subscriptionPage.paymentMethod}>
+                <SettingsSubsection
+                  title={t.settings.subscriptionPage.paymentMethod}
+                >
                   {subscriptionLoading ? (
                     <p className="text-sm text-muted-foreground">
                       {t.settings.subscriptionPage.loadingPaymentMethods}
@@ -1110,7 +1137,9 @@ export default function SettingsPage() {
                   )}
                 </SettingsSubsection>
 
-                <SettingsSubsection title={t.settings.subscriptionPage.billingHistory}>
+                <SettingsSubsection
+                  title={t.settings.subscriptionPage.billingHistory}
+                >
                   {historyLoading ? (
                     <div className="flex flex-col items-center justify-center space-y-3 py-8">
                       <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
@@ -1210,7 +1239,9 @@ export default function SettingsPage() {
       default:
         return (
           <div className="space-y-6">
-            <p className="text-muted-foreground">{t.settings.sectionNotFound}</p>
+            <p className="text-muted-foreground">
+              {t.settings.sectionNotFound}
+            </p>
           </div>
         );
     }
