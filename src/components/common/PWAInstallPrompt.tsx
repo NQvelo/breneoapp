@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Download, X } from "lucide-react";
+import { Download, X } from "@/components/icons";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 
 export const PWAInstallPrompt: React.FC = () => {

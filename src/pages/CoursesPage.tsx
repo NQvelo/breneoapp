@@ -12,7 +12,7 @@ import {
   filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Bookmark, ChevronRight } from "lucide-react";
+import { ArrowUpRight, Bookmark, ChevronRight } from "@/components/icons";
 import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";

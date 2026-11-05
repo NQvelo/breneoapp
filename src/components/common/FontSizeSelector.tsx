@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Type } from "lucide-react";
+import { Type } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export function FontSizeSelector() {

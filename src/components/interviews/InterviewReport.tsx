@@ -21,7 +21,7 @@ import {
   Sparkles,
   Trophy,
   XCircle,
-} from "lucide-react";
+} from "@/components/icons";
 
 const PASS_THRESHOLD = 75;
 

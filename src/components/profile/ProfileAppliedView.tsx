@@ -18,7 +18,7 @@ import {
   Loader2,
   MapPin,
   Calendar,
-} from "lucide-react";
+} from "@/components/icons";
 
 export type AppliedTab = "courses" | "jobs";
 

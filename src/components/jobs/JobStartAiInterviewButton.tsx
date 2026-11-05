@@ -1,5 +1,5 @@
 import React from "react";
-import { Crown } from "lucide-react";
+import { Crown } from "@/components/icons";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useLocalizedNavigate } from "@/hooks/useLocalizedNavigate";

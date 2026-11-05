@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X } from "@/components/icons";
 import type { UserSkill, SkillSuggestion } from "@/api/profile/types";
 import { profileApi } from "@/api/profile/profileApi";
 import { cn } from "@/lib/utils";

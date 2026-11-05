@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { cn } from "@/lib/utils";

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Briefcase, Flame } from "lucide-react";
+import { ArrowRight, Briefcase, Flame } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 

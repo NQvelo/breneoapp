@@ -20,7 +20,7 @@ import {
   DrawerFooter,
   DrawerClose,
 } from "@/components/ui/drawer";
-import { CheckCircle2, X } from "lucide-react";
+import { CheckCircle2, X } from "@/components/icons";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import { useMobile } from "@/hooks/use-mobile";

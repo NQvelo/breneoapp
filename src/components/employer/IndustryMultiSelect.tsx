@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
-import { X } from "lucide-react";
+import { X } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AggregatorIndustry } from "@/api/employer/aggregatorBffApi";

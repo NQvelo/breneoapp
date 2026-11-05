@@ -1,6 +1,6 @@
 import React from "react";
 import { useTheme } from "next-themes";
-import { Check, Globe, Moon, Sun } from "lucide-react";
+import { Check, Globe, Moon, Sun } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,

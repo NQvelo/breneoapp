@@ -36,7 +36,7 @@ import {
   Search as SearchIcon,
   ChevronDown,
   Trash2,
-} from "lucide-react";
+} from "@/components/icons";
 import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {

@@ -39,7 +39,7 @@ import {
   DollarSign,
   Tag,
   MapPin,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   getUserTestAnswers,
   calculateSkillScores,

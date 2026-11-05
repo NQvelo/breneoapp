@@ -32,7 +32,7 @@ import {
   SlidersHorizontal,
   ExternalLink,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";

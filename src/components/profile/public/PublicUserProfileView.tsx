@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, Mail, MapPin, Phone } from "lucide-react";
+import { Loader2, Mail, MapPin, Phone } from "@/components/icons";
 import { JobMatchIndicator } from "@/components/jobs/JobMatchIndicator";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

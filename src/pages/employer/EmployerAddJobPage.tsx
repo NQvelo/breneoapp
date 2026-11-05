@@ -29,7 +29,7 @@ import {
   Trash2,
   Pencil,
   Check,
-} from "lucide-react";
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";

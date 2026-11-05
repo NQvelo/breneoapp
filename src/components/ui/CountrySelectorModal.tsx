@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMobile } from "@/hooks/use-mobile";
-import { Search, X } from "lucide-react";
+import { Search, X } from "@/components/icons";
 import { countries, Country } from "@/data/countries";
 
 interface CountrySelectorModalProps {

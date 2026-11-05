@@ -1,6 +1,6 @@
 {
   "name": "breneoapp",
-  "version": "0.3.29",
+  "version": "0.3.30",
   "private": true,
   "type": "module",
   "homepage": "https://dashboard.breneo.ge",
@@ -19,6 +19,7 @@
     "security-test": "npx tsx scripts/security-test.ts"
   },
   "dependencies": {
+    "@fluentui/react-icons": "^2.0.345",
     "@google/genai": "^1.48.0",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -67,6 +68,7 @@
     "firebase-admin": "^13.10.0",
     "framer-motion": "^12.26.2",
     "glisse": "^0.5.0",
+    "iconsax-react": "^0.0.8",
     "input-otp": "^1.2.4",
     "katex": "^0.17.0",
     "libphonenumber-js": "^1.12.10",
@@ -78,6 +80,7 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.0",
+    "react-icons": "^5.7.0",
     "react-markdown": "^10.1.0",
     "react-phone-number-input": "^3.4.12",
     "react-resizable-panels": "^2.1.3",

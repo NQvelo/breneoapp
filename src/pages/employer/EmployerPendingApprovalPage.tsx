@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { Clock } from "@/components/icons";
 import {
   EMPLOYER_ACCESS_POLL_MS,
   EMPLOYER_ACTIVE_LANDING_PATH,

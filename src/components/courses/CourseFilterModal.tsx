@@ -19,7 +19,7 @@ import { useMobile } from "@/hooks/use-mobile";
 import { countries } from "@/data/countries";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronRight, Search as SearchIcon, ChevronDown } from "lucide-react";
+import { ChevronRight, Search as SearchIcon, ChevronDown } from "@/components/icons";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Collapsible,

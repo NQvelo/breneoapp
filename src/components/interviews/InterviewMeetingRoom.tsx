@@ -25,7 +25,7 @@ import {
   Volume2,
   VolumeX,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 
 export type MeetingPhase =
   | "setup"

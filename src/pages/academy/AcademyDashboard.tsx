@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, BookOpen } from "lucide-react";
+import { Plus, Edit, BookOpen } from "@/components/icons";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeAcademyProfileApiResponse } from "@/api/academy";

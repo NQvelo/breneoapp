@@ -736,4 +736,15 @@ export const ka = {
     addAnother:
       "სხვა ინდუსტრიის დასამატებლად გამოიყენეთ ზემოთ მოცემული ძიების ველი.",
   },
+  // XP earned notice
+  xpGained: {
+    title: "თქვენ მიიღეთ {xp} XP!",
+    subtitle: "გააგრძელეთ — ყოველი განაცხადი და კურსი წინ გწევთ.",
+    jobApplication: "გაგზავნეთ განაცხადი ვაკანსიაზე",
+    jobApplications: "გაგზავნეთ განაცხადი {count} ვაკანსიაზე",
+    courseEnrollment: "ჩაეწერეთ კურსზე",
+    courseEnrollments: "ჩაეწერეთ {count} კურსზე",
+    total: "სულ: {xp} XP",
+    gotIt: "გასაგებია",
+  },
 };

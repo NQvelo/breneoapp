@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2 } from "@/components/icons";
 
 const PASS_THRESHOLD = 75;
 const AUTO_ADVANCE_MS = 3000;

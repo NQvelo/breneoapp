@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Clock, GraduationCap, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, GraduationCap, CheckCircle2 } from "@/components/icons";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { Button } from "@/components/ui/button";

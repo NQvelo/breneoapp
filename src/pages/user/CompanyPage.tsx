@@ -13,7 +13,7 @@ import {
   Loader2,
   MapPin,
   Users,
-} from "lucide-react";
+} from "@/components/icons";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

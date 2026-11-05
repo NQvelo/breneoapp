@@ -29,7 +29,7 @@ import {
   type PatchAggregatorCompanyBody,
 } from "@/api/employer/aggregatorBffApi";
 import { uploadEmployerCompanyLogoToAggregator } from "@/api/employer/employerProfileApi";
-import { Loader2, PencilLine, UploadCloud, X } from "lucide-react";
+import { Loader2, PencilLine, UploadCloud, X } from "@/components/icons";
 
 const EMPLOYEE_BANDS = [
   "1-10",

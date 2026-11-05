@@ -41,7 +41,7 @@ import {
   Users,
   Loader2,
   Search,
-} from "lucide-react";
+} from "@/components/icons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";

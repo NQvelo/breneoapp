@@ -12,7 +12,7 @@ import {
   Briefcase,
   DollarSign,
   CheckCircle2,
-} from "lucide-react";
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
 import { supabase } from "@/integrations/supabase/client";

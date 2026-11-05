@@ -1,12 +1,12 @@
 import React from "react";
-import type { LucideIcon } from "lucide-react";
+import type { IconComponent } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export interface SettingsListItemConfig {
   id: string;
   title: string;
   subtitle: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   iconBgClass: string;
   iconColorClass: string;
   onClick: () => void;

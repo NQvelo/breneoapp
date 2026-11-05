@@ -1,4 +1,4 @@
-import { Atom, Check, Lock } from "lucide-react";
+import { Atom, Check, Lock } from "@/components/icons";
 import type { AtomPathItem } from "@/api/atoms";
 import { cn } from "@/lib/utils";
 

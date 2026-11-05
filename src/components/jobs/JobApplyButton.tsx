@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "@/components/icons";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { toast } from "sonner";
 import { TokenManager } from "@/api/auth/tokenManager";

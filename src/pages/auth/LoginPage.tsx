@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, ImageIcon } from "lucide-react";
+import { Eye, EyeOff, ImageIcon } from "@/components/icons";
 import { toast } from "sonner"; // ✅ Required for error toasts
 import { useAuth } from "@/contexts/AuthContext"; // ✅ IMPORT USEAUTH
 import { AuthPageHeader } from "@/components/auth/AuthPageHeader";

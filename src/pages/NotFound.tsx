@@ -2,7 +2,7 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon } from "@/components/icons";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const NotFound = () => {

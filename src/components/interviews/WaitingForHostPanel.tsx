@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, UserRound } from "lucide-react";
+import { CheckCircle2, UserRound } from "@/components/icons";
 import {
   INTERVIEWER_JOIN_DELAY_MS,
   playEnterMeetingSound,

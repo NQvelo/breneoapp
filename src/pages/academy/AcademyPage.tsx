@@ -14,7 +14,7 @@ import {
   Phone,
   Link2,
   Check,
-} from "lucide-react";
+} from "@/components/icons";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/api/auth/apiClient";
 import { useAuth } from "@/contexts/AuthContext";

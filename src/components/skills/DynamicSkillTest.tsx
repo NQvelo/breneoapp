@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext"; // corrected relative path
 import apiClient from "@/api/auth/apiClient";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Award, CheckCircle2, AlertCircle } from "lucide-react";
+import { ChevronRight, Award, CheckCircle2, AlertCircle } from "@/components/icons";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

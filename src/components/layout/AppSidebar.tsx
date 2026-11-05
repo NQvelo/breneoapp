@@ -1,13 +1,20 @@
 import React from "react";
 import { useLocation, type LinkProps } from "react-router-dom";
 import { TabBar } from "glisse";
+import {
+  Book1,
+  Briefcase as BriefcaseCurved,
+  Home2,
+  People,
+  ProfileCircle,
+  Teacher,
+} from "iconsax-react";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
 import {
   Briefcase,
   Home,
   Settings,
-  CircleUserRound,
   Bell,
   Moon,
   Sun,
@@ -17,7 +24,7 @@ import {
   Zap,
   Sparkles,
   Users,
-} from "lucide-react";
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "next-themes";
@@ -358,21 +365,25 @@ export function AppSidebar({
   // Mobile navigation: employers / academy get 3; job seekers keep 4.
   const mobileNavItems = isAcademy
     ? [
-        { icon: Home, label: t.nav.home, href: "/academy/home" },
-        { icon: LibraryBig, label: t.nav.courses, href: "/academy/courses" },
-        { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
+        { icon: Home2, label: t.nav.home, href: "/academy/home" },
+        { icon: Book1, label: t.nav.courses, href: "/academy/courses" },
+        { icon: ProfileCircle, label: t.nav.profile, href: profilePath },
       ]
     : isEmployer
       ? [
-          { icon: Briefcase, label: t.nav.yourJobs, href: "/employer/jobs" },
-          { icon: Users, label: t.nav.members, href: "/employer/members" },
-          { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
+          {
+            icon: BriefcaseCurved,
+            label: t.nav.yourJobs,
+            href: "/employer/jobs",
+          },
+          { icon: People, label: t.nav.members, href: "/employer/members" },
+          { icon: ProfileCircle, label: t.nav.profile, href: profilePath },
         ]
       : [
-          { icon: Home, label: t.nav.home, href: "/home" },
-          { icon: Briefcase, label: t.nav.jobs, href: "/jobs" },
-          { icon: GraduationCap, label: t.nav.growthShort, href: "/courses" },
-          { icon: CircleUserRound, label: t.nav.profile, href: profilePath },
+          { icon: Home2, label: t.nav.home, href: "/home" },
+          { icon: BriefcaseCurved, label: t.nav.jobs, href: "/jobs" },
+          { icon: Teacher, label: t.nav.growthShort, href: "/courses" },
+          { icon: ProfileCircle, label: t.nav.profile, href: profilePath },
         ];
 
   const activeMobileNavHref =
@@ -439,7 +450,22 @@ export function AppSidebar({
               value: item.href,
               href: item.href,
               label: item.label,
-              icon: <item.icon strokeWidth={1.75} />,
+              icon:
+                item.href === profilePath && sidebarAvatarUrl ? (
+                  <img
+                    src={sidebarAvatarUrl}
+                    alt=""
+                    className="breneo-tab-avatar"
+                    data-square={isRegularUser ? undefined : ""}
+                    data-active={
+                      item.href === activeMobileNavHref ? "" : undefined
+                    }
+                  />
+                ) : (
+                  <item.icon
+                    variant={item.href === activeMobileNavHref ? "Bold" : "Linear"}
+                  />
+                ),
             }))}
             style={{ "--lg-tab-selected": "#19B5FE" } as React.CSSProperties}
           />

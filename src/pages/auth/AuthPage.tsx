@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, ImageIcon } from "lucide-react";
+import { Eye, EyeOff, ImageIcon } from "@/components/icons";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import apiClient from "@/api/auth/apiClient";

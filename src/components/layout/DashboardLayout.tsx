@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
 import { TokenManager } from "@/api/auth/tokenManager";
 import { AcademyVerifiedCongratsModal } from "@/components/common/AcademyVerifiedCongratsModal";
+import { XpGainedModal } from "@/components/common/XpGainedModal";
 import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
 import { cn } from "@/lib/utils";
 import { useGlobalNotificationAlerts } from "@/hooks/useGlobalNotificationAlerts";
@@ -144,6 +145,7 @@ export function DashboardLayout({
         <div className={cn(resolvedContainMainScroll && "h-full")}>{children}</div>
       </main>
       <AcademyVerifiedCongratsModal />
+      <XpGainedModal />
       <SubscriptionModal 
         isOpen={isSubscriptionModalOpen} 
         onClose={() => setIsSubscriptionModalOpen(false)} 

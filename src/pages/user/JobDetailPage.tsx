@@ -48,7 +48,7 @@ import {
   Loader2,
   ThumbsUp,
   Hourglass,
-} from "lucide-react";
+} from "@/components/icons";
 
 import { numericIdToUuid, cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
@@ -85,7 +85,7 @@ import { JobMockInterviewPromo } from "@/components/jobs/JobMockInterviewPromo";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
-import { Zap } from "lucide-react";
+import { Zap } from "@/components/icons";
 import { profileApi } from "@/api/profile";
 import { useUserIndustryProfile } from "@/hooks/useUserIndustryProfile";
 import {

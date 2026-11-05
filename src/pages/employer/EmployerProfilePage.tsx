@@ -39,7 +39,7 @@ import {
   Building2,
   User,
   Settings,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   extractBreneoEmailFromJwt,
   extractBreneoUserIdFromEmployerProfileRaw,

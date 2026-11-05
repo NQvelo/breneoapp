@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { usePwaInstall } from "@/hooks/usePwaInstall";

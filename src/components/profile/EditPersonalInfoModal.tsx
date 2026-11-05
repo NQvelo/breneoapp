@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X } from "@/components/icons";
 import type { ProfilePayload } from "@/api/profile/types";
 
 export interface EditPersonalInfoModalProps {
@@ -57,11 +57,19 @@ export function EditPersonalInfoModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const normalizeUrl = (url: string) =>
-    url.trim().startsWith("http") ? url.trim() : `https://${url.trim()}`;
+  const normalizeUrl = (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
+
+  // Parent passes a fresh `initial` object every render; only reseed when the sheet opens.
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
 
   useEffect(() => {
     if (open) {
+      const initial = initialRef.current;
       setFirst_name(initial.first_name ?? "");
       setLast_name(initial.last_name ?? "");
       setEmail(initial.email ?? "");
@@ -75,29 +83,30 @@ export function EditPersonalInfoModal({
       setDribbble(initial.social_links?.dribbble ?? "");
       setError(null);
     }
-  }, [open, initial]);
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSaving(true);
     try {
-      const social_links: Record<string, string> = {};
-      if (github.trim()) social_links.github = normalizeUrl(github);
-      if (linkedin.trim()) social_links.linkedin = normalizeUrl(linkedin);
-      if (facebook.trim()) social_links.facebook = normalizeUrl(facebook);
-      if (instagram.trim()) social_links.instagram = normalizeUrl(instagram);
-      if (dribbble.trim()) social_links.dribbble = normalizeUrl(dribbble);
+      // Cleared optional fields are sent as "" so the backend actually removes them.
+      const social_links: Record<string, string> = {
+        ...(initial.social_links ?? {}),
+        github: normalizeUrl(github),
+        linkedin: normalizeUrl(linkedin),
+        facebook: normalizeUrl(facebook),
+        instagram: normalizeUrl(instagram),
+        dribbble: normalizeUrl(dribbble),
+      };
       await onSave({
         first_name: first_name.trim() || undefined,
         last_name: last_name.trim() || undefined,
         email: email.trim() || undefined,
         phone_number: phone_number.trim() || undefined,
-        country_region: country_region.trim() || undefined,
-        city: city.trim() || undefined,
-        social_links: Object.keys(social_links).length
-          ? social_links
-          : undefined,
+        country_region: country_region.trim(),
+        city: city.trim(),
+        social_links,
       });
       onOpenChange(false);
     } catch (err: unknown) {
@@ -235,7 +244,9 @@ export function EditPersonalInfoModal({
                     <Label htmlFor="github">GitHub</Label>
                     <Input
                       id="github"
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       placeholder="https://github.com/username"
                       value={github}
                       onChange={(e) => setGithub(e.target.value)}
@@ -245,7 +256,9 @@ export function EditPersonalInfoModal({
                     <Label htmlFor="linkedin">LinkedIn</Label>
                     <Input
                       id="linkedin"
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       placeholder="https://linkedin.com/in/username"
                       value={linkedin}
                       onChange={(e) => setLinkedin(e.target.value)}
@@ -255,7 +268,9 @@ export function EditPersonalInfoModal({
                     <Label htmlFor="facebook">Facebook</Label>
                     <Input
                       id="facebook"
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       placeholder="https://facebook.com/username"
                       value={facebook}
                       onChange={(e) => setFacebook(e.target.value)}
@@ -265,7 +280,9 @@ export function EditPersonalInfoModal({
                     <Label htmlFor="instagram">Instagram</Label>
                     <Input
                       id="instagram"
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       placeholder="https://instagram.com/username"
                       value={instagram}
                       onChange={(e) => setInstagram(e.target.value)}
@@ -275,7 +292,9 @@ export function EditPersonalInfoModal({
                     <Label htmlFor="dribbble">Dribbble</Label>
                     <Input
                       id="dribbble"
-                      type="url"
+                      type="text"
+                      inputMode="url"
+                      autoComplete="url"
                       placeholder="https://dribbble.com/username"
                       value={dribbble}
                       onChange={(e) => setDribbble(e.target.value)}

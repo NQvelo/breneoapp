@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon } from "@/components/icons";
 
 const Index = () => {
   const navigate = useNavigate();

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, MapPin, Pencil, Clock } from "lucide-react";
+import { Loader2, MapPin, Pencil, Clock } from "@/components/icons";
 import { toast } from "sonner";
 import {
   fetchEmployerJobById,

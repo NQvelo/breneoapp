@@ -48,7 +48,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MoreVertical, UserPlus } from "lucide-react";
+import { MoreVertical, UserPlus } from "@/components/icons";
 import { toast } from "sonner";
 
 function statusBadgeLabel(m: CompanyStaffMembership): string {

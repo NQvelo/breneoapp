@@ -2,7 +2,7 @@ import React from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
-import { Bell, Moon, Sun, Zap, ArrowLeft } from "lucide-react";
+import { Bell, Moon, Sun, Zap, ArrowLeft } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";

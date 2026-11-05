@@ -19,7 +19,7 @@ import {
   Settings,
   Clock,
   Tag,
-} from "lucide-react";
+} from "@/components/icons";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMobile } from "@/hooks/use-mobile";
@@ -71,7 +71,7 @@ import {
   Bookmark,
   Loader2,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { supabase } from "@/integrations/supabase/client";
@@ -1539,7 +1539,15 @@ const ProfilePage = () => {
     const data = res.data as Record<string, unknown>;
     const profileObj = data?.profile as Record<string, unknown> | undefined;
     const userObj = data?.user as Record<string, unknown> | undefined;
-    setProfileData(data as ProfileData);
+    setProfileData({
+      ...data,
+      country_region:
+        data?.country_region ??
+        profileObj?.country_region ??
+        payload.country_region ??
+        "",
+      city: data?.city ?? profileObj?.city ?? payload.city ?? "",
+    } as ProfileData);
     setAboutMe(
       (data?.about_me ?? profileObj?.about_me ?? userObj?.about_me) as
         | string
@@ -1550,17 +1558,21 @@ const ProfilePage = () => {
         profileObj?.profile_image ??
         userObj?.profile_image) as string | null,
     );
-    if (data?.social_links && typeof data.social_links === "object") {
-      const sl = data.social_links as Record<string, string>;
-      setSocialLinks({
-        github: sl.github ?? "",
-        linkedin: sl.linkedin ?? "",
-        facebook: sl.facebook ?? "",
-        instagram: sl.instagram ?? "",
-        dribbble: sl.dribbble ?? "",
-        behance: sl.behance ?? "",
-      });
-    }
+    const responseLinks =
+      data?.social_links ?? profileObj?.social_links ?? userObj?.social_links;
+    const sl = (
+      responseLinks && typeof responseLinks === "object"
+        ? responseLinks
+        : (payload.social_links ?? {})
+    ) as Record<string, string>;
+    setSocialLinks({
+      github: sl.github ?? "",
+      linkedin: sl.linkedin ?? "",
+      facebook: sl.facebook ?? "",
+      instagram: sl.instagram ?? "",
+      dribbble: sl.dribbble ?? "",
+      behance: sl.behance ?? "",
+    });
     toast.success("Profile updated.");
   };
 

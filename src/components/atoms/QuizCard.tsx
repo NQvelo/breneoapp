@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/components/icons";
 import type { AtomSubmitResult } from "@/api/atoms";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

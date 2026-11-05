@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, Loader2 } from "lucide-react";
+import { Eye, Loader2 } from "@/components/icons";
 import {
   fetchEmployerJobApplicants,
   type JobApplicant,

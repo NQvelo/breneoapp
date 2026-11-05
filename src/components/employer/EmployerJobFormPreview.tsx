@@ -8,7 +8,7 @@ import {
   Pencil,
   Clock,
   Loader2,
-} from "lucide-react";
+} from "@/components/icons";
 import { validateHttpUrl } from "@/api/employer/publishJob";
 import { hasDistinctStructuredSections } from "@/utils/jobSectionsDedup";
 import {

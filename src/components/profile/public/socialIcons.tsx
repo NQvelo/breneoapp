@@ -1,5 +1,5 @@
 import React from "react";
-import { Link2 } from "lucide-react";
+import { Link2 } from "@/components/icons";
 import type { PublicSocialLinks } from "@/api/profile/publicUserProfileTypes";
 
 export type SocialPlatform = keyof PublicSocialLinks;

@@ -3,7 +3,7 @@ import type { InterviewQuestion } from "@/api/interview/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Play, Volume2 } from "lucide-react";
+import { AlertCircle, Play, Volume2 } from "@/components/icons";
 
 interface InterviewQuestionPlayerProps {
   question: InterviewQuestion;

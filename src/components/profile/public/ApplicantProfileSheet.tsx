@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "@/components/icons";
 import type { EmployerJob } from "@/api/employer/jobsApi";
 import { recordApplicantCvView } from "@/api/employer/jobApplicantsApi";
 import { computeApplicantMatchPercent } from "@/utils/applicantJobMatch";

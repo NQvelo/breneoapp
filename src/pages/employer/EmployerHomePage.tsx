@@ -12,7 +12,7 @@ import {
   MapPin,
   Plus,
   CheckCircle2,
-} from "lucide-react";
+} from "@/components/icons";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";

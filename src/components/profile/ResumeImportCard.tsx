@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { FileUp, Loader2 } from "lucide-react";
+import { FileUp, Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { SettingsSectionCard } from "@/components/settings/SettingsSectionUi";
 import { Progress } from "@/components/ui/progress";

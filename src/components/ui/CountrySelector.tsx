@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown } from "@/components/icons";
 import { CountrySelectorModal } from "./CountrySelectorModal";
 import { Country, countries } from "@/data/countries";
 

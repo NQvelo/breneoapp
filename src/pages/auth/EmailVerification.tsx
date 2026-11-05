@@ -9,7 +9,7 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import axios from "axios";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon } from "@/components/icons";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const EmailVerification: React.FC = () => {

@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { toast } from "sonner";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "@/components/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMyCvViews, MY_CV_VIEWS_QUERY_KEY } from "@/hooks/useMyCvViews";
 import { useMyApplications } from "@/hooks/useMyApplications";

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@/components/icons";
 import { isPwaInstalled, subscribePwaInstall } from "@/lib/pwaInstall";
 import { cn } from "@/lib/utils";
 

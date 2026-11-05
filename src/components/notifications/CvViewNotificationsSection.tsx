@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, Loader2, CheckCircle } from "lucide-react";
+import { Eye, Loader2, CheckCircle } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {

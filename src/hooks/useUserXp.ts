@@ -9,6 +9,8 @@ export interface UserXp {
   jobApplicationsCount: number;
   courseEnrollmentsCount: number;
   isLoading: boolean;
+  /** Both sources have loaded, so the counts are real rather than fallback zeros. */
+  isReady: boolean;
 }
 
 /** XP derived from the user's job applications and course enrollments (job seekers only). */
@@ -31,5 +33,6 @@ export function useUserXp(
     jobApplicationsCount,
     courseEnrollmentsCount,
     isLoading: enabled && (loadingApps || loadingCourses),
+    isReady: enabled && myApps !== undefined && enrolledCourses !== undefined,
   };
 }

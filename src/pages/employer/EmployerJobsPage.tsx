@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreVertical, Briefcase, Users, Calendar } from "lucide-react";
+import { Plus, MoreVertical, Briefcase, Users, Calendar } from "@/components/icons";
 import { toast } from "sonner";
 import {
   fetchEmployerJobsFiltered,

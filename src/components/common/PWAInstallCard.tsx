@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, CheckCircle2 } from "lucide-react";
+import { Download, CheckCircle2 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 

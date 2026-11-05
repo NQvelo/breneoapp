@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AxiosError } from "axios";
-import { Check, SquarePen, X } from "lucide-react";
+import { Check, SquarePen, X } from "@/components/icons";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

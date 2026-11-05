@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, EyeOff, ImageIcon, X } from "lucide-react";
+import { Eye, EyeOff, ImageIcon, X } from "@/components/icons";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";

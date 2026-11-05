@@ -7,7 +7,7 @@ import {
   CheckCircle2,
   Loader2,
   UserRound,
-} from "lucide-react";
+} from "@/components/icons";
 
 const PASS_THRESHOLD = 75;
 /** Interviewer-side panel background (lighter grey on dark meeting canvas). */

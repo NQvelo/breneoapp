@@ -18,7 +18,7 @@ import {
   MapPin,
   Pencil,
   Users,
-} from "lucide-react";
+} from "@/components/icons";
 import { toast } from "sonner";
 
 function relativeAdded(value?: string): string {

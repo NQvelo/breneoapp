@@ -1,4 +1,4 @@
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";

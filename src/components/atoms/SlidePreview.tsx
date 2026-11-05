@@ -1,4 +1,4 @@
-import { Brain, ClipboardList } from "lucide-react";
+import { Brain, ClipboardList } from "@/components/icons";
 import type { ContentCard } from "@/api/atoms";
 import { StoryCard } from "./StoryCard";
 import { LessonCoverCard } from "./LessonCoverCard";

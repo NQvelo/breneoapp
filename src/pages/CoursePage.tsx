@@ -26,7 +26,7 @@ import {
   Video,
   Users,
   ExternalLink,
-} from "lucide-react";
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { recordCoursePageView } from "@/api/academy/courseAnalyticsApi";

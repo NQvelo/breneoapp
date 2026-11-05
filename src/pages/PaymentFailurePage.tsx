@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { XCircle } from "lucide-react";
+import { XCircle } from "@/components/icons";
 
 export default function PaymentFailurePage() {
   const navigate = useNavigate();

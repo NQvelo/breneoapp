@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "@/components/icons";
 
 const STORAGE_KEY_PREFIX = "academy_verified_congrats_shown";
 

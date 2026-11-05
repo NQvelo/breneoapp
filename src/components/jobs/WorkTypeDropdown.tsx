@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Network, X } from "lucide-react";
+import { Network, X } from "@/components/icons";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

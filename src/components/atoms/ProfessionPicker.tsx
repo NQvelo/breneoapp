@@ -1,7 +1,7 @@
 import type { Profession } from "@/api/atoms";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronRight, GraduationCap } from "lucide-react";
+import { ChevronRight, GraduationCap } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 interface ProfessionPickerProps {

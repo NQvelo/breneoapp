@@ -7,7 +7,7 @@ import PhoneInput from "react-phone-number-input";
 import type { Country } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { useAuth } from "@/contexts/AuthContext";
-import { Eye, EyeOff, Building2 } from "lucide-react";
+import { Eye, EyeOff, Building2 } from "@/components/icons";
 
 interface AuthFormProps {
   initialRole?: "student" | "academy";

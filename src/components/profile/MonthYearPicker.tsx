@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

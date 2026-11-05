@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X } from "@/components/icons";
 import { bogService } from "@/api";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";

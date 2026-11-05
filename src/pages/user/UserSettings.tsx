@@ -44,7 +44,7 @@ import {
   Sun,
   Moon,
   Monitor,
-} from "lucide-react";
+} from "@/components/icons";
 import { useMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {

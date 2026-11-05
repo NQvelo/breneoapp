@@ -19,7 +19,7 @@ import {
   Clock,
   GraduationCap,
   Users,
-} from "lucide-react";
+} from "@/components/icons";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { normalizeAcademyProfileApiResponse } from "@/api/academy";

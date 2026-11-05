@@ -9,7 +9,7 @@ import { getLocalizedPath } from "@/utils/localeUtils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, ChevronDown, LogOut } from "lucide-react";
+import { Building2, ChevronDown, LogOut } from "@/components/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,

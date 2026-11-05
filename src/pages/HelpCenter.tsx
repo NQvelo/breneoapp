@@ -16,7 +16,7 @@ import {
   CircleUserRound,
   Settings,
   Briefcase,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   Card,
   CardContent,

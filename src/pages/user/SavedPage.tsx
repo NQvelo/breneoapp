@@ -17,7 +17,7 @@ import {
   ExternalLink,
   MapPin,
   Loader2,
-} from "lucide-react";
+} from "@/components/icons";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { fetchJobDetail } from "@/api/jobs/jobService";

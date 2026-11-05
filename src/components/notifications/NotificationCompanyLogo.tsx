@@ -1,4 +1,4 @@
-import { Briefcase } from "lucide-react";
+import { Briefcase } from "@/components/icons";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { normalizeNotificationLogoUrl } from "@/api/notifications/notificationDisplayUtils";

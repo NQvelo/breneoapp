@@ -725,4 +725,15 @@ export const en = {
     remove: "Remove {name}",
     addAnother: "Add another industry using the search field above.",
   },
+  // XP earned notice
+  xpGained: {
+    title: "You earned {xp} XP!",
+    subtitle: "Keep going — every application and course moves you forward.",
+    jobApplication: "Applied to a job",
+    jobApplications: "Applied to {count} jobs",
+    courseEnrollment: "Enrolled in a course",
+    courseEnrollments: "Enrolled in {count} courses",
+    total: "Total: {xp} XP",
+    gotIt: "Got it",
+  },
 };

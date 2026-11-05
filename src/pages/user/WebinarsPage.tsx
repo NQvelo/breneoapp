@@ -5,7 +5,7 @@ import { useTranslation } from "@/contexts/LanguageContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle } from "@/components/icons";
 import { toast } from "sonner";
 import {
   atomsApi,

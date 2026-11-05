@@ -21,7 +21,7 @@ import {
   jobIdFromApplication,
   type JobApplicationItem,
 } from "@/api/jobs/jobApplicationsApi";
-import { Briefcase, CheckCircle, Eye, Loader2 } from "lucide-react";
+import { Briefcase, CheckCircle, Eye, Loader2 } from "@/components/icons";
 import { toast } from "sonner";
 
 type CvViewListItem =

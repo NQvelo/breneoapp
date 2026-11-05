@@ -1,5 +1,5 @@
 import React from "react";
-import { ImageIcon } from "lucide-react";
+import { ImageIcon } from "@/components/icons";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 import { AuthHeaderControls } from "@/components/auth/AuthHeaderControls";
 

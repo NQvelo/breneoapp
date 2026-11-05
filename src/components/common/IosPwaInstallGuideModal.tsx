@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Plus, Share } from "lucide-react";
+import { Plus, Share } from "@/components/icons";
 import {
   Dialog,
   DialogContent,

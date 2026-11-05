@@ -201,6 +201,12 @@
   }
 }
 
+/* Platform icons (src/components/icons): at 16px this matches the mobile tab bar's line weight */
+.breneo-icon,
+.breneo-icon [stroke-width] {
+  stroke-width: 1.875;
+}
+
 /* Glisse mobile tab bar: platform font and smaller icons */
 .breneo-tab-bar.lg-tab-bar[data-icons] {
   --lg-tab-width: min(80px, calc((100vw - 40px) / var(--lg-tabs)));
@@ -209,7 +215,7 @@
   --lg-glass-bend: 0.8;
   --lg-glass-dispersion: 0.7;
   --lg-blur: 2px;
-  --lg-tab-idle: #6b7280;
+  --lg-tab-idle: #000000;
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.08),
     0 12px 40px rgba(0, 0, 0, 0.14),
@@ -219,7 +225,7 @@
 .breneo-tab-bar.lg-tab-bar[data-theme="dark"] {
   --lg-glass: rgb(40 40 40 / 0.42);
   --lg-rim-shine: 0.4;
-  --lg-tab-idle: #9ca3af;
+  --lg-tab-idle: #ffffff;
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.35),
     0 16px 48px rgba(0, 0, 0, 0.45),
@@ -273,6 +279,22 @@
 .breneo-tab-bar .lg-tab-icon > svg {
   width: 20px;
   height: 20px;
+}
+
+.breneo-tab-bar .breneo-tab-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.breneo-tab-bar .breneo-tab-avatar[data-square] {
+  border-radius: 6px;
+}
+
+.breneo-tab-bar .breneo-tab-avatar[data-active] {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
 }
 
 @layer utilities {
