@@ -1,14 +1,14 @@
 export type SettingsSection =
   | "account"
+  | "cv"
   | "notifications"
-  | "privacy"
   | "subscription"
   | "accessibility";
 
 export const VALID_SETTINGS_SECTIONS: SettingsSection[] = [
   "account",
+  "cv",
   "notifications",
-  "privacy",
   "subscription",
   "accessibility",
 ];

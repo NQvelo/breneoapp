@@ -37,9 +37,9 @@ import {
   Bell,
   CreditCard,
   ChevronRight,
+  FileUp,
   LogOut,
   User,
-  Shield,
   Palette,
   Sun,
   Moon,
@@ -54,7 +54,7 @@ import {
 import { bogService } from "@/api/bog/bogService";
 import { PaymentTransaction } from "@/api/bog/bogService";
 import { useSubscription } from "@/contexts/SubscriptionContext";
-import { ResumeImportCard } from "@/components/profile/ResumeImportCard";
+import { AccountCvSection } from "@/components/profile/AccountCvSection";
 import {
   SettingsGroupList,
   type SettingsListItemConfig,
@@ -63,6 +63,7 @@ import { SettingsPwaAppCard } from "@/components/settings/SettingsPwaAppCard";
 import { SettingsAppVersionFooter } from "@/components/settings/SettingsAppVersionFooter";
 import { SettingsMobileHeader } from "@/components/settings/SettingsMobileHeader";
 import { AcademyAccountInfoCard } from "@/components/settings/AcademyAccountInfoCard";
+import { AccountDataActions } from "@/components/settings/AccountDataActions";
 import {
   SettingsActionRow,
   SettingsListRow,
@@ -323,11 +324,6 @@ export default function SettingsPage() {
   );
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Privacy & Security
-  const [showSkills, setShowSkills] = useState(true);
-  const [showTestResults, setShowTestResults] = useState(true);
-  const [showCompletedCourses, setShowCompletedCourses] = useState(true);
-
   // Accessibility
   const [fontSize, setFontSize] = useState<"small" | "medium" | "big">(
     contextFontSize,
@@ -378,11 +374,6 @@ export default function SettingsPage() {
     setInAppProgress(loadPreference("notif_in_app_progress", true));
     setNewsletter(loadPreference("notif_newsletter", false));
     setPushNotifications(loadPreference("notif_push", false));
-    setShowSkills(loadPreference("privacy_show_skills", true));
-    setShowTestResults(loadPreference("privacy_show_test_results", true));
-    setShowCompletedCourses(
-      loadPreference("privacy_show_completed_courses", true),
-    );
     const savedFontSize = loadPreference(
       "breneo-font-size",
       contextFontSize,
@@ -470,27 +461,6 @@ export default function SettingsPage() {
       localStorage.setItem("notif_push", JSON.stringify(pushNotifications));
     }
   }, [pushNotifications, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem("privacy_show_skills", JSON.stringify(showSkills));
-    }
-  }, [showSkills, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(
-        "privacy_show_test_results",
-        JSON.stringify(showTestResults),
-      );
-    }
-  }, [showTestResults, mounted]);
-  useEffect(() => {
-    if (mounted) {
-      localStorage.setItem(
-        "privacy_show_completed_courses",
-        JSON.stringify(showCompletedCourses),
-      );
-    }
-  }, [showCompletedCourses, mounted]);
   // Handle font size change - apply immediately
   const handleFontSizeChange = (value: "small" | "medium" | "big") => {
     setFontSize(value);
@@ -723,6 +693,25 @@ export default function SettingsPage() {
           iconColorClass: "text-sky-600 dark:text-sky-400",
           onClick: openSection("account"),
         },
+      ],
+    ];
+
+    if (!isOrgSettings) {
+      groups.push([
+        {
+          id: "cv",
+          title: getSettingsSectionLabel("cv", t),
+          subtitle: t.settings.list.cvSubtitle,
+          icon: FileUp,
+          iconBgClass: "bg-violet-100 dark:bg-violet-950/40",
+          iconColorClass: "text-violet-600 dark:text-violet-400",
+          onClick: openSection("cv"),
+        },
+      ]);
+    }
+
+    groups.push(
+      [
         {
           id: "notifications",
           title: getSettingsSectionLabel("notifications", t),
@@ -746,18 +735,7 @@ export default function SettingsPage() {
           onClick: openSection("accessibility"),
         },
       ],
-      [
-        {
-          id: "privacy",
-          title: getSettingsSectionLabel("privacy", t),
-          subtitle: t.settings.list.privacySubtitle,
-          icon: Shield,
-          iconBgClass: "bg-pink-100 dark:bg-pink-950/40",
-          iconColorClass: "text-pink-600 dark:text-pink-400",
-          onClick: openSection("privacy"),
-        },
-      ],
-    ];
+    );
 
     groups.push([
       {
@@ -785,6 +763,7 @@ export default function SettingsPage() {
     subscriptionInfo?.plan_name,
     isAcademySettings,
     academyDisplay?.name,
+    isOrgSettings,
   ]);
 
   const logoutItem: SettingsListItemConfig = {
@@ -822,6 +801,7 @@ export default function SettingsPage() {
                       }
                     />
                   </SettingsSubsection>
+                  <AccountDataActions />
                 </div>
               </SettingsSectionCard>
             </div>
@@ -846,12 +826,38 @@ export default function SettingsPage() {
                       }
                     />
                   </SettingsSubsection>
+                  <AccountDataActions />
                 </div>
               </SettingsSectionCard>
             </div>
           );
         }
-        return <ResumeImportCard />;
+        return (
+          <div className="space-y-4">
+            <SettingsSectionCard>
+              <div className="space-y-6">
+                <SettingsSubsection title={t.settings.sections.account}>
+                  <SettingsListRow
+                    primary={t.settings.changePassword.email}
+                    secondary={recoveryEmail || "—"}
+                  />
+                  <SettingsActionRow
+                    label={t.settings.privacyPage.changePassword}
+                    description={t.settings.privacyPage.changePasswordDesc}
+                    onClick={() => setChangePasswordOpen(true)}
+                    trailing={
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    }
+                  />
+                </SettingsSubsection>
+                <AccountDataActions />
+              </div>
+            </SettingsSectionCard>
+          </div>
+        );
+
+      case "cv":
+        return <AccountCvSection />;
 
       case "notifications":
         return (
@@ -962,66 +968,6 @@ export default function SettingsPage() {
             </SettingsSectionCard>
           </div>
         );
-
-      case "privacy": {
-        return (
-          <div className="space-y-4">
-            <SettingsSectionCard>
-              <div className="space-y-6">
-                <SettingsSubsection title={t.settings.privacyPage.security}>
-                  <SettingsActionRow
-                    label={t.settings.privacyPage.changePassword}
-                    description={t.settings.privacyPage.changePasswordDesc}
-                    onClick={() => setChangePasswordOpen(true)}
-                    trailing={
-                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    }
-                  />
-                </SettingsSubsection>
-
-                {!isOrgSettings ? (
-                  <SettingsSubsection
-                    title={t.settings.privacyPage.dataVisibility}
-                  >
-                    <SettingsToggleRow
-                      label={t.settings.privacyPage.showSkills}
-                      description={t.settings.privacyPage.showSkillsDesc}
-                    >
-                      <Switch
-                        aria-label={t.settings.privacyPage.showSkills}
-                        checked={showSkills}
-                        onCheckedChange={setShowSkills}
-                      />
-                    </SettingsToggleRow>
-                    <SettingsToggleRow
-                      label={t.settings.privacyPage.showTestResults}
-                      description={t.settings.privacyPage.showTestResultsDesc}
-                    >
-                      <Switch
-                        aria-label={t.settings.privacyPage.showTestResults}
-                        checked={showTestResults}
-                        onCheckedChange={setShowTestResults}
-                      />
-                    </SettingsToggleRow>
-                    <SettingsToggleRow
-                      label={t.settings.privacyPage.showCompletedCourses}
-                      description={
-                        t.settings.privacyPage.showCompletedCoursesDesc
-                      }
-                    >
-                      <Switch
-                        aria-label={t.settings.privacyPage.showCompletedCourses}
-                        checked={showCompletedCourses}
-                        onCheckedChange={setShowCompletedCourses}
-                      />
-                    </SettingsToggleRow>
-                  </SettingsSubsection>
-                ) : null}
-              </div>
-            </SettingsSectionCard>
-          </div>
-        );
-      }
 
       case "subscription":
         return (

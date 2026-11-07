@@ -125,6 +125,8 @@ interface SettingsActionRowProps {
   description?: string;
   onClick: () => void;
   trailing?: React.ReactNode;
+  destructive?: boolean;
+  disabled?: boolean;
 }
 
 export function SettingsActionRow({
@@ -132,15 +134,28 @@ export function SettingsActionRow({
   description,
   onClick,
   trailing,
+  destructive,
+  disabled,
 }: SettingsActionRowProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-4 rounded-2xl bg-gray-50/90 px-4 py-3.5 text-left transition-colors hover:bg-gray-100/90 dark:bg-white/5 dark:hover:bg-white/10"
+      disabled={disabled}
+      className={cn(
+        "flex w-full items-center justify-between gap-4 rounded-2xl bg-gray-50/90 px-4 py-3.5 text-left transition-colors hover:bg-gray-100/90 disabled:opacity-60 dark:bg-white/5 dark:hover:bg-white/10",
+        destructive && "hover:bg-red-50/80 dark:hover:bg-red-950/20",
+      )}
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <p
+          className={cn(
+            "text-sm font-semibold",
+            destructive ? "text-red-600 dark:text-red-500" : "text-foreground",
+          )}
+        >
+          {label}
+        </p>
         {description ? (
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {description}

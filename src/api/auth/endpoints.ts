@@ -30,6 +30,11 @@ export const API_ENDPOINTS = {
     SKILLS: "/api/me/skills/",
     INDUSTRY_PROFILE: "/api/me/industry-profile/",
     MATCHED_PROFESSIONS: "/api/me/profession/",
+    RESUME: "/api/me/resume/",
+  },
+  ATS: {
+    PARSE: "/api/ats/parse/",
+    MATCH: "/api/ats/match/",
   },
   EDUCATIONS: "/api/educations/",
   WORK_EXPERIENCES: "/api/work-experiences/",
