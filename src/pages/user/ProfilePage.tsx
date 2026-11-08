@@ -1,4 +1,11 @@
-import React, { Suspense, useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  Suspense,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+} from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
@@ -19,6 +26,7 @@ import {
   Settings,
   Clock,
   Tag,
+  MoreVertical,
 } from "@/components/icons";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +65,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import usePhoneVerification from "@/hooks/usePhoneVerification";
@@ -105,6 +119,30 @@ import {
 } from "@/components/profile";
 import { ProfileAppliedView } from "@/components/profile/ProfileAppliedView";
 import { ProfileViewSwitcher } from "@/components/profile/ProfileViewSwitcher";
+function PersonalInfoMenuRow({
+  icon,
+  iconClassName,
+  label,
+}: {
+  icon: React.ReactNode;
+  iconClassName: string;
+  label: string;
+}) {
+  return (
+    <span className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-foreground">
+      <span
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+          iconClassName,
+        )}
+      >
+        {icon}
+      </span>
+      <span className="text-sm font-medium">{label}</span>
+    </span>
+  );
+}
+
 const SkillsBarChart = React.lazy(
   () => import("@/components/profile/SkillsBarChart").then((m) => ({ default: m.SkillsBarChart })),
 );
@@ -330,6 +368,9 @@ const ProfilePage = () => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [aboutMe, setAboutMe] = useState<string | null>(null);
+  const [aboutMeExpanded, setAboutMeExpanded] = useState(false);
+  const [aboutMeOverflows, setAboutMeOverflows] = useState(false);
+  const aboutMeTextRef = useRef<HTMLParagraphElement>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<
     "profile" | "saved" | "applied"
@@ -342,6 +383,24 @@ const ProfilePage = () => {
   );
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageTimestamp, setImageTimestamp] = useState(Date.now());
+
+  useLayoutEffect(() => {
+    const el = aboutMeTextRef.current;
+    if (!el || aboutMeExpanded) return;
+
+    const measure = () => {
+      setAboutMeOverflows(el.scrollHeight > el.clientHeight + 1);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [aboutMe, aboutMeExpanded, loadingProfile, activeView]);
+
+  useEffect(() => {
+    setAboutMeExpanded(false);
+  }, [aboutMe]);
 
   // Update active view based on hash
   useEffect(() => {
@@ -410,6 +469,7 @@ const ProfilePage = () => {
   const [loadingWorkExperiences, setLoadingWorkExperiences] = useState(false);
   const [loadingProfileSkills, setLoadingProfileSkills] = useState(false);
   const [isPersonalInfoModalOpen, setIsPersonalInfoModalOpen] = useState(false);
+  const [personalInfoMenuOpen, setPersonalInfoMenuOpen] = useState(false);
   const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
   const [isWorkExperienceModalOpen, setIsWorkExperienceModalOpen] =
     useState(false);
@@ -1786,6 +1846,47 @@ const ProfilePage = () => {
     );
   };
 
+  const openPersonalInfoEditor = () => {
+    setPersonalInfoMenuOpen(false);
+    if (isMobile) {
+      window.setTimeout(() => setIsPersonalInfoModalOpen(true), 180);
+      return;
+    }
+    setIsPersonalInfoModalOpen(true);
+  };
+
+  const goToSettings = () => {
+    setPersonalInfoMenuOpen(false);
+    navigate("/settings");
+  };
+
+  const goToResumeSettings = () => {
+    setPersonalInfoMenuOpen(false);
+    navigate("/settings?section=cv");
+  };
+
+  const settingsAction = (
+    <PersonalInfoMenuRow
+      icon={<Settings className="h-4 w-4" />}
+      iconClassName="bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
+      label={t.nav.settings}
+    />
+  );
+  const editPersonalInfoAction = (
+    <PersonalInfoMenuRow
+      icon={<Edit className="h-4 w-4" />}
+      iconClassName="bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300"
+      label={t.profile.editPersonalInfo}
+    />
+  );
+  const resumeAction = (
+    <PersonalInfoMenuRow
+      icon={<Upload className="h-4 w-4" />}
+      iconClassName="bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
+      label={t.profile.addRemoveResume}
+    />
+  );
+
   return (
     <DashboardLayout>
       <ProfileViewSwitcher
@@ -1808,15 +1909,56 @@ const ProfilePage = () => {
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Personal information
               </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => setIsPersonalInfoModalOpen(true)}
-                aria-label="Edit personal information"
-              >
-                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
+              {isMobile ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t.profile.personalInfoActions}
+                  onClick={() => setPersonalInfoMenuOpen(true)}
+                  className="h-9 w-9 rounded-full"
+                >
+                  <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </Button>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t.profile.personalInfoActions}
+                      className="h-9 w-9 rounded-full"
+                    >
+                      <MoreVertical className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    sideOffset={8}
+                    className="w-60 rounded-2xl border-0 bg-white p-1.5 shadow-xl dark:bg-[#2a2a2a]"
+                  >
+                    <DropdownMenuItem
+                      onClick={openPersonalInfoEditor}
+                      className="cursor-pointer rounded-xl p-0 focus:bg-gray-100 dark:focus:bg-white/10"
+                    >
+                      {editPersonalInfoAction}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={goToSettings}
+                      className="cursor-pointer rounded-xl p-0 focus:bg-gray-100 dark:focus:bg-white/10"
+                    >
+                      {settingsAction}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={goToResumeSettings}
+                      className="cursor-pointer rounded-xl p-0 focus:bg-gray-100 dark:focus:bg-white/10"
+                    >
+                      {resumeAction}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </CardHeader>
             <CardContent className="px-6 pb-6">
               <div className="flex flex-row items-center gap-4 mb-4">
@@ -1911,7 +2053,11 @@ const ProfilePage = () => {
                   .map(([platform, url]) => (
                     <a
                       key={platform}
-                      href={url}
+                      href={
+                        /^https?:\/\//i.test(url.trim())
+                          ? url.trim()
+                          : `https://${url.trim()}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className={cn(
@@ -1920,30 +2066,16 @@ const ProfilePage = () => {
                       )}
                     >
                       {getSocialIcon(platform, "h-4 w-4 text-gray-500")}
-                      {url.length > 35
-                        ? `${url.slice(0, 32)}...`
-                        : url.replace(/^https?:\/\/(www\.)?/, "")}
+                      {platformLabels[platform]}
                     </a>
                   ))}
-              </div>
-              <div className="mt-4 flex md:justify-end">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate("/settings")}
-                  className="w-full md:w-auto rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
-                  aria-label={t.nav.settings}
-                >
-                  <Settings className="h-4 w-4" />
-                  {t.nav.settings}
-                </Button>
               </div>
             </CardContent>
           </Card>
 
           {/* 2. About Me */}
           <Card className="border-0 rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <CardHeader className="mb-0 flex flex-row items-center justify-between p-4 pb-2 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 About Me
               </h3>
@@ -1957,25 +2089,30 @@ const ProfilePage = () => {
                 <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
               </Button>
             </CardHeader>
-            <CardContent className="px-6 py-4">
+            <CardContent className="px-6 pb-4 pt-0">
               {loadingProfile ? (
                 <div className="text-center py-4 text-gray-500">Loading...</div>
               ) : aboutMe ? (
                 <div>
-                  <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
-                    {aboutMe.length > 200
-                      ? `${aboutMe.substring(0, 200)}...`
-                      : aboutMe}
+                  <p
+                    ref={aboutMeTextRef}
+                    className={cn(
+                      "text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed",
+                      !aboutMeExpanded && "line-clamp-5",
+                    )}
+                  >
+                    {aboutMe}
                   </p>
-                  {aboutMe.length > 200 && (
+                  {aboutMeOverflows ? (
                     <Button
+                      type="button"
                       variant="link"
                       className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
-                      onClick={handleOpenAboutMeModal}
+                      onClick={() => setAboutMeExpanded((open) => !open)}
                     >
-                      View More
+                      {aboutMeExpanded ? "View less" : "View more"}
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500 italic">
@@ -2797,6 +2934,38 @@ const ProfilePage = () => {
         }}
         onSave={handleSavePersonalInfo}
       />
+      {isMobile ? (
+        <Drawer open={personalInfoMenuOpen} onOpenChange={setPersonalInfoMenuOpen}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader className="pb-8">
+              <DrawerTitle>Personal information</DrawerTitle>
+            </DrawerHeader>
+            <div className="space-y-1 px-3 pb-6">
+              <button
+                type="button"
+                onClick={openPersonalInfoEditor}
+                className="w-full rounded-xl transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                {editPersonalInfoAction}
+              </button>
+              <button
+                type="button"
+                onClick={goToSettings}
+                className="w-full rounded-xl transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                {settingsAction}
+              </button>
+              <button
+                type="button"
+                onClick={goToResumeSettings}
+                className="w-full rounded-xl transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                {resumeAction}
+              </button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
       <EditEducationModal
         open={isEducationModalOpen}
         onOpenChange={setIsEducationModalOpen}

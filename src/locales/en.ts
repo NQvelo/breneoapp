@@ -198,6 +198,9 @@ export const en = {
     education: "Education",
     bio: "Bio",
     saveChanges: "Save Changes",
+    personalInfoActions: "Personal information actions",
+    editPersonalInfo: "Edit personal info",
+    addRemoveResume: "Add/remove resume",
   },
   // Settings
   settings: {
@@ -220,7 +223,7 @@ export const en = {
     },
     list: {
       manageAccount: "Manage your account",
-      cvSubtitle: "Upload and score a resume",
+      cvSubtitle: "Upload a resume",
       on: "On",
       off: "Off",
       freePlan: "Free Plan",
@@ -317,13 +320,29 @@ export const en = {
       removeAccountError: "Could not remove your account.",
       cv: {
         description:
-          "Upload a PDF or DOCX resume. The formatted CV stays on this page, and the same details are copied into your profile, education, work experience, and skills. A new upload replaces education and work experience. Skills are added alongside the ones you already have. Your account email stays the same.",
+          "Upload a PDF or DOCX resume. The details are saved to your profile, education, work experience, and skills. A new upload replaces education and work experience. Skills are added alongside the ones you already have.",
         upload: "Upload resume",
         replace: "Upload a different resume",
         uploading: "Reading resume...",
         fileHint: "PDF or DOCX, up to 10 MB",
         emptyTitle: "No resume yet",
-        emptyBody: "Upload a CV to see every parsed detail written out here.",
+        emptyBody: "Upload a CV to save it to your profile.",
+        savedTitle: "Your CV is saved",
+        savedBody:
+          "You can review it on your profile, upload a different resume, or remove this one.",
+        uploaded: "Uploaded",
+        cvActions: "CV actions",
+        reuploadCv: "Reupload new CV",
+        removeCv: "Remove current CV",
+        removeCvWorking: "Removing...",
+        removeCvError: "Could not remove this CV.",
+        removeCvConfirmDescription:
+          "This removes the saved CV, About Me, education, work experience, and skills. Your name, phone, location, and photo stay.",
+        removeCvConfirm: "Remove CV",
+        uploadSuccessTitle: "CV saved",
+        uploadSuccessBody: "Your resume was uploaded and saved to your profile.",
+        uploadFailureTitle: "Upload failed",
+        viewProfile: "View profile",
         fileTooLarge: "CV file size must be 10 MB or less.",
         unsupportedFormat:
           "Only PDF and DOCX files are accepted. Legacy .doc files are not supported.",
