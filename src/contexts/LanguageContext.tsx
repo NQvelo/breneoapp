@@ -10,6 +10,7 @@ import { en } from "@/locales/en";
 import { ka } from "@/locales/ka";
 import {
   getLanguageFromPath,
+  getExplicitLanguageFromPath,
   addLanguagePrefix,
   removeLanguagePrefix,
 } from "@/utils/localeUtils";
@@ -61,7 +62,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted || typeof window === "undefined") return;
 
-    const urlLang = getLanguageFromPath(location.pathname);
+    const urlLang = getExplicitLanguageFromPath(location.pathname);
     if (urlLang && urlLang !== language) {
       setLanguageState(urlLang);
       localStorage.setItem("appLanguage", urlLang);

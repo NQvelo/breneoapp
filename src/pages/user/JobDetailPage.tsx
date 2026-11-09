@@ -81,7 +81,6 @@ import {
 } from "@/utils/jobEmploymentDisplay";
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
-import { JobMockInterviewPromo } from "@/components/jobs/JobMockInterviewPromo";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
@@ -2086,14 +2085,6 @@ const JobDetailPage = () => {
               {user && requiredSkillsList.length > 0 ? (
                 <JobMissingSkillsCoursesSlider
                   missingSkills={missingJobSkills}
-                  className="mt-6"
-                />
-              ) : null}
-
-              {user ? (
-                <JobMockInterviewPromo
-                  jobTitle={getJobTitle()}
-                  jobId={applicationJobId}
                   className="mt-6"
                 />
               ) : null}

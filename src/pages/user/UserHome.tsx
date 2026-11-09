@@ -59,7 +59,6 @@ import type { JobDetail } from "@/api/jobs/types";
 import { cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import { toast } from "sonner";
-import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import {
   DashboardAnalytics,
   type ApplicationStats,
@@ -1245,7 +1244,6 @@ const UserHome = () => {
 
   return (
     <DashboardLayout>
-      <BetaVersionModal />
       {/* Mobile Welcome Message */}
       {isMobile && (
         <div className="mb-4 px-4 md:hidden">

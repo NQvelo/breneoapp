@@ -8,7 +8,7 @@ import { buildAiInterviewStartPath } from "@/components/jobs/JobAiInterviewHeade
 
 interface JobStartAiInterviewButtonProps {
   jobTitle: string;
-  jobId: string | number;
+  jobId?: string | number | null;
   size?: ButtonProps["size"];
   className?: string;
   label?: string;

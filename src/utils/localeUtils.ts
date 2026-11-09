@@ -7,16 +7,19 @@ export function getLanguageCode(language: Language): string {
   return language === "ka" ? "ka" : "en";
 }
 
+/** Language written in the URL (`/en/...` or `/ka/...`). Null when the path has no prefix. */
+export function getExplicitLanguageFromPath(pathname: string): Language | null {
+  const firstSegment = pathname.split("/").filter(Boolean)[0];
+  if (firstSegment === "ka" || firstSegment === "en") return firstSegment;
+  return null;
+}
+
 /**
  * Get language from URL path
  */
 export function getLanguageFromPath(pathname: string): Language {
-  const segments = pathname.split("/").filter(Boolean);
-  const firstSegment = segments[0];
-  
-  if (firstSegment === "ka" || firstSegment === "en") {
-    return firstSegment as Language;
-  }
+  const explicit = getExplicitLanguageFromPath(pathname);
+  if (explicit) return explicit;
   
   // Default to stored language or English
   if (typeof window !== "undefined") {

@@ -92,7 +92,6 @@ import {
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
-import { BetaVersionModal } from "@/components/common/BetaVersionModal";
 import {
   getMatchQualityLabel,
 } from "@/utils/jobMatchUtils";
@@ -2354,8 +2353,6 @@ const JobsPage = () => {
 
   return (
     <DashboardLayout>
-      <BetaVersionModal />
-
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">

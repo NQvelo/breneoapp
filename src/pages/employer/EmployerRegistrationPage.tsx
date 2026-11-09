@@ -8,6 +8,7 @@ import { Eye, EyeOff, ImageIcon, X } from "@/components/icons";
 import { CountrySelector } from "@/components/ui/CountrySelector";
 import { Country, countries } from "@/data/countries";
 import { toast } from "sonner";
+import { AuthCoverImage } from "@/components/auth/AuthCoverImage";
 import { AuthPageHeader } from "@/components/auth/AuthPageHeader";
 import { AuthLegalNotice } from "@/components/auth/AuthLegalNotice";
 import apiClient from "@/api/auth/apiClient";
@@ -209,21 +210,9 @@ const EmployerRegistrationPage = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
 
-  const [backgroundLoaded, setBackgroundLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-
   const [selectedCountry, setSelectedCountry] = useState<Country | undefined>(
     countries.find((c) => c.code === "GE"),
   );
-
-  const preloadImage = useCallback((src: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-      img.src = src;
-    });
-  }, []);
 
   useEffect(() => {
     const loadIndustries = async () => {
@@ -236,21 +225,6 @@ const EmployerRegistrationPage = () => {
     };
     loadIndustries();
   }, []);
-
-  useEffect(() => {
-    const preloadImages = async () => {
-      try {
-        await Promise.all([
-          preloadImage("/lovable-uploads/Breneo-logo.png"),
-          preloadImage("/lovable-uploads/Breneo-logo-dark.png"),
-          preloadImage("/lovable-uploads/future.png"),
-        ]);
-      } catch {
-        setImageError(true);
-      }
-    };
-    preloadImages();
-  }, [preloadImage]);
 
   useEffect(() => {
     document.title = "Employer registration | Breneo";
@@ -1299,33 +1273,7 @@ const EmployerRegistrationPage = () => {
         </div>
 
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-5">
-          <div className="relative h-full w-full overflow-hidden rounded-3xl">
-            {!backgroundLoaded && !imageError && (
-              <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-[#242424] dark:to-[#2a2a2a] animate-pulse flex items-center justify-center">
-                <ImageIcon className="h-16 w-16 text-gray-400 dark:text-gray-600" />
-              </div>
-            )}
-            <div
-              className={`w-full h-full bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${
-                backgroundLoaded ? "opacity-100" : "opacity-0"
-              }`}
-              style={{
-                backgroundImage: backgroundLoaded
-                  ? "url('/lovable-uploads/future.png')"
-                  : "none",
-              }}
-            />
-            <img
-              src="/lovable-uploads/future.png"
-              alt=""
-              className="hidden"
-              onLoad={() => setBackgroundLoaded(true)}
-              onError={() => {
-                setImageError(true);
-                setBackgroundLoaded(true);
-              }}
-            />
-          </div>
+          <AuthCoverImage src="/lovable-uploads/future.png" />
         </div>
       </div>
     </div>

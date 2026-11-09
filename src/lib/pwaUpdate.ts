@@ -92,11 +92,13 @@ export function initPwaUpdate(): void {
   });
 }
 
+/** A newer build is waiting, for the installed app or a normal browser visit. */
+export function isAppUpdateReady(): boolean {
+  return serviceWorkerUpdateAvailable || remoteVersionAvailable !== null;
+}
+
 export function isPwaUpdateAvailable(): boolean {
-  return (
-    isPwaInstalled() &&
-    (serviceWorkerUpdateAvailable || remoteVersionAvailable !== null)
-  );
+  return isPwaInstalled() && isAppUpdateReady();
 }
 
 export function getRemoteAppVersion(): string | null {

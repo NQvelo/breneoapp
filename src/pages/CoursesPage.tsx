@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { GrowthInterviewSection } from "@/components/growth/GrowthInterviewSection";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,8 +18,6 @@ import { toast } from "sonner";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { cn } from "@/lib/utils";
-import { BetaVersionModal } from "@/components/common/BetaVersionModal";
-
 const COURSES_FILTERED_RESULTS_KEY = "coursesResults";
 
 const saveFilteredCoursesToSession = (courses: Course[]) => {
@@ -541,8 +540,6 @@ const CoursesPage = () => {
 
   return (
     <DashboardLayout>
-      <BetaVersionModal />
-
       <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8 pb-32 md:pb-16">
         {coursesLoading && !shouldShowSavedCourses ? (
           <div className="space-y-10">
@@ -662,6 +659,7 @@ const CoursesPage = () => {
             </section>
           </>
         ) : null}
+        <GrowthInterviewSection />
       </div>
     </DashboardLayout>
   );

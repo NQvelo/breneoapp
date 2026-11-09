@@ -1,13 +1,15 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTranslation } from "@/contexts/LanguageContext";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
+import { getLocalizedPath } from "@/utils/localeUtils";
 import { ImageIcon } from "@/components/icons";
 import { BreneoLogo } from "@/components/common/BreneoLogo";
 
 const NotFound = () => {
   const location = useLocation();
   const { user, loading } = useAuth();
+  const { language } = useLanguage();
   const t = useTranslation();
 
   // Image loading states
@@ -162,7 +164,7 @@ const NotFound = () => {
                 </Link>
                 <span className="mx-2">•</span>
                 <Link
-                  to="/auth/signup"
+                  to={getLocalizedPath("/start", language)}
                   className="hover:text-primary transition-colors"
                 >
                   {t.auth.signup}

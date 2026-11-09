@@ -23,6 +23,7 @@ const SignupPage = lazy(() => import("@/pages/auth/AuthPage"));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPasswordPage"));
 const EmailVerification = lazy(() => import("@/pages/auth/EmailVerification"));
 const EmailConfirmed = lazy(() => import("@/pages/auth/EmailConfirmed"));
+const OnboardingPage = lazy(() => import("@/pages/auth/OnboardingPage"));
 
 // User pages (User-only)
 const UserDashboard = lazy(() => import("@/pages/user/UserHome"));
@@ -247,6 +248,7 @@ export const AppRoutes = () => {
           ========================================== */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/auth/login" element={<LoginPage />} />
+        {createLocalizedRoute("/start", <OnboardingPage />)}
         <Route path="/auth/signup" element={<SignupPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/email-verification" element={<EmailVerification />} />

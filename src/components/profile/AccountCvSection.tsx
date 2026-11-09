@@ -275,7 +275,7 @@ export function AccountCvSection() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="space-y-4">
       <SettingsSectionCard>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-muted-foreground">

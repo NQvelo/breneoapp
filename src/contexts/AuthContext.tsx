@@ -21,6 +21,7 @@ import {
   getLanguageFromPath,
   removeLanguagePrefix,
 } from "@/utils/localeUtils";
+import { applyOnboardingAnswers } from "@/onboarding/onboardingAnswers";
 interface User {
   id: number | string; // Allow both number and string IDs
   username?: string; // Make optional since profile might not have username
@@ -674,6 +675,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       // List of public routes
       const publicRoutes = [
+        "/start",
         "/auth/login",
         "/auth/signup",
         "/auth/reset-password",
@@ -1024,6 +1026,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       setUser(userData);
+
+      if ((userData.user_type || "user") === "user") {
+        try {
+          await applyOnboardingAnswers();
+        } catch (error) {
+          console.warn("Could not save onboarding answers:", error);
+        }
+      }
 
       if (userData.user_type === "academy") {
         setEmployerDisplay(null);
