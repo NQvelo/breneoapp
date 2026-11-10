@@ -97,17 +97,17 @@ export function DashboardProfileWelcome() {
     <section className="-mt-4 flex min-h-full flex-col bg-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:-mt-8 sm:px-8">
       <div className="mx-auto w-full max-w-6xl">
         <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-3 pb-3 text-center sm:px-6 sm:pb-6">
-          <div className="w-full max-w-[240px] sm:max-w-[360px]">
+          <div className="w-full max-w-[300px] sm:max-w-[360px]">
             <img
               src={WELCOME_ILLUSTRATION_LIGHT}
               alt=""
-              className="mx-auto block h-auto max-h-[200px] w-full bg-transparent object-contain sm:max-h-[320px] dark:hidden"
+              className="mx-auto block h-auto max-h-[280px] w-full bg-transparent object-contain sm:max-h-[320px] dark:hidden"
               draggable={false}
             />
             <img
               src={WELCOME_ILLUSTRATION_DARK}
               alt=""
-              className="mx-auto hidden h-auto max-h-[200px] w-full bg-transparent object-contain sm:max-h-[320px] dark:block"
+              className="mx-auto hidden h-auto max-h-[280px] w-full bg-transparent object-contain sm:max-h-[320px] dark:block"
               draggable={false}
             />
           </div>
@@ -119,60 +119,63 @@ export function DashboardProfileWelcome() {
           </p>
           <div className="mt-4 w-full sm:mt-6">
             <div className="mx-auto grid w-full max-w-3xl gap-2 text-left sm:grid-cols-2 sm:gap-4">
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  disabled={uploading}
-                  className={cn(actionCardClass, "disabled:opacity-70")}
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-950/60 dark:text-violet-300">
-                    {uploading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <FileUp className="h-5 w-5" />
-                    )}
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+                className={cn(actionCardClass, "disabled:opacity-70")}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-950/60 dark:text-violet-300">
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <FileUp className="h-5 w-5" />
+                  )}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 sm:mt-4">
+                    {copy.uploadTitle}
+                  </h3>
+                  <p className="mt-0.5 text-sm leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-1">
+                    {uploading ? cvCopy.uploading : copy.uploadBody}
+                  </p>
+                  <span className="mt-2 hidden items-center gap-1 text-sm font-semibold text-[#19B5FE] sm:mt-auto sm:inline-flex sm:pt-4">
+                    {copy.uploadAction}
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 sm:mt-4">
-                      {copy.uploadTitle}
-                    </h3>
-                    <p className="mt-0.5 text-sm leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-1">
-                      {uploading ? cvCopy.uploading : copy.uploadBody}
-                    </p>
-                    <span className="mt-2 hidden items-center gap-1 text-sm font-semibold text-[#19B5FE] sm:mt-auto sm:inline-flex sm:pt-4">
-                      {copy.uploadAction}
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-[#19B5FE] sm:hidden" />
-                </button>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-[#19B5FE] sm:hidden" />
+              </button>
 
-                <Link to={profilePath} className={actionCardClass}>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300">
-                    <PencilLine className="h-5 w-5" />
+              <Link to={profilePath} className={actionCardClass}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300">
+                  <PencilLine className="h-5 w-5" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 sm:mt-4">
+                    {copy.manualTitle}
+                  </h3>
+                  <p className="mt-0.5 text-sm leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-1">
+                    {copy.manualBody}
+                  </p>
+                  <span className="mt-2 hidden items-center gap-1 text-sm font-semibold text-[#19B5FE] sm:mt-auto sm:inline-flex sm:pt-4">
+                    {copy.manualAction}
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 sm:mt-4">
-                      {copy.manualTitle}
-                    </h3>
-                    <p className="mt-0.5 text-sm leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-1">
-                      {copy.manualBody}
-                    </p>
-                    <span className="mt-2 hidden items-center gap-1 text-sm font-semibold text-[#19B5FE] sm:mt-auto sm:inline-flex sm:pt-4">
-                      {copy.manualAction}
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-[#19B5FE] sm:hidden" />
-                </Link>
-              </div>
-              {uploadError ? (
-                <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
-                  {uploadError}
-                </p>
-              ) : null}
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-[#19B5FE] sm:hidden" />
+              </Link>
             </div>
+            {uploadError ? (
+              <p
+                className="mt-3 text-sm text-red-600 dark:text-red-400"
+                role="alert"
+              >
+                {uploadError}
+              </p>
+            ) : null}
           </div>
+        </div>
         <input
           ref={inputRef}
           type="file"
