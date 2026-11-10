@@ -33,11 +33,16 @@ import {
 } from "@/data/georgian-cities";
 import {
   ChevronRight,
+  ChevronLeft,
   Search as SearchIcon,
   ChevronDown,
   Trash2,
 } from "@/components/icons";
 import { SalaryRangeFilter } from "@/components/jobs/SalaryRangeFilter";
+import {
+  JOB_ROLE_CATEGORIES,
+  JOB_SENIORITY_LEVELS,
+} from "@/components/jobs/JobSearchPreferenceChips";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Collapsible,
@@ -60,6 +65,8 @@ interface JobFilterModalProps {
     salaryMin?: number;
     salaryMax?: number;
     salaryByAgreement?: boolean;
+    roleCategory?: string[];
+    seniority?: string[];
   };
   onFiltersChange: (newFilters: {
     country: string;
@@ -71,6 +78,8 @@ interface JobFilterModalProps {
     salaryMin?: number;
     salaryMax?: number;
     salaryByAgreement?: boolean;
+    roleCategory?: string[];
+    seniority?: string[];
   }) => void;
   onApply: () => void;
   onClear?: () => void;
@@ -94,8 +103,10 @@ interface FilterFormProps {
   onFiltersChange: JobFilterModalProps["onFiltersChange"];
   isMobile?: boolean;
   userTopSkills?: string[];
-  mobileView?: "main" | "workType" | "country";
-  onMobileViewChange?: (view: "main" | "workType" | "country") => void;
+  mobileView?: "main" | "workType" | "country" | "category" | "level";
+  onMobileViewChange?: (
+    view: "main" | "workType" | "country" | "category" | "level",
+  ) => void;
   countrySearchQuery?: string;
   onCountrySearchChange?: (query: string) => void;
 }
@@ -113,6 +124,8 @@ const FilterForm: React.FC<FilterFormProps> = ({
   const { t, language } = useLanguage();
   const [isWorkTypeOpen, setIsWorkTypeOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [isLevelOpen, setIsLevelOpen] = useState(false);
   const [internalCountrySearchQuery, setInternalCountrySearchQuery] =
     useState("");
 
@@ -275,6 +288,19 @@ const FilterForm: React.FC<FilterFormProps> = ({
     userTopSkills.length > 0 &&
     userTopSkills.every((skill) => filters.skills.includes(skill));
 
+  const toggleStringList = (
+    key: "roleCategory" | "seniority",
+    id: string,
+  ) => {
+    const current = filters[key] ?? [];
+    onFiltersChange({
+      ...filters,
+      [key]: current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id],
+    });
+  };
+
   const handleSalaryChange = (
     min: number | undefined,
     max: number | undefined,
@@ -300,7 +326,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                 return (
                   <label
                     key={type}
-                    className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-3"
+                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3"
                   >
                     <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
                       {workTypeLabels[type] || type}
@@ -308,20 +334,20 @@ const FilterForm: React.FC<FilterFormProps> = ({
                     <Checkbox
                       checked={isChecked}
                       onCheckedChange={() => handleJobTypeChange(type)}
-                      className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                      className="h-6 w-6 shrink-0 rounded-[8px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                     />
                   </label>
                 );
               })}
-              <div className="border-t border-gray-300 dark:border-gray-600 my-2" />
-              <label className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-3">
+              <div className="border-t border-[#e4e4e4] dark:border-[#3a3a3a] my-2" />
+              <label className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3">
                 <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
                   Remote Jobs Only
                 </span>
                 <Checkbox
                   checked={filters.isRemote || false}
                   onCheckedChange={(checked) => handleRemoteChange(!!checked)}
-                  className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                  className="h-6 w-6 shrink-0 rounded-[8px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                 />
               </label>
             </div>
@@ -346,7 +372,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                   return (
                     <label
                       key={city.id}
-                      className="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-2 gap-2"
+                      className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-2"
                     >
                       <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 truncate">
                         {georgianCityLabel(city, language)}
@@ -354,12 +380,76 @@ const FilterForm: React.FC<FilterFormProps> = ({
                       <Checkbox
                         checked={isChecked}
                         onCheckedChange={() => handleCityToggle(city.id)}
-                        className="h-6 w-6 shrink-0 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                        className="h-6 w-6 shrink-0 rounded-[8px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                       />
                     </label>
                   );
                 })
               )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (mobileView === "category") {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="space-y-3">
+              {JOB_ROLE_CATEGORIES.map((category) => {
+                const isChecked = (filters.roleCategory ?? []).includes(
+                  category.value,
+                );
+                return (
+                  <label
+                    key={category.value}
+                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3"
+                  >
+                    <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
+                      {t.onboarding.roleCategories[category.labelId]}
+                    </span>
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={() =>
+                        toggleStringList("roleCategory", category.value)
+                      }
+                      className="h-6 w-6 shrink-0 rounded-[8px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (mobileView === "level") {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="space-y-3">
+              {JOB_SENIORITY_LEVELS.map((level) => {
+                const isChecked = (filters.seniority ?? []).includes(level);
+                return (
+                  <label
+                    key={level}
+                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3"
+                  >
+                    <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
+                      {t.jobs.levels[level]}
+                    </span>
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={() =>
+                        toggleStringList("seniority", level)
+                      }
+                      className="h-6 w-6 shrink-0 rounded-[8px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                    />
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -386,9 +476,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
           <button
             type="button"
             onClick={() => onMobileViewChange?.("workType")}
-            className="flex items-center justify-between w-full bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-between w-full rounded-[14px] bg-white p-4 text-gray-700 transition-colors hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444]"
           >
-            <span className="text-sm font-medium text-gray-900">
+            <span className="text-sm font-medium">
               {t.jobs.workType}
             </span>
             <ChevronRight className="h-4 w-4 text-gray-400" />
@@ -400,10 +490,36 @@ const FilterForm: React.FC<FilterFormProps> = ({
           <button
             type="button"
             onClick={() => onMobileViewChange?.("country")}
-            className="flex items-center justify-between w-full bg-white rounded-xl border border-gray-200 p-4 hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-between w-full rounded-[14px] bg-white p-4 text-gray-700 transition-colors hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444]"
           >
-            <span className="text-sm font-medium text-gray-900">
+            <span className="text-sm font-medium">
               {t.jobs.city}
+            </span>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => onMobileViewChange?.("category")}
+            className="flex items-center justify-between w-full rounded-[14px] bg-white p-4 text-gray-700 transition-colors hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444]"
+          >
+            <span className="text-sm font-medium">
+              {t.jobs.category}
+            </span>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => onMobileViewChange?.("level")}
+            className="flex items-center justify-between w-full rounded-[14px] bg-white p-4 text-gray-700 transition-colors hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444]"
+          >
+            <span className="text-sm font-medium">
+              {t.jobs.level}
             </span>
             <ChevronRight className="h-4 w-4 text-gray-400" />
           </button>
@@ -437,7 +553,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                       ${
                         isSelected
                           ? "bg-breneo-blue text-white border-breneo-blue hover:bg-breneo-blue/90 dark:bg-breneo-blue dark:text-white dark:border-breneo-blue dark:hover:bg-breneo-blue/90"
-                          : "bg-transparent text-gray-900 border-gray-300 hover:border-gray-400 dark:text-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
+                          : "bg-white text-gray-700 border-[#e4e4e4] hover:bg-[#e4e4e4] dark:bg-[#3A3A3A] dark:text-gray-200 dark:border-[#3a3a3a] dark:hover:bg-[#444]"
                       }
                     `}
                   >
@@ -455,7 +571,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
   return (
     <div className="space-y-6">
       {/* Salary Range Filter - Desktop */}
-      <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-lg p-4">
+      <div className="bg-white dark:bg-[#3A3A3A] rounded-lg p-4">
         <SalaryRangeFilter
           minSalary={0}
           maxSalary={20000}
@@ -468,7 +584,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
 
       {/* Skills/Interests Filter - Desktop */}
       {userTopSkills.length > 0 && (
-        <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-lg p-4 space-y-3">
+        <div className="bg-white dark:bg-[#3A3A3A] rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-base font-medium dark:text-gray-100">
               {t.jobs.interests}
@@ -494,7 +610,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                     ${
                       isSelected
                         ? "bg-breneo-blue text-white border-breneo-blue hover:bg-breneo-blue/90 dark:bg-breneo-blue dark:text-white dark:border-breneo-blue dark:hover:bg-breneo-blue/90"
-                        : "bg-transparent text-gray-900 border-gray-300 hover:border-gray-400 dark:text-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
+                        : "bg-white text-gray-700 border-[#e4e4e4] hover:bg-[#e4e4e4] dark:bg-[#3A3A3A] dark:text-gray-200 dark:border-[#3a3a3a] dark:hover:bg-[#444]"
                     }
                   `}
                 >
@@ -510,7 +626,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
       <div className="space-y-3">
         <Collapsible open={isWorkTypeOpen} onOpenChange={setIsWorkTypeOpen}>
           <CollapsibleTrigger
-            className={`flex items-center justify-between w-full bg-gray-100 dark:bg-[rgb(55,57,60)] px-4 py-3 hover:bg-gray-200 dark:hover:bg-[rgb(55,57,60)] transition-colors ${
+            className={`flex items-center justify-between w-full bg-white dark:bg-[#3A3A3A] px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#444] transition-colors ${
               isWorkTypeOpen ? "rounded-t-lg" : "rounded-lg"
             }`}
           >
@@ -524,7 +640,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
             />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-0">
-            <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-b-lg overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-[#3A3A3A] rounded-b-lg overflow-hidden flex flex-col">
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-3">
                   {jobTypes.map((type) => {
@@ -532,12 +648,12 @@ const FilterForm: React.FC<FilterFormProps> = ({
                     return (
                       <label
                         key={type}
-                        className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2"
+                        className="flex items-center space-x-3 cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[0.7rem] px-2 py-2"
                       >
                         <Checkbox
                           checked={isChecked}
                           onCheckedChange={() => handleJobTypeChange(type)}
-                          className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                          className="h-6 w-6 rounded-[4px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                         />
                         <span className="text-sm text-gray-900 dark:text-gray-100">
                           {workTypeLabels[type] || type}
@@ -546,12 +662,12 @@ const FilterForm: React.FC<FilterFormProps> = ({
                     );
                   })}
                 </div>
-                <div className="border-t border-gray-300 dark:border-gray-600 my-2" />
-                <label className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2">
+                <div className="border-t border-[#e4e4e4] dark:border-[#3a3a3a] my-2" />
+                <label className="flex items-center space-x-3 cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[0.7rem] px-2 py-2">
                   <Checkbox
                     checked={filters.isRemote || false}
                     onCheckedChange={(checked) => handleRemoteChange(!!checked)}
-                    className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                    className="h-6 w-6 rounded-[4px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                   />
                   <span className="text-sm text-gray-900 dark:text-gray-100">
                     Remote Jobs Only
@@ -575,7 +691,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
           }}
         >
           <CollapsibleTrigger
-            className={`flex items-center justify-between w-full bg-gray-100 dark:bg-[rgb(55,57,60)] px-4 py-3 hover:bg-gray-200 dark:hover:bg-[rgb(55,57,60)] transition-colors ${
+            className={`flex items-center justify-between w-full bg-white dark:bg-[#3A3A3A] px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#444] transition-colors ${
               isLocationOpen ? "rounded-t-lg" : "rounded-lg"
             }`}
           >
@@ -589,9 +705,9 @@ const FilterForm: React.FC<FilterFormProps> = ({
             />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-0">
-            <div className="bg-gray-100 dark:bg-[rgb(55,57,60)] rounded-b-lg overflow-hidden flex flex-col">
+            <div className="bg-white dark:bg-[#3A3A3A] rounded-b-lg overflow-hidden flex flex-col">
               {/* Search Bar - Sticky at top */}
-              <div className="sticky top-0 z-10 bg-gray-100 dark:bg-[rgb(55,57,60)] p-3 border-b border-gray-300 dark:border-gray-600">
+              <div className="sticky top-0 z-10 bg-white dark:bg-[#3A3A3A] p-3 border-b border-[#e4e4e4] dark:border-[#3a3a3a]">
                 <div className="relative">
                   <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -599,7 +715,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                     placeholder={t.jobs.searchCities}
                     value={searchQuery}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="pl-9 pr-3 h-9 text-sm bg-white dark:bg-gray-700"
+                    className="pl-9 pr-3 h-9 text-sm bg-white dark:bg-[#2c2c2c] dark:border-[#3a3a3a]"
                   />
                 </div>
               </div>
@@ -615,12 +731,12 @@ const FilterForm: React.FC<FilterFormProps> = ({
                       return (
                         <label
                           key={city.id}
-                          className="flex items-center space-x-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-[0.7rem] px-2 py-2"
+                          className="flex items-center space-x-3 cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[0.7rem] px-2 py-2"
                         >
                           <Checkbox
                             checked={isChecked}
                             onCheckedChange={() => handleCityToggle(city.id)}
-                            className="h-6 w-6 rounded-[6px] border-[#8C8C8C] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                            className="h-6 w-6 rounded-[4px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
                           />
                           <span className="text-sm text-gray-900 dark:text-gray-100">
                             {georgianCityLabel(city, language)}
@@ -630,6 +746,98 @@ const FilterForm: React.FC<FilterFormProps> = ({
                     })
                   )}
                 </div>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      <div className="space-y-3">
+        <Collapsible open={isCategoryOpen} onOpenChange={setIsCategoryOpen}>
+          <CollapsibleTrigger
+            className={`flex items-center justify-between w-full bg-white dark:bg-[#3A3A3A] px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#444] transition-colors ${
+              isCategoryOpen ? "rounded-t-lg" : "rounded-lg"
+            }`}
+          >
+            <Label className="text-base font-medium dark:text-gray-100 cursor-pointer">
+              {t.jobs.category}
+            </Label>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${
+                isCategoryOpen ? "transform rotate-180" : ""
+              }`}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-0">
+            <div className="bg-white dark:bg-[#3A3A3A] rounded-b-lg p-4">
+              <div className="grid grid-cols-2 gap-3">
+                {JOB_ROLE_CATEGORIES.map((category) => {
+                  const isChecked = (filters.roleCategory ?? []).includes(
+                    category.value,
+                  );
+                  return (
+                    <label
+                      key={category.value}
+                      className="flex items-center space-x-3 cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[0.7rem] px-2 py-2"
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() =>
+                          toggleStringList("roleCategory", category.value)
+                        }
+                        className="h-6 w-6 rounded-[4px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                      />
+                      <span className="text-sm text-gray-900 dark:text-gray-100">
+                        {t.onboarding.roleCategories[category.labelId]}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      <div className="space-y-3">
+        <Collapsible open={isLevelOpen} onOpenChange={setIsLevelOpen}>
+          <CollapsibleTrigger
+            className={`flex items-center justify-between w-full bg-white dark:bg-[#3A3A3A] px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#444] transition-colors ${
+              isLevelOpen ? "rounded-t-lg" : "rounded-lg"
+            }`}
+          >
+            <Label className="text-base font-medium dark:text-gray-100 cursor-pointer">
+              {t.jobs.level}
+            </Label>
+            <ChevronDown
+              className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${
+                isLevelOpen ? "transform rotate-180" : ""
+              }`}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-0">
+            <div className="bg-white dark:bg-[#3A3A3A] rounded-b-lg p-4">
+              <div className="grid grid-cols-2 gap-3">
+                {JOB_SENIORITY_LEVELS.map((level) => {
+                  const isChecked = (filters.seniority ?? []).includes(level);
+                  return (
+                    <label
+                      key={level}
+                      className="flex items-center space-x-3 cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[0.7rem] px-2 py-2"
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() =>
+                          toggleStringList("seniority", level)
+                        }
+                        className="h-6 w-6 rounded-[4px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:bg-breneo-blue data-[state=checked]:border-breneo-blue"
+                      />
+                      <span className="text-sm text-gray-900 dark:text-gray-100">
+                        {t.jobs.levels[level]}
+                      </span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
           </CollapsibleContent>
@@ -651,9 +859,9 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
 }) => {
   const { t } = useLanguage();
   const isMobile = useMobile();
-  const [mobileView, setMobileView] = useState<"main" | "workType" | "country">(
-    "main",
-  );
+  const [mobileView, setMobileView] = useState<
+    "main" | "workType" | "country" | "category" | "level"
+  >("main");
   const [showWorkTypePicker, setShowWorkTypePicker] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState("");
@@ -736,18 +944,37 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     // Main Filter View
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
-        <DrawerContent className="max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
-          <DrawerHeader className={`flex-shrink-0 border-b border-gray-200`}>
-            <DrawerTitle className="text-xl font-bold">
-              {mobileView === "workType"
-                ? t.jobs.workType
-                : mobileView === "country"
-                  ? t.jobs.city
-                  : SEARCH_TITLE_KA}
-            </DrawerTitle>
+        <DrawerContent className="max-h-[90vh] flex flex-col bg-background backdrop-blur-none">
+          <DrawerHeader className={`flex-shrink-0 border-b border-[#e4e4e4] dark:border-[#3a3a3a]`}>
+            <div className="flex items-center gap-2">
+              {mobileView !== "main" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCountrySearchQuery("");
+                    setMobileView("main");
+                  }}
+                  aria-label={t.common.back}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-300 p-0 text-gray-600 transition-colors hover:bg-gray-400 hover:text-gray-800 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-gray-100"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <DrawerTitle className="text-xl font-bold">
+                {mobileView === "workType"
+                  ? t.jobs.workType
+                  : mobileView === "country"
+                    ? t.jobs.city
+                    : mobileView === "category"
+                      ? t.jobs.category
+                      : mobileView === "level"
+                        ? t.jobs.level
+                        : SEARCH_TITLE_KA}
+              </DrawerTitle>
+            </div>
           </DrawerHeader>
           {mobileView === "country" && (
-            <div className="flex-shrink-0 px-6 py-3 border-b border-gray-200">
+            <div className="flex-shrink-0 px-6 py-3 border-b border-[#e4e4e4] dark:border-[#3a3a3a]">
               <div className="relative">
                 <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -773,7 +1000,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
             />
           </div>
           {mobileView === "main" && (
-            <DrawerFooter className="border-t border-gray-200">
+            <DrawerFooter className="border-t border-[#e4e4e4] dark:border-[#3a3a3a]">
               <div
                 className={`flex gap-3 w-full ${
                   onClear ? "justify-between" : "justify-end"
@@ -799,7 +1026,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                       type="button"
                       variant="ghost"
                       disabled
-                      className="h-12 px-4 rounded-[18px] text-base font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 border-0"
+                      className="h-12 px-4 rounded-[18px] text-base font-medium bg-white text-gray-700 hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444] border-0"
                     >
                       {t.common.save}
                     </Button>
@@ -817,8 +1044,11 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               </div>
             </DrawerFooter>
           )}
-          {(mobileView === "workType" || mobileView === "country") && (
-            <DrawerFooter className="border-t border-gray-200">
+          {(mobileView === "workType" ||
+            mobileView === "country" ||
+            mobileView === "category" ||
+            mobileView === "level") && (
+            <DrawerFooter className="border-t border-[#e4e4e4] dark:border-[#3a3a3a]">
               <Button
                 onClick={() => {
                   setCountrySearchQuery("");
@@ -837,7 +1067,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
+      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col bg-background backdrop-blur-none">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Filter Jobs</DialogTitle>
         </DialogHeader>
@@ -874,7 +1104,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                   type="button"
                   variant="ghost"
                   disabled
-                  className="h-12 px-4 text-base font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700 border-0"
+                  className="h-12 px-4 text-base font-medium bg-white text-gray-700 hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444] border-0"
                 >
                   {t.common.save}
                 </Button>

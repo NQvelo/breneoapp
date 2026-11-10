@@ -37,6 +37,7 @@ import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
+import { JOB_ROLE_CATEGORIES } from "@/components/jobs/JobSearchPreferenceChips";
 import { LocationDropdown } from "@/components/jobs/LocationDropdown";
 import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { profileApi } from "@/api/profile";
@@ -58,6 +59,35 @@ import {
   filterHardSkills,
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob, JobSearchSort } from "@/api/jobs";
+
+function filtersFromSearchParams(searchParams: URLSearchParams): JobFilters {
+  const countriesParam = searchParams.get("countries");
+  const skillsParam = searchParams.get("skills");
+  const jobTypesParam = searchParams.get("jobTypes");
+  const isRemoteParam = searchParams.get("isRemote");
+  const datePostedParam = searchParams.get("datePosted");
+  const salaryMinParam = searchParams.get("salaryMin");
+  const salaryMaxParam = searchParams.get("salaryMax");
+  const salaryByAgreementParam = searchParams.get("salaryByAgreement");
+  const roleCategoryParam = searchParams.get("roleCategory");
+  const seniorityParam = searchParams.get("seniority");
+
+  return {
+    country: "Georgia",
+    countries: countriesParam ? countriesParam.split(",").filter(Boolean) : [],
+    jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
+    isRemote: isRemoteParam === "true",
+    datePosted: datePostedParam || undefined,
+    skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
+    salaryMin: salaryMinParam ? parseInt(salaryMinParam, 10) : undefined,
+    salaryMax: salaryMaxParam ? parseInt(salaryMaxParam, 10) : undefined,
+    salaryByAgreement: salaryByAgreementParam === "true",
+    roleCategory: roleCategoryParam
+      ? roleCategoryParam.split(",").filter(Boolean)
+      : [],
+    seniority: seniorityParam ? seniorityParam.split(",").filter(Boolean) : [],
+  };
+}
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
@@ -173,30 +203,9 @@ const JobSearchResultsPage = () => {
   const searchTerm = searchParams.get("search") || "";
   const page = parseInt(searchParams.get("page") || "1", 10);
 
-  const [activeFilters, setActiveFilters] = useState<JobFilters>(() => {
-    const countriesParam = searchParams.get("countries");
-    const skillsParam = searchParams.get("skills");
-    const jobTypesParam = searchParams.get("jobTypes");
-    const isRemoteParam = searchParams.get("isRemote");
-    const datePostedParam = searchParams.get("datePosted");
-    const salaryMinParam = searchParams.get("salaryMin");
-    const salaryMaxParam = searchParams.get("salaryMax");
-    const salaryByAgreementParam = searchParams.get("salaryByAgreement");
-
-    return {
-      country: "Georgia",
-      countries: countriesParam
-        ? countriesParam.split(",").filter(Boolean)
-        : [],
-      jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
-      isRemote: isRemoteParam === "true",
-      datePosted: datePostedParam || undefined,
-      skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
-      salaryMin: salaryMinParam ? parseInt(salaryMinParam, 10) : undefined,
-      salaryMax: salaryMaxParam ? parseInt(salaryMaxParam, 10) : undefined,
-      salaryByAgreement: salaryByAgreementParam === "true",
-    };
-  });
+  const [activeFilters, setActiveFilters] = useState<JobFilters>(() =>
+    filtersFromSearchParams(searchParams),
+  );
 
   // Debug log
   useEffect(() => {
@@ -214,28 +223,7 @@ const JobSearchResultsPage = () => {
 
   // Sync activeFilters when URL params change
   useEffect(() => {
-    const countriesParam = searchParams.get("countries");
-    const skillsParam = searchParams.get("skills");
-    const jobTypesParam = searchParams.get("jobTypes");
-    const isRemoteParam = searchParams.get("isRemote");
-    const datePostedParam = searchParams.get("datePosted");
-    const salaryMinParam = searchParams.get("salaryMin");
-    const salaryMaxParam = searchParams.get("salaryMax");
-    const salaryByAgreementParam = searchParams.get("salaryByAgreement");
-
-    setActiveFilters({
-      country: "Georgia",
-      countries: countriesParam
-        ? countriesParam.split(",").filter(Boolean)
-        : [],
-      jobTypes: jobTypesParam ? jobTypesParam.split(",").filter(Boolean) : [],
-      isRemote: isRemoteParam === "true",
-      datePosted: datePostedParam || undefined,
-      skills: skillsParam ? skillsParam.split(",").filter(Boolean) : [],
-      salaryMin: salaryMinParam ? parseInt(salaryMinParam, 10) : undefined,
-      salaryMax: salaryMaxParam ? parseInt(salaryMaxParam, 10) : undefined,
-      salaryByAgreement: salaryByAgreementParam === "true",
-    });
+    setActiveFilters(filtersFromSearchParams(searchParams));
   }, [searchParams]);
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
@@ -251,6 +239,10 @@ const JobSearchResultsPage = () => {
     if (filters.salaryMin !== undefined || filters.salaryMax !== undefined)
       count += 1;
     if (filters.salaryByAgreement) count += 1;
+    if (filters.roleCategory && filters.roleCategory.length > 0)
+      count += filters.roleCategory.length;
+    if (filters.seniority && filters.seniority.length > 0)
+      count += filters.seniority.length;
     return count;
   };
 
@@ -434,6 +426,8 @@ const JobSearchResultsPage = () => {
       salaryMin: activeFilters.salaryMin,
       salaryMax: activeFilters.salaryMax,
       salaryByAgreement: activeFilters.salaryByAgreement,
+      roleCategory: [...(activeFilters.roleCategory ?? [])].sort(),
+      seniority: [...(activeFilters.seniority ?? [])].sort(),
     });
   }, [activeFilters]);
 
@@ -748,6 +742,12 @@ const JobSearchResultsPage = () => {
       if (filters.salaryByAgreement) {
         params.set("salaryByAgreement", "true");
       }
+      if (filters.roleCategory && filters.roleCategory.length > 0) {
+        params.set("roleCategory", filters.roleCategory.join(","));
+      }
+      if (filters.seniority && filters.seniority.length > 0) {
+        params.set("seniority", filters.seniority.join(","));
+      }
       setSearchParams(params, { replace: true });
     },
     [setSearchParams],
@@ -776,6 +776,8 @@ const JobSearchResultsPage = () => {
       salaryMin: undefined,
       salaryMax: undefined,
       salaryByAgreement: false,
+      roleCategory: [],
+      seniority: [],
     };
     const newPage = 1;
     setTempFilters(clearedFilters);
@@ -858,6 +860,50 @@ const JobSearchResultsPage = () => {
         label: skill,
         onRemove: () => handleRemoveSkill(skill),
         ariaLabel: `Remove ${skill} filter`,
+      });
+    });
+
+    (activeFilters.roleCategory ?? []).forEach((categoryId) => {
+      const match = JOB_ROLE_CATEGORIES.find((item) => item.value === categoryId);
+      const label = match
+        ? t.onboarding.roleCategories[match.labelId]
+        : categoryId;
+      filters.push({
+        id: `category-${categoryId}`,
+        label,
+        onRemove: () => {
+          const newFilters = {
+            ...activeFilters,
+            roleCategory: (activeFilters.roleCategory ?? []).filter(
+              (id) => id !== categoryId,
+            ),
+          };
+          setActiveFilters(newFilters);
+          setTempFilters(newFilters);
+          updateUrlWithFilters(newFilters, searchTerm, 1);
+        },
+        ariaLabel: `Remove ${label} filter`,
+      });
+    });
+
+    (activeFilters.seniority ?? []).forEach((levelId) => {
+      const label =
+        t.jobs.levels[levelId as keyof typeof t.jobs.levels] ?? levelId;
+      filters.push({
+        id: `level-${levelId}`,
+        label,
+        onRemove: () => {
+          const newFilters = {
+            ...activeFilters,
+            seniority: (activeFilters.seniority ?? []).filter(
+              (id) => id !== levelId,
+            ),
+          };
+          setActiveFilters(newFilters);
+          setTempFilters(newFilters);
+          updateUrlWithFilters(newFilters, searchTerm, 1);
+        },
+        ariaLabel: `Remove ${label} filter`,
       });
     });
 
@@ -972,6 +1018,7 @@ const JobSearchResultsPage = () => {
     handleRemoveJobType,
     handleRemoveRemote,
     updateUrlWithFilters,
+    t,
   ]);
 
   const filtersContainerRef = useRef<HTMLDivElement>(null);

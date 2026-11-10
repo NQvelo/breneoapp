@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { cn } from "@/lib/utils";
-import { PLATFORM_FILTER_CHIP_CLASS } from "@/lib/chipStyles";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Bookmark,
@@ -30,7 +28,6 @@ import {
   Truck,
   Tag,
   Sun,
-  X,
   Code,
   Database,
   Globe,
@@ -72,9 +69,8 @@ import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
-import { georgianCityLabelById } from "@/data/georgian-cities";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { LocationDropdown } from "@/components/jobs/LocationDropdown";
+import { JobSearchPreferenceChips } from "@/components/jobs/JobSearchPreferenceChips";
 import { profileApi } from "@/api/profile";
 import {
   matchJobDetailToUser,
@@ -82,7 +78,6 @@ import {
   normalizeSkillName,
 } from "@/services/matching";
 import type { JobDetail } from "@/api/jobs/types";
-import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
 import { useMobile } from "@/hooks/use-mobile";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -94,13 +89,8 @@ import {
 } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
-import {
-  getMatchQualityLabel,
-} from "@/utils/jobMatchUtils";
-import {
-  formatJobSalaryDisplay,
-  formatSalaryFilterLabel,
-} from "@/utils/jobSalaryFormat";
+import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
+import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
 import {
   resolveJobEmploymentType,
   resolveJobWorkArrangement,
@@ -122,16 +112,6 @@ interface Job {
   benefits?: string;
   matchPercentage?: number;
 }
-
-const jobTypes = ["FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"];
-
-const jobTypeLabels: Record<string, string> = {
-  FULLTIME: "Full Time",
-  PARTTIME: "Part Time",
-  CONTRACTOR: "Contractor",
-  INTERN: "Intern",
-  INTERNSHIP: "Internship",
-};
 
 // Skill icon mapping - maps skill names to appropriate icons
 const getSkillIcon = (
@@ -746,9 +726,9 @@ const JobsPage = () => {
   const { showProfileWelcome, isCheckingProfile } = useNeedsProfileForMatching(
     user?.id,
   );
-  const { language } = useLanguage();
-  const queryClient = useQueryClient();
+  const { t } = useLanguage();
   const isMobile = useMobile();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterModalOpen, setFilterModalOpen] = useState(false);
@@ -841,6 +821,8 @@ const JobsPage = () => {
       salaryMin: undefined, // No salary min filter
       salaryMax: undefined, // No salary max filter
       salaryByAgreement: false, // No salary by agreement filter
+      roleCategory: [],
+      seniority: [],
     };
   });
 
@@ -860,20 +842,6 @@ const JobsPage = () => {
   // The jobs displayed here are filtered by user's top skills from skill test
 
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
-
-  // Helper function to count active filters
-  const countActiveFilters = (filters: JobFilters): number => {
-    let count = 0;
-    if (filters.countries.length > 0) count += filters.countries.length;
-    if (filters.jobTypes.length > 0) count += filters.jobTypes.length;
-    if (filters.isRemote) count += 1;
-    if (filters.datePosted) count += 1;
-    if (filters.skills.length > 0) count += filters.skills.length;
-    if (filters.salaryMin !== undefined || filters.salaryMax !== undefined)
-      count += 1;
-    if (filters.salaryByAgreement) count += 1;
-    return count;
-  };
 
   // Sync tempFilters with activeFilters when modal opens to reflect current search bar location
   useEffect(() => {
@@ -895,7 +863,9 @@ const JobsPage = () => {
       searchParams.get("page") ||
       searchParams.get("salaryMin") ||
       searchParams.get("salaryMax") ||
-      searchParams.get("salaryByAgreement");
+      searchParams.get("salaryByAgreement") ||
+      searchParams.get("roleCategory") ||
+      searchParams.get("seniority");
 
     if (hasFilterParams) {
       const params = new URLSearchParams(searchParams);
@@ -1213,40 +1183,53 @@ const JobsPage = () => {
     setRemoteJobsPage((prev) => prev + 1);
   }, []);
 
+  const goToSearchResults = useCallback(
+    (filters: JobFilters, search: string) => {
+      const params = new URLSearchParams();
+      const trimmed = search.trim();
+      if (trimmed) {
+        params.set("search", trimmed);
+      }
+      if (filters.countries.length > 0) {
+        params.set("countries", filters.countries.join(","));
+      }
+      if (filters.skills.length > 0) {
+        params.set("skills", filters.skills.join(","));
+      }
+      if (filters.jobTypes.length > 0) {
+        params.set("jobTypes", filters.jobTypes.join(","));
+      }
+      if (filters.isRemote) {
+        params.set("isRemote", "true");
+      }
+      if (filters.datePosted) {
+        params.set("datePosted", filters.datePosted);
+      }
+      if (filters.salaryMin !== undefined) {
+        params.set("salaryMin", String(filters.salaryMin));
+      }
+      if (filters.salaryMax !== undefined) {
+        params.set("salaryMax", String(filters.salaryMax));
+      }
+      if (filters.salaryByAgreement) {
+        params.set("salaryByAgreement", "true");
+      }
+      if (filters.roleCategory && filters.roleCategory.length > 0) {
+        params.set("roleCategory", filters.roleCategory.join(","));
+      }
+      if (filters.seniority && filters.seniority.length > 0) {
+        params.set("seniority", filters.seniority.join(","));
+      }
+
+      navigate(`/jobs/search?${params.toString()}`);
+    },
+    [navigate],
+  );
+
   // Immediate search (when user presses Enter or clicks Search button)
   const handleSearch = useCallback(() => {
-    // Always redirect to search results page with filters
-    const params = new URLSearchParams();
-    if (searchTerm.trim()) {
-      params.set("search", searchTerm.trim());
-    }
-    if (activeFilters.countries.length > 0) {
-      params.set("countries", activeFilters.countries.join(","));
-    }
-    if (activeFilters.skills.length > 0) {
-      params.set("skills", activeFilters.skills.join(","));
-    }
-    if (activeFilters.jobTypes.length > 0) {
-      params.set("jobTypes", activeFilters.jobTypes.join(","));
-    }
-    if (activeFilters.isRemote) {
-      params.set("isRemote", "true");
-    }
-    if (activeFilters.datePosted) {
-      params.set("datePosted", activeFilters.datePosted);
-    }
-    if (activeFilters.salaryMin !== undefined) {
-      params.set("salaryMin", String(activeFilters.salaryMin));
-    }
-    if (activeFilters.salaryMax !== undefined) {
-      params.set("salaryMax", String(activeFilters.salaryMax));
-    }
-    if (activeFilters.salaryByAgreement) {
-      params.set("salaryByAgreement", "true");
-    }
-
-    navigate(`/jobs/search?${params.toString()}`);
-  }, [searchTerm, activeFilters, navigate]);
+    goToSearchResults(activeFilters, searchTerm);
+  }, [searchTerm, activeFilters, goToSearchResults]);
 
   // Note: Search and filter changes don't affect the displayed jobs here
   // They only redirect to the search results page when user clicks search button
@@ -2218,124 +2201,23 @@ const JobsPage = () => {
     isLoadingMoreRemote,
   ]);
 
-  // Helper function to redirect to search results with filters
-  const redirectToSearchResults = useCallback(
-    (filters: JobFilters, search: string) => {
-      const params = new URLSearchParams();
-      if (search) {
-        params.set("search", search);
-      }
-      if (filters.countries.length > 0) {
-        params.set("countries", filters.countries.join(","));
-      }
-      if (filters.skills.length > 0) {
-        params.set("skills", filters.skills.join(","));
-      }
-      if (filters.jobTypes.length > 0) {
-        params.set("jobTypes", filters.jobTypes.join(","));
-      }
-      if (filters.isRemote) {
-        params.set("isRemote", "true");
-      }
-      if (filters.datePosted) {
-        params.set("datePosted", filters.datePosted);
-      }
-      navigate(`/jobs/search?${params.toString()}`);
-    },
-    [navigate],
-  );
-
-  // Handle work types change - only update filters, don't redirect until search button is clicked
-  const handleWorkTypesChange = (workTypes: string[]) => {
-    const newFilters = {
-      ...activeFilters,
-      jobTypes: workTypes,
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    // Don't redirect - wait for user to click search button
+  const patchFilters = (patch: Partial<JobFilters>) => {
+    const next = { ...activeFilters, ...patch };
+    setActiveFilters(next);
+    setTempFilters(next);
   };
 
-  // Handle remote change - only update filters, don't redirect until search button is clicked
-  const handleRemoteChange = (isRemote: boolean) => {
-    const newFilters = {
-      ...activeFilters,
-      isRemote: isRemote,
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    // Don't redirect - wait for user to click search button
+  const openFilters = () => {
+    setTempFilters(activeFilters);
+    setFilterModalOpen(true);
   };
-
-  // Handle countries change - redirect to search results
-  const handleCountriesChange = (countryCodes: string[]) => {
-    const newFilters = {
-      ...activeFilters,
-      countries: countryCodes,
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    // Redirect to search results page when filters change
-    redirectToSearchResults(newFilters, searchTerm);
-  };
-
-  // Handle removing a skill filter - redirect to search results
-  const handleRemoveSkill = (skillToRemove: string) => {
-    const newFilters = {
-      ...activeFilters,
-      skills: activeFilters.skills.filter((skill) => skill !== skillToRemove),
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    redirectToSearchResults(newFilters, searchTerm);
-  };
-
-  // Handle removing a country filter - redirect to search results
-  const handleRemoveCountry = (countryCodeToRemove: string) => {
-    const newFilters = {
-      ...activeFilters,
-      countries: activeFilters.countries.filter(
-        (code) => code !== countryCodeToRemove,
-      ),
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    redirectToSearchResults(newFilters, searchTerm);
-  };
-
-  // Handle removing job type filter - redirect to search results
-  const handleRemoveJobType = (jobTypeToRemove: string) => {
-    const newJobTypes = activeFilters.jobTypes.filter(
-      (type) => type !== jobTypeToRemove,
-    );
-    const newFilters = {
-      ...activeFilters,
-      jobTypes: newJobTypes,
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    redirectToSearchResults(newFilters, searchTerm);
-  };
-
-  // Handle removing remote filter - redirect to search results
-  const handleRemoveRemote = () => {
-    const newFilters = {
-      ...activeFilters,
-      isRemote: false,
-    };
-    setActiveFilters(newFilters);
-    setTempFilters(newFilters);
-    redirectToSearchResults(newFilters, searchTerm);
-  };
-
-  // No need to sync selectedJobType anymore as we use WorkTypeDropdown directly
 
   const handleApplyFilters = () => {
-    console.log("🔧 Applying filters:", tempFilters);
     setActiveFilters(tempFilters);
     setFilterModalOpen(false);
-    // Redirect to search results page with filters
-    redirectToSearchResults(tempFilters, searchTerm);
+    if (isMobile) {
+      goToSearchResults(tempFilters, searchTerm);
+    }
   };
 
   const handleClearFilters = () => {
@@ -2349,6 +2231,8 @@ const JobsPage = () => {
       salaryMin: undefined,
       salaryMax: undefined,
       salaryByAgreement: false,
+      roleCategory: [],
+      seniority: [],
     };
     setTempFilters(clearedFilters);
     setActiveFilters(clearedFilters);
@@ -2377,285 +2261,64 @@ const JobsPage = () => {
         {/* Modern Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
           <div className="flex items-center bg-white dark:bg-[#242424] rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
-            {/* Briefcase Icon - At the start */}
             <Briefcase
               className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
               strokeWidth={2}
             />
 
-            {/* Search Input Field */}
             <Input
-              placeholder="ძებნა"
+              placeholder={t.jobs.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => handleSearchTermChange(e.target.value)}
               onKeyDown={handleKeyDown}
               className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
             />
 
-            {/* Work Types Field - Hidden on mobile, shown on desktop */}
-            {!isMobile && (
-              <>
-                <div className="w-px bg-gray-300 dark:bg-gray-600 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
-                <div className="flex items-center flex-1 min-w-0 relative">
-                  <WorkTypeDropdown
-                    selectedWorkTypes={activeFilters.jobTypes}
-                    onWorkTypesChange={handleWorkTypesChange}
-                    isRemote={activeFilters.isRemote}
-                    onRemoteChange={handleRemoteChange}
-                    placeholder="მუშაობის ტიპები"
-                  />
-                </div>
-              </>
+            {isMobile && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={openFilters}
+                className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md ml-2 relative"
+                aria-label={t.jobs.filters}
+              >
+                <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
+              </Button>
             )}
 
-            {/* Filter Button - Inside search bar */}
-            {(() => {
-              const activeFilterCount = countActiveFilters(activeFilters);
-              return (
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setFilterModalOpen(true)}
-                  className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md ml-2 relative"
-                  aria-label="Filter jobs"
-                >
-                  <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
-                  {activeFilterCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-breneo-blue text-white text-xs rounded-full">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              );
-            })()}
-
-            {/* Search Button - Circular purple button with white magnifying glass */}
             <Button
               variant="default"
               size="icon"
               onClick={handleSearch}
               className="h-10 w-10 flex-shrink-0 bg-breneo-blue hover:bg-breneo-blue/90 rounded-md ml-2"
-              aria-label="Search"
+              aria-label={t.jobs.search}
             >
               <Search className="h-5 w-5 text-white" />
             </Button>
           </div>
+
+          <JobSearchPreferenceChips
+            jobTypes={activeFilters.jobTypes}
+            isRemote={activeFilters.isRemote}
+            countries={activeFilters.countries}
+            roleCategory={activeFilters.roleCategory ?? []}
+            seniority={activeFilters.seniority ?? []}
+            salaryMin={activeFilters.salaryMin}
+            salaryMax={activeFilters.salaryMax}
+            salaryByAgreement={activeFilters.salaryByAgreement}
+            onJobTypesChange={(jobTypes) => patchFilters({ jobTypes })}
+            onRemoteChange={(isRemote) => patchFilters({ isRemote })}
+            onCountriesChange={(countries) => patchFilters({ countries })}
+            onRoleCategoryChange={(roleCategory) =>
+              patchFilters({ roleCategory })
+            }
+            onSeniorityChange={(seniority) => patchFilters({ seniority })}
+            onSalaryChange={(salaryMin, salaryMax, salaryByAgreement) =>
+              patchFilters({ salaryMin, salaryMax, salaryByAgreement })
+            }
+          />
         </div>
 
-        {/* Active Filters Section */}
-        {(() => {
-          const hasActiveFilters =
-            activeFilters.skills.length > 0 ||
-            activeFilters.countries.length > 0 ||
-            activeFilters.jobTypes.length > 0 ||
-            activeFilters.isRemote ||
-            activeFilters.datePosted ||
-            activeFilters.salaryMin !== undefined ||
-            activeFilters.salaryMax !== undefined ||
-            activeFilters.salaryByAgreement;
-
-          if (!hasActiveFilters) return null;
-
-          return (
-            <div className="mb-8">
-              <h2 className="text-lg font-bold mb-4">Active Filters</h2>
-              <div className="flex flex-wrap gap-2">
-                {/* Skills */}
-                {activeFilters.skills.map((skill) => (
-                  <div
-                    key={`skill-${skill}`}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                  >
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      {String(skill)}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveSkill(skill)}
-                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                      aria-label={`Remove ${skill} filter`}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-
-                {/* Cities */}
-                {activeFilters.countries.map((cityId) => {
-                  const cityName = georgianCityLabelById(cityId, language);
-                  return (
-                    <div
-                      key={`country-${cityId}`}
-                      className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                    >
-                      <span className="text-sm font-medium whitespace-nowrap">
-                        {cityName}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveCountry(cityId)}
-                        className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                        aria-label={`Remove ${cityName} filter`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {/* Job Types */}
-                {activeFilters.jobTypes.map((jobType) => {
-                  const jobTypeLabel = jobTypeLabels[jobType]
-                    ? String(jobTypeLabels[jobType])
-                    : String(jobType);
-                  return (
-                    <div
-                      key={`jobType-${jobType}`}
-                      className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                    >
-                      <span className="text-sm font-medium whitespace-nowrap">
-                        {jobTypeLabel}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveJobType(jobType)}
-                        className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                        aria-label={`Remove ${jobTypeLabel} filter`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {/* Remote */}
-                {activeFilters.isRemote && (
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                  >
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      Remote
-                    </span>
-                    <button
-                      onClick={handleRemoveRemote}
-                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                      aria-label="Remove Remote filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Date Posted */}
-                {activeFilters.datePosted && (
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                  >
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      {activeFilters.datePosted === "today"
-                        ? "Posted Today"
-                        : activeFilters.datePosted === "week"
-                          ? "Posted This Week"
-                          : activeFilters.datePosted === "month"
-                            ? "Posted This Month"
-                            : `Posted: ${activeFilters.datePosted}`}
-                    </span>
-                    <button
-                      onClick={() => {
-                        const newFilters = {
-                          ...activeFilters,
-                          datePosted: undefined,
-                        };
-                        setActiveFilters(newFilters);
-                        setTempFilters(newFilters);
-                        redirectToSearchResults(newFilters, searchTerm);
-                      }}
-                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                      aria-label="Remove Date Posted filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Salary Range */}
-                {(activeFilters.salaryMin !== undefined ||
-                  activeFilters.salaryMax !== undefined) && (
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                  >
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      {formatSalaryFilterLabel(
-                        activeFilters.salaryMin,
-                        activeFilters.salaryMax,
-                      )}
-                    </span>
-                    <button
-                      onClick={() => {
-                        const newFilters = {
-                          ...activeFilters,
-                          salaryMin: undefined,
-                          salaryMax: undefined,
-                        };
-                        setActiveFilters(newFilters);
-                        setTempFilters(newFilters);
-                        redirectToSearchResults(newFilters, searchTerm);
-                      }}
-                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                      aria-label="Remove Salary filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Salary By Agreement */}
-                {activeFilters.salaryByAgreement && (
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2.5 rounded-[14px] transition-colors",
-                      PLATFORM_FILTER_CHIP_CLASS,
-                    )}
-                  >
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      Salary By Agreement
-                    </span>
-                    <button
-                      onClick={() => {
-                        const newFilters = {
-                          ...activeFilters,
-                          salaryByAgreement: false,
-                        };
-                        setActiveFilters(newFilters);
-                        setTempFilters(newFilters);
-                        redirectToSearchResults(newFilters, searchTerm);
-                      }}
-                      className="flex-shrink-0 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full p-0.5 transition-colors"
-                      aria-label="Remove Salary By Agreement filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
 
         {(internshipError || remoteError || error) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
@@ -2675,19 +2338,20 @@ const JobsPage = () => {
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-lg font-bold">Top Matched Jobs</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex items-stretch gap-4 md:flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-4 max-md:scrollbar-hide max-md:snap-x max-md:snap-mandatory max-md:-mx-2 max-md:px-2 max-md:[&>*]:h-[300px]">
               {topMatchedJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
+                  className="group flex h-full max-md:h-[300px] w-[calc((100%-2rem)/3)] min-w-[280px] snap-start flex-shrink-0 flex-col self-stretch transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
                   onClick={() => {
                     if (!job.id || String(job.id).trim() === "") return;
                     const encodedId = encodeURIComponent(String(job.id));
                     navigate(`/jobs/${encodedId}`);
                   }}
                 >
-                  <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
-                    <div className="flex items-start gap-3 mb-3">
+                  <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
+                    <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex items-start gap-3 mb-3 min-h-10">
                       {job.company_logo ? (
                         <div className="flex-shrink-0 relative w-10 h-10">
                           <img
@@ -2704,7 +2368,7 @@ const JobsPage = () => {
                         </div>
                       ) : null}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm min-w-0">
+                        <h3 className="font-semibold text-sm truncate">
                           <CompanyNameLink
                             name={job.company_name || job.company}
                             className="font-semibold text-sm"
@@ -2718,22 +2382,25 @@ const JobsPage = () => {
                     <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
                       {job.title}
                     </h4>
-                    <JobListingMetaBadges
-                      employmentType={job.employment_type}
-                      workArrangement={job.work_arrangement}
-                      salary={job.salary}
-                    />
-                    <div className="mt-7 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
+                    <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
+                      <JobListingMetaBadges
+                        employmentType={job.employment_type}
+                        workArrangement={job.work_arrangement}
+                        salary={job.salary}
+                      />
+                    </div>
+                    </div>
+                    <div className="mt-auto flex shrink-0 items-center justify-between gap-4 pt-7">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
                         <RadialProgress
                           value={job.matchPercentage ?? 0}
                           size={44}
                           strokeWidth={5}
                           showLabel={false}
                           percentageTextSize="sm"
-                          className="text-breneo-blue"
+                          className="shrink-0 text-breneo-blue"
                         />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
+                        <span className="line-clamp-2 text-xs font-semibold text-gray-700 dark:text-gray-100">
                           {getMatchQualityLabel(job.matchPercentage)}
                         </span>
                       </div>
@@ -2746,7 +2413,7 @@ const JobsPage = () => {
                         }}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
                         className={cn(
-                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                          "h-10 w-10 shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
                           job.is_saved
                             ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                             : "text-black dark:text-white",
@@ -2774,9 +2441,12 @@ const JobsPage = () => {
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-lg font-bold">Top Matched Jobs</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex items-stretch gap-4 md:flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-4 max-md:scrollbar-hide max-md:snap-x max-md:snap-mandatory max-md:-mx-2 max-md:px-2 max-md:[&>*]:h-[300px]">
               {[...Array(3)].map((_, i) => (
-                <Card key={i}>
+                <Card
+                  key={i}
+                  className="h-full max-md:h-[300px] w-[calc((100%-2rem)/3)] min-w-[280px] snap-start flex-shrink-0"
+                >
                   <CardContent className="p-4">
                     <div className="animate-pulse">
                       <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
@@ -2798,20 +2468,21 @@ const JobsPage = () => {
               <h2 className="text-lg font-bold">Remote Jobs</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex items-stretch gap-4 md:flex-wrap max-md:flex-nowrap max-md:overflow-x-auto max-md:pb-4 max-md:scrollbar-hide max-md:snap-x max-md:snap-mandatory max-md:-mx-2 max-md:px-2 max-md:[&>*]:h-[300px]">
               {remoteJobs.map((job) => (
                 <Card
                   key={job.id}
-                  className="group flex flex-col transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
+                  className="group flex h-full max-md:h-[300px] w-[calc((100%-2rem)/3)] min-w-[280px] snap-start flex-shrink-0 flex-col self-stretch transition-all duration-200 overflow-hidden rounded-3xl cursor-pointer hover:shadow-soft"
                   onClick={() => {
                     if (!job.id || String(job.id).trim() === "") return;
                     const encodedId = encodeURIComponent(String(job.id));
                     navigate(`/jobs/${encodedId}`);
                   }}
                 >
-                  <CardContent className="px-5 pt-5 pb-4 flex flex-col flex-grow">
+                  <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
+                    <div className="flex min-h-0 flex-1 flex-col">
                     {/* Company Logo and Info */}
-                    <div className="flex items-start gap-3 mb-3">
+                    <div className="flex items-start gap-3 mb-3 min-h-10">
                       {job.company_logo ? (
                         <div className="flex-shrink-0 relative w-10 h-10">
                           <img
@@ -2828,7 +2499,7 @@ const JobsPage = () => {
                         </div>
                       ) : null}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm min-w-0">
+                        <h3 className="font-semibold text-sm truncate">
                           <CompanyNameLink
                             name={job.company_name || job.company}
                             className="font-semibold text-sm"
@@ -2845,24 +2516,27 @@ const JobsPage = () => {
                       {job.title}
                     </h4>
 
-                    <JobListingMetaBadges
-                      employmentType={job.employment_type}
-                      workArrangement={job.work_arrangement}
-                      salary={job.salary}
-                    />
+                    <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
+                      <JobListingMetaBadges
+                        employmentType={job.employment_type}
+                        workArrangement={job.work_arrangement}
+                        salary={job.salary}
+                      />
+                    </div>
+                    </div>
 
                     {/* Match percentage & Save button (same total match as job detail page) */}
-                    <div className="mt-7 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
+                    <div className="mt-auto flex shrink-0 items-center justify-between gap-4 pt-7">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
                         <RadialProgress
                           value={job.matchPercentage ?? 0}
                           size={44}
                           strokeWidth={5}
                           showLabel={false}
                           percentageTextSize="sm"
-                          className="text-breneo-blue"
+                          className="shrink-0 text-breneo-blue"
                         />
-                        <span className="text-xs font-semibold text-gray-700">
+                        <span className="line-clamp-2 text-xs font-semibold text-gray-700">
                           {getMatchQualityLabel(job.matchPercentage)}
                         </span>
                       </div>
@@ -2875,7 +2549,7 @@ const JobsPage = () => {
                         }}
                         aria-label={job.is_saved ? "Unsave job" : "Save job"}
                         className={cn(
-                          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10",
+                          "h-10 w-10 shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
                           job.is_saved
                             ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
                             : "text-black dark:text-white",
