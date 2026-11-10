@@ -90,7 +90,9 @@ function HowItWorksModal({
           </div>
           <DrawerFooter>
             <DrawerClose asChild>
-              <Button className={closeButtonClass}>{t.courses.howItWorksGotIt}</Button>
+              <Button className={closeButtonClass}>
+                {t.courses.howItWorksGotIt}
+              </Button>
             </DrawerClose>
           </DrawerFooter>
         </DrawerContent>
@@ -194,10 +196,7 @@ export function GrowthInterviewSection() {
           </div>
         </div>
       </div>
-      <HowItWorksModal
-        open={howItWorksOpen}
-        onOpenChange={setHowItWorksOpen}
-      />
+      <HowItWorksModal open={howItWorksOpen} onOpenChange={setHowItWorksOpen} />
     </section>
   );
 }

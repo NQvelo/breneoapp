@@ -2,9 +2,11 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { GrowthInterviewSection } from "@/components/growth/GrowthInterviewSection";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import {
   calculateSkillScores,
@@ -106,6 +108,9 @@ const AcademyLogo = ({ name, src }: { name: string; src: string | null }) => {
 
 const CoursesPage = () => {
   const { user } = useAuth();
+  const { showProfileWelcome, isCheckingProfile } = useNeedsProfileForMatching(
+    user?.id,
+  );
   const t = useTranslation();
   const queryClient = useQueryClient();
   // State for user's top skills from test results
@@ -537,6 +542,21 @@ const CoursesPage = () => {
       <span className="text-sm text-gray-600">{count}</span>
     </div>
   );
+
+  if (isCheckingProfile || showProfileWelcome) {
+    return (
+      <DashboardLayout>
+        {showProfileWelcome ? (
+          <DashboardProfileWelcome />
+        ) : (
+          <div className="mx-auto max-w-6xl space-y-4 px-4 py-8">
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-72 w-full rounded-3xl" />
+          </div>
+        )}
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

@@ -33,6 +33,8 @@ interface DashboardLayoutProps {
    * Use for long forms (e.g. add course) to avoid a nested scroll area.
    */
   containMainScroll?: boolean;
+  /** Keep the sidebar and tab bar visible, but block their navigation items. */
+  navLocked?: boolean;
 }
 
 export function DashboardLayout({
@@ -41,14 +43,28 @@ export function DashboardLayout({
   showHeader = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showHeader,
   background = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.background,
   containMainScroll = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.containMainScroll,
+  navLocked = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.navLocked,
 }: DashboardLayoutProps) {
   const setShellOptions = useContext(DashboardShellContext);
 
   useLayoutEffect(() => {
     if (!setShellOptions) return;
-    setShellOptions({ showSidebar, showHeader, background, containMainScroll });
+    setShellOptions({
+      showSidebar,
+      showHeader,
+      background,
+      containMainScroll,
+      navLocked,
+    });
     return () => setShellOptions(DEFAULT_DASHBOARD_LAYOUT_OPTIONS);
-  }, [setShellOptions, showSidebar, showHeader, background, containMainScroll]);
+  }, [
+    setShellOptions,
+    showSidebar,
+    showHeader,
+    background,
+    containMainScroll,
+    navLocked,
+  ]);
 
   if (setShellOptions) return <>{children}</>;
 
@@ -58,6 +74,7 @@ export function DashboardLayout({
       showHeader={showHeader}
       background={background}
       containMainScroll={containMainScroll}
+      navLocked={navLocked}
     >
       {children}
     </DashboardChrome>
@@ -71,6 +88,7 @@ export function DashboardChrome({
   showHeader = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showHeader,
   background = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.background,
   containMainScroll = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.containMainScroll,
+  navLocked = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.navLocked,
 }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -167,6 +185,7 @@ export function DashboardChrome({
           collapsed={sidebarCollapsed}
           toggleSidebar={toggleSidebar}
           onUpgradeClick={openSubscriptionModal}
+          navLocked={navLocked}
         />
       )}
       {showHeader && (

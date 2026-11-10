@@ -312,6 +312,23 @@ export const en = {
     skillTest: "Skill Test",
     skillPath: "Skill Path",
     interests: "Interests",
+    profileWelcome: {
+      title: "Filling your profile is important",
+      subtitle:
+        "A complete profile lets Breneo AI match more jobs with you.",
+      whyTitle: "Why this is important for you",
+      whyBody:
+        "Without your CV or experience, Breneo AI can't match jobs with you.",
+      uploadTitle: "Upload your CV",
+      uploadBody: "A PDF or DOCX is saved to your profile.",
+      uploadAction: "Upload CV",
+      manualTitle: "Fill it in yourself",
+      manualBody: "Add your experience, skills, and education.",
+      manualAction: "Go to profile",
+      jobsTitle: "Jobs for you",
+      moreJobs: "Want more jobs? Fill in your profile.",
+      lockedMatches: "Fill in your profile if you want to see your matches.",
+    },
   },
   // Jobs
   jobs: {

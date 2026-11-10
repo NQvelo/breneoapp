@@ -1,24 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { jobService, type ApiJob } from "@/api/jobs";
 import { AuthPageHeader } from "@/components/auth/AuthPageHeader";
 import { ArrowLeft, Briefcase, Clock } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
-import {
-  resolveJobEmploymentType,
-  resolveJobWorkArrangement,
-} from "@/utils/jobEmploymentDisplay";
-import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { cn } from "@/lib/utils";
+import { loadJobsForRoles, type PreviewJob } from "@/onboarding/onboardingJobs";
 import {
-  jobMatchesOnboardingLocation,
   loadOnboardingDraft,
-  locationSearchCountries,
   ROLE_CATEGORY_SUBROLES,
-  roleSearchKeywords,
   saveOnboardingDraft,
   subrolesForCategories,
   type OnboardingDraft,
@@ -34,187 +26,6 @@ import {
 
 const STEP_COUNT = 10;
 const SEARCH_STEP = STEP_COUNT - 1;
-
-type PreviewJob = {
-  id: string;
-  title: string;
-  company: string;
-  logo?: string;
-  employmentType: string;
-  workArrangement: string;
-  salary: string;
-};
-
-function textField(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function locationOf(job: ApiJob): string {
-  const direct = textField(job.location);
-  if (direct) return direct;
-  const parts = [
-    job.job_city,
-    job.city,
-    job.job_state,
-    job.state,
-    job.job_country,
-    job.country,
-  ]
-    .map(textField)
-    .filter(Boolean);
-  return [...new Set(parts)].join(", ");
-}
-
-function logoOf(job: ApiJob): string | undefined {
-  const candidates = [
-    job.company_logo,
-    job.employer_logo,
-    job.logo_url,
-    job.logo_upload,
-  ];
-  for (const candidate of candidates) {
-    const logo = textField(candidate);
-    if (!logo) continue;
-    if (logo.startsWith("//")) return `https:${logo}`;
-    if (
-      logo.startsWith("http://") ||
-      logo.startsWith("https://") ||
-      logo.startsWith("data:") ||
-      logo.startsWith("/")
-    ) {
-      return logo;
-    }
-  }
-  return undefined;
-}
-
-function countryOf(job: ApiJob): string {
-  const extra = job as { location_country?: unknown };
-  return textField(job.job_country || job.country || extra.location_country);
-}
-
-function toPreviewJob(job: ApiJob): PreviewJob {
-  const title = textField(job.job_title || job.title);
-  const company = textField(job.company_name || job.employer_name || job.company);
-  return {
-    id: String(job.job_id || job.id || `${title}-${company}`),
-    title,
-    company,
-    logo: logoOf(job),
-    employmentType: resolveJobEmploymentType(job),
-    workArrangement: resolveJobWorkArrangement(job),
-    salary: formatJobSalaryDisplay(job),
-  };
-}
-
-function pickTopJobs(jobs: ApiJob[], keywords: string[]): PreviewJob[] {
-  const lowered = keywords.map((word) => word.toLowerCase());
-  const scored = jobs
-    .map((job) => {
-      const preview = toPreviewJob(job);
-      const haystack = preview.title.toLowerCase();
-      const score = lowered.reduce(
-        (total, word) => total + (haystack.includes(word) ? 1 : 0),
-        0,
-      );
-      return { ...preview, score };
-    })
-    .filter((job) => job.title && job.score > 0);
-
-  scored.sort((left, right) => right.score - left.score);
-  const seen = new Set<string>();
-  const top: PreviewJob[] = [];
-  for (const job of scored) {
-    const key = `${job.title}|${job.company}`.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    top.push({
-      id: job.id,
-      title: job.title,
-      company: job.company,
-      logo: job.logo,
-      employmentType: job.employmentType,
-      workArrangement: job.workArrangement,
-      salary: job.salary,
-    });
-    if (top.length === 5) break;
-  }
-  return top;
-}
-
-async function fetchMatchingJobs(
-  keywords: string[],
-  countries: string[],
-): Promise<ApiJob[]> {
-  if (keywords.length === 0) return [];
-  const result = await jobService.fetchActiveJobs({
-    query: "",
-    page: 1,
-    pageSize: 40,
-    sort: "newest",
-    filters: {
-      country: "",
-      countries: [],
-      jobTypes: [],
-      isRemote: false,
-      skills: keywords,
-      ...(countries.length > 0 ? { locationCountry: countries } : {}),
-    },
-  });
-  return result.jobs;
-}
-
-function roleMatches(
-  jobs: ApiJob[],
-  role: string,
-  choices: readonly OnboardingLocation[],
-): PreviewJob[] {
-  const keywords = roleSearchKeywords([role]);
-  const scoped =
-    choices.length > 0
-      ? jobs.filter((job) =>
-          choices.some((choice) =>
-            jobMatchesOnboardingLocation(countryOf(job), locationOf(job), choice),
-          ),
-        )
-      : jobs;
-  return pickTopJobs(scoped, keywords);
-}
-
-function mergeRoleJobs(lists: PreviewJob[][]): PreviewJob[] {
-  const merged: PreviewJob[] = [];
-  const seen = new Set<string>();
-  const longest = lists.reduce((count, list) => Math.max(count, list.length), 0);
-  for (let index = 0; index < longest && merged.length < 5; index += 1) {
-    for (const list of lists) {
-      const job = list[index];
-      if (!job) continue;
-      const key = `${job.title}|${job.company}`.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(job);
-      if (merged.length === 5) break;
-    }
-  }
-  return merged;
-}
-
-async function loadJobsForRoles(
-  roles: readonly string[],
-  choices: readonly OnboardingLocation[],
-): Promise<PreviewJob[]> {
-  const keywords = roleSearchKeywords(roles);
-  const countries = locationSearchCountries(choices);
-  const regionalJobs = await fetchMatchingJobs(keywords, countries).catch(
-    () => [],
-  );
-  const regional = mergeRoleJobs(
-    roles.map((role) => roleMatches(regionalJobs, role, choices)),
-  );
-  if (regional.length > 0 || countries.length === 0) return regional;
-  const allJobs = await fetchMatchingJobs(keywords, []).catch(() => []);
-  return mergeRoleJobs(roles.map((role) => roleMatches(allJobs, role, [])));
-}
 
 const INTENTS: OnboardingIntent[] = ["jobs", "interviews", "learning", "cv"];
 const SITUATIONS: OnboardingSituation[] = [

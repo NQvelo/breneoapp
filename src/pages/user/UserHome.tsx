@@ -48,7 +48,6 @@ import {
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
-import { profileApi } from "@/api/profile";
 import {
   matchJobDetailToUser,
   buildUserMatchProfileFromSkillTest,
@@ -64,7 +63,9 @@ import {
   type ApplicationStats,
   type DailyPickJob,
 } from "@/components/home/DashboardAnalytics";
+import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
 import { useMyApplicationCounts } from "@/hooks/useMyApplications";
+import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
@@ -425,11 +426,9 @@ const UserHome = () => {
   };
 
   // Profile skills (same source as job detail page for identical total match)
-  const { data: profileSkills = [] } = useQuery({
-    queryKey: ["profileSkills", user?.id],
-    queryFn: () => profileApi.getMySkills(),
-    enabled: !!user,
-  });
+  const { isCheckingProfile, showProfileWelcome, profileSkills } =
+    useNeedsProfileForMatching(user?.id);
+  const showMatchedJobs = !!user && !isCheckingProfile && !showProfileWelcome;
   const userSkillsForMatch = useMemo(() => {
     const fromProfile = (profileSkills || []).map((s) =>
       normalizeSkillName(s.skill_name),
@@ -615,7 +614,7 @@ const UserHome = () => {
   } = useQuery({
     queryKey: ["home-georgian-jobs"],
     queryFn: () => fetchGeorgianJobs(),
-    enabled: !!user,
+    enabled: showMatchedJobs,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -627,7 +626,7 @@ const UserHome = () => {
   } = useQuery({
     queryKey: ["home-worldwide-jobs"],
     queryFn: () => fetchWorldwideJobs(),
-    enabled: !!user,
+    enabled: showMatchedJobs,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
@@ -699,7 +698,7 @@ const UserHome = () => {
         return [];
       }
     },
-    enabled: !!user && !loadingSkills, // Wait for skills to load
+    enabled: showMatchedJobs && !loadingSkills,
   });
 
   // Filter and sort courses based on user skills
@@ -1242,10 +1241,18 @@ const UserHome = () => {
     );
   }
 
+  if (showProfileWelcome) {
+    return (
+      <DashboardLayout>
+        <DashboardProfileWelcome />
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       {/* Mobile Welcome Message */}
-      {isMobile && (
+      {isMobile && !isCheckingProfile && !showProfileWelcome && (
         <div className="mb-4 px-4 md:hidden">
           <h1 className="text-xl font-semibold text-foreground">
             {t.auth.welcome},{" "}
@@ -1258,40 +1265,51 @@ const UserHome = () => {
       )}
       <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         <div className="space-y-6">
-          <DashboardAnalytics
-            applicationStats={applicationStats}
-            applicationStatsLoading={applicationsLoading}
-            dailyPick={dailyPickJob}
-            dailyPickLoading={georgianJobsLoading && worldwideJobsLoading}
-          />
+          {!isCheckingProfile && !showProfileWelcome && (
+            <DashboardAnalytics
+              applicationStats={applicationStats}
+              applicationStatsLoading={applicationsLoading}
+              dailyPick={dailyPickJob}
+              dailyPickLoading={georgianJobsLoading && worldwideJobsLoading}
+            />
+          )}
 
           {/* Main Content - Top Jobs and Courses */}
           <div className="space-y-6 pt-6 md:pt-8">
-            {renderJobsCarouselSection({
-              title: "Georgian jobs for you",
-              jobs: transformedGeorgianJobs,
-              isLoading: georgianJobsLoading,
-              error: georgianJobsError,
-              emptyMessage: "No Georgian jobs available right now.",
-              scrollRef: georgiaJobsScrollRef,
-              onScroll: scrollGeorgiaJobs,
-              scrollLabel: "Georgian jobs",
-            })}
+            {isCheckingProfile ? (
+              <div className="space-y-4">
+                <Skeleton className="h-7 w-56" />
+                <Skeleton className="h-72 w-full rounded-3xl" />
+              </div>
+            ) : (
+              <>
+                {renderJobsCarouselSection({
+                  title: "Georgian jobs for you",
+                  jobs: transformedGeorgianJobs,
+                  isLoading: georgianJobsLoading,
+                  error: georgianJobsError,
+                  emptyMessage: "No Georgian jobs available right now.",
+                  scrollRef: georgiaJobsScrollRef,
+                  onScroll: scrollGeorgiaJobs,
+                  scrollLabel: "Georgian jobs",
+                })}
 
-            {renderJobsCarouselSection({
-              title: "Worldwide jobs for you",
-              jobs: transformedWorldwideJobs,
-              isLoading: worldwideJobsLoading,
-              error: worldwideJobsError,
-              emptyMessage:
-                "No jobs found. Try adjusting your search criteria.",
-              scrollRef: jobsScrollRef,
-              onScroll: scrollJobs,
-              scrollLabel: "worldwide jobs",
-            })}
+                {renderJobsCarouselSection({
+                  title: "Worldwide jobs for you",
+                  jobs: transformedWorldwideJobs,
+                  isLoading: worldwideJobsLoading,
+                  error: worldwideJobsError,
+                  emptyMessage:
+                    "No jobs found. Try adjusting your search criteria.",
+                  scrollRef: jobsScrollRef,
+                  onScroll: scrollJobs,
+                  scrollLabel: "worldwide jobs",
+                })}
+              </>
+            )}
 
-            {/* Top Courses Section */}
-            <div>
+            {!isCheckingProfile && !showProfileWelcome ? (
+              <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   {/* <GraduationCap className="h-6 w-6 text-breneo-blue" /> */}
@@ -1434,7 +1452,8 @@ const UserHome = () => {
                   })}
                 </div>
               )}
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

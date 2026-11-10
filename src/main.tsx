@@ -11,5 +11,5 @@ initPwaUpdate();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <RootApp />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

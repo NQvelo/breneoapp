@@ -12,6 +12,7 @@ import {
 } from "iconsax-react";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 import { isNavHrefActive } from "./navActive";
 
 const TabBarLink = ({
@@ -27,6 +28,7 @@ interface MobileTabBarProps {
   role: "user" | "academy" | "employer";
   profilePath: string;
   avatarUrl?: string;
+  navLocked?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   role,
   profilePath,
   avatarUrl,
+  navLocked = false,
 }: MobileTabBarProps) {
   const { pathname } = useLocation();
   const { resolvedTheme } = useTheme();
@@ -93,7 +96,13 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   );
 
   return (
-    <div className="breneo-tab-bar-dock md:hidden fixed bottom-0 left-0 right-0 z-50">
+    <div
+      className={cn(
+        "breneo-tab-bar-dock md:hidden fixed bottom-0 left-0 right-0 z-50",
+        navLocked && "pointer-events-none opacity-40",
+      )}
+      aria-disabled={navLocked || undefined}
+    >
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background/50 to-transparent"
         aria-hidden

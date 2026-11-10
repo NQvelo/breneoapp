@@ -61,9 +61,7 @@ export function SettingsSectionCard({
       ) : null}
       <CardContent
         className={cn(
-          showHeader
-            ? settingsSectionContentClassName
-            : "space-y-3 p-6",
+          showHeader ? settingsSectionContentClassName : "space-y-3 p-6",
           contentClassName,
         )}
       >

@@ -747,6 +747,17 @@ export function skillsForRoles(roles: readonly string[]): string[] {
   return [...names];
 }
 
+const ONBOARDING_SEED_SKILLS = new Set(
+  ONBOARDING_ROLE_IDS.map((role) =>
+    ROLE_SEARCH_KEYWORDS[role]?.[0]?.trim().toLowerCase(),
+  ).filter((name): name is string => Boolean(name)),
+);
+
+/** Skills written automatically from the signup quiz, not added on the profile. */
+export function isOnboardingSeedSkill(name: string): boolean {
+  return ONBOARDING_SEED_SKILLS.has(name.trim().toLowerCase());
+}
+
 export function industryYearsForAnswers(
   roles: readonly string[],
   experience: OnboardingExperience | null,
@@ -767,24 +778,10 @@ export function industryYearsForAnswers(
   return Object.fromEntries([...industries].map((industry) => [industry, years]));
 }
 
-function aboutMeText(profile: Record<string, unknown>): string {
-  const nested = profile.profile;
-  const fromNested =
-    nested && typeof nested === "object"
-      ? (nested as Record<string, unknown>).about_me
-      : "";
-  return String(profile.about_me || fromNested || "").trim();
-}
-
-/** Write the quiz answers onto the signed-in user, then clear the saved draft. */
+/** Save quiz skills and industry years. Answers stay in the browser cache and are not written to About Me. */
 export async function applyOnboardingAnswers(): Promise<void> {
   const draft = loadOnboardingDraft();
   if (!draft.completed) return;
-
-  const profile = await profileApi.getProfile().catch(() => ({}));
-  if (!aboutMeText(profile) && draft.summary.trim()) {
-    await profileApi.updateProfile({ about_me: draft.summary.trim() });
-  }
 
   for (const skill of skillsForRoles(draft.roles)) {
     try {
@@ -815,6 +812,4 @@ export async function applyOnboardingAnswers(): Promise<void> {
       }
     }
   }
-
-  localStorage.removeItem(ONBOARDING_STORAGE_KEY);
 }

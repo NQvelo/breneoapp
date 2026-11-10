@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { cn } from "@/lib/utils";
 import { PLATFORM_FILTER_CHIP_CLASS } from "@/lib/chipStyles";
 import { supabase } from "@/integrations/supabase/client";
@@ -741,6 +743,9 @@ const loadFiltersFromSession = (
 
 const JobsPage = () => {
   const { user } = useAuth();
+  const { showProfileWelcome, isCheckingProfile } = useNeedsProfileForMatching(
+    user?.id,
+  );
   const { language } = useLanguage();
   const queryClient = useQueryClient();
   const isMobile = useMobile();
@@ -2350,6 +2355,21 @@ const JobsPage = () => {
     setFilterModalOpen(false);
     // Just clear filters in UI, don't redirect since we're showing latest jobs
   };
+
+  if (isCheckingProfile || showProfileWelcome) {
+    return (
+      <DashboardLayout>
+        {showProfileWelcome ? (
+          <DashboardProfileWelcome />
+        ) : (
+          <div className="mx-auto max-w-6xl space-y-4 px-4 py-8">
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-72 w-full rounded-3xl" />
+          </div>
+        )}
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

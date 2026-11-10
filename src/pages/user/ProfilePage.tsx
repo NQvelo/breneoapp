@@ -474,6 +474,31 @@ const ProfilePage = () => {
   const [isWorkExperienceModalOpen, setIsWorkExperienceModalOpen] =
     useState(false);
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const sectionId = location.hash.replace("#", "");
+    if (
+      sectionId !== "education" &&
+      sectionId !== "experience" &&
+      sectionId !== "skills"
+    ) {
+      return;
+    }
+    if (activeView !== "profile") return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    location.hash,
+    activeView,
+    loadingEducations,
+    loadingWorkExperiences,
+    loadingProfileSkills,
+  ]);
   // Ref to track manual updates to prevent useEffect from overwriting
   const manualSocialLinkUpdateRef = useRef(false);
   const socialLinksUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1710,6 +1735,7 @@ const ProfilePage = () => {
       }
     }
     toast.success("Work experience updated.");
+    await queryClient.invalidateQueries({ queryKey: ["profileGate"] });
   };
 
   // Handler to save About Me
@@ -2123,7 +2149,7 @@ const ProfilePage = () => {
           </Card>
 
           {/* 3. Education */}
-          <Card className="border-0 rounded-3xl">
+          <Card id="education" className="scroll-mt-24 border-0 rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Education
@@ -2181,7 +2207,7 @@ const ProfilePage = () => {
           </Card>
 
           {/* 4. Work experience */}
-          <Card className="border-0 rounded-3xl">
+          <Card id="experience" className="scroll-mt-24 border-0 rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Work experience
@@ -2237,7 +2263,7 @@ const ProfilePage = () => {
           </Card>
 
           {/* 5. Skills */}
-          <Card className="border-0 rounded-3xl">
+          <Card id="skills" className="scroll-mt-24 border-0 rounded-3xl">
             <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Skills

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   industryYearsForAnswers,
+  isOnboardingSeedSkill,
   jobMatchesOnboardingLocation,
   skillsForRoles,
 } from "../onboardingAnswers";
@@ -8,6 +9,12 @@ import {
 describe("onboarding answers", () => {
   it("turns selected roles into profile skills", () => {
     expect(skillsForRoles(["react", "devops"])).toEqual(["React", "DevOps"]);
+  });
+
+  it("recognizes skills that signup writes automatically", () => {
+    expect(isOnboardingSeedSkill("React")).toBe(true);
+    expect(isOnboardingSeedSkill(" devops ")).toBe(true);
+    expect(isOnboardingSeedSkill("Figma")).toBe(false);
   });
 
   it("maps experience and roles onto industry years", () => {

@@ -45,12 +45,41 @@ interface AppSidebarProps {
   collapsed: boolean;
   toggleSidebar: () => void;
   onUpgradeClick?: () => void;
+  navLocked?: boolean;
+}
+
+const lockedNavClass = "pointer-events-none cursor-not-allowed opacity-40";
+
+function NavDestination({
+  to,
+  locked,
+  className,
+  children,
+}: {
+  to: string;
+  locked: boolean;
+  className: string;
+  children: React.ReactNode;
+}) {
+  if (locked) {
+    return (
+      <span className={cn(className, lockedNavClass)} aria-disabled="true">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <LocalizedLink to={to} className={className}>
+      {children}
+    </LocalizedLink>
+  );
 }
 
 export const AppSidebar = React.memo(function AppSidebar({
   collapsed,
   toggleSidebar,
   onUpgradeClick,
+  navLocked = false,
 }: AppSidebarProps) {
   const location = useLocation();
   // ✅ Get the user object directly from the context
@@ -373,6 +402,7 @@ export const AppSidebar = React.memo(function AppSidebar({
         role={isAcademy ? "academy" : isEmployer ? "employer" : "user"}
         profilePath={profilePath}
         avatarUrl={sidebarAvatarUrl}
+        navLocked={navLocked}
       />
 
       {/* Desktop Sidebar */}
@@ -403,9 +433,10 @@ export const AppSidebar = React.memo(function AppSidebar({
               {navItems.map((item, index) => {
                 const isActive = isNavItemActive(item.href);
                 return (
-                  <LocalizedLink
+                  <NavDestination
                     key={index}
                     to={item.href}
+                    locked={navLocked}
                     className={cn(
                       "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                       isActive
@@ -434,7 +465,7 @@ export const AppSidebar = React.memo(function AppSidebar({
                         {item.label}
                       </span>
                     )}
-                  </LocalizedLink>
+                  </NavDestination>
                 );
               })}
             </nav>
@@ -444,8 +475,9 @@ export const AppSidebar = React.memo(function AppSidebar({
           <div className="px-4 pb-4">
             {/* Settings (all roles); plan upgrade for all account types */}
             <div className="mb-4 space-y-1">
-              <LocalizedLink
+              <NavDestination
                 to={settingsPath}
+                locked={navLocked}
                 className={cn(
                   "flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                   currentPath === settingsPath
@@ -467,15 +499,18 @@ export const AppSidebar = React.memo(function AppSidebar({
                     {t.nav.settings}
                   </span>
                 )}
-              </LocalizedLink>
+              </NavDestination>
 
               {/* Plan widget — shows audience-specific plans from API */}
               <button
+                type="button"
                 onClick={onUpgradeClick}
+                disabled={navLocked}
                 className={cn(
                   "w-full flex items-center space-x-4 px-4 py-2.5 rounded-xl transition-all duration-200 group",
                   "bg-primary/20 hover:bg-primary/30 text-left",
                   collapsed && "justify-center px-4",
+                  navLocked && lockedNavClass,
                 )}
               >
                 {subscriptionInfo?.is_active ? (
@@ -501,8 +536,9 @@ export const AppSidebar = React.memo(function AppSidebar({
 
             {/* Profile / employer company */}
             <div className="mt-4 border-t border-border/70 pt-4">
-              <LocalizedLink
+              <NavDestination
                 to={profilePath}
+                locked={navLocked}
                 className="flex items-center gap-4 px-4 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-[#2d2d2d] transition-all duration-200 group"
               >
                 {/* 22px-wide column like Lucide icons; 32px avatar centered — label text starts same as nav `space-x-4` */}
@@ -539,7 +575,7 @@ export const AppSidebar = React.memo(function AppSidebar({
                     </span>
                   </div>
                 )}
-              </LocalizedLink>
+              </NavDestination>
             </div>
           </div>
         </div>

@@ -159,6 +159,7 @@ export function AccountCvSection() {
       profileApi.getMySkills().catch(() => undefined),
       queryClient.invalidateQueries({ queryKey: ["profile"] }),
       queryClient.invalidateQueries({ queryKey: ["profileSkills"] }),
+      queryClient.invalidateQueries({ queryKey: ["profileGate"] }),
     ]);
     const data = meProfile?.data;
     const firstName = readProfileString(data, "first_name");

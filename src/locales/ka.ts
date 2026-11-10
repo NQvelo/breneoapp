@@ -317,6 +317,23 @@ export const ka = {
     skillTest: "უნარების ტესტი",
     skillPath: "უნარების გზა",
     interests: "ინტერესები",
+    profileWelcome: {
+      title: "პროფილის შევსება მნიშვნელოვანია",
+      subtitle:
+        "სრული პროფილით Breneo AI უფრო მეტ ვაკანსიას შეგირჩევთ.",
+      whyTitle: "რატომ არის ეს თქვენთვის მნიშვნელოვანი",
+      whyBody:
+        "CV-ის ან გამოცდილების გარეშე Breneo AI ვერ შეგირჩევთ ვაკანსიებს.",
+      uploadTitle: "ატვირთეთ CV",
+      uploadBody: "PDF ან DOCX ინახება პროფილში.",
+      uploadAction: "CV-ის ატვირთვა",
+      manualTitle: "შეავსეთ ხელით",
+      manualBody: "დაამატეთ გამოცდილება, უნარები და განათლება.",
+      manualAction: "პროფილზე გადასვლა",
+      jobsTitle: "ვაკანსიები თქვენთვის",
+      moreJobs: "მეტი ვაკანსია გინდათ? შეავსეთ პროფილი.",
+      lockedMatches: "შეავსეთ პროფილი, თუ გსურთ ნახოთ თქვენი დამთხვევები.",
+    },
   },
   // Jobs
   jobs: {

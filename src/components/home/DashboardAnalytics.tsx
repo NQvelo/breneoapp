@@ -24,6 +24,7 @@ interface DashboardAnalyticsProps {
   applicationStatsLoading?: boolean;
   dailyPick: DailyPickJob | null;
   dailyPickLoading?: boolean;
+  hideDailyPick?: boolean;
 }
 
 const sectionClass =
@@ -154,6 +155,7 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
   applicationStatsLoading,
   dailyPick,
   dailyPickLoading,
+  hideDailyPick = false,
 }) => (
   <section
     className="relative isolate overflow-hidden rounded-3xl p-5 md:p-7"
@@ -180,7 +182,9 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
           stats={applicationStats}
           isLoading={applicationStatsLoading}
         />
-        <DailyPickSection job={dailyPick} isLoading={dailyPickLoading} />
+        {hideDailyPick ? null : (
+          <DailyPickSection job={dailyPick} isLoading={dailyPickLoading} />
+        )}
       </div>
     </div>
   </section>
