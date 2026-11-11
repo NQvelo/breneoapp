@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/api/auth/apiClient";
@@ -7,7 +7,6 @@ import {
   normalizeAcademyProfileApiResponse,
   normalizeSocialLinksFromApi,
   toAcademyProfilePayload,
-  toAcademyTablePayload,
   type AcademyProfileApiRaw,
 } from "@/api/academy";
 import { toast } from "sonner";
@@ -16,31 +15,25 @@ import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerFooter,
-  DrawerClose,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea, type TextareaProps } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Edit,
   Settings,
@@ -52,8 +45,13 @@ import {
   Camera,
   Upload,
   Check,
-  Pencil,
+  X,
+  Loader2,
 } from "@/components/icons";
+import {
+  coverGradientStyle,
+  useSoftImageGradient,
+} from "@/utils/imageGradient";
 import { useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 import { useTranslation } from "@/contexts/LanguageContext";
@@ -226,86 +224,49 @@ function normalizeAcademyAvatarSrc(
   return `/${v}`;
 }
 
-const aboutDashedShell =
-  "rounded-lg border border-dashed border-gray-300 bg-transparent transition hover:border-breneo-blue focus-within:border-breneo-blue dark:border-[#444444]";
+const emptySocialLinks = (): SocialLinks => ({
+  github: "",
+  linkedin: "",
+  facebook: "",
+  instagram: "",
+  dribbble: "",
+  behance: "",
+});
 
-const aboutReadOnlyTextClass =
-  "text-gray-600 dark:text-gray-300 leading-relaxed text-base whitespace-pre-wrap break-words";
-
-function AutoSizeTextarea({
-  minHeightPx = 80,
-  className,
-  onChange,
-  value,
-  ...props
-}: TextareaProps & { minHeightPx?: number }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  const syncHeight = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "0px";
-    el.style.overflow = "hidden";
-    el.style.height = `${Math.max(minHeightPx, el.scrollHeight)}px`;
-  }, [minHeightPx]);
-
-  useEffect(() => {
-    syncHeight();
-  }, [value, syncHeight]);
-
-  return (
-    <Textarea
-      {...props}
-      ref={ref}
-      value={value}
-      rows={1}
-      onChange={(e) => {
-        onChange?.(e);
-        requestAnimationFrame(syncHeight);
-      }}
-      className={cn("resize-none overflow-hidden", className)}
-    />
-  );
+function normalizeLinkUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-function AboutSectionEditToggle({
-  isEditing,
-  onEdit,
-  onDone,
-  disabled,
-  editLabel,
-  doneLabel,
+function ProfileMenuRow({
+  icon,
+  iconClassName,
+  label,
 }: {
-  isEditing: boolean;
-  onEdit: () => void;
-  onDone: () => void;
-  disabled?: boolean;
-  editLabel: string;
-  doneLabel: string;
+  icon: React.ReactNode;
+  iconClassName: string;
+  label: string;
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      disabled={disabled}
-      className={cn(
-        "h-9 w-9 shrink-0 rounded-full",
-        "bg-muted/80 text-muted-foreground",
-        "hover:bg-muted hover:text-foreground",
-        "dark:bg-white/10 dark:hover:bg-white/15",
-      )}
-      onClick={isEditing ? onDone : onEdit}
-      aria-label={isEditing ? doneLabel : editLabel}
-    >
-      {isEditing ? (
-        <Check className="h-5 w-5" />
-      ) : (
-        <Pencil className="h-5 w-5" />
-      )}
-    </Button>
+    <span className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-foreground">
+      <span
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+          iconClassName,
+        )}
+      >
+        {icon}
+      </span>
+      <span className="text-sm font-medium">{label}</span>
+    </span>
   );
 }
+
+const profileSheetClassName =
+  "flex flex-col h-full overflow-hidden px-4 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4 bg-white dark:bg-[#181818]";
+const profileSheetOverlayClassName =
+  "backdrop-blur-sm bg-black/20 dark:bg-black/40";
 
 const AcademyProfilePage = () => {
   const {
@@ -322,8 +283,12 @@ const AcademyProfilePage = () => {
   );
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingAbout, setEditingAbout] = useState(false);
+  const [infoMenuOpen, setInfoMenuOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [aboutDraft, setAboutDraft] = useState("");
+  const [aboutExpanded, setAboutExpanded] = useState(false);
+  const [aboutOverflows, setAboutOverflows] = useState(false);
+  const aboutTextRef = useRef<HTMLParagraphElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formState, setFormState] = useState({
     academy_name: "",
@@ -332,28 +297,10 @@ const AcademyProfilePage = () => {
     contact_email: "",
   });
   // Social links state
-  const [socialLinks, setSocialLinks] = useState<SocialLinks>({
-    github: "",
-    linkedin: "",
-    facebook: "",
-    instagram: "",
-    dribbble: "",
-    behance: "",
-  });
-  const [loadingSocialLinks, setLoadingSocialLinks] = useState(false);
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>(emptySocialLinks);
+  const [socialDraft, setSocialDraft] = useState<SocialLinks>(emptySocialLinks);
+  const socialDraftDirtyRef = useRef(false);
   const socialLinksApiUnavailableRef = useRef(false);
-  const [isSocialLinkModalOpen, setIsSocialLinkModalOpen] = useState(false);
-  const [editingPlatform, setEditingPlatform] = useState<
-    SocialPlatform | "website" | null
-  >(null);
-  const [socialLinkForm, setSocialLinkForm] = useState<{
-    platform: string;
-    url: string;
-  }>({
-    platform: "",
-    url: "",
-  });
-  const [savingSocialLink, setSavingSocialLink] = useState(false);
   // Profile image upload state
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
@@ -367,6 +314,10 @@ const AcademyProfilePage = () => {
     normalizeAcademyAvatarSrc(displayProfileImage) ??
     displayProfileImage ??
     undefined;
+  const coverGradient = useSoftImageGradient(
+    avatarDisplaySrc,
+    academyProfile?.id || academyProfile?.academy_name || "academy",
+  );
 
   // Academy accounts are not authorized for GET/PATCH `/api/profile/` (403). Load photo from academy profile.
   useEffect(() => {
@@ -390,6 +341,25 @@ const AcademyProfilePage = () => {
       cancelled = true;
     };
   }, [authLoading, user?.id, user?.profile_image]);
+
+  useLayoutEffect(() => {
+    const el = aboutTextRef.current;
+    if (!el || aboutExpanded) return;
+
+    const measure = () => {
+      setAboutOverflows(el.scrollHeight > el.clientHeight + 1);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [academyProfile?.description, aboutExpanded, loading]);
+
+  useEffect(() => {
+    if (isEditing && socialDraftDirtyRef.current) return;
+    setSocialDraft({ ...socialLinks });
+  }, [socialLinks, isEditing]);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -596,7 +566,6 @@ const AcademyProfilePage = () => {
       if (!user?.email?.trim()) return;
       if (socialLinksApiUnavailableRef.current) return;
 
-      setLoadingSocialLinks(true);
       try {
         const token = localStorage.getItem("authToken");
         const role = "academy";
@@ -645,8 +614,6 @@ const AcademyProfilePage = () => {
           dribbble: "",
           behance: "",
         });
-      } finally {
-        setLoadingSocialLinks(false);
       }
     };
 
@@ -654,6 +621,81 @@ const AcademyProfilePage = () => {
       fetchSocialLinks();
     }
   }, [user, academyProfile]);
+
+  const persistSocialDraft = async (academyId: string, userEmail: string) => {
+    const platforms = Object.keys(emptySocialLinks()) as SocialPlatform[];
+    const nextLinks = emptySocialLinks();
+    let changed = false;
+    for (const platform of platforms) {
+      const next = normalizeLinkUrl(socialDraft[platform] || "");
+      nextLinks[platform] = next;
+      if (next !== normalizeLinkUrl(socialLinks[platform] || "")) {
+        changed = true;
+      }
+    }
+    if (!changed) return;
+
+    const token = localStorage.getItem("authToken");
+    if (!token) throw new Error("Authentication token is missing");
+
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+
+    for (const platform of platforms) {
+      const next = nextLinks[platform] || "";
+      if (next === normalizeLinkUrl(socialLinks[platform] || "")) continue;
+      const body = {
+        [platform]: next,
+        role: "academy",
+        academy: academyId,
+        user_email: userEmail,
+      };
+      try {
+        await apiClient.patch("/api/social-links/", body, { headers });
+      } catch (patchError) {
+        const status = (patchError as AxiosError).response?.status;
+        if (next && (status === 404 || status === 400)) {
+          await apiClient.post("/api/social-links/", body, { headers });
+        } else {
+          throw patchError;
+        }
+      }
+    }
+
+    setSocialLinks(nextLinks);
+    try {
+      const refreshed = await apiClient.get("/api/social-links/", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { role: "academy", academy: academyId, user_email: userEmail },
+      });
+      if (
+        refreshed.data &&
+        typeof refreshed.data === "object" &&
+        !Array.isArray(refreshed.data)
+      ) {
+        setSocialLinks(normalizeSocialLinksFromApi(refreshed.data));
+      }
+    } catch {
+      /* local draft is already applied */
+    }
+  };
+
+  const openAcademyEditor = () => {
+    setInfoMenuOpen(false);
+    socialDraftDirtyRef.current = false;
+    if (academyProfile) {
+      setFormState({
+        academy_name: academyProfile.academy_name,
+        description: academyProfile.description,
+        website_url: academyProfile.website_url,
+        contact_email: academyProfile.contact_email,
+      });
+    }
+    setSocialDraft({ ...socialLinks });
+    setIsEditing(true);
+  };
 
   const handleUpdateProfile = async () => {
     if (!user) {
@@ -724,11 +766,27 @@ const AcademyProfilePage = () => {
         profile_image: refreshedImage ?? null,
       });
 
-      toast.success(
-        academyProfile
-          ? "Your academy profile has been updated."
-          : "Your academy profile has been created.",
-      );
+      let socialWarning: string | null = null;
+      if (updatedProfile.id && user.email?.trim()) {
+        try {
+          await persistSocialDraft(updatedProfile.id, user.email.trim());
+        } catch (socialError: unknown) {
+          console.error("Error updating social links:", socialError);
+          socialWarning =
+            "Academy details were saved, but social links could not be updated.";
+        }
+      }
+
+      if (socialWarning) {
+        toast.error(socialWarning);
+      } else {
+        toast.success(
+          academyProfile
+            ? "Your academy profile has been updated."
+            : "Your academy profile has been created.",
+        );
+      }
+      socialDraftDirtyRef.current = false;
       setIsEditing(false);
     } catch (error: unknown) {
       const axiosError = error as AxiosError;
@@ -754,27 +812,20 @@ const AcademyProfilePage = () => {
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    const { id, value } = e.target;
-    setFormState((prev) => ({ ...prev, [id]: value }));
-  };
-
-  const startEditingAbout = () => {
+  const openAboutEditor = () => {
     setAboutDraft(academyProfile?.description || "");
-    setEditingAbout(true);
+    setIsAboutOpen(true);
   };
 
   const handleSaveAbout = async () => {
     if (!user || !academyProfile) {
-      setEditingAbout(false);
+      setIsAboutOpen(false);
       return;
     }
 
     const trimmed = aboutDraft.trim();
     if (trimmed === (academyProfile.description || "").trim()) {
-      setEditingAbout(false);
+      setIsAboutOpen(false);
       return;
     }
 
@@ -811,7 +862,7 @@ const AcademyProfilePage = () => {
         ...prev,
         description: n.description,
       }));
-      setEditingAbout(false);
+      setIsAboutOpen(false);
       toast.success("About section updated.");
     } catch (error: unknown) {
       console.error("Error updating about section:", error);
@@ -826,303 +877,6 @@ const AcademyProfilePage = () => {
       );
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleDeleteWebsite = async () => {
-    if (!academyProfile) return;
-
-    setIsSubmitting(true);
-    try {
-      const response = await apiClient.patch(
-        API_ENDPOINTS.ACADEMY.PROFILE,
-        toAcademyTablePayload({
-          description: academyProfile.description,
-          website_url: null,
-          contact_email: academyProfile.contact_email,
-        }),
-      );
-
-      if (response.data) {
-        const updatedProfile: AcademyProfile = {
-          ...academyProfile,
-          website_url: "",
-        };
-        setAcademyProfile(updatedProfile);
-        setFormState((prev) => ({
-          ...prev,
-          website_url: "",
-        }));
-        toast({
-          title: "Success",
-          description: "Website has been removed.",
-        });
-      }
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError;
-      let errorMessage = "Failed to remove website. Please try again.";
-
-      if (axiosError.response?.data) {
-        const errorData = axiosError.response.data as {
-          detail?: string;
-          message?: string;
-        };
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      }
-
-      console.error("Error removing website:", errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handler to open social link modal (edit existing)
-  const handleEditSocialLink = (platform: SocialPlatform) => {
-    setEditingPlatform(platform);
-    setSocialLinkForm({
-      platform: platform,
-      url: socialLinks[platform] || "",
-    });
-    setIsSocialLinkModalOpen(true);
-  };
-
-  // Helper function to validate URL
-  const isValidUrl = (urlString: string): boolean => {
-    try {
-      const url = new URL(urlString);
-      return url.protocol === "http:" || url.protocol === "https:";
-    } catch {
-      // If URL constructor throws, try adding https://
-      try {
-        const url = new URL(`https://${urlString}`);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-  };
-
-  // Handler to save/update social link or website
-  const handleSaveSocialLink = async () => {
-    if (
-      !user ||
-      !academyProfile ||
-      !socialLinkForm.platform ||
-      !socialLinkForm.url.trim()
-    ) {
-      toast.error("Please select a platform and provide a URL.");
-      return;
-    }
-
-    // Validate URL format
-    const urlToValidate = socialLinkForm.url.trim();
-    if (!isValidUrl(urlToValidate)) {
-      toast.error("Please enter a valid URL (e.g., https://example.com).");
-      return;
-    }
-
-    setSavingSocialLink(true);
-
-    try {
-      // Handle website separately (save to academy profile)
-      if (socialLinkForm.platform === "website") {
-        // Normalize URL - add https:// if missing
-        let normalizedUrl = urlToValidate;
-        if (
-          !normalizedUrl.startsWith("http://") &&
-          !normalizedUrl.startsWith("https://")
-        ) {
-          normalizedUrl = `https://${normalizedUrl}`;
-        }
-
-        const response = await apiClient.patch(
-          API_ENDPOINTS.ACADEMY.PROFILE,
-          toAcademyTablePayload({
-            description: academyProfile.description,
-            website_url: normalizedUrl || null,
-            contact_email: academyProfile.contact_email,
-          }),
-        );
-
-        if (response && response.data) {
-          const updatedProfile: AcademyProfile = {
-            ...academyProfile,
-            website_url: normalizedUrl || "",
-          };
-          setAcademyProfile(updatedProfile);
-          setFormState((prev) => ({
-            ...prev,
-            website_url: updatedProfile.website_url,
-          }));
-
-          toast.success(
-            editingPlatform === "website"
-              ? "Website updated successfully."
-              : "Website added successfully.",
-          );
-
-          setIsSocialLinkModalOpen(false);
-          setSocialLinkForm({ platform: "", url: "" });
-          setEditingPlatform(null);
-        } else {
-          throw new Error("No response data received");
-        }
-        return;
-      }
-
-      // Handle social links (save to social-links API)
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        throw new Error("Authentication token is missing");
-      }
-
-      const platform = socialLinkForm.platform as SocialPlatform;
-      const role = "academy";
-      const academyId = academyProfile.id;
-      const userEmail = user?.email;
-
-      if (!academyId || !userEmail) {
-        throw new Error(
-          "Missing required information: academy ID or user email",
-        );
-      }
-
-      // Normalize URL - add https:// if missing
-      let normalizedUrl = urlToValidate;
-      if (
-        !normalizedUrl.startsWith("http://") &&
-        !normalizedUrl.startsWith("https://")
-      ) {
-        normalizedUrl = `https://${normalizedUrl}`;
-      }
-
-      // Prepare the data object with all required fields
-      const socialLinkData = {
-        [platform]: normalizedUrl,
-        role,
-        academy: academyId,
-        user_email: userEmail,
-      } as Record<string, unknown>;
-
-      console.log("💾 Saving social link:", {
-        platform,
-        url: normalizedUrl,
-        role,
-        academy: academyId,
-        user_email: userEmail,
-      });
-
-      // Try PATCH first (for updates), then POST if it fails (for creates)
-      let response;
-      try {
-        // Attempt PATCH (update existing record)
-        response = await apiClient.patch("/api/social-links/", socialLinkData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        console.log("✅ Social link saved via PATCH:", response.data);
-      } catch (patchError) {
-        const axiosPatchError = patchError as AxiosError;
-        // If PATCH fails with 404 or similar, try POST (create new record)
-        if (
-          axiosPatchError.response?.status === 404 ||
-          axiosPatchError.response?.status === 400
-        ) {
-          console.log("⚠️ PATCH failed, trying POST to create new record...");
-          try {
-            response = await apiClient.post(
-              "/api/social-links/",
-              socialLinkData,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  "Content-Type": "application/json",
-                },
-              },
-            );
-            console.log("✅ Social link created via POST:", response.data);
-          } catch (postError) {
-            // If POST also fails, throw the original error
-            console.error("❌ Both PATCH and POST failed:", postError);
-            throw patchError;
-          }
-        } else {
-          // For other errors, throw the original error
-          throw patchError;
-        }
-      }
-
-      if (!response || !response.data) {
-        throw new Error("No response data received from server");
-      }
-
-      // Update local state immediately with the saved value
-      setSocialLinks((prev) => ({
-        ...prev,
-        [platform]: normalizedUrl,
-      }));
-
-      // Re-fetch from server to ensure we have the persisted state
-      try {
-        const refreshed = await apiClient.get("/api/social-links/", {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { role, academy: academyId, user_email: userEmail },
-        });
-
-        if (
-          refreshed.data &&
-          typeof refreshed.data === "object" &&
-          !Array.isArray(refreshed.data)
-        ) {
-          const refreshedLinks = {
-            github: refreshed.data.github || "",
-            linkedin: refreshed.data.linkedin || "",
-            facebook: refreshed.data.facebook || "",
-            instagram: refreshed.data.instagram || "",
-            dribbble: refreshed.data.dribbble || "",
-            behance: refreshed.data.behance || "",
-          };
-          setSocialLinks(refreshedLinks);
-          console.log("✅ Social links refreshed from server:", refreshedLinks);
-        }
-      } catch (refreshError) {
-        console.warn(
-          "⚠️ Could not refresh social links from server:",
-          refreshError,
-        );
-        // Don't throw - we already updated local state, so continue
-      }
-
-      toast.success(
-        editingPlatform
-          ? "Social link updated successfully."
-          : "Social link added successfully.",
-      );
-
-      setIsSocialLinkModalOpen(false);
-      setSocialLinkForm({ platform: "", url: "" });
-      setEditingPlatform(null);
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError;
-      let errorMessage = "Failed to save. Please try again.";
-
-      if (axiosError.response?.data) {
-        const errorData = axiosError.response.data as {
-          detail?: string;
-          message?: string;
-        };
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      console.error("Error saving social link/website:", error);
-      toast.error(errorMessage);
-    } finally {
-      setSavingSocialLink(false);
     }
   };
 
@@ -1255,117 +1009,301 @@ const AcademyProfilePage = () => {
     }
   };
 
-  const handleDeleteSocialLink = async (platform: SocialPlatform) => {
-    if (
-      !user ||
-      !academyProfile ||
-      !confirm("Are you sure you want to remove this social link?")
-    ) {
-      return;
-    }
+  const settingsAction = (
+    <ProfileMenuRow
+      icon={<Settings className="h-4 w-4" />}
+      iconClassName="bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
+      label={t.nav.settings}
+    />
+  );
+  const editAcademyAction = (
+    <ProfileMenuRow
+      icon={<Edit className="h-4 w-4" />}
+      iconClassName="bg-sky-100 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300"
+      label="Edit academy information"
+    />
+  );
 
-    try {
-      const token = localStorage.getItem("authToken");
-      if (!token) {
-        throw new Error("Authentication token is missing");
-      }
+  const socialFields: {
+    platform: SocialPlatform;
+    label: string;
+    placeholder: string;
+  }[] = [
+    {
+      platform: "github",
+      label: "GitHub",
+      placeholder: "https://github.com/username",
+    },
+    {
+      platform: "linkedin",
+      label: "LinkedIn",
+      placeholder: "https://linkedin.com/in/username",
+    },
+    {
+      platform: "facebook",
+      label: "Facebook",
+      placeholder: "https://facebook.com/username",
+    },
+    {
+      platform: "instagram",
+      label: "Instagram",
+      placeholder: "https://instagram.com/username",
+    },
+    {
+      platform: "dribbble",
+      label: "Dribbble",
+      placeholder: "https://dribbble.com/username",
+    },
+    {
+      platform: "behance",
+      label: "Behance",
+      placeholder: "https://behance.net/username",
+    },
+  ];
 
-      const role = "academy";
-      const academyId = academyProfile.id;
-      const userEmail = user?.email;
+  const academyInfoSheet = (
+    <Sheet open={isEditing} onOpenChange={setIsEditing}>
+      <SheetContent
+        side="rightProfile"
+        overlayClassName={profileSheetOverlayClassName}
+        className={profileSheetClassName}
+      >
+        <SheetHeader>
+          <SheetTitle className="flex-1 min-w-0">
+            {academyProfile
+              ? "Edit academy information"
+              : "Create academy profile"}
+          </SheetTitle>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleUpdateProfile()}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {academyProfile ? "Saving..." : "Creating..."}
+                </>
+              ) : academyProfile ? (
+                "Save"
+              ) : (
+                "Create"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-10 w-10 shrink-0 p-0"
+              onClick={() => setIsEditing(false)}
+              disabled={isSubmitting}
+              aria-label="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div className="space-y-3 rounded-lg bg-gray-100 p-4 dark:bg-[#242424]">
+            <p className="text-sm font-medium">Academy</p>
+            <div className="space-y-2">
+              <Label htmlFor="academy_name">Academy name</Label>
+              <Input
+                id="academy_name"
+                value={formState.academy_name}
+                onChange={(e) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    academy_name: e.target.value,
+                  }))
+                }
+                placeholder="Enter academy name"
+                disabled={isSubmitting}
+              />
+            </div>
+            {!academyProfile ? (
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formState.description}
+                  onChange={(e) =>
+                    setFormState((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  placeholder="Describe your academy"
+                  className="min-h-[120px]"
+                  disabled={isSubmitting}
+                />
+              </div>
+            ) : null}
+          </div>
 
-      if (!academyId || !userEmail) {
-        throw new Error(
-          "Missing required information: academy ID or user email",
-        );
-      }
+          <div className="space-y-3 rounded-lg bg-gray-100 p-4 dark:bg-[#242424]">
+            <p className="text-sm font-medium">Contact</p>
+            <div className="space-y-2">
+              <Label htmlFor="website_url">Website</Label>
+              <Input
+                id="website_url"
+                value={formState.website_url}
+                onChange={(e) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    website_url: e.target.value,
+                  }))
+                }
+                placeholder="https://example.com"
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact_email">Contact email</Label>
+              <Input
+                id="contact_email"
+                type="email"
+                value={formState.contact_email}
+                onChange={(e) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    contact_email: e.target.value,
+                  }))
+                }
+                placeholder="contact@academy.com"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
 
-      console.log("🗑️ Deleting social link:", {
-        platform,
-        role,
-        academy: academyId,
-        user_email: userEmail,
-      });
+          <div className="space-y-3 rounded-lg bg-gray-100 p-4 dark:bg-[#242424]">
+            <p className="text-sm font-medium">Social links (optional)</p>
+            <div className="space-y-3">
+              {socialFields.map((field) => (
+                <div key={field.platform} className="space-y-2">
+                  <Label htmlFor={`social-${field.platform}`}>{field.label}</Label>
+                  <Input
+                    id={`social-${field.platform}`}
+                    type="text"
+                    inputMode="url"
+                    autoComplete="url"
+                    placeholder={field.placeholder}
+                    value={socialDraft[field.platform] || ""}
+                    onChange={(e) => {
+                      socialDraftDirtyRef.current = true;
+                      setSocialDraft((prev) => ({
+                        ...prev,
+                        [field.platform]: e.target.value,
+                      }));
+                    }}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 
-      // PATCH to set the platform URL to empty string
-      const updateData = {
-        [platform]: "",
-        role,
-        academy: academyId,
-        user_email: userEmail,
-      } as Record<string, unknown>;
+  const aboutSheet = (
+    <Sheet open={isAboutOpen} onOpenChange={setIsAboutOpen}>
+      <SheetContent
+        side="rightProfile"
+        overlayClassName={profileSheetOverlayClassName}
+        className={profileSheetClassName}
+      >
+        <SheetHeader>
+          <SheetTitle className="flex-1 min-w-0">Edit About</SheetTitle>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              size="sm"
+              onClick={() => void handleSaveAbout()}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Saving..." : "Save Changes"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-10 w-10 shrink-0 p-0"
+              onClick={() => setIsAboutOpen(false)}
+              disabled={isSubmitting}
+              aria-label="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+          <div>
+            <Label htmlFor="academy-about">Tell students about your academy</Label>
+            <Textarea
+              id="academy-about"
+              placeholder="Share something about your academy..."
+              value={aboutDraft}
+              onChange={(e) => setAboutDraft(e.target.value)}
+              className="mt-2 min-h-[200px]"
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 
-      const response = await apiClient.patch("/api/social-links/", updateData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response || !response.data) {
-        throw new Error("No response data received from server");
-      }
-
-      console.log("✅ Social link deleted:", response.data);
-
-      // Update local state immediately
-      setSocialLinks((prev) => ({
-        ...prev,
-        [platform]: "",
-      }));
-
-      // Re-fetch to ensure server state is synchronized
-      try {
-        const refreshed = await apiClient.get("/api/social-links/", {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { role, academy: academyId, user_email: userEmail },
-        });
-        if (
-          refreshed.data &&
-          typeof refreshed.data === "object" &&
-          !Array.isArray(refreshed.data)
-        ) {
-          const refreshedLinks = {
-            github: refreshed.data.github || "",
-            linkedin: refreshed.data.linkedin || "",
-            facebook: refreshed.data.facebook || "",
-            instagram: refreshed.data.instagram || "",
-            dribbble: refreshed.data.dribbble || "",
-            behance: refreshed.data.behance || "",
-          };
-          setSocialLinks(refreshedLinks);
-          console.log(
-            "✅ Social links refreshed from server after deletion:",
-            refreshedLinks,
-          );
-        }
-      } catch (refreshError) {
-        console.warn(
-          "⚠️ Could not refresh social links from server:",
-          refreshError,
-        );
-        // Don't throw - we already updated local state
-      }
-
-      toast.success("Social link removed successfully.");
-    } catch (error: unknown) {
-      const axiosError = error as AxiosError;
-      let errorMessage = "Failed to remove social link. Please try again.";
-
-      if (axiosError.response?.data) {
-        const errorData = axiosError.response.data as {
-          detail?: string;
-          message?: string;
-        };
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      console.error("❌ Error deleting social link:", error);
-      toast.error(errorMessage);
-    }
-  };
+  const photoSheet = (
+    <Sheet
+      open={isProfileImageModalOpen}
+      onOpenChange={setIsProfileImageModalOpen}
+    >
+      <SheetContent
+        side="rightProfile"
+        overlayClassName={profileSheetOverlayClassName}
+        className={profileSheetClassName}
+      >
+        <SheetHeader>
+          <SheetTitle className="flex-1 min-w-0">Profile Photo</SheetTitle>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-10 w-10 shrink-0 p-0"
+              onClick={() => setIsProfileImageModalOpen(false)}
+              aria-label="Cancel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+          <Button
+            onClick={handleUploadFromModal}
+            className="w-full justify-start gap-3"
+            variant="ghost"
+            disabled={uploadingImage}
+          >
+            <Upload className="h-5 w-5" />
+            {displayProfileImage ? "Update Photo" : "Upload Photo"}
+          </Button>
+          {displayProfileImage ? (
+            <Button
+              onClick={handleRemoveImage}
+              className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
+              variant="ghost"
+              disabled={uploadingImage}
+            >
+              <Trash2 className="h-5 w-5" />
+              Remove Photo
+            </Button>
+          ) : null}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 
   // Show loading while auth is loading or profile data is loading
   if (authLoading || loading) {
@@ -1381,18 +1319,16 @@ const AcademyProfilePage = () => {
     );
   }
 
-  // Show message if academy profile doesn't exist yet (404 case)
-  // Allow users to create profile from this page as well
-  if (!academyProfile && !loading) {
+  if (!academyProfile) {
     return (
       <DashboardLayout>
         <div className="flex flex-col justify-center items-center h-64 space-y-4">
           <h2 className="text-2xl font-bold">Academy Profile Not Found</h2>
           <p className="text-gray-600 dark:text-gray-400">
-            Your academy profile hasn't been set up yet.
+            Your academy profile hasn&apos;t been set up yet.
           </p>
           <div className="flex gap-4">
-            <Button onClick={() => setIsEditing(true)}>Create Profile</Button>
+            <Button onClick={openAcademyEditor}>Create Profile</Button>
             <Button
               variant="outline"
               onClick={() => navigate("/academy/settings")}
@@ -1401,647 +1337,252 @@ const AcademyProfilePage = () => {
             </Button>
           </div>
         </div>
-        {/* Edit Dialog - Allow creating profile from here */}
-        <Dialog open={isEditing} onOpenChange={setIsEditing}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create Academy Profile</DialogTitle>
-              <DialogDescription>
-                Enter your academy's information to create your profile. Click
-                save when you're done.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="academy_name" className="text-right">
-                  Academy Name *
-                </Label>
-                <Input
-                  id="academy_name"
-                  value={formState.academy_name}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  placeholder="Enter academy name"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={formState.description}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  placeholder="Describe your academy"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="website_url" className="text-right">
-                  Website URL
-                </Label>
-                <Input
-                  id="website_url"
-                  value={formState.website_url}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  placeholder="https://example.com"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="contact_email" className="text-right">
-                  Contact Email
-                </Label>
-                <Input
-                  id="contact_email"
-                  type="email"
-                  value={formState.contact_email}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                  placeholder="contact@academy.com"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateProfile} disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Profile"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {academyInfoSheet}
       </DashboardLayout>
     );
   }
 
   const displayName =
-    academyProfile?.academy_name?.trim() ||
+    academyProfile.academy_name?.trim() ||
     user?.first_name?.trim() ||
     "Academy";
   const avatarFallback = displayName.charAt(0).toUpperCase() || "A";
-  const websiteRaw = academyProfile?.website_url?.trim() ?? "";
+  const websiteRaw = academyProfile.website_url?.trim() ?? "";
   const websiteHref =
     websiteRaw && !/^https?:\/\//i.test(websiteRaw)
       ? `https://${websiteRaw}`
       : websiteRaw;
+  const websiteLabel = websiteRaw
+    .replace(/^https?:\/\/(www\.)?/i, "")
+    .replace(/\/$/, "");
 
   return (
     <DashboardLayout>
       <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
-        {/* Personal information — matches user Profile layout */}
-        <Card className="border-0 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              Personal information
-            </h3>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            <div className="flex flex-row items-center gap-4 mb-4">
-              <div className="flex-shrink-0">
-                <div
-                  className="relative group cursor-pointer rounded-full overflow-hidden w-12 h-12 sm:w-14 sm:h-14"
-                  onClick={handleImageModalClick}
-                >
-                  <OptimizedAvatar
-                    key={`avatar-${imageTimestamp}`}
-                    src={avatarDisplaySrc}
-                    alt="Profile photo"
-                    fallback={avatarFallback}
-                    size="lg"
-                    loading="eager"
-                    className="rounded-full"
-                  />
-                  {uploadingImage ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-10">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <Camera className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                    </div>
-                  )}
-                </div>
-                <input
-                  id="profile-image-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  className="hidden"
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate">
-                    {displayName}
-                  </h1>
-                  {academyProfile?.is_verified === true && (
-                    <span
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#5D78FF_0%,#2EB9D1_100%)] text-white shadow-sm ring-2 ring-white dark:ring-gray-950"
-                      title="Verified academy"
-                      aria-label="Verified academy"
-                    >
-                      <Check
-                        className="h-2.5 w-2.5"
-                        strokeWidth={3.5}
-                        aria-hidden
-                      />
-                    </span>
-                  )}
-                </div>
-              </div>
+        <Card className="overflow-hidden border-0 rounded-3xl">
+          <div className="relative">
+            <div className="relative h-28 sm:h-36">
+              <div
+                className="absolute inset-0 dark:hidden"
+                style={{
+                  background: coverGradientStyle(coverGradient, "light"),
+                }}
+              />
+              <div
+                className="absolute inset-0 hidden dark:block"
+                style={{
+                  background: coverGradientStyle(coverGradient, "dark"),
+                }}
+              />
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              {websiteHref ? (
-                <a
-                  href={websiteHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline"
-                >
-                  <Globe className="h-4 w-4 text-gray-500" />
-                  {websiteRaw.length > 40
-                    ? `${websiteRaw.slice(0, 37)}...`
-                    : websiteRaw.replace(/^https?:\/\/(www\.)?/, "")}
-                </a>
-              ) : null}
-              {user?.email && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
-                  <Mail className="h-4 w-4 text-gray-500" />
-                  {user.email}
-                </span>
-              )}
-              {academyProfile?.contact_email &&
-                academyProfile.contact_email !== user?.email && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
-                    <Mail className="h-4 w-4 text-gray-500" />
-                    {academyProfile.contact_email}
-                  </span>
-                )}
-              {user?.phone_number && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100">
-                  <Phone className="h-4 w-4 text-gray-500" />
-                  {user.phone_number}
-                </span>
-              )}
-              {(Object.entries(socialLinks) as [SocialPlatform, string][])
-                .filter(([_, url]) => url?.trim())
-                .map(([platform, url]) => (
-                  <span
-                    key={platform}
-                    className="inline-flex items-center gap-1.5 max-w-full"
+            <div className="relative -mt-14 flex flex-col gap-4 border-b border-gray-100 px-5 pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex-shrink-0">
+                  <div
+                    className="group relative h-16 w-16 cursor-pointer overflow-hidden rounded-sm bg-white shadow-sm"
+                    onClick={handleImageModalClick}
                   >
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 dark:bg-[#3A3A3A] px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100 hover:underline max-w-full min-w-0"
-                    >
-                      {getSocialIcon(
-                        platform,
-                        "h-4 w-4 text-gray-500 shrink-0",
-                      )}
-                      <span className="truncate">
-                        {url.length > 35
-                          ? `${url.slice(0, 32)}...`
-                          : url.replace(/^https?:\/\/(www\.)?/, "")}
+                    <OptimizedAvatar
+                      key={`avatar-${imageTimestamp}`}
+                      src={avatarDisplaySrc}
+                      alt="Profile photo"
+                      fallback={avatarFallback}
+                      size="lg"
+                      loading="eager"
+                      className="!h-16 !w-16 !rounded-sm"
+                    />
+                    {uploadingImage ? (
+                      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-black/50">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 z-10 flex items-center justify-center rounded-sm bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Camera className="h-4 w-4 text-white sm:h-5 sm:w-5" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="profile-image-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="hidden"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <h1 className="truncate text-xl font-bold text-gray-900">
+                      {displayName}
+                    </h1>
+                    {academyProfile.is_verified === true && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full bg-[linear-gradient(135deg,#5D78FF_0%,#2EB9D1_100%)] text-white shadow-sm"
+                            aria-label="This badge is for verified academies"
+                          >
+                            <Check className="h-2.5 w-2.5" strokeWidth={3.5} aria-hidden />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          This badge is for verified academies
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {user?.phone_number ? (
+                      <span className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                        <Phone className="h-3.5 w-3.5" />
+                        {user.phone_number}
                       </span>
-                    </a>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 rounded-full"
-                      onClick={() => handleEditSocialLink(platform)}
-                      aria-label={`Edit ${platformLabels[platform]}`}
-                    >
-                      <Edit className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 rounded-full text-red-600 hover:text-red-700"
-                      onClick={() => handleDeleteSocialLink(platform)}
-                      aria-label={`Remove ${platformLabels[platform]}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </span>
-                ))}
+                    ) : null}
+                    {user?.email ? (
+                      <span className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                        <Mail className="h-3.5 w-3.5" />
+                        {user.email}
+                      </span>
+                    ) : null}
+                    {academyProfile.contact_email &&
+                    academyProfile.contact_email !== user?.email ? (
+                      <span className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                        <Mail className="h-3.5 w-3.5" />
+                        {academyProfile.contact_email}
+                      </span>
+                    ) : null}
+                    {websiteHref ? (
+                      <a
+                        href={websiteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:underline dark:text-gray-400"
+                      >
+                        <Globe className="h-3.5 w-3.5" />
+                        {websiteLabel.length > 40
+                          ? `${websiteLabel.slice(0, 37)}...`
+                          : websiteLabel}
+                      </a>
+                    ) : null}
+                    {(Object.entries(socialLinks) as [SocialPlatform, string][])
+                      .filter(([, url]) => url?.trim())
+                      .map(([platform, url]) => (
+                        <a
+                          key={platform}
+                          href={normalizeLinkUrl(url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:underline dark:text-gray-400"
+                        >
+                          {getSocialIcon(platform, "h-3.5 w-3.5")}
+                          {platformLabels[platform]}
+                        </a>
+                      ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 px-4"
+                  onClick={() => navigate("/academy/settings")}
+                >
+                  Settings
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-9 px-4"
+                  onClick={openAcademyEditor}
+                >
+                  Edit
+                </Button>
+              </div>
             </div>
-
-            <div className="mt-4 flex md:justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => navigate("/academy/settings")}
-                className="w-full md:w-auto rounded-full gap-2 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 text-black dark:bg-[#4A4A4A] dark:hover:bg-[#4A4A4A]/90 dark:text-white"
-                aria-label={t.nav.settings}
-              >
-                <Settings className="h-4 w-4" />
-                {t.nav.settings}
-              </Button>
-            </div>
-          </CardContent>
+          </div>
         </Card>
 
-        {/* About — inline edit like job posting description */}
+
         <Card className="border-0 rounded-3xl">
-          <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+          <CardHeader className="mb-0 flex flex-row items-center justify-between border-b-0 p-4 pb-2">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               About
             </h3>
-            {academyProfile ? (
-              <AboutSectionEditToggle
-                isEditing={editingAbout}
-                onEdit={startEditingAbout}
-                onDone={() => void handleSaveAbout()}
-                disabled={isSubmitting}
-                editLabel="Edit about"
-                doneLabel="Save about"
-              />
-            ) : null}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full"
+              onClick={openAboutEditor}
+              aria-label="Edit about"
+            >
+              <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </Button>
           </CardHeader>
-          <CardContent className="px-6 py-4">
-            {editingAbout ? (
-              <div className={cn(aboutDashedShell)}>
-                <AutoSizeTextarea
-                  id="academy-about-description"
-                  value={aboutDraft}
-                  onChange={(e) => setAboutDraft(e.target.value)}
-                  minHeightPx={160}
-                  disabled={isSubmitting}
-                  className="min-h-[160px] w-full rounded-lg border-0 bg-transparent px-3 py-3 text-base shadow-none focus-visible:ring-0 dark:text-white"
-                  placeholder="Tell students about your academy…"
-                />
-              </div>
-            ) : academyProfile?.description?.trim() ? (
-              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
-                <div className={aboutReadOnlyTextClass}>
+          <CardContent className="px-6 pb-4 pt-0">
+            {academyProfile.description?.trim() ? (
+              <div>
+                <p
+                  ref={aboutTextRef}
+                  className={cn(
+                    "whitespace-pre-wrap text-sm leading-relaxed text-gray-900 dark:text-gray-100",
+                    !aboutExpanded && "line-clamp-5",
+                  )}
+                >
                   {academyProfile.description}
-                </div>
+                </p>
+                {aboutOverflows ? (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="mt-2 h-auto p-0 text-sm font-normal text-breneo-blue hover:underline"
+                    onClick={() => setAboutExpanded((open) => !open)}
+                  >
+                    {aboutExpanded ? "View less" : "View more"}
+                  </Button>
+                ) : null}
               </div>
             ) : (
-              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-4">
-                <p className="text-sm text-muted-foreground">
-                  No description yet. Tap edit to tell students about your
-                  academy.
-                </p>
-              </div>
+              <p className="text-sm italic text-gray-500">
+                No information available. Add some details about your academy!
+              </p>
             )}
           </CardContent>
         </Card>
-
-        {/* Edit Dialog */}
-        <Dialog open={isEditing} onOpenChange={setIsEditing}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Academy Profile</DialogTitle>
-              <DialogDescription>
-                Make changes to your academy's information here. Click save when
-                you're done.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="academy_name" className="text-right">
-                  Academy Name
-                </Label>
-                <Input
-                  id="academy_name"
-                  value={formState.academy_name}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={formState.description}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="website_url" className="text-right">
-                  Website URL
-                </Label>
-                <Input
-                  id="website_url"
-                  value={formState.website_url}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="contact_email" className="text-right">
-                  Contact Email
-                </Label>
-                <Input
-                  id="contact_email"
-                  type="email"
-                  value={formState.contact_email}
-                  onChange={handleInputChange}
-                  className="col-span-3"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsEditing(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateProfile} disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Social Link Add/Edit Modal */}
-        {isMobile ? (
-          <Drawer
-            open={isSocialLinkModalOpen}
-            onOpenChange={setIsSocialLinkModalOpen}
-          >
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>
-                  {editingPlatform === "website"
-                    ? "Edit Website"
-                    : editingPlatform
-                      ? "Edit Social Link"
-                      : "Add Link"}
-                </DrawerTitle>
-              </DrawerHeader>
-              <div className="px-4 pb-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="social-platform-mobile">Platform *</Label>
-                    <Select
-                      value={socialLinkForm.platform}
-                      onValueChange={(value) =>
-                        setSocialLinkForm({
-                          ...socialLinkForm,
-                          platform: value,
-                        })
-                      }
-                      disabled={savingSocialLink || !!editingPlatform}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select a platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="website">
-                          <div className="flex items-center gap-2">
-                            <Globe className="h-4 w-4" />
-                            <span>Website</span>
-                          </div>
-                        </SelectItem>
-                        {(Object.keys(platformLabels) as SocialPlatform[]).map(
-                          (platform) => (
-                            <SelectItem key={platform} value={platform}>
-                              <div className="flex items-center gap-2">
-                                {getSocialIcon(platform, "h-4 w-4")}
-                                <span>{platformLabels[platform]}</span>
-                              </div>
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="social-url-mobile">URL *</Label>
-                    <Input
-                      id="social-url-mobile"
-                      type="url"
-                      placeholder="https://..."
-                      value={socialLinkForm.url}
-                      onChange={(e) =>
-                        setSocialLinkForm({
-                          ...socialLinkForm,
-                          url: e.target.value,
-                        })
-                      }
-                      className="mt-2"
-                      disabled={savingSocialLink}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-              <DrawerFooter>
-                <Button
-                  onClick={handleSaveSocialLink}
-                  disabled={savingSocialLink}
-                >
-                  {savingSocialLink
-                    ? "Saving..."
-                    : editingPlatform
-                      ? "Update"
-                      : "Add"}
-                </Button>
-                <DrawerClose asChild>
-                  <Button variant="outline" disabled={savingSocialLink}>
-                    Cancel
-                  </Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
-        ) : (
-          <Dialog
-            open={isSocialLinkModalOpen}
-            onOpenChange={setIsSocialLinkModalOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingPlatform === "website"
-                    ? "Edit Website"
-                    : editingPlatform
-                      ? "Edit Social Link"
-                      : "Add Link"}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="social-platform-desktop">Platform *</Label>
-                    <Select
-                      value={socialLinkForm.platform}
-                      onValueChange={(value) =>
-                        setSocialLinkForm({
-                          ...socialLinkForm,
-                          platform: value,
-                        })
-                      }
-                      disabled={savingSocialLink || !!editingPlatform}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select a platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="website">
-                          <div className="flex items-center gap-2">
-                            <Globe className="h-4 w-4" />
-                            <span>Website</span>
-                          </div>
-                        </SelectItem>
-                        {(Object.keys(platformLabels) as SocialPlatform[]).map(
-                          (platform) => (
-                            <SelectItem key={platform} value={platform}>
-                              <div className="flex items-center gap-2">
-                                {getSocialIcon(platform, "h-4 w-4")}
-                                <span>{platformLabels[platform]}</span>
-                              </div>
-                            </SelectItem>
-                          ),
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="social-url-desktop">URL *</Label>
-                    <Input
-                      id="social-url-desktop"
-                      type="url"
-                      placeholder="https://..."
-                      value={socialLinkForm.url}
-                      onChange={(e) =>
-                        setSocialLinkForm({
-                          ...socialLinkForm,
-                          url: e.target.value,
-                        })
-                      }
-                      className="mt-2"
-                      disabled={savingSocialLink}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsSocialLinkModalOpen(false);
-                    setSocialLinkForm({ platform: "", url: "" });
-                    setEditingPlatform(null);
-                  }}
-                  disabled={savingSocialLink}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveSocialLink}
-                  disabled={savingSocialLink}
-                >
-                  {savingSocialLink
-                    ? "Saving..."
-                    : editingPlatform
-                      ? "Update"
-                      : "Add"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* Profile Image Upload Modal */}
-        {isMobile ? (
-          <Drawer
-            open={isProfileImageModalOpen}
-            onOpenChange={setIsProfileImageModalOpen}
-          >
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>Profile Photo</DrawerTitle>
-              </DrawerHeader>
-              <div className="px-4 pb-4">
-                <div className="space-y-2">
-                  <Button
-                    onClick={handleUploadFromModal}
-                    className="w-full justify-start gap-3"
-                    variant="ghost"
-                    disabled={uploadingImage}
-                  >
-                    <Upload className="h-5 w-5" />
-                    {displayProfileImage ? "Update Photo" : "Upload Photo"}
-                  </Button>
-                  {displayProfileImage ? (
-                    <Button
-                      onClick={handleRemoveImage}
-                      className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
-                      variant="ghost"
-                      disabled={uploadingImage}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                      Remove Photo
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            </DrawerContent>
-          </Drawer>
-        ) : (
-          <Dialog
-            open={isProfileImageModalOpen}
-            onOpenChange={setIsProfileImageModalOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Profile Photo</DialogTitle>
-              </DialogHeader>
-              <div className="py-4">
-                <div className="space-y-2">
-                  <Button
-                    onClick={handleUploadFromModal}
-                    className="w-full justify-start gap-3"
-                    variant="ghost"
-                    disabled={uploadingImage}
-                  >
-                    <Upload className="h-5 w-5" />
-                    {displayProfileImage ? "Update Photo" : "Upload Photo"}
-                  </Button>
-                  {displayProfileImage ? (
-                    <Button
-                      onClick={handleRemoveImage}
-                      className="w-full justify-start gap-3 text-red-600 hover:text-red-700"
-                      variant="ghost"
-                      disabled={uploadingImage}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                      Remove Photo
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsProfileImageModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
       </div>
+
+      {isMobile ? (
+        <Drawer open={infoMenuOpen} onOpenChange={setInfoMenuOpen}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader className="pb-8">
+              <DrawerTitle>Personal information</DrawerTitle>
+            </DrawerHeader>
+            <div className="space-y-1 px-3 pb-6">
+              <button
+                type="button"
+                onClick={openAcademyEditor}
+                className="w-full rounded-xl transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                {editAcademyAction}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setInfoMenuOpen(false);
+                  navigate("/academy/settings");
+                }}
+                className="w-full rounded-xl transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                {settingsAction}
+              </button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : null}
+      {academyInfoSheet}
+      {aboutSheet}
+      {photoSheet}
     </DashboardLayout>
   );
 };

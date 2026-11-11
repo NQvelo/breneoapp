@@ -1,25 +1,43 @@
-import React from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import {
-  ArrowLeft,
-  ExternalLink,
-  Mail,
-  Globe,
-  Phone,
-  Link2,
+  Bookmark,
   Check,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  GraduationCap,
+  Link2,
+  Mail,
+  Phone,
 } from "@/components/icons";
-import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "@/contexts/LanguageContext";
+import {
+  PLATFORM_CHIP_BADGE_CLASS,
+} from "@/lib/chipStyles";
 import { slugToAcademyName } from "@/utils/academyUtils";
+import {
+  coverGradientStyle,
+  useSoftImageGradient,
+} from "@/utils/imageGradient";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 // Social Platform Icons as React Components
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -105,6 +123,20 @@ const platformLabels: Record<SocialPlatform, string> = {
   instagram: "Instagram",
 };
 
+function websiteHref(value: string | undefined) {
+  if (!value) return "";
+  const raw = value.trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.includes(".")) return `https://${raw}`;
+  return "";
+}
+
+function websiteLabel(value: string) {
+  const label = value.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
+  return label.length > 40 ? `${label.slice(0, 37)}...` : label;
+}
+
 interface Course {
   id: string;
   title: string;
@@ -119,6 +151,53 @@ interface Course {
   topics: string[];
   required_skills: string[];
 }
+
+function courseMeta(course: Course) {
+  return [course.duration, course.level, course.category]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function courseMatchScore(course: Course, userSkills: string[]): number {
+  if (!userSkills.length || course.required_skills.length === 0) return 0;
+
+  const normalizeSkill = (skill: string) =>
+    skill.toLowerCase().trim().replace(/\s+/g, " ");
+  const normalizedUserSkills = userSkills.map(normalizeSkill);
+  const normalizedCourseSkills = course.required_skills.map(normalizeSkill);
+
+  let matchCount = 0;
+  normalizedCourseSkills.forEach((courseSkill) => {
+    normalizedUserSkills.forEach((userSkill) => {
+      if (userSkill === courseSkill) matchCount += 2;
+      else if (
+        courseSkill.includes(userSkill) ||
+        userSkill.includes(courseSkill)
+      ) {
+        matchCount += 1;
+      }
+    });
+  });
+
+  if (matchCount === 0) return 0;
+  return (
+    (matchCount / normalizedCourseSkills.length) *
+    (matchCount / normalizedUserSkills.length) *
+    10
+  );
+}
+
+const headerButtonClass = "h-9 px-4";
+
+const headerMetaClass =
+  "inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200";
+
+const courseCarouselNavButtonClass = cn(
+  "h-8 w-8 border-0 backdrop-blur-sm",
+  "bg-white/75 hover:bg-white/90 text-gray-700",
+  "dark:bg-[#3A3A3A]/75 dark:hover:bg-[#3A3A3A]/90 dark:text-white",
+  "[&_svg]:text-current",
+);
 
 type ApiCourse = {
   id?: string | number | null;
@@ -172,7 +251,11 @@ const isUUID = (str: string): boolean => {
 const AcademyPage = () => {
   const { academySlug } = useParams<{ academySlug: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const t = useTranslation();
+  const queryClient = useQueryClient();
+  const userId = user?.id ? String(user.id) : null;
+  const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
+  const coursesScrollRef = useRef<HTMLDivElement>(null);
 
   // Determine if the parameter is an academy_id (UUID or number) or a slug
   const isNumericId = academySlug ? /^\d+$/.test(academySlug) : false;
@@ -521,438 +604,528 @@ const AcademyPage = () => {
     retry: 1,
   });
 
-  if (!academySlug) {
-    return (
-      <DashboardLayout>
-        <div className="p-6 text-center">
-          <p className="text-red-500">Academy ID or slug is required</p>
-          <Link to="/courses">
-            <Button variant="outline" className="mt-4">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Courses
-            </Button>
-          </Link>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  useEffect(() => {
+    if (!user?.id) {
+      setUserTopSkills([]);
+      return;
+    }
+    let cancelled = false;
+    const loadSkills = async () => {
+      try {
+        const response = await apiClient.get(
+          `/api/skilltest/results/?user=${user.id}`,
+        );
+        const skillTestData = Array.isArray(response.data)
+          ? response.data[0]
+          : response.data;
+        const skillsJson = skillTestData?.skills_json || {};
+        const allSkills = [
+          ...Object.keys(skillsJson.tech || {}),
+          ...Object.keys(skillsJson.soft || {}),
+        ];
+        if (!cancelled) setUserTopSkills(allSkills);
+      } catch {
+        if (!cancelled) setUserTopSkills([]);
+      }
+    };
+    loadSkills();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const { data: savedCourses = [] } = useQuery({
+    queryKey: ["savedCourses", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      try {
+        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+        const savedCoursesArray = profileResponse.data?.saved_courses || [];
+        return savedCoursesArray.map((id: string | number) => String(id));
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!userId,
+  });
+
+  const saveCourseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!userId) throw new Error("Please log in to save courses.");
+      await apiClient.post(`/api/save-course/${id}/`);
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["savedCourses", userId] });
+      const previousSavedCourses = queryClient.getQueryData<string[]>([
+        "savedCourses",
+        userId,
+      ]);
+      let wasSaved = false;
+      queryClient.setQueryData<string[]>(["savedCourses", userId], (prev) => {
+        if (!prev) return prev;
+        wasSaved = prev.includes(id);
+        return wasSaved
+          ? prev.filter((courseId) => courseId !== id)
+          : [...prev, id];
+      });
+      return { previousSavedCourses, wasSaved };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previousSavedCourses && userId) {
+        queryClient.setQueryData(
+          ["savedCourses", userId],
+          context.previousSavedCourses,
+        );
+      }
+      toast.error("Failed to update saved courses. Please try again.");
+    },
+    onSuccess: (_data, _id, context) => {
+      queryClient.invalidateQueries({ queryKey: ["savedCourses", userId] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success(
+        context?.wasSaved
+          ? "Removed from saved courses."
+          : "Course saved to your profile.",
+      );
+    },
+  });
 
   const academyDisplayName =
     academyProfile?.academy_name ||
     (slug ? slugToAcademyName(slug) : "Loading Academy...");
+  const logo = academyProfile?.profile_photo_url || academyProfile?.logo_url;
+  const coverGradient = useSoftImageGradient(
+    logo,
+    academyProfile?.id || academySlug || "academy",
+  );
+  const siteUrl = websiteHref(academyProfile?.website_url);
+  const courseCount = courses?.length ?? 0;
+  const { matchedCourses, otherCourses } = useMemo(() => {
+    const scored = (courses ?? []).map((course) => ({
+      course,
+      match: courseMatchScore(course, userTopSkills),
+    }));
+    scored.sort((a, b) => b.match - a.match);
+    return {
+      matchedCourses: scored
+        .filter((item) => item.match > 0)
+        .map((item) => item.course),
+      otherCourses: scored
+        .filter((item) => item.match <= 0)
+        .map((item) => item.course),
+    };
+  }, [courses, userTopSkills]);
+
+  const scrollMatchedCourses = (direction: "left" | "right") => {
+    if (!coursesScrollRef.current) return;
+    const scrollAmount = 400;
+    coursesScrollRef.current.scrollTo({
+      left:
+        direction === "left"
+          ? coursesScrollRef.current.scrollLeft - scrollAmount
+          : coursesScrollRef.current.scrollLeft + scrollAmount,
+      behavior: "smooth",
+    });
+  };
+  const socialEntries = academyProfile?.social_links
+    ? (
+        Object.entries(academyProfile.social_links) as [
+          SocialPlatform,
+          string | undefined,
+        ][]
+      ).filter((entry): entry is [SocialPlatform, string] =>
+        Boolean(entry[1] && entry[1].trim()),
+      )
+    : [];
 
   return (
     <DashboardLayout>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-        {/* Left Column - Profile Summary */}
-        {profileLoading ? (
+      <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
+        {!academySlug ? (
+          <Card className="border-0 rounded-3xl">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              Academy not found.
+            </CardContent>
+          </Card>
+        ) : profileLoading ? (
           <>
-            <div className="lg:col-span-2 space-y-6">
-              <div className="animate-pulse space-y-6">
-                <div className="h-10 w-64 bg-gray-200 rounded"></div>
-                <Card>
-                  <CardHeader>
-                    <div className="h-6 w-32 bg-gray-200 rounded"></div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="h-4 w-full bg-gray-200 rounded"></div>
-                      <div className="h-4 w-full bg-gray-200 rounded"></div>
-                      <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-            <div className="lg:col-span-1 space-y-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="animate-pulse flex flex-col items-center">
-                    <div className="w-32 h-32 bg-gray-200 rounded-3xl mb-6"></div>
-                    <div className="h-6 w-32 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-4 w-20 bg-gray-200 rounded mb-4"></div>
-                    <div className="h-8 w-16 bg-gray-200 rounded"></div>
+            <Card className="overflow-hidden border-0 rounded-3xl">
+              <CardContent className="px-6 py-6">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-28" />
                   </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="h-4 w-16 bg-gray-200 rounded mx-auto"></div>
-                </CardContent>
-              </Card>
-            </div>
-          </>
-        ) : academyProfile ? (
-          <>
-            {/* Left Column - Profile Summary */}
-            <div className="lg:col-span-1 space-y-6">
-              {/* Profile Header Card */}
-              <Card>
-                <CardContent className="flex flex-col items-center pb-6 pt-6">
-                  <div className="relative">
-                    <OptimizedAvatar
-                      src={
-                        academyProfile.profile_photo_url ||
-                        academyProfile.logo_url ||
-                        undefined
-                      }
-                      alt={academyProfile.academy_name || "Academy"}
-                      fallback={
-                        academyProfile.academy_name
-                          ? academyProfile.academy_name.charAt(0).toUpperCase()
-                          : "A"
-                      }
-                      size="xl"
-                      loading="lazy"
-                      className="h-32 w-32"
-                    />
-                  </div>
-                  {academyProfile.academy_name && (
-                    <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 px-2">
-                      <h1 className="text-2xl font-bold text-center">
-                        {academyProfile.academy_name}
-                      </h1>
-                      {academyProfile.is_verified && (
-                        <span
-                          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#5D78FF_0%,#3E506D_40%,#2EB9D1_100%)] text-white shadow-sm ring-2 ring-white dark:ring-gray-950"
-                          title="Verified academy"
-                          aria-label="Verified academy"
-                        >
-                          <Check
-                            className="h-3 w-3"
-                            strokeWidth={3.5}
-                            aria-hidden
-                          />
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {/* Total Courses */}
-                  <div className="mt-4 text-center">
-                    <div className="text-3xl font-bold text-gray-900">
-                      {courses?.length || 0}
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      Total courses
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* ACADEMY Badge */}
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <Badge
-                    variant="outline"
-                    className="text-xs uppercase tracking-wider"
-                  >
-                    ACADEMY
-                  </Badge>
-                </CardContent>
-              </Card>
-
-              {/* Contact Information Card */}
-              <Card>
-                <CardHeader>
-                  <h3 className="text-lg font-bold">Contact Information</h3>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {academyProfile.phone_number && (
-                    <div className="flex items-center gap-3">
-                      <div className="bg-breneo-blue/10 rounded-full p-2">
-                        <Phone size={18} className="text-breneo-blue" />
-                      </div>
-                      <span className="text-sm">
-                        {academyProfile.phone_number}
-                      </span>
-                    </div>
-                  )}
-                  {academyProfile.contact_email && (
-                    <div className="flex items-center gap-3">
-                      <div className="bg-breneo-blue/10 rounded-full p-2">
-                        <Mail size={18} className="text-breneo-blue" />
-                      </div>
-                      <span className="text-sm">
-                        {academyProfile.contact_email}
-                      </span>
-                    </div>
-                  )}
-                  {academyProfile.website_url && (
-                    <div className="flex items-center gap-3">
-                      <div className="bg-breneo-blue/10 rounded-full p-2">
-                        <Globe size={18} className="text-breneo-blue" />
-                      </div>
-                      <a
-                        href={academyProfile.website_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-breneo-blue hover:underline flex items-center gap-1"
-                      >
-                        {academyProfile.website_url}
-                        <ExternalLink size={14} />
-                      </a>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Social Networks Card */}
-              {academyProfile.social_links &&
-                (academyProfile.social_links.github ||
-                  academyProfile.social_links.linkedin ||
-                  academyProfile.social_links.facebook ||
-                  academyProfile.social_links.instagram) && (
-                  <Card>
-                    <CardHeader>
-                      <h3 className="text-lg font-bold">Social Networks</h3>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {Object.entries(academyProfile.social_links)
-                          .filter(([_, url]) => url && url.trim() !== "")
-                          .map(([platform, url]) => (
-                            <a
-                              key={platform}
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 flex-1 hover:text-breneo-blue transition-colors"
-                            >
-                              <div className="bg-breneo-blue/10 rounded-full p-2">
-                                {getSocialIcon(
-                                  platform as SocialPlatform,
-                                  "h-[18px] w-[18px] text-breneo-blue",
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {platformLabels[platform as SocialPlatform]}
-                                </p>
-                              </div>
-                              <ExternalLink
-                                size={14}
-                                className="text-gray-400"
-                              />
-                            </a>
-                          ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-            </div>
-
-            {/* Right Column - Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Header */}
-              <div className="mb-4">
-                <Link to="/courses">
-                  <Button
-                    variant="ghost"
-                    className="text-breneo-blue hover:text-breneo-blue/80 mb-4"
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Courses
-                  </Button>
-                </Link>
-              </div>
-
-              {/* About Section */}
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-bold text-gray-900">About me</h2>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-gray-700 leading-relaxed space-y-3">
-                    {academyProfile.description ? (
-                      <p>{academyProfile.description}</p>
-                    ) : (
-                      <p className="text-gray-400 italic">
-                        No description available
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Courses Section */}
-              <Card>
-                <CardHeader>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    My courses ({courses?.length || 0})
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  {coursesLoading ? (
-                    <div className="text-center py-12">
-                      <div className="text-gray-500">Loading courses...</div>
-                    </div>
-                  ) : courses && courses.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {courses.map((course) => (
-                        <Card key={course.id} className="overflow-hidden">
-                          <div className="h-40 overflow-hidden">
-                            <img
-                              src={
-                                course.image
-                                  ? course.image
-                                  : "/lovable-uploads/no_photo.png"
-                              }
-                              alt={course.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                // Prevent infinite loop - only set fallback if not already set
-                                if (
-                                  !target.src.includes(
-                                    "/lovable-uploads/no_photo.png",
-                                  )
-                                ) {
-                                  target.onerror = null; // Remove error handler to prevent loop
-                                  target.src = "/lovable-uploads/no_photo.png";
-                                }
-                              }}
-                            />
-                          </div>
-                          <CardContent className="p-5">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-medium text-lg">
-                                {course.title}
-                              </h3>
-                              {course.popular && (
-                                <Badge
-                                  variant="outline"
-                                  className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-                                >
-                                  Popular
-                                </Badge>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2 mb-3 text-sm text-gray-500">
-                              <span>{course.level}</span>
-                              <span>•</span>
-                              <span>{course.duration}</span>
-                              <span>•</span>
-                              <span>{course.category}</span>
-                            </div>
-
-                            <p className="text-gray-700 text-sm mb-3 line-clamp-2">
-                              {course.description}
-                            </p>
-
-                            <div className="mb-4">
-                              <div className="flex flex-wrap gap-2">
-                                {course.topics
-                                  .slice(0, 3)
-                                  .map((topic, index) => (
-                                    <span
-                                      key={index}
-                                      className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded"
-                                    >
-                                      {topic}
-                                    </span>
-                                  ))}
-                                {course.topics.length > 3 && (
-                                  <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                                    +{course.topics.length - 3} more
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex justify-between items-center">
-                              <div className="flex flex-wrap gap-1">
-                                {course.required_skills
-                                  .slice(0, 2)
-                                  .map((skill, index) => (
-                                    <span
-                                      key={index}
-                                      className="bg-breneo-blue/10 text-breneo-blue text-xs px-2 py-1 rounded"
-                                    >
-                                      {skill}
-                                    </span>
-                                  ))}
-                                {course.required_skills.length > 2 && (
-                                  <span className="bg-breneo-blue/10 text-breneo-blue text-xs px-2 py-1 rounded">
-                                    +{course.required_skills.length - 2}
-                                  </span>
-                                )}
-                              </div>
-                              <Button
-                                size="sm"
-                                variant={
-                                  course.enrolled ? "outline" : "default"
-                                }
-                                className={
-                                  course.enrolled
-                                    ? ""
-                                    : "bg-breneo-blue hover:bg-breneo-blue/90"
-                                }
-                                onClick={() => {
-                                  if (!course.enrolled) {
-                                    navigate(`/course/${course.id}`);
-                                  }
-                                }}
-                              >
-                                {course.enrolled ? "Continue" : "Enroll"}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 bg-gray-50 rounded-3xl border">
-                      <p className="text-gray-500 mb-4">
-                        No courses found for {academyDisplayName}
-                      </p>
-                      <Link to="/courses">
-                        <Button variant="outline">Browse All Courses</Button>
-                      </Link>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </>
-        ) : profileError || !academyProfile ? (
-          <div className="lg:col-span-3">
-            <Card className="border-red-200">
-              <CardContent className="p-6 text-center">
-                <div className="max-w-md mx-auto">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-breneo-navy mb-4">
-                    Academy Not Found
-                  </h1>
-                  <p className="text-red-600 mb-4 text-lg">
-                    Cannot find an academy
-                  </p>
-                  <p className="text-gray-600 text-sm mb-4">
-                    {profileError instanceof Error
-                      ? profileError.message === "Academy not found" ||
-                        profileError.message.includes("not found") ||
-                        profileError.message.includes("404")
-                        ? "The academy you're looking for doesn't exist or has been removed."
-                        : `Error: ${profileError.message}`
-                      : "The academy you're looking for doesn't exist or has been removed."}
-                  </p>
-                  {academySlug && (
-                    <p className="text-gray-500 text-xs mb-6">
-                      {isAcademyId
-                        ? `Academy ID: ${academyId}`
-                        : `Academy Slug: ${slug}`}
-                    </p>
-                  )}
-                  <Link to="/courses">
-                    <Button variant="default">
-                      <ArrowLeft className="w-4 h-4 mr-2" />
-                      Back to Courses
-                    </Button>
-                  </Link>
+                  <Skeleton className="h-16 w-16 rounded-sm" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 w-28 rounded-full" />
+                  <Skeleton className="h-8 w-36 rounded-full" />
                 </div>
               </CardContent>
             </Card>
-          </div>
-        ) : null}
+            <Card className="border-0 rounded-3xl">
+              <CardContent className="space-y-2 px-6 py-6">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </CardContent>
+            </Card>
+          </>
+        ) : profileError || !academyProfile ? (
+          <Card className="border-0 rounded-3xl">
+            <CardContent className="p-10 text-center">
+              <GraduationCap className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+              <h1 className="text-xl font-semibold text-foreground">
+                Academy not found
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {profileError instanceof Error &&
+                profileError.message &&
+                profileError.message !== "Academy not found" &&
+                !profileError.message.includes("not found") &&
+                !profileError.message.includes("404")
+                  ? profileError.message
+                  : "The academy you're looking for doesn't exist or has been removed."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <Card className="overflow-hidden border-0 rounded-3xl">
+              <div className="relative">
+                <div className="relative h-28 sm:h-36">
+                  <div
+                    className="absolute inset-0 dark:hidden"
+                    style={{
+                      background: coverGradientStyle(coverGradient, "light"),
+                    }}
+                  />
+                  <div
+                    className="absolute inset-0 hidden dark:block"
+                    style={{
+                      background: coverGradientStyle(coverGradient, "dark"),
+                    }}
+                  />
+                </div>
+                <div className="relative -mt-14 flex flex-col gap-4 border-b border-gray-100 px-5 pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <OptimizedAvatar
+                      src={logo}
+                      alt={academyDisplayName}
+                      fallback={
+                        academyDisplayName.charAt(0).toUpperCase() || "A"
+                      }
+                      size="lg"
+                      className="!h-16 !w-16 !rounded-sm bg-white shadow-sm"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <h1 className="truncate text-xl font-bold text-gray-900">
+                          {academyDisplayName}
+                        </h1>
+                        {academyProfile.is_verified ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full bg-[linear-gradient(135deg,#5D78FF_0%,#2EB9D1_100%)] text-white shadow-sm"
+                                aria-label="This badge is for verified academies"
+                              >
+                                <Check
+                                  className="h-2.5 w-2.5"
+                                  strokeWidth={3.5}
+                                  aria-hidden
+                                />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              This badge is for verified academies
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {academyProfile.phone_number ? (
+                          <a
+                            href={`tel:${academyProfile.phone_number}`}
+                            className={headerMetaClass}
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                            {academyProfile.phone_number}
+                          </a>
+                        ) : null}
+                        {academyProfile.contact_email ? (
+                          <a
+                            href={`mailto:${academyProfile.contact_email}`}
+                            className={headerMetaClass}
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                            {academyProfile.contact_email}
+                          </a>
+                        ) : null}
+                        {siteUrl ? (
+                          <a
+                            href={siteUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(headerMetaClass, "hover:underline")}
+                          >
+                            <Globe className="h-3.5 w-3.5" />
+                            {websiteLabel(siteUrl)}
+                          </a>
+                        ) : null}
+                        {socialEntries.map(([platform, url]) => (
+                          <a
+                            key={platform}
+                            href={websiteHref(url) || url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={cn(headerMetaClass, "hover:underline")}
+                          >
+                            {getSocialIcon(platform, "h-3.5 w-3.5")}
+                            {platformLabels[platform]}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {siteUrl ? (
+                    <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+                      <Button asChild size="sm" className={headerButtonClass}>
+                        <a
+                          href={siteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Visit website
+                        </a>
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </Card>
+
+            <Card className="border-0 rounded-3xl">
+              <CardHeader className="mb-0 border-b-0 p-4 pb-2">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  About
+                </h3>
+              </CardHeader>
+              <CardContent className="px-6 pb-6 pt-0">
+                {academyProfile.description?.trim() ? (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900 dark:text-gray-100">
+                    {academyProfile.description}
+                  </p>
+                ) : (
+                  <p className="text-sm italic text-gray-500">
+                    No information available.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <div id="academy-courses" />
+            {matchedCourses.length > 0 ? (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    Top courses picked for you
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className={courseCarouselNavButtonClass}
+                      onClick={() => scrollMatchedCourses("left")}
+                      aria-label="Scroll courses left"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className={courseCarouselNavButtonClass}
+                      onClick={() => scrollMatchedCourses("right")}
+                      aria-label="Scroll courses right"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div
+                  ref={coursesScrollRef}
+                  className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-2 px-2"
+                >
+                  {matchedCourses.map((course) => {
+                    const isSaved = savedCourses.includes(String(course.id));
+                    return (
+                      <Link
+                        key={course.id}
+                        to={`/course/${course.id}`}
+                        className="block w-[calc((100%-2rem)/3)] min-w-[280px] flex-shrink-0 snap-start"
+                      >
+                        <Card className="group relative flex w-full cursor-pointer flex-col rounded-3xl transition-all duration-200 hover:shadow-soft">
+                          <CardContent className="relative flex flex-grow flex-col overflow-hidden rounded-3xl p-0">
+                            <div className="relative isolate h-40 w-full overflow-hidden rounded-t-3xl">
+                              <img
+                                src={course.image}
+                                alt={course.title}
+                                className="h-full w-full origin-center object-cover transition-transform duration-200 group-hover:scale-105"
+                                onError={(event) => {
+                                  (event.target as HTMLImageElement).src =
+                                    "/lovable-uploads/no_photo.png";
+                                }}
+                              />
+                            </div>
+                            <div className="flex min-h-[140px] flex-grow flex-col p-4">
+                              <h3 className="mb-2 line-clamp-2 text-base font-semibold transition-colors group-hover:text-breneo-blue">
+                                {course.title}
+                              </h3>
+                              <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {course.duration ? (
+                                    <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
+                                      {course.duration}
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                {userId ? (
+                                  <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      saveCourseMutation.mutate(
+                                        String(course.id),
+                                      );
+                                    }}
+                                    disabled={saveCourseMutation.isPending}
+                                    aria-label={
+                                      isSaved ? "Unsave course" : "Save course"
+                                    }
+                                    className={cn(
+                                      "h-10 w-10 flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
+                                      isSaved
+                                        ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
+                                        : "text-black dark:text-white",
+                                    )}
+                                  >
+                                    <Bookmark
+                                      className={cn(
+                                        "h-4 w-4 transition-colors",
+                                        isSaved
+                                          ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
+                                          : "text-black dark:text-white",
+                                      )}
+                                    />
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {coursesLoading ||
+            coursesError ||
+            otherCourses.length > 0 ||
+            matchedCourses.length === 0 ? (
+            <Card className="overflow-hidden border-0 rounded-3xl">
+              <CardHeader className="border-b-0 p-4 pb-3">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  {t.nav.courses}
+                </h3>
+              </CardHeader>
+              <CardContent className="px-0 pb-2">
+                {coursesLoading ? (
+                  <div className="space-y-3 px-6 pb-4">
+                    <Skeleton className="h-5 w-2/3" />
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-5 w-1/2" />
+                  </div>
+                ) : coursesError ? (
+                  <p className="px-6 pb-4 text-sm text-muted-foreground">
+                    Could not load courses for {academyDisplayName}.
+                  </p>
+                ) : courseCount === 0 ? (
+                  <div className="px-6 pb-6 text-center text-muted-foreground">
+                    <GraduationCap className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+                    <p className="font-medium text-foreground">
+                      {t.courses.noOurCourses}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {otherCourses.map((course) => {
+                      const meta = courseMeta(course);
+                      const isSaved = savedCourses.includes(String(course.id));
+                      return (
+                        <Link
+                          key={course.id}
+                          to={`/course/${course.id}`}
+                          className="block"
+                        >
+                          <div className="group flex items-center gap-4 px-4 py-4 transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30 md:px-6">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="line-clamp-2 text-base font-semibold transition-colors group-hover:text-breneo-blue">
+                                {course.title}
+                              </h3>
+                              {meta ? (
+                                <p className="mt-1 truncate text-sm text-gray-500">
+                                  {meta}
+                                </p>
+                              ) : null}
+                            </div>
+                            {userId ? (
+                              <div onClick={(event) => event.preventDefault()}>
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    saveCourseMutation.mutate(String(course.id));
+                                  }}
+                                  disabled={saveCourseMutation.isPending}
+                                  aria-label={
+                                    isSaved ? "Unsave course" : "Save course"
+                                  }
+                                  className={cn(
+                                    "h-10 w-10 flex-shrink-0 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A]",
+                                    isSaved
+                                      ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
+                                      : "text-black dark:text-white",
+                                  )}
+                                >
+                                  <Bookmark
+                                    className={cn(
+                                      "h-4 w-4 transition-colors",
+                                      isSaved
+                                        ? "text-breneo-blue fill-breneo-blue animate-heart-pop"
+                                        : "text-black dark:text-white",
+                                    )}
+                                  />
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            ) : null}
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
