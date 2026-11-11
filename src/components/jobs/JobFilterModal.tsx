@@ -326,7 +326,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                 return (
                   <label
                     key={type}
-                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3"
+                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[14px] px-3 py-3.5 min-h-[52px] gap-3"
                   >
                     <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
                       {workTypeLabels[type] || type}
@@ -340,7 +340,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                 );
               })}
               <div className="border-t border-[#e4e4e4] dark:border-[#3a3a3a] my-2" />
-              <label className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3">
+              <label className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[14px] px-3 py-3.5 min-h-[52px] gap-3">
                 <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
                   Remote Jobs Only
                 </span>
@@ -372,7 +372,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                   return (
                     <label
                       key={city.id}
-                      className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-2"
+                      className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[14px] px-3 py-3.5 min-h-[52px] gap-2"
                     >
                       <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 truncate">
                         {georgianCityLabel(city, language)}
@@ -404,7 +404,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                 return (
                   <label
                     key={category.value}
-                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3"
+                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[14px] px-3 py-3.5 min-h-[52px] gap-3"
                   >
                     <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
                       {t.onboarding.roleCategories[category.labelId]}
@@ -435,7 +435,7 @@ const FilterForm: React.FC<FilterFormProps> = ({
                 return (
                   <label
                     key={level}
-                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded px-2 py-2 gap-3"
+                    className="flex items-center cursor-pointer hover:bg-[#e4e4e4] dark:hover:bg-[#3a3a3a] rounded-[14px] px-3 py-3.5 min-h-[52px] gap-3"
                   >
                     <span className="text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0">
                       {t.jobs.levels[level]}

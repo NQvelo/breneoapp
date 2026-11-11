@@ -10,7 +10,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import {
   useInfiniteQuery,
@@ -21,25 +21,31 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
-  Filter,
   Bookmark,
   MapPin,
   Clock,
   Briefcase,
   Tag,
   Loader2,
-  ArrowDown,
+  ChevronDown,
   SlidersHorizontal,
   ExternalLink,
   X,
 } from "@/components/icons";
 import { toast } from "sonner";
 import { JobFilterModal } from "@/components/jobs/JobFilterModal";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
-import { JOB_ROLE_CATEGORIES } from "@/components/jobs/JobSearchPreferenceChips";
-import { LocationDropdown } from "@/components/jobs/LocationDropdown";
-import { WorkTypeDropdown } from "@/components/jobs/WorkTypeDropdown";
+import {
+  JOB_ROLE_CATEGORIES,
+  JobSearchPreferenceChips,
+} from "@/components/jobs/JobSearchPreferenceChips";
 import { profileApi } from "@/api/profile";
 import {
   matchJobDetailToUser,
@@ -98,6 +104,7 @@ import {
   jobDataMatchesSelectedCountries,
 } from "@/utils/jobMatchUtils";
 import {
+  extractJobSalaryMidpoint,
   formatJobSalaryDisplay,
   formatSalaryFilterLabel,
 } from "@/utils/jobSalaryFormat";
@@ -121,7 +128,143 @@ interface Job {
   benefits?: string;
   matchPercentage?: number;
   datePosted?: string;
+  salaryAmount?: number | null;
   jobSkills?: string[];
+}
+
+type ResultSort = "relevance" | "date" | "salary_high" | "salary_low";
+
+const RESULT_SORTS: ResultSort[] = [
+  "relevance",
+  "date",
+  "salary_high",
+  "salary_low",
+];
+
+const POSTED_WITHIN = ["all", "month", "week", "3days", "day"] as const;
+type PostedWithin = (typeof POSTED_WITHIN)[number];
+
+function postedWithinMs(value: string | undefined): number | null {
+  if (!value || value === "all") return null;
+  if (value === "month") return 30 * 24 * 60 * 60 * 1000;
+  if (value === "week") return 7 * 24 * 60 * 60 * 1000;
+  if (value === "3days") return 3 * 24 * 60 * 60 * 1000;
+  if (value === "day" || value === "today") return 24 * 60 * 60 * 1000;
+  return null;
+}
+
+function ResultOptionMenu({
+  label,
+  options,
+  value,
+  active,
+  modal,
+  onChange,
+}: {
+  label: string;
+  options: { id: string; label: string }[];
+  value: string;
+  active: boolean;
+  modal: boolean;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || modal) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open, modal]);
+
+  const choose = (id: string) => {
+    onChange(id);
+    setOpen(false);
+  };
+
+  const optionsList = (
+    <div className={modal ? "space-y-2 px-4 pb-6" : undefined}>
+      {options.map((option) => (
+        <div
+          key={option.id}
+          role="button"
+          tabIndex={0}
+          onClick={() => choose(option.id)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              choose(option.id);
+            }
+          }}
+          className={
+            modal
+              ? "flex min-h-[52px] cursor-pointer items-center gap-3 rounded-[14px] px-3 py-3.5 text-gray-900 hover:bg-[#e4e4e4] dark:text-gray-100 dark:hover:bg-[#3a3a3a]"
+              : "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-gray-900 hover:bg-[#e4e4e4] dark:text-gray-100 dark:hover:bg-[#3a3a3a]"
+          }
+        >
+          <Checkbox
+            checked={value === option.id}
+            className={
+              modal
+                ? "pointer-events-none h-6 w-6 shrink-0 rounded-[8px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:border-breneo-blue data-[state=checked]:bg-breneo-blue"
+                : "pointer-events-none h-5 w-5 shrink-0 rounded-[4px] border-[#e4e4e4] bg-white dark:border-[#3a3a3a] dark:bg-[#2c2c2c] data-[state=checked]:border-breneo-blue data-[state=checked]:bg-breneo-blue"
+            }
+          />
+          <span className="min-w-0 flex-1 truncate text-sm">{option.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "inline-flex max-w-[220px] items-center gap-1.5 rounded-[14px] px-4 py-2.5 text-sm font-medium transition-colors",
+          active
+            ? "bg-breneo-blue/10 text-breneo-blue"
+            : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444]",
+        )}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {modal ? (
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerContent className="bg-background">
+            <DrawerHeader>
+              <DrawerTitle>{label}</DrawerTitle>
+            </DrawerHeader>
+            {optionsList}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        open && (
+          <div className="absolute right-0 top-full z-50 mt-2 w-[min(280px,calc(100vw-2rem))] rounded-[24px] border border-[#e4e4e4] bg-white p-2 shadow-xl dark:border-[#3a3a3a] dark:bg-[#242424]">
+            {optionsList}
+          </div>
+        )
+      )}
+    </div>
+  );
 }
 
 const jobTypeLabels: Record<string, string> = {
@@ -221,30 +364,20 @@ const JobSearchResultsPage = () => {
     );
   }, [searchTerm, page, searchParams, activeFilters, userTopSkills]);
 
-  // Sync activeFilters when URL params change
-  useEffect(() => {
-    setActiveFilters(filtersFromSearchParams(searchParams));
-  }, [searchParams]);
-
+  const [draftSearch, setDraftSearch] = useState(searchTerm);
+  const [pendingFilters, setPendingFilters] = useState<JobFilters>(() =>
+    filtersFromSearchParams(searchParams),
+  );
   const [tempFilters, setTempFilters] = useState<JobFilters>(activeFilters);
 
-  // Helper function to count active filters
-  const countActiveFilters = (filters: JobFilters): number => {
-    let count = 0;
-    if (filters.countries.length > 0) count += filters.countries.length;
-    if (filters.jobTypes.length > 0) count += filters.jobTypes.length;
-    if (filters.isRemote) count += 1;
-    if (filters.datePosted) count += 1;
-    if (filters.skills.length > 0) count += filters.skills.length;
-    if (filters.salaryMin !== undefined || filters.salaryMax !== undefined)
-      count += 1;
-    if (filters.salaryByAgreement) count += 1;
-    if (filters.roleCategory && filters.roleCategory.length > 0)
-      count += filters.roleCategory.length;
-    if (filters.seniority && filters.seniority.length > 0)
-      count += filters.seniority.length;
-    return count;
-  };
+  // Sync applied and pending filters when the URL changes
+  useEffect(() => {
+    const next = filtersFromSearchParams(searchParams);
+    setActiveFilters(next);
+    setPendingFilters(next);
+    setTempFilters(next);
+    setDraftSearch(searchParams.get("search") || "");
+  }, [searchParams]);
 
   // Fetch saved jobs
   const { data: savedJobs = [] } = useQuery<string[]>({
@@ -606,6 +739,7 @@ const JobSearchResultsPage = () => {
         }
 
         const salary = formatJobSalaryDisplay(job);
+        const salaryAmount = extractJobSalaryMidpoint(job);
 
         const employmentType = resolveJobEmploymentType(job);
         const workArrangement = resolveJobWorkArrangement(job);
@@ -659,6 +793,7 @@ const JobSearchResultsPage = () => {
           company_logo: companyLogo,
           is_saved: savedJobs?.includes(String(jobId)),
           salary,
+          salaryAmount,
           employment_type: employmentType,
           work_arrangement: workArrangement,
           matchPercentage,
@@ -669,14 +804,54 @@ const JobSearchResultsPage = () => {
       .filter((job): job is Job => job !== null);
   }, [jobs, savedJobs, user, userSkillsForMatch]);
 
+  const sortBy: ResultSort = RESULT_SORTS.includes(
+    searchParams.get("sortBy") as ResultSort,
+  )
+    ? (searchParams.get("sortBy") as ResultSort)
+    : "relevance";
+
+  const postedWithin: PostedWithin =
+    activeFilters.datePosted === "today"
+      ? "day"
+      : POSTED_WITHIN.includes(activeFilters.datePosted as PostedWithin)
+        ? (activeFilters.datePosted as PostedWithin)
+        : "all";
+
   // Match % is computed client-side, so order the loaded results here.
-  const regularJobs = useMemo(
-    () =>
-      [...transformedJobs].sort(
+  const regularJobs = useMemo(() => {
+    const windowMs = postedWithinMs(activeFilters.datePosted);
+    const now = Date.now();
+    const visible =
+      windowMs == null
+        ? transformedJobs
+        : transformedJobs.filter((job) => {
+            const postedAt = Date.parse(job.datePosted || "");
+            if (!Number.isFinite(postedAt)) return true;
+            return now - postedAt <= windowMs;
+          });
+
+    const sorted = [...visible];
+    if (sortBy === "date") {
+      sorted.sort(
+        (a, b) =>
+          (Date.parse(b.datePosted || "") || 0) -
+          (Date.parse(a.datePosted || "") || 0),
+      );
+    } else if (sortBy === "salary_high" || sortBy === "salary_low") {
+      const direction = sortBy === "salary_high" ? -1 : 1;
+      sorted.sort((a, b) => {
+        if (a.salaryAmount == null && b.salaryAmount == null) return 0;
+        if (a.salaryAmount == null) return 1;
+        if (b.salaryAmount == null) return -1;
+        return (a.salaryAmount - b.salaryAmount) * direction;
+      });
+    } else {
+      sorted.sort(
         (a, b) => (b.matchPercentage ?? -1) - (a.matchPercentage ?? -1),
-      ),
-    [transformedJobs],
-  );
+      );
+    }
+    return sorted;
+  }, [transformedJobs, sortBy, activeFilters.datePosted]);
 
   // Save job mutation
   const saveJobMutation = useMutation({
@@ -748,21 +923,69 @@ const JobSearchResultsPage = () => {
       if (filters.seniority && filters.seniority.length > 0) {
         params.set("seniority", filters.seniority.join(","));
       }
+      const sortByParam = searchParams.get("sortBy");
+      if (sortByParam && sortByParam !== "relevance") {
+        params.set("sortBy", sortByParam);
+      }
       setSearchParams(params, { replace: true });
     },
-    [setSearchParams],
+    [setSearchParams, searchParams],
   );
 
-  const handleSearch = (value: string) => {
-    const newPage = 1;
-    updateUrlWithFilters(activeFilters, value, newPage);
+  const setSortBy = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === "relevance") params.delete("sortBy");
+    else params.set("sortBy", next);
+    params.set("page", "1");
+    setSearchParams(params, { replace: true });
+  };
+
+  const setPostedWithin = (next: string) => {
+    updateUrlWithFilters(
+      {
+        ...activeFilters,
+        datePosted: next === "all" ? undefined : next,
+      },
+      searchTerm,
+      1,
+    );
+  };
+
+  const sortOptions = [
+    { id: "relevance", label: t.jobs.sortByRelevance },
+    { id: "date", label: t.jobs.sortByDate },
+    { id: "salary_high", label: t.jobs.sortHighestSalary },
+    { id: "salary_low", label: t.jobs.sortLowestSalary },
+  ];
+  const postedOptions = [
+    { id: "all", label: t.jobs.postedAllTime },
+    { id: "month", label: t.jobs.postedPastMonth },
+    { id: "week", label: t.jobs.postedPastWeek },
+    { id: "3days", label: t.jobs.postedPast3Days },
+    { id: "day", label: t.jobs.postedPast24Hours },
+  ];
+
+  const submitSearch = (filters: JobFilters, search: string) => {
+    setPendingFilters(filters);
+    updateUrlWithFilters(filters, search, 1);
+  };
+
+  const handleSearch = () => {
+    submitSearch(pendingFilters, draftSearch);
+  };
+
+  const patchPendingFilters = (patch: Partial<JobFilters>) => {
+    setPendingFilters((current) => ({ ...current, ...patch }));
+  };
+
+  const openFilters = () => {
+    setTempFilters(pendingFilters);
+    setFilterModalOpen(true);
   };
 
   const handleApplyFilters = () => {
-    const newPage = 1;
-    setActiveFilters(tempFilters);
-    updateUrlWithFilters(tempFilters, searchTerm, newPage);
     setFilterModalOpen(false);
+    submitSearch(tempFilters, draftSearch);
   };
 
   const handleClearFilters = () => {
@@ -779,10 +1002,9 @@ const JobSearchResultsPage = () => {
       roleCategory: [],
       seniority: [],
     };
-    const newPage = 1;
     setTempFilters(clearedFilters);
-    setActiveFilters(clearedFilters);
-    updateUrlWithFilters(clearedFilters, searchTerm, newPage);
+    setPendingFilters(clearedFilters);
+    updateUrlWithFilters(clearedFilters, draftSearch, 1);
     setFilterModalOpen(false);
   };
 
@@ -938,32 +1160,6 @@ const JobSearchResultsPage = () => {
       });
     }
 
-    // Date Posted
-    if (activeFilters.datePosted) {
-      const dateLabel =
-        activeFilters.datePosted === "today"
-          ? "Posted Today"
-          : activeFilters.datePosted === "week"
-            ? "Posted This Week"
-            : activeFilters.datePosted === "month"
-              ? "Posted This Month"
-              : `Posted: ${activeFilters.datePosted}`;
-      filters.push({
-        id: "datePosted",
-        label: dateLabel,
-        onRemove: () => {
-          const newFilters = {
-            ...activeFilters,
-            datePosted: undefined,
-          };
-          setActiveFilters(newFilters);
-          setTempFilters(newFilters);
-          updateUrlWithFilters(newFilters, searchTerm, 1);
-        },
-        ariaLabel: "Remove Date Posted filter",
-      });
-    }
-
     // Salary Range
     if (
       activeFilters.salaryMin !== undefined ||
@@ -1111,95 +1307,102 @@ const JobSearchResultsPage = () => {
   }, [allFilters]);
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto pt-2 pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
         {/* Search Bar */}
         <div className="mb-8 relative max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white dark:bg-[#242424] rounded-xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-3 md:py-4 overflow-visible min-h-[3.5rem] flex-1">
-              {/* Briefcase Icon - At the start */}
-              <Briefcase
-                className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
-                strokeWidth={2}
-              />
+          <div className="flex items-center bg-white dark:bg-[#242424] rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
+            <Briefcase
+              className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
+              strokeWidth={2}
+            />
 
-              {/* Search Input Field */}
-              <Input
-                type="text"
-                placeholder={t.jobs.searchPlaceholder}
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
-              />
+            <Input
+              type="text"
+              placeholder={t.jobs.searchPlaceholder}
+              value={draftSearch}
+              onChange={(e) => setDraftSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearch();
+              }}
+              className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-sm text-gray-900 dark:text-gray-100 flex-1 min-w-0 bg-transparent h-auto py-0"
+            />
 
-              {/* Work Types Field - Hidden on mobile, shown on desktop */}
-              {!isMobile && (
-                <>
-                  <div className="w-px bg-gray-300 dark:bg-gray-700 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
-                  <div className="flex items-center flex-1 min-w-0 relative">
-                    <WorkTypeDropdown
-                      selectedWorkTypes={activeFilters.jobTypes}
-                      onWorkTypesChange={(types) => {
-                        const newFilters = {
-                          ...activeFilters,
-                          jobTypes: types,
-                        };
-                        setActiveFilters(newFilters);
-                        setTempFilters(newFilters);
-                        updateUrlWithFilters(newFilters, searchTerm, 1);
-                      }}
-                      isRemote={activeFilters.isRemote}
-                      onRemoteChange={(isRemote) => {
-                        const newFilters = {
-                          ...activeFilters,
-                          isRemote: isRemote,
-                        };
-                        setActiveFilters(newFilters);
-                        setTempFilters(newFilters);
-                        updateUrlWithFilters(newFilters, searchTerm, 1);
-                      }}
-                    />
-                  </div>
-                  <div className="w-px bg-gray-300 dark:bg-gray-700 ml-2 mr-4 flex-shrink-0 h-6 my-auto" />
-                  <div className="flex items-center flex-1 min-w-0 relative">
-                    <LocationDropdown
-                      selectedLocations={activeFilters.countries}
-                      onLocationsChange={(countries) => {
-                        const newFilters = { ...activeFilters, countries };
-                        setActiveFilters(newFilters);
-                        setTempFilters(newFilters);
-                        updateUrlWithFilters(newFilters, searchTerm, 1);
-                      }}
-                    />
-                  </div>
-                </>
-              )}
+            {isMobile && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={openFilters}
+                className="h-10 w-10 flex-shrink-0 bg-gray-100 dark:bg-gray-700 border-0 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md ml-2 relative"
+                aria-label={t.jobs.filters}
+              >
+                <SlidersHorizontal className="h-4 w-4" strokeWidth={2} />
+              </Button>
+            )}
+
+            <Button
+              variant="default"
+              size="icon"
+              onClick={handleSearch}
+              className="h-10 w-10 flex-shrink-0 bg-breneo-blue hover:bg-breneo-blue/90 rounded-md ml-2"
+              aria-label={t.jobs.search}
+            >
+              <Search className="h-5 w-5 text-white" />
+            </Button>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <JobSearchPreferenceChips
+              jobTypes={pendingFilters.jobTypes}
+              isRemote={pendingFilters.isRemote}
+              countries={pendingFilters.countries}
+              roleCategory={pendingFilters.roleCategory ?? []}
+              seniority={pendingFilters.seniority ?? []}
+              salaryMin={pendingFilters.salaryMin}
+              salaryMax={pendingFilters.salaryMax}
+              salaryByAgreement={pendingFilters.salaryByAgreement}
+              onJobTypesChange={(jobTypes) => patchPendingFilters({ jobTypes })}
+              onRemoteChange={(isRemote) => patchPendingFilters({ isRemote })}
+              onCountriesChange={(countries) =>
+                patchPendingFilters({ countries })
+              }
+              onRoleCategoryChange={(roleCategory) =>
+                patchPendingFilters({ roleCategory })
+              }
+              onSeniorityChange={(seniority) =>
+                patchPendingFilters({ seniority })
+              }
+              onSalaryChange={(salaryMin, salaryMax, salaryByAgreement) =>
+                patchPendingFilters({
+                  salaryMin,
+                  salaryMax,
+                  salaryByAgreement,
+                })
+              }
+            />
+            <div className="mt-3 flex shrink-0 flex-wrap items-center justify-start gap-2 md:ml-auto md:justify-end">
+              <ResultOptionMenu
+                label={
+                  sortOptions.find((option) => option.id === sortBy)?.label ??
+                  t.jobs.sortByRelevance
+                }
+                options={sortOptions}
+                value={sortBy}
+                active={sortBy !== "relevance"}
+                modal={isMobile}
+                onChange={setSortBy}
+              />
+              <ResultOptionMenu
+                label={
+                  postedOptions.find((option) => option.id === postedWithin)
+                    ?.label ?? t.jobs.postedAllTime
+                }
+                options={postedOptions}
+                value={postedWithin}
+                active={postedWithin !== "all"}
+                modal={isMobile}
+                onChange={setPostedWithin}
+              />
             </div>
-
-            {/* Filter Button - Outside search bar */}
-            {(() => {
-              const activeFilterCount = countActiveFilters(activeFilters);
-              return (
-                <Button
-                  variant="outline"
-                  onClick={() => setFilterModalOpen(true)}
-                  className="group flex items-center gap-2 bg-breneo-blue/10 hover:bg-breneo-blue rounded-xl px-4 py-3 md:py-4 hover:bg-breneo-blue hover:text-white text-gray-900 dark:text-gray-100 whitespace-nowrap h-auto relative min-h-[3.5rem] transition-colors"
-                  aria-label="Filter jobs"
-                >
-                  <SlidersHorizontal
-                    className="h-4 w-4 group-hover:text-white"
-                    strokeWidth={2}
-                  />
-                  <span className="hidden md:inline text-sm font-medium">
-                    {t.jobs.filters}
-                  </span>
-                  {activeFilterCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-breneo-blue text-white text-xs rounded-full">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              );
-            })()}
           </div>
         </div>
 
@@ -1238,28 +1441,12 @@ const JobSearchResultsPage = () => {
         )}
 
         {/* Results Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {totalJobs > 0
-                ? `${totalJobs} ${t.jobs.vacancies}`
-                : `${transformedJobs.length} ${t.jobs.vacancies}`}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-2 md:px-3 pointer-events-none"
-              tabIndex={-1}
-              aria-label={t.jobs.matchDescendingFull}
-            >
-              <span className="text-xs md:text-sm whitespace-nowrap">
-                {isMobile ? t.jobs.matchDescending : t.jobs.matchDescendingFull}
-              </span>
-              <ArrowDown className="h-4 w-4 ml-1 md:ml-2" />
-            </Button>
-          </div>
+        <div className="mb-6">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {totalJobs > 0
+              ? `${totalJobs} ${t.jobs.vacancies}`
+              : `${transformedJobs.length} ${t.jobs.vacancies}`}
+          </span>
         </div>
 
         {/* Job List */}

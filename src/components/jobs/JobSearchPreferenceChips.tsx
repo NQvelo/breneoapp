@@ -84,6 +84,7 @@ type JobSearchPreferenceChipsProps = {
     max: number | undefined,
     byAgreement: boolean,
   ) => void;
+  className?: string;
 };
 
 export function JobSearchPreferenceChips({
@@ -101,6 +102,7 @@ export function JobSearchPreferenceChips({
   onRoleCategoryChange,
   onSeniorityChange,
   onSalaryChange,
+  className,
 }: JobSearchPreferenceChipsProps) {
   const { t, language } = useLanguage();
   const [openChip, setOpenChip] = useState<OpenChip>(null);
@@ -175,7 +177,13 @@ export function JobSearchPreferenceChips({
     salaryMin !== undefined || salaryMax !== undefined || salaryByAgreement;
 
   return (
-    <div ref={rootRef} className="mt-3 hidden flex-wrap gap-2 md:flex">
+    <div
+      ref={rootRef}
+      className={cn(
+        "mt-3 hidden min-w-0 flex-1 flex-wrap gap-2 md:flex",
+        className,
+      )}
+    >
       <ChipMenu
         label={
           workTypeNames.length === 0

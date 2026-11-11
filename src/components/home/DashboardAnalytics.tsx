@@ -28,11 +28,14 @@ interface DashboardAnalyticsProps {
 }
 
 const sectionClass =
-  "flex flex-1 flex-col gap-4 py-6 first:pt-0 last:pb-0 md:px-6 md:py-0 md:first:pl-0 md:last:pr-0";
+  "flex min-w-0 flex-1 flex-col gap-4 py-6 first:pt-0 last:pb-0 md:px-6 md:py-0 md:first:pl-0 md:last:pr-0";
 const sectionTitleClass = "text-base font-bold text-white";
 const glassClass =
   "rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md";
-const dailyPickCardClass = cn(glassClass, "flex items-start gap-3 p-3");
+const dailyPickCardClass = cn(
+  glassClass,
+  "flex w-full min-w-0 max-w-full items-start gap-3 overflow-hidden p-3",
+);
 const heroSkeletonClass = "bg-white/20";
 
 const ApplicationStatusSection: React.FC<{
@@ -127,7 +130,7 @@ const DailyPickSection: React.FC<{
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="line-clamp-2 text-sm font-bold text-white group-hover:underline">
+          <h4 className="line-clamp-2 break-words text-sm font-bold text-white group-hover:underline">
             {job.title}
           </h4>
           <p className="mt-0.5 truncate text-xs text-white/75">
