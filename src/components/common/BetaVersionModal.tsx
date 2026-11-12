@@ -91,7 +91,7 @@ export const BetaVersionModal: React.FC = () => {
               {t.appUpdate.title}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="px-6 pb-2">
+          <div className="px-6 pb-0">
             <div className="flex flex-col items-center justify-center pb-4">
               {rocket}
             </div>
@@ -99,7 +99,7 @@ export const BetaVersionModal: React.FC = () => {
               {message}
             </DrawerDescription>
           </div>
-          <div className="p-4">{updateButton}</div>
+          <div className="px-4 pb-4 pt-10">{updateButton}</div>
         </DrawerContent>
       </Drawer>
     );
@@ -117,7 +117,7 @@ export const BetaVersionModal: React.FC = () => {
           {rocket}
         </div>
         <DialogDescription className="text-base">{message}</DialogDescription>
-        <div className="pt-4">{updateButton}</div>
+        <div className="pt-10">{updateButton}</div>
       </DialogContent>
     </Dialog>
   );

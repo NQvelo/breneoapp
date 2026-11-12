@@ -402,6 +402,11 @@ const getSkillColor = (skill: string, index: number): string => {
   return colors[index % colors.length];
 };
 
+const isAvailableListing = (job: ApiJob): boolean => {
+  const active = (job as { is_active?: boolean | number | null }).is_active;
+  return active !== false && active !== 0;
+};
+
 // Fetch all internship jobs without any filtering
 const fetchInternshipJobs = async (
   page: number = 1,
@@ -442,7 +447,7 @@ const fetchInternshipJobs = async (
     // Filter out jobs without valid IDs
     const validJobs = response.jobs.filter((job) => {
       const jobId = String(job.id || "");
-      return jobId && jobId.trim() !== "";
+      return jobId.trim() !== "" && isAvailableListing(job);
     });
 
     // Return valid internship jobs with pagination info
@@ -503,7 +508,7 @@ const fetchLatestJobs = async (
     // Filter out jobs without valid IDs
     let validJobs = response.jobs.filter((job) => {
       const jobId = job.id || "";
-      return jobId && jobId.trim() !== "";
+      return jobId.trim() !== "" && isAvailableListing(job);
     });
 
     // Apply client-side salary filtering (same as JobSearchResultsPage)
@@ -616,7 +621,7 @@ const fetchRemoteJobs = async (
     // Filter out jobs without valid IDs
     const validJobs = response.jobs.filter((job) => {
       const jobId = String(job.id || "");
-      return jobId && jobId.trim() !== "";
+      return jobId.trim() !== "" && isAvailableListing(job);
     });
 
     console.log(
@@ -639,9 +644,10 @@ const fetchRemoteJobs = async (
 const JOBS_FILTERS_STORAGE_KEY = "jobsFilters";
 const COURSES_FILTERS_STORAGE_KEY = "coursesFilters";
 
-// Latest jobs cache: avoid refetch on every reload (only last 1 week jobs)
+// Short-lived paint cache only. The jobs query always refetches so closed
+// listings are not kept after they stop being available.
 const LATEST_JOBS_CACHE_KEY = "jobsPage_latestJobs";
-const LATEST_JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const LATEST_JOBS_CACHE_TTL_MS = 2 * 60 * 1000;
 
 interface LatestJobsCacheEntry {
   jobs: ApiJob[];
@@ -649,6 +655,14 @@ interface LatestJobsCacheEntry {
   total: number;
   timestamp: number;
 }
+
+const clearCachedLatestJobs = () => {
+  try {
+    sessionStorage.removeItem(LATEST_JOBS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+};
 
 const getCachedLatestJobs = (): {
   jobs: ApiJob[];
@@ -664,14 +678,21 @@ const getCachedLatestJobs = (): {
       !Array.isArray(entry.jobs) ||
       Date.now() - entry.timestamp > LATEST_JOBS_CACHE_TTL_MS
     ) {
+      clearCachedLatestJobs();
+      return null;
+    }
+    const jobs = entry.jobs.filter(isAvailableListing);
+    if (jobs.length === 0) {
+      clearCachedLatestJobs();
       return null;
     }
     return {
-      jobs: entry.jobs,
+      jobs,
       hasMore: entry.hasMore ?? false,
-      total: entry.total ?? entry.jobs.length,
+      total: entry.total ?? jobs.length,
     };
   } catch {
+    clearCachedLatestJobs();
     return null;
   }
 };
@@ -681,13 +702,20 @@ const setCachedLatestJobs = (data: {
   hasMore: boolean;
   total: number;
 }) => {
+  const jobs = data.jobs.filter(isAvailableListing);
+  if (jobs.length === 0) {
+    clearCachedLatestJobs();
+    return;
+  }
   try {
     sessionStorage.setItem(
       LATEST_JOBS_CACHE_KEY,
       JSON.stringify({
-        ...data,
+        jobs,
+        hasMore: data.hasMore,
+        total: data.total,
         timestamp: Date.now(),
-      } as LatestJobsCacheEntry),
+      } satisfies LatestJobsCacheEntry),
     );
   } catch {
     // ignore
@@ -1007,12 +1035,6 @@ const JobsPage = () => {
     queryKey: ["latestJobs"],
     queryFn: async () => {
       try {
-        // Use sessionStorage cache only when it has jobs (avoid serving stale empty cache)
-        const cached = getCachedLatestJobs();
-        if (cached && cached.jobs.length > 0) {
-          return cached;
-        }
-
         const response = await jobService.fetchActiveJobs({
           query: "",
           filters: {
@@ -1031,12 +1053,13 @@ const JobsPage = () => {
         });
 
         if (!response || !Array.isArray(response.jobs)) {
+          clearCachedLatestJobs();
           return { jobs: [], hasMore: false, total: 0 };
         }
 
         const validJobs = response.jobs.filter((job) => {
           const jobId = String(job.id || job.job_id || "");
-          return jobId && jobId.trim() !== "";
+          return jobId.trim() !== "" && isAvailableListing(job);
         });
 
         const result = {
@@ -1047,15 +1070,17 @@ const JobsPage = () => {
         setCachedLatestJobs(result);
         return result;
       } catch (error) {
+        clearCachedLatestJobs();
         console.error("❌ Error fetching jobs:", error);
         throw error;
       }
     },
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    refetchOnReconnect: false,
-    staleTime: LATEST_JOBS_CACHE_TTL_MS, // 30 min - no refetch while fresh
-    gcTime: 60 * 60 * 1000, // 1 hour in memory
+    placeholderData: () => getCachedLatestJobs() ?? undefined,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    staleTime: 0,
+    gcTime: 60 * 1000,
     retry: 2,
     retryDelay: 1000,
     enabled: true,
@@ -1069,11 +1094,11 @@ const JobsPage = () => {
   } = useQuery({
     queryKey: ["internshipJobs", internshipJobsPage],
     queryFn: () => fetchInternshipJobs(internshipJobsPage),
-    refetchOnWindowFocus: false,
-    refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
-    refetchOnReconnect: false,
-    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    staleTime: 0,
+    gcTime: 60 * 1000,
     retry: 1,
     retryDelay: 1000,
     enabled: true, // Always fetch jobs
@@ -1087,11 +1112,11 @@ const JobsPage = () => {
   } = useQuery({
     queryKey: ["remoteJobs", remoteJobsPage],
     queryFn: () => fetchRemoteJobs(remoteJobsPage, []),
-    refetchOnWindowFocus: false,
-    refetchOnMount: true, // Fetch on mount to ensure jobs are loaded
-    refetchOnReconnect: false,
-    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+    refetchOnReconnect: true,
+    staleTime: 0,
+    gcTime: 60 * 1000,
     retry: 1,
     retryDelay: 1000,
     enabled: true, // Always fetch remote jobs
@@ -2319,7 +2344,6 @@ const JobsPage = () => {
           />
         </div>
 
-
         {(internshipError || remoteError || error) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">
             <AlertCircle className="h-5 w-5" />
@@ -2351,44 +2375,44 @@ const JobsPage = () => {
                 >
                   <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
                     <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex items-start gap-3 mb-3 min-h-10">
-                      {job.company_logo ? (
-                        <div className="flex-shrink-0 relative w-10 h-10">
-                          <img
-                            src={job.company_logo}
-                            alt={`${job.company_name || job.company} logo`}
-                            className="w-10 h-10 rounded-md object-cover flex-shrink-0"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display =
-                                "none";
-                            }}
-                          />
+                      <div className="flex items-start gap-3 mb-3 min-h-10">
+                        {job.company_logo ? (
+                          <div className="flex-shrink-0 relative w-10 h-10">
+                            <img
+                              src={job.company_logo}
+                              alt={`${job.company_name || job.company} logo`}
+                              className="w-10 h-10 rounded-md object-cover flex-shrink-0"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm truncate">
+                            <CompanyNameLink
+                              name={job.company_name || job.company}
+                              className="font-semibold text-sm"
+                            />
+                          </h3>
+                          <p className="mt-0.5 text-xs text-gray-500 truncate">
+                            {job.location}
+                          </p>
                         </div>
-                      ) : null}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm truncate">
-                          <CompanyNameLink
-                            name={job.company_name || job.company}
-                            className="font-semibold text-sm"
-                          />
-                        </h3>
-                        <p className="mt-0.5 text-xs text-gray-500 truncate">
-                          {job.location}
-                        </p>
                       </div>
-                    </div>
-                    <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
-                      {job.title}
-                    </h4>
-                    <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
-                      <JobListingMetaBadges
-                        employmentType={job.employment_type}
-                        workArrangement={job.work_arrangement}
-                        salary={job.salary}
-                      />
-                    </div>
+                      <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
+                        {job.title}
+                      </h4>
+                      <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
+                        <JobListingMetaBadges
+                          employmentType={job.employment_type}
+                          workArrangement={job.work_arrangement}
+                          salary={job.salary}
+                        />
+                      </div>
                     </div>
                     <div className="mt-auto flex shrink-0 items-center justify-between gap-4 pt-7">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -2481,48 +2505,48 @@ const JobsPage = () => {
                 >
                   <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
                     <div className="flex min-h-0 flex-1 flex-col">
-                    {/* Company Logo and Info */}
-                    <div className="flex items-start gap-3 mb-3 min-h-10">
-                      {job.company_logo ? (
-                        <div className="flex-shrink-0 relative w-10 h-10">
-                          <img
-                            src={job.company_logo}
-                            alt={`${job.company_name || job.company} logo`}
-                            className="w-10 h-10 rounded-full object-cover"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display =
-                                "none";
-                            }}
-                          />
+                      {/* Company Logo and Info */}
+                      <div className="flex items-start gap-3 mb-3 min-h-10">
+                        {job.company_logo ? (
+                          <div className="flex-shrink-0 relative w-10 h-10">
+                            <img
+                              src={job.company_logo}
+                              alt={`${job.company_name || job.company} logo`}
+                              className="w-10 h-10 rounded-full object-cover"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-sm truncate">
+                            <CompanyNameLink
+                              name={job.company_name || job.company}
+                              className="font-semibold text-sm"
+                            />
+                          </h3>
+                          <p className="mt-0.5 text-xs text-gray-500 truncate">
+                            {job.location}
+                          </p>
                         </div>
-                      ) : null}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm truncate">
-                          <CompanyNameLink
-                            name={job.company_name || job.company}
-                            className="font-semibold text-sm"
-                          />
-                        </h3>
-                        <p className="mt-0.5 text-xs text-gray-500 truncate">
-                          {job.location}
-                        </p>
                       </div>
-                    </div>
 
-                    {/* Job Title */}
-                    <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
-                      {job.title}
-                    </h4>
+                      {/* Job Title */}
+                      <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem]">
+                        {job.title}
+                      </h4>
 
-                    <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
-                      <JobListingMetaBadges
-                        employmentType={job.employment_type}
-                        workArrangement={job.work_arrangement}
-                        salary={job.salary}
-                      />
-                    </div>
+                      <div className="min-h-[1.75rem] max-md:min-h-[4.5rem]">
+                        <JobListingMetaBadges
+                          employmentType={job.employment_type}
+                          workArrangement={job.work_arrangement}
+                          salary={job.salary}
+                        />
+                      </div>
                     </div>
 
                     {/* Match percentage & Save button (same total match as job detail page) */}

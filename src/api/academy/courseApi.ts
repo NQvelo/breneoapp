@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type RawAxiosRequestHeaders } from "axios";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 
@@ -134,10 +134,22 @@ export type CourseWriteFields = {
   total_duration: string;
   skillIds: number[];
   lecturer_name: string;
-  lecturer_photo_url: string | null;
   academy_name?: string;
+  /** PATCH only. Sets writable `lecturer_photo` to null. */
+  clearLecturerPhoto?: boolean;
+  /** PATCH only. Sets writable `cover_image` to null. */
+  clearCoverImage?: boolean;
 };
 
+export type CourseWriteFiles = {
+  coverImageFile?: File | null;
+  lecturerPhotoFile?: File | null;
+};
+
+/**
+ * Course writes use `lecturer_photo` / `cover_image` (files).
+ * `lecturer_photo_url` and `cover_image_url` are read-only response fields.
+ */
 export function buildCourseJsonPayload(
   fields: CourseWriteFields,
 ): Record<string, unknown> {
@@ -153,10 +165,15 @@ export function buildCourseJsonPayload(
     skills_taught: fields.skillIds,
     registration_link: "",
     lecturer_name: fields.lecturer_name,
-    lecturer_photo_url: fields.lecturer_photo_url || "",
   };
   if (fields.academy_name != null) {
     body.academy_name = fields.academy_name;
+  }
+  if (fields.clearLecturerPhoto) {
+    body.lecturer_photo = null;
+  }
+  if (fields.clearCoverImage) {
+    body.cover_image = null;
   }
   return body;
 }
@@ -175,13 +192,84 @@ export function appendCourseFieldsToFormData(
   formData.append("total_duration", fields.total_duration);
   formData.append("registration_link", "");
   formData.append("lecturer_name", fields.lecturer_name);
-  formData.append("lecturer_photo_url", fields.lecturer_photo_url || "");
   if (fields.academy_name != null) {
     formData.append("academy_name", fields.academy_name);
   }
   for (const id of fields.skillIds) {
     formData.append("skills_taught", String(id));
   }
+}
+
+function stripJsonContentTypeForFormData(
+  headers: RawAxiosRequestHeaders | undefined,
+): void {
+  if (!headers) return;
+  const h = headers as { delete?: (name: string) => void };
+  if (typeof h.delete === "function") {
+    h.delete("Content-Type");
+    return;
+  }
+  const plain = headers as Record<string, unknown>;
+  delete plain["Content-Type"];
+  delete plain["content-type"];
+}
+
+/**
+ * Create or update a course.
+ * File fields must be multipart. The shared client defaults to
+ * `Content-Type: application/json`, and Axios then JSON-encodes FormData,
+ * which turns a File into `{}` and the API rejects the photo.
+ */
+export async function saveCourse(
+  method: "post" | "patch",
+  url: string,
+  fields: CourseWriteFields,
+  files: CourseWriteFiles = {},
+) {
+  const coverImageFile = files.coverImageFile ?? null;
+  const lecturerPhotoFile = files.lecturerPhotoFile ?? null;
+  const hasFile = coverImageFile != null || lecturerPhotoFile != null;
+
+  if (!hasFile) {
+    return apiClient[method](url, buildCourseJsonPayload(fields));
+  }
+
+  const formData = new FormData();
+  appendCourseFieldsToFormData(formData, {
+    ...fields,
+    clearLecturerPhoto: false,
+    clearCoverImage: false,
+  });
+  if (coverImageFile) {
+    formData.append("cover_image", coverImageFile);
+  }
+  if (lecturerPhotoFile) {
+    formData.append("lecturer_photo", lecturerPhotoFile);
+  }
+
+  const uploaded = await apiClient[method](url, formData, {
+    timeout: 60000,
+    transformRequest: [
+      (data, headers) => {
+        if (typeof FormData !== "undefined" && data instanceof FormData) {
+          stripJsonContentTypeForFormData(headers);
+        }
+        return data;
+      },
+    ],
+  });
+
+  if (method !== "patch") return uploaded;
+
+  const clearBody: Record<string, null> = {};
+  if (fields.clearLecturerPhoto && !lecturerPhotoFile) {
+    clearBody.lecturer_photo = null;
+  }
+  if (fields.clearCoverImage && !coverImageFile) {
+    clearBody.cover_image = null;
+  }
+  if (Object.keys(clearBody).length === 0) return uploaded;
+  return apiClient.patch(url, clearBody);
 }
 
 export function formatCourseApiError(

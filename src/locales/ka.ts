@@ -345,6 +345,15 @@ export const ka = {
     didYouApplyDescription:
       "თუ განაცხადი გააგზავნეთ, ვაკანსიას დავამატებთ თქვენი პროფილის გაგზავნილ ვაკანსიებში.",
     markApplyFailed: "განაცხადის შენახვა ვერ მოხერხდა. სცადეთ თავიდან.",
+    knowSkillTitle: "იცით ეს უნარი?",
+    knowSkillDescription:
+      "პროფილის უნარებში მხოლოდ იმ შემთხვევაში დავამატებთ, თუ შეგიძლიათ მისი გამოყენება.",
+    knowSkillSaved: "უნარი დაემატა პროფილს",
+    knowSkillSaveFailed: "უნარის შენახვა ვერ მოხერხდა. სცადეთ თავიდან.",
+    removeSkillTitle: "წავშალოთ ეს უნარი?",
+    removeSkillDescription: "ის წაიშლება თქვენი პროფილის უნარებიდან.",
+    removeSkillRemoved: "უნარი წაიშალა პროფილიდან",
+    removeSkillRemoveFailed: "უნარის წაშლა ვერ მოხერხდა. სცადეთ თავიდან.",
     save: "შენახვა",
     saved: "შენახულია",
     location: "ადგილმდებარეობა",

@@ -26,7 +26,6 @@ import {
   AlertCircle,
   Globe,
   Users,
-  Factory,
   Home,
   GraduationCap,
   Award,
@@ -93,6 +92,22 @@ import {
 } from "@/utils/industryMatch";
 import { JobApplyButton } from "@/components/jobs/JobApplyButton";
 import { ExternalApplyConfirmDialog } from "@/components/jobs/ExternalApplyConfirmDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { useMyApplications } from "@/hooks/useMyApplications";
 import type { ExternalJobSnapshot } from "@/api/jobs/jobApplicationsApi";
 import { markExternalApplyStarted } from "@/lib/pendingExternalApply";
@@ -126,6 +141,11 @@ const JobDetailPage = () => {
   const [selectedRequiredSkills, setSelectedRequiredSkills] = useState<
     Set<string>
   >(new Set());
+  const [skillPrompt, setSkillPrompt] = useState<{
+    skill: string;
+    mode: "add" | "remove";
+  } | null>(null);
+  const [isSavingSkill, setIsSavingSkill] = useState(false);
   const mainContentRef = React.useRef<HTMLDivElement>(null);
   const selectedSkillsInitedForJobRef = React.useRef<string | null>(null);
 
@@ -1064,17 +1084,6 @@ const JobDetailPage = () => {
     return String(requirements);
   };
 
-  // Get required experience
-  const getRequiredExperience = () => {
-    if (!jobDetail) return undefined;
-    return (
-      jobDetail.required_experience ||
-      jobDetail.job_required_experience ||
-      jobDetail.experience ||
-      undefined
-    );
-  };
-
   // Required skills — same list as employer posting (stored API skills first)
   const requiredSkillsList = useMemo(() => {
     if (!jobDetail) return [];
@@ -1159,17 +1168,6 @@ const JobDetailPage = () => {
       ),
     );
   }, [jobDetail, requiredSkillsList, userSkills, isLoadingUserSkills]);
-
-  // Get education requirements
-  const getEducationRequired = () => {
-    if (!jobDetail) return undefined;
-    return (
-      jobDetail.education ||
-      jobDetail.education_required ||
-      jobDetail.required_education ||
-      undefined
-    );
-  };
 
   // Parse benefits into an array of benefit items
   const getBenefitsList = (): string[] => {
@@ -1369,18 +1367,6 @@ const JobDetailPage = () => {
     }
   };
 
-  // Get job category/industry
-  const getJobCategory = () => {
-    if (!jobDetail) return undefined;
-    return (
-      jobDetail.job_category ||
-      jobDetail.category ||
-      jobDetail.industry ||
-      jobDetail.job_industry ||
-      undefined
-    );
-  };
-
   // Get current page URL for sharing
   const getShareUrl = () => {
     return window.location.href;
@@ -1544,6 +1530,122 @@ const JobDetailPage = () => {
     };
   };
 
+  const selectRequiredSkill = (skill: string) => {
+    setSelectedRequiredSkills((prev) => {
+      const next = new Set(prev);
+      next.add(skill);
+      return next;
+    });
+  };
+
+  const handleRequiredSkillClick = (skill: string) => {
+    if (!user) return;
+    if (selectedRequiredSkills.has(skill)) {
+      setSkillPrompt({ skill, mode: "remove" });
+      return;
+    }
+    if (userSkills.includes(normalizeSkillName(skill))) {
+      selectRequiredSkill(skill);
+      return;
+    }
+    setSkillPrompt({ skill, mode: "add" });
+  };
+
+  const confirmSkillPrompt = async () => {
+    const skill = skillPrompt?.skill.trim();
+    if (!skill || !skillPrompt || isSavingSkill) return;
+    setIsSavingSkill(true);
+    try {
+      if (skillPrompt.mode === "add") {
+        const saved = await profileApi.addSkill(skill);
+        queryClient.setQueryData(
+          ["profileSkills", user?.id],
+          (current: typeof profileSkills) => [...(current ?? []), saved],
+        );
+        selectRequiredSkill(skill);
+        toast.success(t.jobs.knowSkillSaved);
+      } else {
+        const key = normalizeSkillName(skill);
+        const matches = profileSkills.filter(
+          (item) => normalizeSkillName(item.skill_name) === key,
+        );
+        await Promise.all(
+          matches.map((item) => profileApi.removeSkill(item.skill_id)),
+        );
+        setSelectedRequiredSkills((prev) => {
+          const next = new Set(prev);
+          next.delete(skill);
+          return next;
+        });
+        toast.success(t.jobs.removeSkillRemoved);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ["profileSkills", user?.id],
+      });
+      setSkillPrompt(null);
+    } catch (error) {
+      console.error("Failed to update skill:", error);
+      toast.error(
+        skillPrompt.mode === "add"
+          ? t.jobs.knowSkillSaveFailed
+          : t.jobs.removeSkillRemoveFailed,
+      );
+    } finally {
+      setIsSavingSkill(false);
+    }
+  };
+
+  const closeSkillConfirm = () => {
+    if (!isSavingSkill) setSkillPrompt(null);
+  };
+
+  const skillIllustration = (
+    <img
+      src="/lovable-uploads/3dicons-target-dynamic-color.png"
+      alt=""
+      className="h-32 w-32 object-contain"
+    />
+  );
+
+  const skillNoButton = (
+    <Button
+      type="button"
+      variant="secondary"
+      className={isMobile ? "w-full" : "flex-1"}
+      onClick={closeSkillConfirm}
+      disabled={isSavingSkill}
+    >
+      {t.common.no}
+    </Button>
+  );
+
+  const skillYesButton = (
+    <Button
+      type="button"
+      className={isMobile ? "w-full" : "flex-1"}
+      onClick={() => void confirmSkillPrompt()}
+      disabled={isSavingSkill}
+    >
+      {isSavingSkill ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        t.common.yes
+      )}
+    </Button>
+  );
+
+  const skillPromptTitle =
+    skillPrompt?.mode === "remove"
+      ? t.jobs.removeSkillTitle
+      : t.jobs.knowSkillTitle;
+  const skillConfirmCopy = skillPrompt
+    ? `${skillPrompt.skill}. ${
+        skillPrompt.mode === "remove"
+          ? t.jobs.removeSkillDescription
+          : t.jobs.knowSkillDescription
+      }`
+    : t.jobs.knowSkillDescription;
+
   return (
     <DashboardLayout>
       <ExternalApplyConfirmDialog
@@ -1552,6 +1654,37 @@ const JobDetailPage = () => {
         alreadyApplied={isAppliedToThisJob}
         getSnapshot={getExternalJobSnapshot}
       />
+      {isMobile ? (
+        <Drawer open={!!skillPrompt} onOpenChange={(open) => !open && closeSkillConfirm()}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader className="items-start pb-0 text-left">
+              <div className="mb-3 flex justify-center pl-11">{skillIllustration}</div>
+              <DrawerTitle>{skillPromptTitle}</DrawerTitle>
+              <DrawerDescription className="mt-1">
+                {skillConfirmCopy}
+              </DrawerDescription>
+            </DrawerHeader>
+            <DrawerFooter className="flex-col gap-2 pt-10">
+              {skillYesButton}
+              {skillNoButton}
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={!!skillPrompt} onOpenChange={(open) => !open && closeSkillConfirm()}>
+          <DialogContent className="max-w-sm gap-0">
+            <div className="mb-3 flex justify-center">{skillIllustration}</div>
+            <DialogHeader className="space-y-1 text-left sm:text-left">
+              <DialogTitle>{skillPromptTitle}</DialogTitle>
+              <DialogDescription>{skillConfirmCopy}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
+              {skillNoButton}
+              {skillYesButton}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <div
         ref={mainContentRef}
         className="max-w-7xl mx-auto w-full py-6 pb-40 sm:pb-32 md:pb-24 px-2 sm:px-6 lg:px-8"
@@ -1973,15 +2106,7 @@ const JobDetailPage = () => {
                                       PLATFORM_CHIP_BG_CLASS,
                                     ),
                               )}
-                              onClick={() => {
-                                if (!user) return;
-                                setSelectedRequiredSkills((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(skill)) next.delete(skill);
-                                  else next.add(skill);
-                                  return next;
-                                });
-                              }}
+                              onClick={() => handleRequiredSkillClick(skill)}
                             >
                               {skill}
                               {selected && (
@@ -2025,62 +2150,6 @@ const JobDetailPage = () => {
                   )}
                 </div>
               ) : null}
-
-              {/* Job Details Grid */}
-              {(getRequiredExperience() ||
-                getEducationRequired() ||
-                getJobCategory()) && (
-                <div className="rounded-3xl p-6 shadow-none border-0 mt-6">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold mb-4">
-                    <CheckCircle2 className="h-5 w-5" />
-                    Job Details
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {getRequiredExperience() && (
-                      <div className="flex items-start gap-3">
-                        <Briefcase className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Required Experience
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                            {getRequiredExperience()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {getEducationRequired() && (
-                      <div className="flex items-start gap-3">
-                        <GraduationCap className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Education Required
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                            {getEducationRequired()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {getJobCategory() && (
-                      <div className="flex items-start gap-3">
-                        <Factory className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Category/Industry
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
-                            {getJobCategory()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-              )}
 
               {user && requiredSkillsList.length > 0 ? (
                 <JobMissingSkillsCoursesSlider
@@ -2225,10 +2294,11 @@ const JobDetailPage = () => {
       {jobDetail && (
         <div
           className={cn(
-            "fixed z-[60] left-4 right-4 transition-all duration-300 ease-in-out",
+            "fixed left-4 right-4 transition-all duration-300 ease-in-out",
+            skillPrompt ? "z-[-1]" : "z-40",
             "max-md:bottom-above-mobile-nav md:bottom-4",
             sidebarCollapsed ? "md:left-28" : "md:left-[18rem]",
-            showFixedBar
+            showFixedBar && !skillPrompt
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-4 pointer-events-none",
           )}

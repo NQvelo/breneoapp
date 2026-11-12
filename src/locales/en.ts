@@ -340,6 +340,15 @@ export const en = {
     didYouApplyDescription:
       "If you sent your application, we'll add this job to Applied Jobs in your profile.",
     markApplyFailed: "Could not save your application. Please try again.",
+    knowSkillTitle: "Do you know this skill?",
+    knowSkillDescription:
+      "Add it to your profile skills only if you can use it.",
+    knowSkillSaved: "Skill added to your profile",
+    knowSkillSaveFailed: "Could not save this skill. Please try again.",
+    removeSkillTitle: "Remove this skill?",
+    removeSkillDescription: "It will be removed from your profile skills.",
+    removeSkillRemoved: "Skill removed from your profile",
+    removeSkillRemoveFailed: "Could not remove this skill. Please try again.",
     save: "Save",
     saved: "Saved",
     location: "Location",

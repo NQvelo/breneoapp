@@ -92,11 +92,11 @@ export function IosPwaInstallGuideModal() {
             </DrawerTitle>
           </DrawerHeader>
 
-          <div className="px-6 pb-2 pt-2">
+          <div className="px-6 pb-0 pt-2">
             <GuideSteps />
           </div>
 
-          <DrawerFooter>
+          <DrawerFooter className="pt-10">
             <DrawerClose asChild>
               <Button className="h-12 w-full rounded-full bg-breneo-blue text-base font-semibold text-white hover:bg-breneo-blue/90">
                 {guide.gotIt}
@@ -117,13 +117,13 @@ export function IosPwaInstallGuideModal() {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="pb-0 pt-4">
           <GuideSteps />
         </div>
 
         <Button
           onClick={() => setOpen(false)}
-          className="h-12 w-full rounded-full bg-breneo-blue text-base font-semibold text-white hover:bg-breneo-blue/90"
+          className="mt-10 h-12 w-full rounded-full bg-breneo-blue text-base font-semibold text-white hover:bg-breneo-blue/90"
         >
           {guide.gotIt}
         </Button>

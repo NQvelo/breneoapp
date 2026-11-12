@@ -85,10 +85,10 @@ function HowItWorksModal({
               {t.courses.howItWorks}
             </DrawerTitle>
           </DrawerHeader>
-          <div className="px-6 pb-2 pt-2">
+          <div className="px-6 pb-0 pt-2">
             <HowItWorksSteps />
           </div>
-          <DrawerFooter>
+          <DrawerFooter className="pt-10">
             <DrawerClose asChild>
               <Button className={closeButtonClass}>
                 {t.courses.howItWorksGotIt}
@@ -108,13 +108,13 @@ function HowItWorksModal({
             {t.courses.howItWorks}
           </DialogTitle>
         </DialogHeader>
-        <div className="py-4">
+        <div className="pb-0 pt-4">
           <HowItWorksSteps />
         </div>
         <Button
           type="button"
           onClick={() => onOpenChange(false)}
-          className={closeButtonClass}
+          className={`${closeButtonClass} mt-10`}
         >
           {t.courses.howItWorksGotIt}
         </Button>

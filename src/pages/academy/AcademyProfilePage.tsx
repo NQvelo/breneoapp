@@ -1183,7 +1183,9 @@ const AcademyProfilePage = () => {
             <div className="space-y-3">
               {socialFields.map((field) => (
                 <div key={field.platform} className="space-y-2">
-                  <Label htmlFor={`social-${field.platform}`}>{field.label}</Label>
+                  <Label htmlFor={`social-${field.platform}`}>
+                    {field.label}
+                  </Label>
                   <Input
                     id={`social-${field.platform}`}
                     type="text"
@@ -1240,7 +1242,9 @@ const AcademyProfilePage = () => {
         </SheetHeader>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
           <div>
-            <Label htmlFor="academy-about">Tell students about your academy</Label>
+            <Label htmlFor="academy-about">
+              Tell students about your academy
+            </Label>
             <Textarea
               id="academy-about"
               placeholder="Share something about your academy..."
@@ -1422,7 +1426,11 @@ const AcademyProfilePage = () => {
                             className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full bg-[linear-gradient(135deg,#5D78FF_0%,#2EB9D1_100%)] text-white shadow-sm"
                             aria-label="This badge is for verified academies"
                           >
-                            <Check className="h-2.5 w-2.5" strokeWidth={3.5} aria-hidden />
+                            <Check
+                              className="h-2.5 w-2.5"
+                              strokeWidth={3.5}
+                              aria-hidden
+                            />
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -1503,7 +1511,6 @@ const AcademyProfilePage = () => {
             </div>
           </div>
         </Card>
-
 
         <Card className="border-0 rounded-3xl">
           <CardHeader className="mb-0 flex flex-row items-center justify-between border-b-0 p-4 pb-2">

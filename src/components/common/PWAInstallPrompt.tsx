@@ -44,7 +44,7 @@ export const PWAInstallPrompt: React.FC = () => {
 
   return (
     <Dialog open={showPrompt} onOpenChange={setShowPrompt}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="gap-0 sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Download className="h-5 w-5" />
@@ -55,7 +55,7 @@ export const PWAInstallPrompt: React.FC = () => {
             Get quick access, work offline, and receive updates automatically.
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-0 flex flex-col gap-3 pt-10 sm:flex-row">
           <Button
             onClick={async () => {
               await install();

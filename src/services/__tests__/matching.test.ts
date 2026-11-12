@@ -7,9 +7,12 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeSkillName,
   matchJobToUser,
+  matchJobDetailToUser,
+  getStructuredJobFromDetail,
   getDefaultUserMatchProfile,
   buildUserMatchProfileFromSkillTest,
 } from "../matching";
+import type { JobDetail } from "@/api/jobs/types";
 import type { StructuredJob } from "@/types/matching";
 
 describe("normalizeSkillName", () => {
@@ -22,6 +25,29 @@ describe("normalizeSkillName", () => {
   it("returns lowercase trimmed for unknown skills", () => {
     const out = normalizeSkillName("SomeCustomSkill");
     expect(out).toBe("somecustomskill");
+  });
+  it("ignores non-string skill values", () => {
+    expect(normalizeSkillName(["React"])).toBe("react");
+    expect(normalizeSkillName({ name: "React" })).toBe("");
+  });
+});
+
+describe("getStructuredJobFromDetail - array category", () => {
+  it("matches a job whose category is an array instead of a string", () => {
+    const job = {
+      id: "12991",
+      title: "Software Engineer Interviewer",
+      category: ["Full-Stack Programming"],
+      role_category: null,
+      skills_required: ["English"],
+      languages_required: ["English (proficiency not specified)"],
+    } as unknown as JobDetail;
+
+    const structured = getStructuredJobFromDetail(job);
+    expect(structured.roleCategory).toBe("Full-Stack Programming");
+
+    const result = matchJobDetailToUser(job, getDefaultUserMatchProfile());
+    expect(result.overallPercent).toBeGreaterThanOrEqual(0);
   });
 });
 

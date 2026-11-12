@@ -235,15 +235,15 @@ const SkillTestPage = () => {
         {isMobile ? (
           <Drawer open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
             <DrawerContent>
-              <DrawerHeader>
+              <DrawerHeader className="pb-0">
                 <DrawerTitle>Are you sure?</DrawerTitle>
               </DrawerHeader>
-              <div className="px-6 pb-4">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <div className="px-6 pb-0">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Your progress will be lost if you exit the test.
                 </p>
               </div>
-              <DrawerFooter className="flex flex-col gap-2">
+              <DrawerFooter className="flex flex-col gap-2 pt-10">
                 <Button
                   onClick={handleStayHere}
                   className="w-full bg-primary hover:opacity-90"
@@ -262,14 +262,14 @@ const SkillTestPage = () => {
           </Drawer>
         ) : (
           <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
-            <DialogContent>
+            <DialogContent className="gap-0">
               <DialogHeader>
                 <DialogTitle>Are you sure?</DialogTitle>
               </DialogHeader>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="px-0 text-sm text-gray-600 dark:text-gray-400">
                 Your progress will be lost if you exit the test.
               </p>
-              <DialogFooter className="flex flex-col gap-2">
+              <DialogFooter className="flex flex-col gap-2 pt-10">
                 <Button
                   onClick={handleStayHere}
                   className="w-full bg-primary hover:opacity-90"
@@ -376,15 +376,15 @@ const SkillTestPage = () => {
       {isMobile ? (
         <Drawer open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
           <DrawerContent>
-            <DrawerHeader>
+            <DrawerHeader className="pb-0">
               <DrawerTitle>Are you sure?</DrawerTitle>
             </DrawerHeader>
-            <div className="px-6 pb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <div className="px-6">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Your progress will be lost if you exit the test.
               </p>
             </div>
-            <DrawerFooter className="flex flex-col gap-2">
+            <DrawerFooter className="flex flex-col gap-2 pt-10">
               <Button
                 onClick={handleStayHere}
                 className="w-full bg-primary hover:opacity-90"
@@ -403,14 +403,14 @@ const SkillTestPage = () => {
         </Drawer>
       ) : (
         <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
-          <DialogContent>
+          <DialogContent className="gap-0">
             <DialogHeader>
               <DialogTitle className="text-center">Are you sure?</DialogTitle>
             </DialogHeader>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 text-center">
+            <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               Your progress will be lost if you exit the test.
             </p>
-            <DialogFooter className="flex flex-col gap-2">
+            <DialogFooter className="flex flex-col gap-2 pt-10">
               <Button
                 onClick={handleStayHere}
                 className="w-full bg-primary hover:opacity-90"

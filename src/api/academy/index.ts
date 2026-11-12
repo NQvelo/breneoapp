@@ -10,6 +10,7 @@ export {
   appendCourseFieldsToFormData,
   buildCourseJsonPayload,
   fetchAcademyCourseById,
+  saveCourse,
   formatCourseApiError,
   normalizeAcademyCourseDetail,
   parseCourseViewCount,

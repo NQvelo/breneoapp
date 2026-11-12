@@ -96,7 +96,7 @@ export function AcademyVerifiedCongratsModal() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
             Congratulations!
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="mb-10 text-gray-600 dark:text-gray-400">
             Your academy is now verified. Learners can trust your profile and
             you’ll stand out on the platform.
           </p>

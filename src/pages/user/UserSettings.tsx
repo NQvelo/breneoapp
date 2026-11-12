@@ -1258,23 +1258,17 @@ export default function SettingsPage() {
       {isMobile ? (
         <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
           <DrawerContent className="border-none bg-white dark:bg-background">
-            <DrawerHeader className="pb-2">
-              <DrawerTitle>{t.settings.logoutConfirm.title}</DrawerTitle>
-              <DrawerDescription className="mt-1">
-                {t.settings.logoutConfirm.description}
-              </DrawerDescription>
+            <DrawerHeader className="items-start pb-0">
+              <div className="space-y-3">
+                <DrawerTitle>{t.settings.logoutConfirm.title}</DrawerTitle>
+                <DrawerDescription>
+                  {t.settings.logoutConfirm.description}
+                </DrawerDescription>
+              </div>
             </DrawerHeader>
-            <DrawerFooter className="flex-row gap-2 pt-2">
+            <DrawerFooter className="flex-col gap-2 pt-10">
               <Button
-                type="button"
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setLogoutConfirmOpen(false)}
-              >
-                {t.common.cancel}
-              </Button>
-              <Button
-                className="flex-1 bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
                 onClick={() => {
                   setLogoutConfirmOpen(false);
                   logout();
@@ -1282,19 +1276,27 @@ export default function SettingsPage() {
               >
                 {t.settings.logoutConfirm.confirm}
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full bg-transparent text-foreground hover:bg-transparent"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                {t.common.cancel}
+              </Button>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
-          <DialogContent className="max-w-sm gap-3">
-            <DialogHeader className="space-y-1">
+          <DialogContent className="max-w-sm gap-0">
+            <DialogHeader className="space-y-3">
               <DialogTitle>{t.settings.logoutConfirm.title}</DialogTitle>
               <DialogDescription>
                 {t.settings.logoutConfirm.description}
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="flex flex-row gap-2 sm:space-x-0">
+            <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
               <Button
                 type="button"
                 variant="secondary"

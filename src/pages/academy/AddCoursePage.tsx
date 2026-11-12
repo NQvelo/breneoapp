@@ -50,11 +50,10 @@ import { PLATFORM_CHIP_SKILL_CLASS } from "@/lib/chipStyles";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import {
-  appendCourseFieldsToFormData,
-  buildCourseJsonPayload,
   formatCourseApiError,
   normalizeAcademyProfileApiResponse,
   parseSkillIdsFromCourseApi,
+  saveCourse,
 } from "@/api/academy";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -148,6 +147,7 @@ const AddCoursePage = () => {
     string | null
   >(null);
   const initialCoverSnapshotRef = useRef<string | null>(null);
+  const initialLecturerPhotoUrlRef = useRef("");
   const sectionBaselineRef = useRef<
     Partial<Record<Exclude<EditingSection, null>, string>>
   >({});
@@ -425,6 +425,9 @@ const AddCoursePage = () => {
           initialCoverSnapshotRef.current = coverUrl;
           setLecturerPhotoFile(null);
           setLecturerPhotoPreview(null);
+          initialLecturerPhotoUrlRef.current = String(
+            data.lecturer_photo_url ?? "",
+          );
         }
       } catch (error: unknown) {
         console.error("Error fetching course:", error);
@@ -444,6 +447,7 @@ const AddCoursePage = () => {
   useEffect(() => {
     if (!courseId) {
       initialCoverSnapshotRef.current = null;
+      initialLecturerPhotoUrlRef.current = "";
     }
   }, [courseId]);
 
@@ -530,6 +534,41 @@ const AddCoursePage = () => {
     }
   };
 
+  const courseWriteFromForm = (skillIds: number[], academyName?: string) => {
+    const clearLecturerPhoto =
+      isEditMode &&
+      lecturerPhotoFile == null &&
+      courseForm.lecturer_photo_url.trim() === "" &&
+      initialLecturerPhotoUrlRef.current.trim() !== "";
+    const clearCoverImage =
+      isEditMode &&
+      coverImageFile == null &&
+      imagePreview == null &&
+      Boolean(initialCoverSnapshotRef.current);
+
+    return {
+      fields: {
+        title: courseForm.title,
+        description: courseForm.description,
+        level: courseForm.level,
+        language: courseForm.language,
+        location: courseForm.location,
+        price: Number(courseForm.price || 0),
+        lessons_count: Number.parseInt(courseForm.lessons_count || "0", 10),
+        total_duration: courseForm.total_duration,
+        skillIds,
+        lecturer_name: courseForm.lecturer_name || "",
+        academy_name: academyName,
+        clearLecturerPhoto,
+        clearCoverImage,
+      },
+      files: {
+        coverImageFile,
+        lecturerPhotoFile,
+      },
+    };
+  };
+
   const handleSubmit = async () => {
     if (isEditMode && courseId) {
       await handleUpdateCourse();
@@ -556,41 +595,11 @@ const AddCoursePage = () => {
         return;
       }
 
-      const writeFields = {
-        title: courseForm.title,
-        description: courseForm.description,
-        level: courseForm.level,
-        language: courseForm.language,
-        location: courseForm.location,
-        price: Number(courseForm.price || 0),
-        lessons_count: Number.parseInt(courseForm.lessons_count || "0", 10),
-        total_duration: courseForm.total_duration,
-        skillIds: requiredSkills,
-        lecturer_name: courseForm.lecturer_name || "",
-        lecturer_photo_url: courseForm.lecturer_photo_url || null,
-        academy_name: academyProfile.academy_name,
-      };
-
-      const needsMultipart =
-        coverImageFile !== null || lecturerPhotoFile !== null;
-
-      if (needsMultipart) {
-        const formData = new FormData();
-        appendCourseFieldsToFormData(formData, writeFields);
-        if (coverImageFile) {
-          formData.append("cover_image", coverImageFile);
-        }
-        if (lecturerPhotoFile) {
-          formData.append("lecturer_photo", lecturerPhotoFile);
-        }
-
-        await apiClient.post(API_ENDPOINTS.COURSES, formData);
-      } else {
-        await apiClient.post(
-          API_ENDPOINTS.COURSES,
-          buildCourseJsonPayload(writeFields),
-        );
-      }
+      const { fields, files } = courseWriteFromForm(
+        requiredSkills,
+        academyProfile.academy_name,
+      );
+      await saveCourse("post", API_ENDPOINTS.COURSES, fields, files);
 
       toast.success("Course added successfully");
       navigate("/academy/courses");
@@ -617,40 +626,13 @@ const AddCoursePage = () => {
         return;
       }
 
-      const writeFields = {
-        title: courseForm.title,
-        description: courseForm.description,
-        level: courseForm.level,
-        language: courseForm.language,
-        location: courseForm.location,
-        price: Number(courseForm.price || 0),
-        lessons_count: Number.parseInt(courseForm.lessons_count || "0", 10),
-        total_duration: courseForm.total_duration,
-        skillIds: requiredSkills,
-        lecturer_name: courseForm.lecturer_name || "",
-        lecturer_photo_url: courseForm.lecturer_photo_url || null,
-      };
-
-      const needsMultipart =
-        coverImageFile !== null || lecturerPhotoFile !== null;
-
-      if (needsMultipart) {
-        const formData = new FormData();
-        appendCourseFieldsToFormData(formData, writeFields);
-        if (coverImageFile) {
-          formData.append("cover_image", coverImageFile);
-        }
-        if (lecturerPhotoFile) {
-          formData.append("lecturer_photo", lecturerPhotoFile);
-        }
-
-        await apiClient.patch(`${API_ENDPOINTS.COURSES}${courseId}/`, formData);
-      } else {
-        await apiClient.patch(
-          `${API_ENDPOINTS.COURSES}${courseId}/`,
-          buildCourseJsonPayload(writeFields),
-        );
-      }
+      const { fields, files } = courseWriteFromForm(requiredSkills);
+      await saveCourse(
+        "patch",
+        `${API_ENDPOINTS.COURSES}${courseId}/`,
+        fields,
+        files,
+      );
 
       toast.success("Course updated successfully");
       navigate("/academy/courses");
@@ -1272,7 +1254,7 @@ const AddCoursePage = () => {
                     Delete Course
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="gap-0">
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                     <AlertDialogDescription>
@@ -1280,7 +1262,7 @@ const AddCoursePage = () => {
                       the course.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
-                  <AlertDialogFooter>
+                  <AlertDialogFooter className="pt-10">
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDeleteCourse}>
                       Continue

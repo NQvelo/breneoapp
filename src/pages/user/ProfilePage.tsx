@@ -27,6 +27,7 @@ import {
   Clock,
   Tag,
   MoreVertical,
+  LogOut,
 } from "@/components/icons";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,15 +49,18 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Drawer,
   DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerFooter,
 } from "@/components/ui/drawer";
 import {
   Select,
@@ -470,6 +474,7 @@ const ProfilePage = () => {
   const [loadingProfileSkills, setLoadingProfileSkills] = useState(false);
   const [isPersonalInfoModalOpen, setIsPersonalInfoModalOpen] = useState(false);
   const [personalInfoMenuOpen, setPersonalInfoMenuOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [isEducationModalOpen, setIsEducationModalOpen] = useState(false);
   const [isWorkExperienceModalOpen, setIsWorkExperienceModalOpen] =
     useState(false);
@@ -1891,6 +1896,15 @@ const ProfilePage = () => {
     navigate("/settings?section=cv");
   };
 
+  const openLogoutConfirm = () => {
+    setPersonalInfoMenuOpen(false);
+    if (isMobile) {
+      window.setTimeout(() => setLogoutConfirmOpen(true), 180);
+      return;
+    }
+    setLogoutConfirmOpen(true);
+  };
+
   const settingsAction = (
     <PersonalInfoMenuRow
       icon={<Settings className="h-4 w-4" />}
@@ -1910,6 +1924,13 @@ const ProfilePage = () => {
       icon={<Upload className="h-4 w-4" />}
       iconClassName="bg-violet-100 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
       label={t.profile.addRemoveResume}
+    />
+  );
+  const logoutAction = (
+    <PersonalInfoMenuRow
+      icon={<LogOut className="h-4 w-4" />}
+      iconClassName="bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-300"
+      label={t.settings.logout}
     />
   );
 
@@ -1981,6 +2002,12 @@ const ProfilePage = () => {
                       className="cursor-pointer rounded-xl p-0 focus:bg-gray-100 dark:focus:bg-white/10"
                     >
                       {resumeAction}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={openLogoutConfirm}
+                      className="cursor-pointer rounded-xl p-0 focus:bg-gray-100 dark:focus:bg-white/10"
+                    >
+                      {logoutAction}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -2988,10 +3015,80 @@ const ProfilePage = () => {
               >
                 {resumeAction}
               </button>
+              <button
+                type="button"
+                onClick={openLogoutConfirm}
+                className="w-full rounded-xl transition-colors hover:bg-gray-100 dark:hover:bg-white/10"
+              >
+                {logoutAction}
+              </button>
             </div>
           </DrawerContent>
         </Drawer>
       ) : null}
+      {isMobile ? (
+        <Drawer open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DrawerContent className="border-none bg-white dark:bg-background">
+            <DrawerHeader className="items-start pb-0">
+              <div className="space-y-3">
+                <DrawerTitle>{t.settings.logoutConfirm.title}</DrawerTitle>
+                <DrawerDescription>
+                  {t.settings.logoutConfirm.description}
+                </DrawerDescription>
+              </div>
+            </DrawerHeader>
+            <DrawerFooter className="flex-col gap-2 pt-10">
+              <Button
+                className="w-full bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  logout();
+                }}
+              >
+                {t.settings.logoutConfirm.confirm}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full bg-transparent text-foreground hover:bg-transparent"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                {t.common.cancel}
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DialogContent className="max-w-sm gap-0">
+            <DialogHeader className="space-y-3">
+              <DialogTitle>{t.settings.logoutConfirm.title}</DialogTitle>
+              <DialogDescription>
+                {t.settings.logoutConfirm.description}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setLogoutConfirmOpen(false)}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                className="flex-1 bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
+                onClick={() => {
+                  setLogoutConfirmOpen(false);
+                  logout();
+                }}
+              >
+                {t.settings.logoutConfirm.confirm}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
       <EditEducationModal
         open={isEducationModalOpen}
         onOpenChange={setIsEducationModalOpen}

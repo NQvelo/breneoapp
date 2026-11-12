@@ -75,11 +75,25 @@ for (const [canonical, variants] of Object.entries(SKILL_KEYWORDS)) {
   }
 }
 
+/** API fields are sometimes strings, sometimes arrays (e.g. raw.category). */
+function asMatchText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => asMatchText(item).trim())
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
+}
+
 /**
  * Normalize a skill string to the same canonical name used in the job catalog.
  */
-export function normalizeSkillName(s: string): string {
-  const key = s.toLowerCase().trim().replace(/\s+/g, " ");
+export function normalizeSkillName(s: unknown): string {
+  const key = asMatchText(s).toLowerCase().trim().replace(/\s+/g, " ");
+  if (!key) return "";
   return VARIANT_TO_CANONICAL[key] ?? key;
 }
 
@@ -135,19 +149,19 @@ const ROLE_TO_INDUSTRY: Record<string, string[]> = {
 };
 
 function inferIndustryTags(
-  roleCategory: string,
-  jobIndustry: string | undefined,
-  title: string | undefined
+  roleCategory: unknown,
+  jobIndustry: unknown,
+  title: unknown,
 ): string[] {
   const tags: string[] = [];
-  const industryStr = (jobIndustry || "").trim();
+  const industryStr = asMatchText(jobIndustry).trim();
   if (industryStr) {
     industryStr.split(/[,;|/]/).forEach((t) => {
       const t2 = t.trim();
       if (t2) tags.push(t2);
     });
   }
-  const roleLower = (roleCategory || "").toLowerCase();
+  const roleLower = asMatchText(roleCategory).toLowerCase();
   for (const [role, industries] of Object.entries(ROLE_TO_INDUSTRY)) {
     if (roleLower.includes(role)) {
       industries.forEach((ind) => {
@@ -155,7 +169,7 @@ function inferIndustryTags(
       });
     }
   }
-  const titleLower = (title || "").toLowerCase();
+  const titleLower = asMatchText(title).toLowerCase();
   if (titleLower.includes("fintech") || titleLower.includes("finance")) {
     if (!tags.includes("FinTech")) tags.push("FinTech");
   }
@@ -203,23 +217,22 @@ export function getStructuredJobFromDetail(job: JobDetail): StructuredJob {
     ? [...new Set(techArr.map(normalizeSkillName))]
     : [...new Set(extracted.map(normalizeSkillName))];
 
+  const titleText = asMatchText(job.title ?? job.job_title);
   const seniorityRaw =
-    (raw.seniority as string) ??
-    (job.job_required_experience as string) ??
-    (job.required_experience as string);
-  let seniority = parseSeniority(seniorityRaw);
-  if (!seniority && (job.title || job.job_title)) {
-    seniority = parseSeniority((job.title || job.job_title) as string);
+    raw.seniority ?? job.job_required_experience ?? job.required_experience;
+  let seniority = parseSeniority(asMatchText(seniorityRaw));
+  if (!seniority && titleText) {
+    seniority = parseSeniority(titleText);
   }
 
-  const roleCategory =
-    (raw.role_category as string) ??
-    (raw.roleCategory as string) ??
-    (job.job_category as string) ??
-    (job.category as string) ??
-    (job.industry as string) ??
-    (job.job_industry as string) ??
-    "";
+  const roleCategory = asMatchText(
+    raw.role_category ??
+      raw.roleCategory ??
+      job.job_category ??
+      job.category ??
+      job.industry ??
+      job.job_industry,
+  );
 
   const minYears =
     typeof raw.min_years_experience === "number"
@@ -227,22 +240,19 @@ export function getStructuredJobFromDetail(job: JobDetail): StructuredJob {
       : typeof raw.minYearsExperience === "number"
         ? raw.minYearsExperience
         : parseMinYears(
-            (job.job_required_experience ?? job.required_experience) as string
+            asMatchText(job.job_required_experience ?? job.required_experience),
           );
 
   const langRaw = (raw.languages_required ?? raw.languagesRequired) as string[] | string | undefined;
   const languagesRequired: string[] = Array.isArray(langRaw)
-    ? langRaw.filter((x): x is string => typeof x === "string")
-    : typeof langRaw === "string"
-      ? langRaw.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
-      : [];
+    ? langRaw.map((item) => asMatchText(item).trim()).filter(Boolean)
+    : asMatchText(langRaw)
+        .split(/[,;]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
 
-  const jobIndustry = (job.industry ?? job.job_industry) as string | undefined;
-  const industryTags = inferIndustryTags(
-    roleCategory,
-    jobIndustry,
-    (job.title ?? job.job_title) as string
-  );
+  const jobIndustry = asMatchText(job.industry ?? job.job_industry);
+  const industryTags = inferIndustryTags(roleCategory, jobIndustry, titleText);
 
   return {
     skillsRequired: requiredNormalized,
@@ -487,7 +497,7 @@ function computeIndustryMatch(job: StructuredJob, user: UserMatchProfile): Match
   const userIndustryYears: Record<string, number> = {};
   for (const [tag, years] of Object.entries(yearsByIndustry)) {
     if (years != null && years > 0) {
-      const key = tag.trim().toLowerCase();
+      const key = asMatchText(tag).trim().toLowerCase();
       userIndustryYears[key] = (userIndustryYears[key] ?? 0) + years;
     }
   }
@@ -508,16 +518,16 @@ function computeIndustryMatch(job: StructuredJob, user: UserMatchProfile): Match
 // ---------- Language gating (CEFR) ----------
 const CEFR_ORDER = ["a1", "a2", "b1", "b2", "c1", "c2", "native"];
 
-function parseLanguageLevel(s: string): { lang: string; level: string } {
-  const t = s.trim();
+function parseLanguageLevel(s: unknown): { lang: string; level: string } {
+  const t = asMatchText(s).trim();
   const match = t.match(/^(.+?)\s+(a1|a2|b1|b2|c1|c2|native)$/i);
   if (match) return { lang: match[1].trim().toLowerCase(), level: match[2].toLowerCase() };
   return { lang: t.toLowerCase(), level: "native" };
 }
 
-function levelAtLeast(userLevel: string, requiredLevel: string): boolean {
-  const ui = CEFR_ORDER.indexOf(userLevel.toLowerCase());
-  const ri = CEFR_ORDER.indexOf(requiredLevel.toLowerCase());
+function levelAtLeast(userLevel: unknown, requiredLevel: unknown): boolean {
+  const ui = CEFR_ORDER.indexOf(asMatchText(userLevel).toLowerCase());
+  const ri = CEFR_ORDER.indexOf(asMatchText(requiredLevel).toLowerCase());
   if (ri === -1) return true;
   if (ui === -1) return false;
   return ui >= ri;

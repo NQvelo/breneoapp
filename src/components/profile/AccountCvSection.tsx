@@ -481,7 +481,7 @@ export function AccountCvSection() {
                 <AlertCircle className="h-12 w-12 text-red-500" />
               )}
             </div>
-            <DrawerHeader className="pb-8 pt-6">
+            <DrawerHeader className="pb-0 pt-6">
               <DrawerTitle>
                 {uploadResult?.kind === "success"
                   ? copy.uploadSuccessTitle
@@ -495,7 +495,7 @@ export function AccountCvSection() {
                     : ""}
               </DrawerDescription>
             </DrawerHeader>
-            <DrawerFooter className="px-6 pb-8 pt-2">
+            <DrawerFooter className="px-6 pb-8 pt-10">
               {uploadResult?.kind === "success" ? (
                 <Button type="button" onClick={goToProfile}>
                   {copy.viewProfile}
@@ -537,7 +537,7 @@ export function AccountCvSection() {
                     : ""}
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="mt-8 sm:space-x-0">
+            <DialogFooter className="pt-10 sm:space-x-0">
               {uploadResult?.kind === "success" ? (
                 <Button type="button" className="w-full" onClick={goToProfile}>
                   {copy.viewProfile}
@@ -558,12 +558,12 @@ export function AccountCvSection() {
           if (!removing) setConfirmRemove(open);
         }}
       >
-        <DialogContent className="max-w-sm gap-3">
+        <DialogContent className="max-w-sm gap-0">
           <DialogHeader className="space-y-1">
             <DialogTitle>{copy.removeCv}</DialogTitle>
             <DialogDescription>{copy.removeCvConfirmDescription}</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row gap-2 sm:space-x-0">
+          <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
             <Button
               type="button"
               variant="secondary"

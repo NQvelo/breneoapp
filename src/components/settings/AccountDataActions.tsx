@@ -133,25 +133,25 @@ export function AccountDataActions() {
       {isMobile ? (
         <Drawer open={pending !== null} onOpenChange={(open) => !open && close()}>
           <DrawerContent className="border-none bg-white dark:bg-background">
-            <DrawerHeader className="pb-2">
+            <DrawerHeader className="pb-0">
               <DrawerTitle>{title}</DrawerTitle>
               <DrawerDescription className="mt-1">
                 {description}
               </DrawerDescription>
             </DrawerHeader>
-            <DrawerFooter className="flex-row gap-2 pt-2">
+            <DrawerFooter className="flex-row gap-2 pt-10">
               {confirmButtons}
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
       ) : (
         <Dialog open={pending !== null} onOpenChange={(open) => !open && close()}>
-          <DialogContent className="max-w-sm gap-3">
+          <DialogContent className="max-w-sm gap-0">
             <DialogHeader className="space-y-1">
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>{description}</DialogDescription>
             </DialogHeader>
-            <DialogFooter className="flex flex-row gap-2 sm:space-x-0">
+            <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
               {confirmButtons}
             </DialogFooter>
           </DialogContent>

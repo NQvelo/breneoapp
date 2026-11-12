@@ -272,7 +272,7 @@ export function XpGainedModal() {
   };
 
   const rewards = (
-    <div className="space-y-2">
+    <div className="mt-3 space-y-2">
       {rows.map((row, i) => (
         <motion.div
           key={row.key}
@@ -312,7 +312,7 @@ export function XpGainedModal() {
     return (
       <Drawer open={open} onOpenChange={handleOpenChange}>
         <DrawerContent className="border-none bg-white dark:bg-background">
-          <DrawerHeader className="items-start pb-2 text-left">
+          <DrawerHeader className="items-start pb-0 text-left">
             {/* pl-11 offsets the header's close button (h-7 + gap-4) so the image is centered in the drawer */}
             <div className="mb-3 flex justify-center pl-11">
               <XpBurstIllustration />
@@ -323,7 +323,7 @@ export function XpGainedModal() {
             </DrawerDescription>
           </DrawerHeader>
           <div className="px-6 pt-2">{rewards}</div>
-          <DrawerFooter className="flex-col gap-2 pt-4">
+          <DrawerFooter className="flex-col gap-2 pt-10">
             {gotItButton}
           </DrawerFooter>
         </DrawerContent>
@@ -333,8 +333,8 @@ export function XpGainedModal() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-sm gap-3">
-        <div className="flex justify-center">
+      <DialogContent className="max-w-sm gap-0">
+        <div className="mb-3 flex justify-center">
           <XpBurstIllustration />
         </div>
         <DialogHeader className="space-y-1 text-left sm:text-left">
@@ -342,7 +342,7 @@ export function XpGainedModal() {
           <DialogDescription>{t.xpGained.subtitle}</DialogDescription>
         </DialogHeader>
         {rewards}
-        <DialogFooter className="flex flex-row gap-2 sm:space-x-0">
+        <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
           {gotItButton}
         </DialogFooter>
       </DialogContent>
