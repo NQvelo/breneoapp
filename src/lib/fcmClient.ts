@@ -10,7 +10,7 @@ import { TokenManager } from "@/api/auth/tokenManager";
 import { getEmployerJobsApiBaseUrl } from "@/api/employer/employerJobsApiBase";
 import { getFirebaseApp, getFirebaseWebConfig } from "@/lib/firebase";
 import { showBrowserNotification } from "@/lib/browserNotifications";
-import { initPwaUpdate } from "@/lib/pwaUpdate";
+import { getPwaServiceWorkerRegistration } from "@/lib/pwaUpdate";
 
 const FCM_SW_PATH = "/firebase-messaging-sw.js";
 
@@ -126,8 +126,15 @@ async function getFcmServiceWorkerRegistration(): Promise<ServiceWorkerRegistrat
   }
 
   // Production PWA SW (importScripts firebase-messaging-sw.js) is preferred when active.
+  // Wait for it so the Firebase worker is not registered on the same scope first.
   if (!import.meta.env.DEV) {
-    initPwaUpdate();
+    const pwaRegistration = await getPwaServiceWorkerRegistration();
+    if (pwaRegistration) {
+      const active = await waitForActiveWorker(pwaRegistration);
+      if (hasPushManager(active)) {
+        return active;
+      }
+    }
   }
 
   const registrations = await navigator.serviceWorker.getRegistrations();

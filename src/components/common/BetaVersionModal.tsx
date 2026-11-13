@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { createPortal } from "react-dom";
 import {
   Drawer,
   DrawerContent,
@@ -14,7 +8,7 @@ import {
   DrawerDescription,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "@/components/icons";
+import { RefreshCw, X } from "@/components/icons";
 import { useMobile } from "@/hooks/use-mobile";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { usePwaUpdate } from "@/hooks/usePwaUpdate";
@@ -43,6 +37,20 @@ export const BetaVersionModal: React.FC = () => {
     return () => clearTimeout(timer);
   }, [isAppUpdateReady, dismissed]);
 
+  useEffect(() => {
+    if (!isOpen || isMobile || isUpdating) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setDismissed(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, isMobile, isUpdating]);
+
   const handleDismiss = (open: boolean) => {
     if (open || isUpdating) return;
     setIsOpen(false);
@@ -65,21 +73,14 @@ export const BetaVersionModal: React.FC = () => {
   const updateButton = (
     <Button
       variant="default"
-      className="w-full"
+      className={cn("w-full", !isMobile && "h-9")}
+      size={isMobile ? "default" : "sm"}
       onClick={() => void handleUpdate()}
       disabled={isUpdating}
     >
       <RefreshCw className={cn("mr-2 h-4 w-4", isUpdating && "animate-spin")} />
       {isUpdating ? t.appUpdate.updating : t.appUpdate.update}
     </Button>
-  );
-
-  const rocket = (
-    <img
-      src="/lovable-uploads/3dicons-rocket-front-color.png"
-      alt=""
-      className="w-32 h-32 md:w-40 md:h-40 object-contain"
-    />
   );
 
   if (isMobile) {
@@ -93,7 +94,11 @@ export const BetaVersionModal: React.FC = () => {
           </DrawerHeader>
           <div className="px-6 pb-0">
             <div className="flex flex-col items-center justify-center pb-4">
-              {rocket}
+              <img
+                src="/lovable-uploads/3dicons-rocket-front-color.png"
+                alt=""
+                className="h-32 w-32 object-contain"
+              />
             </div>
             <DrawerDescription className="text-base">
               {message}
@@ -105,20 +110,34 @@ export const BetaVersionModal: React.FC = () => {
     );
   }
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleDismiss}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">
-            {t.appUpdate.title}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col items-center justify-center py-4">
-          {rocket}
-        </div>
-        <DialogDescription className="text-base">{message}</DialogDescription>
-        <div className="pt-10">{updateButton}</div>
-      </DialogContent>
-    </Dialog>
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-labelledby="app-update-title"
+      aria-describedby="app-update-message"
+      className="fixed bottom-6 right-6 z-[70] w-[min(20rem,calc(100vw-3rem))] rounded-2xl border bg-background p-4 shadow-lg animate-in fade-in-0 slide-in-from-bottom-2"
+    >
+      <button
+        type="button"
+        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        onClick={() => handleDismiss(false)}
+        aria-label={t.common.close}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+      <h2 id="app-update-title" className="pr-6 text-sm font-semibold">
+        {t.appUpdate.title}
+      </h2>
+      <p
+        id="app-update-message"
+        className="mt-1 text-sm leading-snug text-muted-foreground"
+      >
+        {message}
+      </p>
+      <div className="mt-3">{updateButton}</div>
+    </div>,
+    document.body,
   );
 };
