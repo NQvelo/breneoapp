@@ -1056,7 +1056,7 @@ const JobsPage = () => {
 
   // Fetch latest regular jobs: no filters, display latest 9 by date
   const {
-    data: jobsData = { jobs: [], hasMore: false, total: 0 },
+    data: jobsData,
     isLoading,
     error,
   } = useQuery({
@@ -1116,7 +1116,7 @@ const JobsPage = () => {
 
   // Fetch all internship jobs without any filtering
   const {
-    data: internshipJobsData = { jobs: [], hasMore: false, total: 0 },
+    data: internshipJobsData,
     isLoading: isLoadingInternships,
     error: internshipError,
   } = useQuery({
@@ -1134,7 +1134,7 @@ const JobsPage = () => {
 
   // Fetch remote jobs
   const {
-    data: remoteJobsData = { jobs: [], hasMore: false, total: 0 },
+    data: remoteJobsData,
     isLoading: isLoadingRemote,
     error: remoteError,
   } = useQuery({
@@ -1152,21 +1152,22 @@ const JobsPage = () => {
 
   // Update all regular jobs when new data arrives - always replace since we only fetch page 1
   useEffect(() => {
-    if (jobsData.jobs && jobsData.jobs.length > 0) {
+    if (!jobsData) return;
+    if (jobsData.jobs.length > 0) {
       // Always replace jobs since we're only fetching page 1 for latest jobs
       setAllRegularJobs(jobsData.jobs);
       setHasMoreRegularJobs(jobsData.hasMore);
       setIsLoadingMoreRegular(false);
     } else {
-      // No jobs
-      setAllRegularJobs([]);
+      setAllRegularJobs((prev) => (prev.length === 0 ? prev : []));
       setHasMoreRegularJobs(false);
     }
   }, [jobsData]);
 
   // Update all internship jobs when new data arrives - no filtering
   useEffect(() => {
-    if (internshipJobsData.jobs && internshipJobsData.jobs.length > 0) {
+    if (!internshipJobsData) return;
+    if (internshipJobsData.jobs.length > 0) {
       if (internshipJobsPage === 1) {
         // First page - replace all jobs
         setAllInternshipJobs(internshipJobsData.jobs);
@@ -1183,15 +1184,15 @@ const JobsPage = () => {
       setHasMoreInternshipJobs(internshipJobsData.hasMore);
       setIsLoadingMoreInternship(false);
     } else if (internshipJobsPage === 1) {
-      // No jobs on first page
-      setAllInternshipJobs([]);
+      setAllInternshipJobs((prev) => (prev.length === 0 ? prev : []));
       setHasMoreInternshipJobs(false);
     }
   }, [internshipJobsData, internshipJobsPage]);
 
   // Update all remote jobs when new data arrives - no filtering
   useEffect(() => {
-    if (remoteJobsData.jobs && remoteJobsData.jobs.length > 0) {
+    if (!remoteJobsData) return;
+    if (remoteJobsData.jobs.length > 0) {
       if (remoteJobsPage === 1) {
         // First page - replace all jobs
         setAllRemoteJobs(remoteJobsData.jobs);
@@ -1208,8 +1209,7 @@ const JobsPage = () => {
       setHasMoreRemoteJobs(remoteJobsData.hasMore);
       setIsLoadingMoreRemote(false);
     } else if (remoteJobsPage === 1) {
-      // No jobs on first page
-      setAllRemoteJobs([]);
+      setAllRemoteJobs((prev) => (prev.length === 0 ? prev : []));
       setHasMoreRemoteJobs(false);
     }
   }, [remoteJobsData, remoteJobsPage]);

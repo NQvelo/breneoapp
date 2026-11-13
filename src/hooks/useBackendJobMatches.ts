@@ -51,15 +51,18 @@ export function useJobMatchByIds(jobIds: Array<string | number | undefined>) {
     [idKey],
   );
 
-  const queries = useQueries({
-    queries: numericIds.map((id) => ({
-      queryKey: ["job-match", user?.id, id],
-      queryFn: () => fetchMyJobMatch(id),
-      enabled: !!user,
-      staleTime: STALE_MS,
-      retry: 1,
-    })),
-  });
+  const queryDefs = useMemo(
+    () =>
+      numericIds.map((id) => ({
+        queryKey: ["job-match", user?.id, id] as const,
+        queryFn: () => fetchMyJobMatch(id),
+        enabled: !!user,
+        staleTime: STALE_MS,
+        retry: 1,
+      })),
+    [numericIds, user?.id],
+  );
+  const queries = useQueries({ queries: queryDefs });
 
   const byId = new Map<string, ApiJobMatch>();
   queries.forEach((query, index) => {
