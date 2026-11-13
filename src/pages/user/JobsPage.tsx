@@ -72,9 +72,15 @@ import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { JobSearchPreferenceChips } from "@/components/jobs/JobSearchPreferenceChips";
 import type { JobDetail } from "@/api/jobs/types";
+import type { ApiJobMatch } from "@/api/jobs/jobMatchesApi";
 import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
 import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
 import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
+import {
+  matchPercentFor,
+  useJobMatchByIds,
+  useJobMatchList,
+} from "@/hooks/useBackendJobMatches";
 import { takeTopExperienceScoredJobs } from "@/utils/topExperienceJobs";
 import { useMobile } from "@/hooks/use-mobile";
 import apiClient from "@/api/auth/apiClient";
@@ -111,6 +117,35 @@ interface Job {
   matchPercentage?: number;
   experiencePercent?: number | null;
 }
+
+const matchToJobsPageCard = (match: ApiJobMatch, savedJobIds: string[]): Job => {
+  const company = match.company?.trim() || "Unknown Company";
+  const logo = match.company_logo?.trim() || undefined;
+  const workMode =
+    match.work_mode && match.work_mode.toLowerCase() !== "unknown"
+      ? match.work_mode
+      : match.workplace_type;
+  const card = {
+    title: match.title,
+    salary: match.salary,
+    employment_type: match.employment_type,
+    work_mode: workMode,
+  };
+  return {
+    id: String(match.id),
+    title: match.title?.trim() || "Untitled Position",
+    company,
+    company_name: company,
+    location: match.location?.trim() || "Location not specified",
+    url: "",
+    company_logo: logo,
+    is_saved: savedJobIds.includes(String(match.id)),
+    salary: formatJobSalaryDisplay(card),
+    employment_type: resolveJobEmploymentType(card),
+    work_arrangement: resolveJobWorkArrangement(card),
+    matchPercentage: match.match_percent,
+  };
+};
 
 // Skill icon mapping - maps skill names to appropriate icons
 const getSkillIcon = (
@@ -765,9 +800,13 @@ const JobsPage = () => {
   const [loadingSkills, setLoadingSkills] = useState(true);
   const skillsInitializedRef = React.useRef(false);
 
-  // Same skills as the job post page, so each job's overall % matches that post.
+  // Same skills as the job post page, so internship and remote cards still score locally.
   const { userSkills: userSkillsForMatch } = useUserSkillsForMatch(user?.id);
   const { experience, hasWorkExperience } = useUserExperienceForMatch(user?.id);
+  const georgiaMatches = useJobMatchList("georgia", 9, !!user);
+  const worldwideMatches = useJobMatchList("worldwide", 9, !!user);
+  const topMatchesLoading =
+    georgiaMatches.isLoading || worldwideMatches.isLoading;
 
   // Pagination state for regular jobs
   const [regularJobsPage, setRegularJobsPage] = useState(1);
@@ -1695,12 +1734,18 @@ const JobsPage = () => {
   );
 
   const topMatchedJobs = useMemo(() => {
-    return takeTopExperienceScoredJobs(
-      transformedJobs,
-      3,
-      hasWorkExperience,
-    );
-  }, [transformedJobs, hasWorkExperience]);
+    const saved = savedJobs ?? [];
+    const seen = new Set<number>();
+    const ranked = [...(georgiaMatches.data ?? []), ...(worldwideMatches.data ?? [])]
+      .filter((match) => {
+        if (match.match_percent <= 0 || seen.has(match.id)) return false;
+        seen.add(match.id);
+        return true;
+      })
+      .sort((a, b) => b.match_percent - a.match_percent)
+      .slice(0, 3);
+    return ranked.map((match) => matchToJobsPageCard(match, saved));
+  }, [georgiaMatches.data, worldwideMatches.data, savedJobs]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
   const transformedInternshipJobs = React.useMemo(() => {
@@ -2165,6 +2210,7 @@ const JobsPage = () => {
       hasWorkExperience,
     );
   }, [transformedRemoteJobs, hasWorkExperience]);
+  const remoteJobMatches = useJobMatchByIds(remoteJobs.map((job) => job.id));
 
   // Debug logging
   useEffect(() => {
@@ -2353,7 +2399,7 @@ const JobsPage = () => {
         )}
 
         {/* Top Matched Jobs Section */}
-        {!isLoading && topMatchedJobs.length > 0 && (
+        {!topMatchesLoading && topMatchedJobs.length > 0 && (
           <section className="mb-10">
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-lg font-bold">Top Matched Jobs</h2>
@@ -2456,7 +2502,7 @@ const JobsPage = () => {
           </section>
         )}
 
-        {isLoading && (
+        {topMatchesLoading && (
           <section className="mb-10">
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-lg font-bold">Top Matched Jobs</h2>
@@ -2545,11 +2591,15 @@ const JobsPage = () => {
                       </div>
                     </div>
 
-                    {/* Match percentage & Save button (same total match as job detail page) */}
+                    {/* Same match_percent as the job post and search. */}
                     <div className="mt-auto flex shrink-0 items-center justify-between gap-4 pt-7">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <RadialProgress
-                          value={job.matchPercentage ?? 0}
+                          value={
+                            matchPercentFor(remoteJobMatches.byId, job.id) ??
+                            job.matchPercentage ??
+                            0
+                          }
                           size={44}
                           strokeWidth={5}
                           showLabel={false}
@@ -2557,7 +2607,10 @@ const JobsPage = () => {
                           className="shrink-0 text-breneo-blue"
                         />
                         <span className="line-clamp-2 text-xs font-semibold text-gray-700">
-                          {getMatchQualityLabel(job.matchPercentage)}
+                          {getMatchQualityLabel(
+                            matchPercentFor(remoteJobMatches.byId, job.id) ??
+                              job.matchPercentage,
+                          )}
                         </span>
                       </div>
                       <Button

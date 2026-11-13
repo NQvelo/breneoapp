@@ -12,12 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadialProgress } from "@/components/ui/radial-progress";
-import {
-  useInfiniteQuery,
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
@@ -26,7 +21,6 @@ import {
   Clock,
   Briefcase,
   Tag,
-  Loader2,
   ChevronDown,
   SlidersHorizontal,
   ExternalLink,
@@ -46,22 +40,12 @@ import {
   JOB_ROLE_CATEGORIES,
   JobSearchPreferenceChips,
 } from "@/components/jobs/JobSearchPreferenceChips";
-import type { JobDetail } from "@/api/jobs/types";
-import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
-import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
-import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
+import { fetchMyJobMatchSearch } from "@/api/jobs/jobMatchesApi";
 import { useMobile } from "@/hooks/use-mobile";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
-import { georgianCityLabelById } from "@/data/georgian-cities";
+import { georgianCityApiName, georgianCityLabelById } from "@/data/georgian-cities";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import {
-  getUserTestAnswers,
-  calculateSkillScores,
-  getTopSkills,
-  filterHardSkills,
-} from "@/utils/skillTestUtils";
-import { jobService, JobFilters, ApiJob, JobSearchSort } from "@/api/jobs";
+import { JobFilters } from "@/api/jobs";
 
 function filtersFromSearchParams(searchParams: URLSearchParams): JobFilters {
   const countriesParam = searchParams.get("countries");
@@ -95,11 +79,7 @@ import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { cn } from "@/lib/utils";
 import { PLATFORM_FILTER_CHIP_CLASS } from "@/lib/chipStyles";
-import {
-  getMatchQualityLabel,
-  extractJobSkills,
-  jobDataMatchesSelectedCountries,
-} from "@/utils/jobMatchUtils";
+import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
 import {
   extractJobSalaryMidpoint,
   formatJobSalaryDisplay,
@@ -326,10 +306,6 @@ const JobSearchResultsPage = () => {
   const t = useTranslation();
   const { language } = useLanguage();
 
-  // Same skills as the job post page, so each result's overall % matches that post.
-  const { userSkills: userSkillsForMatch } = useUserSkillsForMatch(user?.id);
-  const { experience } = useUserExperienceForMatch(user?.id);
-
   // Get search term and filters from URL
   const searchTerm = searchParams.get("search") || "";
   const page = parseInt(searchParams.get("page") || "1", 10);
@@ -348,7 +324,7 @@ const JobSearchResultsPage = () => {
       userTopSkills,
     });
     console.log(
-      "🌐 Job search API: GET …/api/search (via jobService.fetchActiveJobs)",
+      "🌐 Job search API: GET /api/me/job-matches/search/",
     );
   }, [searchTerm, page, searchParams, activeFilters, userTopSkills]);
 
@@ -384,414 +360,125 @@ const JobSearchResultsPage = () => {
     enabled: !!user,
   });
 
-  // Fetch user skills
+  // Interest chips come from the skill test stored on breneo-api.
   useEffect(() => {
     const fetchUserSkills = async () => {
       if (!user) return;
       try {
-        try {
-          const response = await apiClient.get(
-            `/api/skilltest/results/?user=${user.id}`,
-          );
-          if (
-            response.data &&
-            Array.isArray(response.data) &&
-            response.data.length > 0
-          ) {
-            const result = response.data[0];
-            const skillsJson = result.skills_json;
-
-            // Extract only tech skills for the Interests/Skills filter (not soft skills)
-            const techSkills = Object.keys(skillsJson.tech || {});
-
-            setUserTopSkills(techSkills);
-            return;
-          }
-        } catch (apiError) {
-          console.log("API endpoint not available, trying Supabase...");
-        }
-
-        // Fallback to Supabase: fetch from usertestanswers
-        const answers = await getUserTestAnswers(String(user.id));
-        if (answers && answers.length > 0) {
-          const skillScores = calculateSkillScores(answers);
-          const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
-          const topSkills = topSkillsData.map((s) => s.skill);
-          const techSkillsOnly = filterHardSkills(topSkills);
-          setUserTopSkills(techSkillsOnly);
-        }
+        const response = await apiClient.get(
+          `/api/skilltest/results/?user=${user.id}`,
+        );
+        const payload = response.data;
+        const result = Array.isArray(payload)
+          ? payload[0]
+          : payload &&
+              typeof payload === "object" &&
+              Array.isArray((payload as { results?: unknown }).results)
+            ? (payload as { results: unknown[] }).results[0]
+            : payload;
+        const skillsJson =
+          result && typeof result === "object"
+            ? (result as { skills_json?: { tech?: Record<string, unknown> } })
+                .skills_json
+            : undefined;
+        setUserTopSkills(Object.keys(skillsJson?.tech || {}));
       } catch (error) {
         console.error("Error fetching user skills:", error);
+        setUserTopSkills([]);
       }
     };
     fetchUserSkills();
   }, [user]);
 
-  // Fetch jobs (GET /api/search via jobService.fetchActiveJobs)
-  const fetchJobs = async (
-    searchTerm: string,
-    filters: JobFilters,
-    page: number,
-    userTopSkills: string[],
-    sort: JobSearchSort,
-  ): Promise<{ jobs: ApiJob[]; hasMore: boolean; total: number }> => {
-    try {
-      // If all interests are selected, treat as no filter (load all jobs)
-      const allInterestsSelected =
-        userTopSkills.length > 0 &&
-        filters.skills.length > 0 &&
-        userTopSkills.every((skill) => filters.skills.includes(skill)) &&
-        filters.skills.length === userTopSkills.length;
+  const filtersKey = useMemo(
+    () =>
+      JSON.stringify({
+        countries: [...activeFilters.countries].sort(),
+        skills: [...activeFilters.skills].sort(),
+        jobTypes: [...activeFilters.jobTypes].sort(),
+        isRemote: activeFilters.isRemote,
+        datePosted: activeFilters.datePosted,
+        salaryMin: activeFilters.salaryMin,
+        salaryMax: activeFilters.salaryMax,
+        salaryByAgreement: activeFilters.salaryByAgreement,
+        roleCategory: [...(activeFilters.roleCategory ?? [])].sort(),
+        seniority: [...(activeFilters.seniority ?? [])].sort(),
+        workMode: [...(activeFilters.workMode ?? [])].sort(),
+        company: [...(activeFilters.company ?? [])].sort(),
+        locationCountry: [...(activeFilters.locationCountry ?? [])].sort(),
+      }),
+    [activeFilters],
+  );
 
-      // Prepare filters for API call
-      const filtersForAPI: JobFilters = {
-        ...filters,
-        // If all interests selected, clear skills filter to get all jobs
-        skills: allInterestsSelected ? [] : filters.skills,
-      };
-
-      // Use 20 jobs per page to match API pagination
-      const pageSize = 20;
-
-      const response = await jobService.fetchActiveJobs({
-        query: searchTerm || "",
-        filters: filtersForAPI,
-        page,
-        pageSize,
-        sort,
-      });
-
-      if (!response || !Array.isArray(response.jobs)) {
-        return { jobs: [], hasMore: false, total: 0 };
-      }
-
-      let validJobs = response.jobs.filter((job) => {
-        const jobId = String(job.id || "");
-        return jobId && jobId.trim() !== "";
-      });
-
-      // Apply client-side salary filtering
-      if (
-        filters.salaryMin !== undefined ||
-        filters.salaryMax !== undefined ||
-        filters.salaryByAgreement
-      ) {
-        validJobs = validJobs.filter((job) => {
-          const minSalary = job.job_min_salary || job.min_salary;
-          const maxSalary = job.job_max_salary || job.max_salary;
-
-          // If "by agreement" is checked, include jobs without salary info
-          if (filters.salaryByAgreement && !minSalary && !maxSalary) {
-            return true;
-          }
-
-          // If no salary info and "by agreement" is not checked, exclude if salary filters are set
-          if (!minSalary && !maxSalary && !filters.salaryByAgreement) {
-            // If salary filters are set, exclude jobs without salary
-            if (
-              filters.salaryMin !== undefined ||
-              filters.salaryMax !== undefined
-            ) {
-              return false;
-            }
-            return true;
-          }
-
-          // Check if job salary matches the range
-          if (
-            filters.salaryMin !== undefined &&
-            maxSalary &&
-            maxSalary < filters.salaryMin
-          ) {
-            return false;
-          }
-          if (
-            filters.salaryMax !== undefined &&
-            minSalary &&
-            minSalary > filters.salaryMax
-          ) {
-            return false;
-          }
-
-          return true;
-        });
-      }
-
-      if (filters.countries.length > 0) {
-        validJobs = validJobs.filter((job) =>
-          jobDataMatchesSelectedCountries(filters.countries, { apiJob: job }),
-        );
-      }
-
-      // Note: Removed redundant client-side remote filtering
-      // Backend already handles this via work_mode parameter
-
-      return {
-        jobs: validJobs,
-        hasMore: response.hasMore ?? false,
-        total: response.total ?? validJobs.length,
-      };
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-      throw error;
-    }
-  };
-
-  const filtersKey = useMemo(() => {
-    return JSON.stringify({
-      countries: activeFilters.countries.sort(),
-      skills: activeFilters.skills.sort(),
-      jobTypes: activeFilters.jobTypes.sort(),
-      isRemote: activeFilters.isRemote,
-      datePosted: activeFilters.datePosted,
-      salaryMin: activeFilters.salaryMin,
-      salaryMax: activeFilters.salaryMax,
-      salaryByAgreement: activeFilters.salaryByAgreement,
-      roleCategory: [...(activeFilters.roleCategory ?? [])].sort(),
-      seniority: [...(activeFilters.seniority ?? [])].sort(),
-    });
-  }, [activeFilters]);
+  const allInterestsSelected =
+    userTopSkills.length > 0 &&
+    activeFilters.skills.length > 0 &&
+    userTopSkills.every((skill) => activeFilters.skills.includes(skill)) &&
+    activeFilters.skills.length === userTopSkills.length;
 
   const {
-    data: jobsPages,
+    data: rankedMatches = [],
     isLoading,
     error,
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ["job-search", searchTerm, filtersKey, userTopSkills.join(",")],
-    queryFn: ({ pageParam }) =>
-      fetchJobs(searchTerm, activeFilters, pageParam, userTopSkills, "newest"),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.hasMore ? allPages.length + 1 : undefined,
+  } = useQuery({
+    queryKey: ["job-match-search", user?.id, searchTerm, filtersKey],
+    queryFn: () =>
+      fetchMyJobMatchSearch({
+        query: searchTerm,
+        titles: allInterestsSelected ? [] : activeFilters.skills,
+        cities: activeFilters.countries
+          .map((id) => georgianCityApiName(id))
+          .filter(Boolean),
+        locationCountries:
+          activeFilters.countries.length > 0 ? ["Georgia"] : activeFilters.locationCountry,
+        workModes: activeFilters.isRemote
+          ? ["remote"]
+          : activeFilters.workMode,
+        jobSeniorities: activeFilters.seniority,
+        roleCategories: activeFilters.roleCategory,
+        companies: activeFilters.company,
+        datePosted: activeFilters.datePosted,
+        limit: 100,
+      }),
     enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
     retry: 1,
   });
 
-  const jobs = useMemo(() => {
-    const seen = new Set<string>();
-    const merged: ApiJob[] = [];
-    for (const pageData of jobsPages?.pages ?? []) {
-      for (const job of pageData.jobs) {
-        const id = String(job.id || "");
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        merged.push(job);
-      }
-    }
-    return merged;
-  }, [jobsPages]);
-  const totalJobs = jobsPages?.pages[0]?.total || jobs.length;
-
-  const loadMoreRef = useInfiniteScroll({
-    hasMore: !!hasNextPage,
-    isLoading: isFetchingNextPage,
-    onLoadMore: () => {
-      void fetchNextPage();
-    },
-  });
-
-  // Transform jobs
   const transformedJobs: Job[] = useMemo(() => {
-    if (!jobs || jobs.length === 0) return [];
-
-    return jobs
-      .map((job: ApiJob): Job | null => {
-        // Ensure jobId is always a string - use only id field (not job_id or external_job_id)
-        const jobId = String(job.id || "");
-        if (!jobId || jobId.trim() === "") return null;
-
-        const jobTitle =
-          job.title || job.job_title || job.position || "Untitled Position";
-        const companyName =
-          job.company_name ||
-          job.employer_name ||
-          (typeof job.company === "string" ? job.company : null) ||
-          "Unknown Company";
-
-        const jobCity = job.job_city || job.city || "";
-        const jobState = job.job_state || job.state || "";
-        const jobCountry = job.job_country || job.country || "";
-        const location: string =
-          (job.job_location as string | undefined) ||
-          (job.location as string | undefined) ||
-          [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-          "Location not specified";
-
-        const applyLink =
-          job.apply_url ||
-          job.job_apply_link ||
-          job.apply_link ||
-          job.url ||
-          "";
-
-        // Extract company logo - check all possible fields (same as JobsPage)
-        let companyLogo: string | undefined = undefined;
-
-        // Helper function to validate and set logo URL
-        const setLogoIfValid = (logoValue: unknown): boolean => {
-          if (!logoValue) return false;
-          const logoUrl = String(logoValue).trim();
-          if (!logoUrl) return false;
-          try {
-            const url = new URL(logoUrl);
-            // Only allow http/https protocols
-            if (url.protocol.startsWith("http")) {
-              companyLogo = logoUrl;
-              // Debug logging in development
-              if (process.env.NODE_ENV === "development") {
-                console.log("✅ Found valid logo URL:", logoUrl);
-              }
-              return true;
-            }
-          } catch (error) {
-            // Invalid URL
-            if (process.env.NODE_ENV === "development") {
-              console.warn("⚠️ Invalid logo URL:", logoUrl, error);
-            }
-          }
-          return false;
-        };
-
-        // Check root level fields first - prioritize company_logo field
-        // Use Record type to access fields that might not be in the type definition
-        const jobAny = job as Record<string, unknown>;
-
-        // Check company_logo first (most common field name)
-        if (!companyLogo && jobAny.company_logo) {
-          setLogoIfValid(jobAny.company_logo);
-        }
-        if (!companyLogo && job.company_logo) {
-          setLogoIfValid(job.company_logo);
-        }
-        if (!companyLogo && jobAny.companyLogo) {
-          setLogoIfValid(jobAny.companyLogo);
-        }
-        if (!companyLogo && job.companyLogo) {
-          setLogoIfValid(job.companyLogo);
-        }
-        if (!companyLogo && jobAny.employer_logo) {
-          setLogoIfValid(jobAny.employer_logo);
-        }
-        if (!companyLogo && job.employer_logo) {
-          setLogoIfValid(job.employer_logo);
-        }
-        if (!companyLogo && jobAny.logo) {
-          setLogoIfValid(jobAny.logo);
-        }
-        if (!companyLogo && job.logo) {
-          setLogoIfValid(job.logo);
-        }
-        if (!companyLogo && jobAny.logo_url) {
-          setLogoIfValid(jobAny.logo_url);
-        }
-        if (!companyLogo && job.logo_url) {
-          setLogoIfValid(job.logo_url);
-        }
-        // Check additional possible field variations
-        if (!companyLogo && jobAny.employerLogo) {
-          setLogoIfValid(jobAny.employerLogo);
-        }
-        if (!companyLogo && jobAny.companyLogoUrl) {
-          setLogoIfValid(jobAny.companyLogoUrl);
-        }
-        if (!companyLogo && jobAny.logoUrl) {
-          setLogoIfValid(jobAny.logoUrl);
-        }
-
-        // Check nested company object if it exists
-        if (!companyLogo && job.company && typeof job.company === "object") {
-          const companyObj = job.company as Record<string, unknown>;
-          if (companyObj.logo) setLogoIfValid(companyObj.logo);
-          if (!companyLogo && companyObj.logo_url)
-            setLogoIfValid(companyObj.logo_url);
-          if (!companyLogo && companyObj.company_logo)
-            setLogoIfValid(companyObj.company_logo);
-          if (!companyLogo && companyObj.employer_logo)
-            setLogoIfValid(companyObj.employer_logo);
-        }
-
-        // Check employer object if it exists separately
-        if (!companyLogo && job.employer && typeof job.employer === "object") {
-          const employerObj = job.employer as Record<string, unknown>;
-          if (employerObj.logo) setLogoIfValid(employerObj.logo);
-          if (!companyLogo && employerObj.logo_url)
-            setLogoIfValid(employerObj.logo_url);
-          if (!companyLogo && employerObj.company_logo)
-            setLogoIfValid(employerObj.company_logo);
-          if (!companyLogo && employerObj.employer_logo)
-            setLogoIfValid(employerObj.employer_logo);
-        }
-
-        const salary = formatJobSalaryDisplay(job);
-        const salaryAmount = extractJobSalaryMidpoint(job);
-
-        const employmentType = resolveJobEmploymentType(job);
-        const workArrangement = resolveJobWorkArrangement(job);
-
-        const jobSkills = extractJobSkills(job);
-        const matchPercentage =
-          user && userSkillsForMatch.length >= 0
-            ? matchJobAsShownOnJobPost(
-                job as unknown as JobDetail,
-                userSkillsForMatch,
-                { experience },
-              ).overallPercent
-            : undefined;
-
-        // Extract date posted - new API uses posted_at or fetched_at
-        const jobRecord = job as Record<string, unknown>;
-        const datePosted =
-          (job.posted_at as string | undefined) ||
-          (job.fetched_at as string | undefined) ||
-          (job.date_posted as string | undefined) ||
-          (job.posted_date as string | undefined) ||
-          (job.job_posted_at_datetime_utc as string | undefined) ||
-          (job.postedAt as string | undefined) ||
-          (job.job_posted_at as string | undefined) ||
-          (jobRecord.job_publish_timestamp as string | undefined) ||
-          (jobRecord.publish_time as string | undefined) ||
-          (job.created_at as string | undefined) ||
-          (job.published_at as string | undefined) ||
-          undefined;
-
-        // Debug: Log if we found a date (only in development)
-        if (process.env.NODE_ENV === "development" && datePosted) {
-          console.log("Job date found:", {
-            jobId: jobId,
-            datePosted,
-            title: jobTitle,
-          });
-        }
-
-        return {
-          id: jobId,
-          title: jobTitle,
-          company: companyName,
-          // Prefer the raw API `company_name` when available so UI shows exact field
-          company_name:
-            job.company_name ||
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (job as Record<string, any>).employer_name ||
-            (typeof job.company === "string" ? job.company : undefined),
-          location: String(location),
-          url: applyLink,
-          company_logo: companyLogo,
-          is_saved: savedJobs?.includes(String(jobId)),
-          salary,
-          salaryAmount,
-          employment_type: employmentType,
-          work_arrangement: workArrangement,
-          matchPercentage,
-          datePosted,
-          jobSkills,
-        };
-      })
-      .filter((job): job is Job => job !== null);
-  }, [jobs, savedJobs, user, userSkillsForMatch, experience]);
+    const saved = savedJobs ?? [];
+    return rankedMatches.map((match) => {
+      const company = match.company?.trim() || "Unknown Company";
+      const logo = match.company_logo?.trim() || undefined;
+      const workMode =
+        match.work_mode && match.work_mode.toLowerCase() !== "unknown"
+          ? match.work_mode
+          : match.workplace_type;
+      const card = {
+        title: match.title,
+        salary: match.salary,
+        employment_type: match.employment_type,
+        work_mode: workMode,
+      };
+      return {
+        id: String(match.id),
+        title: match.title?.trim() || "Untitled Position",
+        company,
+        company_name: company,
+        location: match.location?.trim() || "Location not specified",
+        url: "",
+        company_logo: logo,
+        is_saved: saved.includes(String(match.id)),
+        salary: formatJobSalaryDisplay(card),
+        salaryAmount: extractJobSalaryMidpoint(card),
+        employment_type: resolveJobEmploymentType(card),
+        work_arrangement: resolveJobWorkArrangement(card),
+        matchPercentage: match.match_percent,
+        datePosted: match.posted_at || undefined,
+        jobSkills: [],
+      };
+    });
+  }, [rankedMatches, savedJobs]);
 
   const sortBy: ResultSort = RESULT_SORTS.includes(
     searchParams.get("sortBy") as ResultSort,
@@ -806,7 +493,7 @@ const JobSearchResultsPage = () => {
         ? (activeFilters.datePosted as PostedWithin)
         : "all";
 
-  // Match % is computed client-side, so order the loaded results here.
+  // Backend match % orders the loaded results. 0% stays off the list.
   const regularJobs = useMemo(() => {
     const windowMs = postedWithinMs(activeFilters.datePosted);
     const now = Date.now();
@@ -819,7 +506,35 @@ const JobSearchResultsPage = () => {
             return now - postedAt <= windowMs;
           });
 
-    const sorted = [...visible];
+    const sorted = visible.filter((job) => {
+      if ((job.matchPercentage ?? 0) <= 0) return false;
+      if (activeFilters.jobTypes.length > 0) {
+        const label = (job.employment_type || "").toLowerCase();
+        const matchesType = activeFilters.jobTypes.some((type) =>
+          label.includes(type.toLowerCase()),
+        );
+        if (!matchesType) return false;
+      }
+      const hasSalaryFilter =
+        activeFilters.salaryMin != null ||
+        activeFilters.salaryMax != null ||
+        activeFilters.salaryByAgreement;
+      if (!hasSalaryFilter) return true;
+      if (job.salaryAmount == null) return !!activeFilters.salaryByAgreement;
+      if (
+        activeFilters.salaryMin != null &&
+        job.salaryAmount < activeFilters.salaryMin
+      ) {
+        return false;
+      }
+      if (
+        activeFilters.salaryMax != null &&
+        job.salaryAmount > activeFilters.salaryMax
+      ) {
+        return false;
+      }
+      return true;
+    });
     if (sortBy === "date") {
       sorted.sort(
         (a, b) =>
@@ -840,7 +555,7 @@ const JobSearchResultsPage = () => {
       );
     }
     return sorted;
-  }, [transformedJobs, sortBy, activeFilters.datePosted]);
+  }, [transformedJobs, sortBy, activeFilters]);
 
   // Save job mutation
   const saveJobMutation = useMutation({
@@ -1432,8 +1147,8 @@ const JobSearchResultsPage = () => {
         {/* Results Header */}
         <div className="mb-6">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {totalJobs > 0
-              ? `${totalJobs} ${t.jobs.vacancies}`
+            {regularJobs.length > 0
+              ? `${regularJobs.length} ${t.jobs.vacancies}`
               : `${transformedJobs.length} ${t.jobs.vacancies}`}
           </span>
         </div>
@@ -1459,7 +1174,7 @@ const JobSearchResultsPage = () => {
               <p className="text-red-600">{t.jobs.errorLoading}</p>
             </CardContent>
           </Card>
-        ) : transformedJobs.length === 0 ? (
+        ) : regularJobs.length === 0 ? (
           <div className="text-center p-10 rounded-3xl text-muted-foreground bg-muted/30">
             <img
               src="/lovable-uploads/3dicons-travel-front-color.png"
@@ -1675,28 +1390,16 @@ const JobSearchResultsPage = () => {
           </div>
         )}
 
-        {!isLoading && transformedJobs.length > 0 ? (
-          hasNextPage ? (
-            <div
-              ref={loadMoreRef}
-              className="flex justify-center py-6"
-              aria-live="polite"
-            >
-              {isFetchingNextPage ? (
-                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-              ) : null}
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <p className="text-base font-semibold text-foreground">
-                You're all caught up! ✨
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                You've seen everything for now. Check back soon for new
-                opportunities.
-              </p>
-            </div>
-          )
+        {!isLoading && regularJobs.length > 0 ? (
+          <div className="py-8 text-center">
+            <p className="text-base font-semibold text-foreground">
+              You're all caught up! ✨
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              You've seen everything for now. Check back soon for new
+              opportunities.
+            </p>
+          </div>
         ) : null}
 
         <JobFilterModal

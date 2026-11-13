@@ -35,6 +35,49 @@ export async function fetchMyJobMatches(
   return Array.isArray(data) ? data : [];
 }
 
+export interface JobMatchSearchParams {
+  query?: string;
+  titles?: string[];
+  cities?: string[];
+  locationCountries?: string[];
+  workModes?: string[];
+  jobSeniorities?: string[];
+  roleCategories?: string[];
+  companies?: string[];
+  datePosted?: string;
+  limit?: number;
+}
+
+function joinList(values: string[] | undefined): string | undefined {
+  const joined = (values ?? []).map((item) => item.trim()).filter(Boolean).join(",");
+  return joined || undefined;
+}
+
+/**
+ * Ranked matches for the current search. The aggregator scores the filtered
+ * candidate set and omits 0%. Highest match is first.
+ */
+export async function fetchMyJobMatchSearch(
+  params: JobMatchSearchParams,
+): Promise<ApiJobMatch[]> {
+  const datePosted = params.datePosted && params.datePosted !== "all" ? params.datePosted : undefined;
+  const { data } = await apiClient.get<ApiJobMatch[]>("/api/me/job-matches/search/", {
+    params: {
+      query: params.query?.trim() || undefined,
+      title: joinList(params.titles),
+      city: joinList(params.cities),
+      location_country: joinList(params.locationCountries),
+      work_mode: joinList(params.workModes),
+      job_seniority: joinList(params.jobSeniorities),
+      role_category: joinList(params.roleCategories),
+      company: joinList(params.companies),
+      date_posted: datePosted,
+      limit: params.limit ?? 100,
+    },
+  });
+  return Array.isArray(data) ? data.filter((job) => job.match_percent > 0) : [];
+}
+
 /** Score for one job. Same integer the list uses. */
 export async function fetchMyJobMatch(
   jobId: string | number,

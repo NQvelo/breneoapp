@@ -63,9 +63,8 @@ import { RadialProgress } from "@/components/ui/radial-progress";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { normalizeSkillName } from "@/services/matching";
 import { resolveJobDisplayRequiredSkills } from "@/utils/jobSkillsResolve";
-import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
 import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
-import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
+import { useJobMatch } from "@/hooks/useBackendJobMatches";
 import {
   formatJobSalaryDisplay,
   stripTrailingLari,
@@ -77,15 +76,9 @@ import {
 import { getMissingJobSkills } from "@/utils/courseSkillMatch";
 import { JobMissingSkillsCoursesSlider } from "@/components/jobs/JobMissingSkillsCoursesSlider";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
-import type { MatchResult } from "@/types/matching";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { Zap } from "@/components/icons";
 import { profileApi } from "@/api/profile";
-import { useUserIndustryProfile } from "@/hooks/useUserIndustryProfile";
-import {
-  parseJobIndustryTags,
-  computeIndustryMatchPercent,
-} from "@/utils/industryMatch";
 import { JobApplyButton } from "@/components/jobs/JobApplyButton";
 import { ExternalApplyConfirmDialog } from "@/components/jobs/ExternalApplyConfirmDialog";
 import {
@@ -123,7 +116,6 @@ import {
 
 const JobDetailPage = () => {
   const { jobId: rawJobId } = useParams<{ jobId: string }>();
-  const { industryYears } = useUserIndustryProfile();
   const t = useTranslation();
   // Decode the job ID in case it was URL-encoded
   const jobId = rawJobId ? decodeURIComponent(rawJobId) : undefined;
@@ -197,7 +189,7 @@ const JobDetailPage = () => {
   // Same skill union as home, jobs, and search so the overall % matches.
   const { profileSkills, userSkills, isLoadingUserSkills } =
     useUserSkillsForMatch(user?.id);
-  const { experience } = useUserExperienceForMatch(user?.id);
+  const { data: backendMatch } = useJobMatch(jobId);
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
@@ -1388,37 +1380,15 @@ const JobDetailPage = () => {
     }
   };
 
-  // Overall % uses the required skills shown on this page.
-  // Until the skill chips are initialized, use the same default as listing cards
-  // (skills the user already has). After that, the chips the user toggles apply.
-  const effectiveMatchResult: MatchResult | null = useMemo(() => {
-    if (!user || !jobDetail) return null;
-    const jobKey = String(jobDetail.id ?? jobDetail.job_id ?? "");
-    const chipsReady = selectedSkillsInitedForJobRef.current === jobKey;
-    return matchJobAsShownOnJobPost(jobDetail, userSkills, {
-      ...(chipsReady ? { selectedSkillNames: selectedRequiredSkills } : {}),
-      experience,
-    });
-  }, [jobDetail, user, userSkills, selectedRequiredSkills, experience]);
-
-  const industryMatchForBar = useMemo(() => {
-    const tags = parseJobIndustryTags(
-      (jobDetail as Record<string, unknown>)?.industry_tags as
-        | string
-        | undefined,
-    );
-    const result = computeIndustryMatchPercent(tags, industryYears);
-    return result.percent;
-  }, [jobDetail, industryYears]);
-
-  const matchQualityKey = effectiveMatchResult
-    ? effectiveMatchResult.overallPercent >= 95
+  // Same integer as Jobs and search: the single-job match API, not a browser score.
+  const matchQualityKey = backendMatch
+    ? backendMatch.match_percent >= 95
       ? "excellentMatch"
-      : effectiveMatchResult.overallPercent >= 85
+      : backendMatch.match_percent >= 85
         ? "bestMatch"
-        : effectiveMatchResult.overallPercent >= 70
+        : backendMatch.match_percent >= 70
           ? "goodMatch"
-          : effectiveMatchResult.overallPercent >= 50
+          : backendMatch.match_percent >= 50
             ? "fairMatch"
             : "badMatch"
     : null;
@@ -1515,6 +1485,9 @@ const JobDetailPage = () => {
       await queryClient.invalidateQueries({
         queryKey: ["profileSkills", user?.id],
       });
+      await queryClient.invalidateQueries({ queryKey: ["job-match"] });
+      await queryClient.invalidateQueries({ queryKey: ["job-matches"] });
+      await queryClient.invalidateQueries({ queryKey: ["job-match-search"] });
       setSkillPrompt(null);
     } catch (error) {
       console.error("Failed to update skill:", error);
@@ -1901,12 +1874,12 @@ const JobDetailPage = () => {
               </div>
 
               {/* Job Match Section - three matches in one box, OVERALL MATCH separate */}
-              {user && jobDetail && effectiveMatchResult && (
+              {user && jobDetail && backendMatch && (
                 <div className="bg-white rounded-3xl p-6 shadow-none border-0 mt-6">
                   <div className="flex flex-col sm:flex-row flex-wrap items-stretch gap-4">
                     <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-row items-center justify-center gap-3 w-full sm:min-w-[280px] flex-1 min-h-[120px] sm:min-h-0">
                       <RadialProgress
-                        value={effectiveMatchResult.overallPercent}
+                        value={backendMatch.match_percent}
                         size={52}
                         strokeWidth={4}
                         showLabel={false}
@@ -1925,13 +1898,13 @@ const JobDetailPage = () => {
                     <div className="rounded-xl p-2 flex flex-wrap items-end justify-center sm:justify-end gap-0.5 sm:gap-x-4 flex-1 min-w-0  sm:min-h-0 w-full">
                       <div className="flex flex-col items-center flex-shrink-0  w-[90px] min-w-[80px]">
                         <RadialProgress
-                          value={effectiveMatchResult.expLevel.percent ?? 0}
+                          value={backendMatch.experience_percent ?? 0}
                           size={52}
                           strokeWidth={4}
                           showLabel={false}
                           percentageTextSize="sm"
                           centerLabel={
-                            effectiveMatchResult.expLevel.percent != null
+                            backendMatch.experience_percent != null
                               ? undefined
                               : "N/A"
                           }
@@ -1943,13 +1916,13 @@ const JobDetailPage = () => {
                       </div>
                       <div className="flex flex-col items-center flex-shrink-0 w-[90px] min-w-[80px]">
                         <RadialProgress
-                          value={effectiveMatchResult.skills.percent ?? 0}
+                          value={backendMatch.skills_percent ?? 0}
                           size={52}
                           strokeWidth={4}
                           showLabel={false}
                           percentageTextSize="sm"
                           centerLabel={
-                            effectiveMatchResult.skills.percent != null
+                            backendMatch.skills_percent != null
                               ? undefined
                               : "N/A"
                           }
@@ -1961,13 +1934,15 @@ const JobDetailPage = () => {
                       </div>
                       <div className="flex flex-col items-center flex-shrink-0 w-[90px] min-w-[80px]">
                         <RadialProgress
-                          value={industryMatchForBar ?? 0}
+                          value={backendMatch.industry_percent ?? 0}
                           size={52}
                           strokeWidth={4}
                           showLabel={false}
                           percentageTextSize="sm"
                           centerLabel={
-                            industryMatchForBar != null ? undefined : "N/A"
+                            backendMatch.industry_percent != null
+                              ? undefined
+                              : "N/A"
                           }
                           className="flex-shrink-0 text-breneo-blue"
                         />
