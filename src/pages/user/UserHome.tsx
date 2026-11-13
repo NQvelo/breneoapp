@@ -47,14 +47,13 @@ import {
 } from "@/utils/skillTestUtils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import { jobService, JobFilters, ApiJob } from "@/api/jobs";
+import type { ApiJobMatch } from "@/api/jobs/jobMatchesApi";
+import { useJobMatchList } from "@/hooks/useBackendJobMatches";
+import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
 import {
-  matchJobDetailToUser,
-  buildUserMatchProfileFromSkillTest,
-  normalizeSkillName,
-} from "@/services/matching";
-import type { JobDetail } from "@/api/jobs/types";
-// Removed filterATSJobs import - displaying all jobs without filtering
+  resolveJobEmploymentType,
+  resolveJobWorkArrangement,
+} from "@/utils/jobEmploymentDisplay";
 import { cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import { toast } from "sonner";
@@ -66,68 +65,9 @@ import {
 import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
 import { useMyApplicationCounts } from "@/hooks/useMyApplications";
 import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
-import { extractJobSkills } from "@/utils/jobMatchUtils";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
-import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
-import {
-  resolveJobEmploymentType,
-  resolveJobWorkArrangement,
-} from "@/utils/jobEmploymentDisplay";
-// extractJobSkills is now imported from @/utils/jobMatchUtils
 
-// Function to calculate job relevance score based on user's hard skills
-const calculateJobRelevanceScore = (
-  job: ApiJob,
-  userHardSkills: string[],
-): number => {
-  // If no user hard skills, return base score
-  if (!userHardSkills || userHardSkills.length === 0) {
-    return 1;
-  }
-
-  // Extract skills from the job
-  const jobSkills = extractJobSkills(job);
-
-  // If no skills found in job, return low score (but don't filter out completely)
-  if (jobSkills.length === 0) {
-    return 0.1;
-  }
-
-  // Normalize skills for comparison
-  const normalizeSkill = (skill: string) =>
-    skill.toLowerCase().trim().replace(/\s+/g, " ");
-
-  const normalizedUserSkills = userHardSkills.map(normalizeSkill);
-  const normalizedJobSkills = jobSkills.map(normalizeSkill);
-
-  // Count matching skills
-  let matchCount = 0;
-  normalizedJobSkills.forEach((jobSkill) => {
-    normalizedUserSkills.forEach((userSkill) => {
-      // Exact match - highest score
-      if (userSkill === jobSkill) {
-        matchCount += 2;
-      }
-      // Partial match - medium score
-      else if (jobSkill.includes(userSkill) || userSkill.includes(jobSkill)) {
-        matchCount += 1;
-      }
-    });
-  });
-
-  // Calculate relevance score: (matches / total job skills) * (matches / total user skills)
-  // This gives higher scores to jobs that match more of the user's skills
-  const score =
-    matchCount > 0
-      ? (matchCount / normalizedJobSkills.length) *
-        (matchCount / normalizedUserSkills.length) *
-        10
-      : 0.1;
-
-  return score;
-};
-
-// calculateMatchPercentage is now imported from @/utils/jobMatchUtils
+const HOME_MATCH_LIMIT = 9;
 
 // Function to calculate course match score based on user skills
 const calculateCourseMatchScore = (
@@ -179,95 +119,6 @@ const calculateCourseMatchScore = (
       : 0.1;
 
   return score;
-};
-
-// Function to check if a job is tech-related (for broader filtering)
-const isTechJob = (job: ApiJob): boolean => {
-  const textToSearch = [
-    job.title || job.job_title || "",
-    job.description || job.job_description || "",
-    job.job_required_experience || job.required_experience || "",
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  // Tech keywords to identify tech jobs
-  const techKeywords = [
-    "developer",
-    "programmer",
-    "engineer",
-    "software",
-    "coding",
-    "programming",
-    "javascript",
-    "python",
-    "java",
-    "react",
-    "node",
-    "sql",
-    "database",
-    "frontend",
-    "backend",
-    "full stack",
-    "web developer",
-    "mobile developer",
-    "devops",
-    "cloud",
-    "aws",
-    "azure",
-    "docker",
-    "kubernetes",
-    "api",
-    "machine learning",
-    "ai",
-    "data science",
-    "analytics",
-    "cybersecurity",
-  ];
-
-  return techKeywords.some((keyword) => textToSearch.includes(keyword));
-};
-
-/** Jobs based in Georgia (country), not the US state. */
-const isGeorgianJob = (job: ApiJob): boolean => {
-  const jobAny = job as Record<string, unknown>;
-  const cc = [job.job_country, job.country, jobAny.location_country]
-    .map((value) =>
-      String(value ?? "")
-        .toLowerCase()
-        .trim(),
-    )
-    .find(Boolean);
-  if (cc === "georgia" || cc === "ge" || cc === "საქართველო") return true;
-
-  const loc = [
-    job.job_location,
-    job.location,
-    job.job_city,
-    job.city,
-    job.job_state,
-    job.state,
-  ]
-    .filter(Boolean)
-    .join(", ")
-    .toLowerCase();
-
-  if (
-    /\b(tbilisi|batumi|kutaisi|rustavi|zugdidi|gori|poti|sokhumi)\b/.test(loc)
-  ) {
-    return true;
-  }
-  if (/\bgeorgia\b/.test(loc)) {
-    if (
-      /\b(atlanta|savannah|augusta|macon|columbus,\s*ga|columbus ga)\b/.test(
-        loc,
-      )
-    ) {
-      return false;
-    }
-    return true;
-  }
-  return false;
 };
 
 // Transformed Job for UI
@@ -339,50 +190,44 @@ const mapApiCourseToHomeCourse = (course: Record<string, unknown>): Course => {
   };
 };
 
-const EMPTY_JOB_FILTERS: JobFilters = {
-  country: "",
-  countries: [],
-  jobTypes: [],
-  isRemote: false,
-  datePosted: undefined,
-  skills: [],
-};
-
-const dedupeApiJobs = (jobs: ApiJob[]): ApiJob[] => {
-  const seen = new Set<string>();
-  return jobs.filter((job) => {
-    const id = String(job.id || job.job_id || "").trim();
-    const key =
-      id ||
-      `${job.title || job.job_title || ""}_${job.company_name || job.employer_name || job.company || ""}`;
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
+const formatHomeJobDate = (postedAt: string | null): string => {
+  const parsed = postedAt ? new Date(postedAt) : new Date();
+  const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 };
 
-const fetchGeorgianJobs = async () => {
-  try {
-    return await jobService.fetchJobsByCountry("Georgia");
-  } catch (error) {
-    console.error("Error fetching Georgian jobs:", error);
-    throw error;
-  }
-};
-
-const fetchWorldwideJobs = async () => {
-  try {
-    const response = await jobService.fetchActiveJobs({
-      query: "",
-      filters: EMPTY_JOB_FILTERS,
-      page: 1,
-      pageSize: 50,
-    });
-    return response.jobs || [];
-  } catch (error) {
-    console.error("Error fetching worldwide jobs:", error);
-    throw error;
-  }
+const matchToHomeJob = (match: ApiJobMatch, savedJobIds: string[]): Job => {
+  const company = match.company?.trim() || "Unknown Company";
+  const logo = match.company_logo?.trim() || undefined;
+  const workMode =
+    match.work_mode && match.work_mode.toLowerCase() !== "unknown"
+      ? match.work_mode
+      : match.workplace_type;
+  const card = {
+    title: match.title,
+    salary: match.salary,
+    employment_type: match.employment_type,
+    work_mode: workMode,
+  };
+  return {
+    id: String(match.id),
+    title: match.title?.trim() || "Untitled Position",
+    company,
+    company_name: company,
+    location: match.location?.trim() || "Location not specified",
+    date: formatHomeJobDate(match.posted_at),
+    logo,
+    company_logo: logo,
+    salary: formatJobSalaryDisplay(card),
+    employment_type: resolveJobEmploymentType(card),
+    work_arrangement: resolveJobWorkArrangement(card),
+    is_saved: savedJobIds.includes(String(match.id)),
+    matchPercentage: match.match_percent,
+  };
 };
 
 const dashboardCarouselNavButtonClass = cn(
@@ -425,17 +270,10 @@ const UserHome = () => {
       .filter((id): id is string => id !== null);
   };
 
-  // Profile skills (same source as job detail page for identical total match)
-  const { isCheckingProfile, showProfileWelcome, profileSkills } =
-    useNeedsProfileForMatching(user?.id);
+  const { isCheckingProfile, showProfileWelcome } = useNeedsProfileForMatching(
+    user?.id,
+  );
   const showMatchedJobs = !!user && !isCheckingProfile && !showProfileWelcome;
-  const userSkillsForMatch = useMemo(() => {
-    const fromProfile = (profileSkills || []).map((s) =>
-      normalizeSkillName(s.skill_name),
-    );
-    const fromTest = (userTopSkills || []).map((s) => normalizeSkillName(s));
-    return [...new Set([...fromProfile, ...fromTest])];
-  }, [profileSkills, userTopSkills]);
 
   // Fetch user's top skills from skill test results
   useEffect(() => {
@@ -611,25 +449,13 @@ const UserHome = () => {
     data: georgianJobs = [],
     isLoading: georgianJobsLoading,
     error: georgianJobsError,
-  } = useQuery({
-    queryKey: ["home-georgian-jobs"],
-    queryFn: () => fetchGeorgianJobs(),
-    enabled: showMatchedJobs,
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-  });
+  } = useJobMatchList("georgia", HOME_MATCH_LIMIT, showMatchedJobs);
 
   const {
     data: worldwideJobs = [],
     isLoading: worldwideJobsLoading,
     error: worldwideJobsError,
-  } = useQuery({
-    queryKey: ["home-worldwide-jobs"],
-    queryFn: () => fetchWorldwideJobs(),
-    enabled: showMatchedJobs,
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-  });
+  } = useJobMatchList("worldwide", HOME_MATCH_LIMIT, showMatchedJobs);
 
   useEffect(() => {
     if (georgianJobsError) {
@@ -772,143 +598,17 @@ const UserHome = () => {
     },
   });
 
-  // Georgian jobs come only from GET /api/search?country=Georgia.
   const { transformedGeorgianJobs, transformedWorldwideJobs } = useMemo(() => {
-    const georgianSource = dedupeApiJobs(georgianJobs || []);
-    const worldwideSource = (worldwideJobs || []).filter(
-      (j) => !isGeorgianJob(j),
-    );
-
-    const sortAndTakeTopApiJobs = (source: ApiJob[]) => {
-      const jobsWithMatchPercentage = source.map((job: ApiJob) => {
-        const matchPercentage =
-          user && userSkillsForMatch.length >= 0
-            ? matchJobDetailToUser(
-                job as unknown as JobDetail,
-                buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-              ).overallPercent
-            : undefined;
-        return { job, matchPercentage };
-      });
-
-      jobsWithMatchPercentage.sort((a, b) => {
-        const matchDiff =
-          (b.matchPercentage ?? -1) - (a.matchPercentage ?? -1);
-        if (matchDiff !== 0) return matchDiff;
-
-        const dateA =
-          a.job.posted_at || a.job.fetched_at || a.job.date_posted || "";
-        const dateB =
-          b.job.posted_at || b.job.fetched_at || b.job.date_posted || "";
-
-        if (dateA && dateB) {
-          try {
-            const timeA = new Date(dateA as string).getTime();
-            const timeB = new Date(dateB as string).getTime();
-            return timeB - timeA;
-          } catch {
-            return 0;
-          }
-        }
-
-        return 0;
-      });
-
-      return jobsWithMatchPercentage.slice(0, 9);
+    const savedIds = savedJobs ?? [];
+    return {
+      transformedGeorgianJobs: georgianJobs.map((match) =>
+        matchToHomeJob(match, savedIds),
+      ),
+      transformedWorldwideJobs: worldwideJobs.map((match) =>
+        matchToHomeJob(match, savedIds),
+      ),
     };
-
-    const mapApiJobToJob = (
-      job: ApiJob,
-      precomputedMatchPercentage?: number,
-    ): Job | null => {
-      const jobId = String(job.id || job.job_id || "").trim();
-      if (!jobId) {
-        console.warn("Skipping job without valid ID:", job);
-        return null;
-      }
-
-      const jobTitle =
-        job.title || job.job_title || job.position || "Untitled Position";
-
-      const companyName =
-        job.company_name ||
-        job.employer_name ||
-        (typeof job.company === "string" ? job.company : null) ||
-        "Unknown Company";
-
-      const jobCity = job.job_city || job.city || "";
-      const jobState = job.job_state || job.state || "";
-      const jobCountry = job.job_country || job.country || "";
-      const location =
-        job.job_location ||
-        job.location ||
-        [jobCity, jobState, jobCountry].filter(Boolean).join(", ") ||
-        "Location not specified";
-
-      const logo =
-        job.logo_upload ||
-        job.employer_logo ||
-        job.company_logo ||
-        job.logo_url ||
-        (typeof job.company === "object" && job.company
-          ? (job.company as { logo_upload?: string; logo?: string })
-              .logo_upload ||
-            (job.company as { logo?: string; company_logo?: string }).logo ||
-            (job.company as { company_logo?: string }).company_logo
-          : undefined);
-
-      const postedDate =
-        job.posted_at ||
-        job.fetched_at ||
-        job.date_posted ||
-        job.posted_date ||
-        job.job_posted_at_datetime_utc ||
-        undefined;
-
-      const salary = formatJobSalaryDisplay(job);
-
-      const employmentType = resolveJobEmploymentType(job);
-      const workArrangement = resolveJobWorkArrangement(job);
-
-      const transformedJob: Job = {
-        id: jobId,
-        title: jobTitle,
-        company: companyName,
-        company_name: companyName,
-        location:
-          typeof location === "string" ? location : "Location not specified",
-        logo,
-        company_logo: logo,
-        salary,
-        employment_type: employmentType,
-        work_arrangement: workArrangement,
-        is_saved: savedJobs?.includes(String(jobId)),
-        matchPercentage: precomputedMatchPercentage,
-        date: postedDate
-          ? new Date(String(postedDate)).toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
-          : new Date().toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            }),
-      };
-      return transformedJob;
-    };
-
-    const transformedGeorgianJobs = sortAndTakeTopApiJobs(georgianSource)
-      .map((item) => mapApiJobToJob(item.job, item.matchPercentage))
-      .filter((job): job is Job => job !== null);
-
-    const transformedWorldwideJobs = sortAndTakeTopApiJobs(worldwideSource)
-      .map((item) => mapApiJobToJob(item.job, item.matchPercentage))
-      .filter((job): job is Job => job !== null);
-
-    return { transformedGeorgianJobs, transformedWorldwideJobs };
-  }, [georgianJobs, worldwideJobs, savedJobs, user, userSkillsForMatch]);
+  }, [georgianJobs, worldwideJobs, savedJobs]);
 
   const { data: applicationCounts, isLoading: applicationsLoading } =
     useMyApplicationCounts(!!user);

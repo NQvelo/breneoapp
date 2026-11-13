@@ -104,11 +104,9 @@ import {
   resolveJobWorkArrangement,
 } from "@/utils/jobEmploymentDisplay";
 import type { JobDetail } from "@/api/jobs/types";
-import {
-  matchJobDetailToUser,
-  buildUserMatchProfileFromSkillTest,
-  normalizeSkillName as normalizeSkillForMatching,
-} from "@/services/matching";
+import { normalizeSkillName as normalizeSkillForMatching } from "@/services/matching";
+import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
+import { experienceFromWorkHistory } from "@/utils/userWorkExperience";
 import { profileApi } from "@/api/profile";
 import type {
   EducationEntry,
@@ -722,18 +720,28 @@ const ProfilePage = () => {
     },
   });
 
-  // Same skill union as JobsPage / JobDetailPage for consistent match %
+  // Same skill union as the job post page (profile + tech + soft) for the same overall %.
   const userSkillsForMatch = useMemo(() => {
     const fromProfile = (profileSkills || []).map((s) =>
       normalizeSkillForMatching(s.skill_name),
     );
-    const fromTest = skillResults?.skills_json?.tech
+    const fromTech = skillResults?.skills_json?.tech
       ? Object.keys(skillResults.skills_json.tech).map((k) =>
           normalizeSkillForMatching(k),
         )
       : [];
-    return [...new Set([...fromProfile, ...fromTest])];
+    const fromSoft = skillResults?.skills_json?.soft
+      ? Object.keys(skillResults.skills_json.soft).map((k) =>
+          normalizeSkillForMatching(k),
+        )
+      : [];
+    return [...new Set([...fromProfile, ...fromTech, ...fromSoft])];
   }, [profileSkills, skillResults]);
+
+  const experienceForMatch = useMemo(
+    () => experienceFromWorkHistory(workExperiences),
+    [workExperiences],
+  );
 
   // Fetch saved job IDs
   const { data: savedJobIds = [] } = useQuery<string[]>({
@@ -772,7 +780,13 @@ const ProfilePage = () => {
   const { data: savedJobs = [], isLoading: loadingSavedJobs } = useQuery<
     SavedJob[]
   >({
-    queryKey: ["savedJobs", user?.id, userSkillsForMatch.join("|")],
+    queryKey: [
+      "savedJobs",
+      user?.id,
+      userSkillsForMatch.join("|"),
+      experienceForMatch.seniority,
+      experienceForMatch.yearsExperienceTotal,
+    ],
     queryFn: async () => {
       if (!user?.id) return [];
       try {
@@ -847,12 +861,12 @@ const ProfilePage = () => {
             const employmentType = resolveJobEmploymentType(jobDetail);
             const workArrangement = resolveJobWorkArrangement(jobDetail);
 
-            // Total match % (same logic as JobsPage / job detail)
             const matchPercentage =
               user && userSkillsForMatch.length >= 0
-                ? matchJobDetailToUser(
+                ? matchJobAsShownOnJobPost(
                     jobDetail as unknown as JobDetail,
-                    buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                    userSkillsForMatch,
+                    { experience: experienceForMatch },
                   ).overallPercent
                 : undefined;
 

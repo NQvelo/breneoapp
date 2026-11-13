@@ -77,6 +77,8 @@ export function DashboardProfileWelcome() {
       await refreshUser().catch(() => undefined);
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
       await queryClient.invalidateQueries({ queryKey: ["profileSkills"] });
+      await queryClient.invalidateQueries({ queryKey: ["job-match"] });
+      await queryClient.invalidateQueries({ queryKey: ["job-matches"] });
       await queryClient.invalidateQueries({
         queryKey: [...PROFILE_GATE_QUERY_KEY],
       });

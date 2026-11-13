@@ -27,7 +27,6 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { fetchActiveJobs, type ApiJob } from "@/api/jobs";
 import type { JobDetail, JobFilters } from "@/api/jobs/types";
-import { profileApi } from "@/api/profile";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
@@ -36,11 +35,9 @@ import {
   resolveJobWorkArrangement,
 } from "@/utils/jobEmploymentDisplay";
 import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
-import {
-  buildUserMatchProfileFromSkillTest,
-  matchJobDetailToUser,
-  normalizeSkillName,
-} from "@/services/matching";
+import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
+import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
+import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
 import { decodeCompanyParam } from "@/utils/companyPagePath";
 
 type PublicCompany = {
@@ -379,20 +376,8 @@ const CompanyPage = () => {
     enabled: !!user,
   });
 
-  const { data: profileSkills = [] } = useQuery({
-    queryKey: ["profileSkills", user?.id],
-    queryFn: () => profileApi.getMySkills(),
-    enabled: !!user,
-  });
-
-  const userSkillsForMatch = useMemo(
-    () => [
-      ...new Set(
-        profileSkills.map((skill) => normalizeSkillName(skill.skill_name)),
-      ),
-    ],
-    [profileSkills],
-  );
+  const { userSkills: userSkillsForMatch } = useUserSkillsForMatch(user?.id);
+  const { experience } = useUserExperienceForMatch(user?.id);
 
   const jobs = useMemo(() => {
     return listedJobs
@@ -400,9 +385,10 @@ const CompanyPage = () => {
         const card = toCompanyJob(job);
         if (!card) return null;
         const matchPercentage = user
-          ? matchJobDetailToUser(
+          ? matchJobAsShownOnJobPost(
               job as unknown as JobDetail,
-              buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+              userSkillsForMatch,
+              { experience },
             ).overallPercent
           : undefined;
         return {
@@ -412,7 +398,7 @@ const CompanyPage = () => {
         };
       })
       .filter((job): job is CompanyJob => job != null);
-  }, [listedJobs, savedJobIds, user, userSkillsForMatch]);
+  }, [listedJobs, savedJobIds, user, userSkillsForMatch, experience]);
 
   const { topJobs, otherJobs } = useMemo(() => {
     const split = splitCompanyJobs(jobs);

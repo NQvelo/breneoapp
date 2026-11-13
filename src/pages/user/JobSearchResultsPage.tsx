@@ -46,13 +46,10 @@ import {
   JOB_ROLE_CATEGORIES,
   JobSearchPreferenceChips,
 } from "@/components/jobs/JobSearchPreferenceChips";
-import { profileApi } from "@/api/profile";
-import {
-  matchJobDetailToUser,
-  buildUserMatchProfileFromSkillTest,
-  normalizeSkillName,
-} from "@/services/matching";
 import type { JobDetail } from "@/api/jobs/types";
+import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
+import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
+import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
 import { useMobile } from "@/hooks/use-mobile";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { georgianCityLabelById } from "@/data/georgian-cities";
@@ -329,18 +326,9 @@ const JobSearchResultsPage = () => {
   const t = useTranslation();
   const { language } = useLanguage();
 
-  const { data: profileSkills = [] } = useQuery({
-    queryKey: ["profileSkills", user?.id],
-    queryFn: () => profileApi.getMySkills(),
-    enabled: !!user,
-  });
-  const userSkillsForMatch = useMemo(() => {
-    const fromProfile = (profileSkills || []).map((s) =>
-      normalizeSkillName(s.skill_name),
-    );
-    const fromTest = (userTopSkills || []).map((s) => normalizeSkillName(s));
-    return [...new Set([...fromProfile, ...fromTest])];
-  }, [profileSkills, userTopSkills]);
+  // Same skills as the job post page, so each result's overall % matches that post.
+  const { userSkills: userSkillsForMatch } = useUserSkillsForMatch(user?.id);
+  const { experience } = useUserExperienceForMatch(user?.id);
 
   // Get search term and filters from URL
   const searchTerm = searchParams.get("search") || "";
@@ -747,9 +735,10 @@ const JobSearchResultsPage = () => {
         const jobSkills = extractJobSkills(job);
         const matchPercentage =
           user && userSkillsForMatch.length >= 0
-            ? matchJobDetailToUser(
+            ? matchJobAsShownOnJobPost(
                 job as unknown as JobDetail,
-                buildUserMatchProfileFromSkillTest(userSkillsForMatch),
+                userSkillsForMatch,
+                { experience },
               ).overallPercent
             : undefined;
 
@@ -802,7 +791,7 @@ const JobSearchResultsPage = () => {
         };
       })
       .filter((job): job is Job => job !== null);
-  }, [jobs, savedJobs, user, userSkillsForMatch]);
+  }, [jobs, savedJobs, user, userSkillsForMatch, experience]);
 
   const sortBy: ResultSort = RESULT_SORTS.includes(
     searchParams.get("sortBy") as ResultSort,

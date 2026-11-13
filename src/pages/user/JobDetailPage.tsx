@@ -61,15 +61,11 @@ import {
 import { useMobile } from "@/hooks/use-mobile";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import { extractJobSkills } from "@/utils/jobMatchUtils";
-import {
-  matchJobDetailToUser,
-  buildUserMatchProfileFromSkillTest,
-  getStructuredJobFromDetail,
-  normalizeSkillName,
-  matchJobToUser,
-  buildStructuredJobForDisplayedSkills,
-} from "@/services/matching";
+import { normalizeSkillName } from "@/services/matching";
 import { resolveJobDisplayRequiredSkills } from "@/utils/jobSkillsResolve";
+import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
+import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
+import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
 import {
   formatJobSalaryDisplay,
   stripTrailingLari,
@@ -198,58 +194,10 @@ const JobDetailPage = () => {
     enabled: !!user,
   });
 
-  // Fetch user skills from profile (user skills table, same as ProfilePage)
-  const { data: profileSkills = [], isLoading: isLoadingProfileSkills } =
-    useQuery({
-      queryKey: ["profileSkills", user?.id],
-      queryFn: () => profileApi.getMySkills(),
-      enabled: !!user,
-    });
-
-  // Fetch user skills from skill test for matching
-  const { data: skillTestSkills = [], isLoading: isLoadingSkillTestSkills } =
-    useQuery<string[]>({
-      queryKey: ["userSkills", user?.id],
-      queryFn: async () => {
-        if (!user) return [];
-        try {
-          const response = await apiClient.get(
-            `/api/skilltest/results/?user=${user.id}`,
-          );
-
-          let skillTestData = null;
-          if (Array.isArray(response.data) && response.data.length > 0) {
-            skillTestData = response.data[0];
-          } else if (response.data && typeof response.data === "object") {
-            skillTestData = response.data;
-          }
-
-          if (skillTestData && skillTestData.skills_json) {
-            const skillsJson = skillTestData.skills_json || {};
-            const techSkills = Object.keys(skillsJson.tech || {});
-            const softSkills = Object.keys(skillsJson.soft || {});
-            return [...techSkills, ...softSkills];
-          }
-          return [];
-        } catch (error) {
-          console.error("Error fetching user skills for matching:", error);
-          return [];
-        }
-      },
-      enabled: !!user,
-    });
-
-  // Combined user skills: profile table (skill_name) + skill test, normalized for comparison
-  const userSkills = useMemo(() => {
-    const fromProfile = (profileSkills || []).map((s) =>
-      normalizeSkillName(s.skill_name),
-    );
-    const fromTest = (skillTestSkills || []).map((s) => normalizeSkillName(s));
-    return [...new Set([...fromProfile, ...fromTest])];
-  }, [profileSkills, skillTestSkills]);
-
-  const isLoadingUserSkills =
-    isLoadingProfileSkills || isLoadingSkillTestSkills;
+  // Same skill union as home, jobs, and search so the overall % matches.
+  const { profileSkills, userSkills, isLoadingUserSkills } =
+    useUserSkillsForMatch(user?.id);
+  const { experience } = useUserExperienceForMatch(user?.id);
 
   const jobIdForSave = jobDetail?.id || jobDetail?.job_id || jobId || "";
   const isSaved = savedJobs?.includes(String(jobIdForSave));
@@ -1440,35 +1388,18 @@ const JobDetailPage = () => {
     }
   };
 
-  // Base match from full profile (used to init chip selection)
-  const matchResult: MatchResult | null =
-    user && jobDetail
-      ? matchJobDetailToUser(
-          jobDetail,
-          buildUserMatchProfileFromSkillTest(userSkills),
-        )
-      : null;
-
-  // Match recalculated from selected skills (chips); skill % reflects user's selection
-  const displayMatchResult: MatchResult | null = useMemo(() => {
+  // Overall % uses the required skills shown on this page.
+  // Until the skill chips are initialized, use the same default as listing cards
+  // (skills the user already has). After that, the chips the user toggles apply.
+  const effectiveMatchResult: MatchResult | null = useMemo(() => {
     if (!user || !jobDetail) return null;
-    const baseProfile = buildUserMatchProfileFromSkillTest(userSkills);
-    const selectedNormalized = Array.from(selectedRequiredSkills).map(
-      normalizeSkillName,
-    );
-    const profileWithSelection = {
-      ...baseProfile,
-      userSkills: selectedNormalized,
-      techStackExperience: selectedNormalized,
-    };
-    const structured =
-      requiredSkillsList.length > 0
-        ? buildStructuredJobForDisplayedSkills(jobDetail, requiredSkillsList)
-        : getStructuredJobFromDetail(jobDetail);
-    return matchJobToUser(structured, profileWithSelection);
-  }, [jobDetail, user, userSkills, selectedRequiredSkills, requiredSkillsList]);
-
-  const effectiveMatchResult = displayMatchResult ?? matchResult;
+    const jobKey = String(jobDetail.id ?? jobDetail.job_id ?? "");
+    const chipsReady = selectedSkillsInitedForJobRef.current === jobKey;
+    return matchJobAsShownOnJobPost(jobDetail, userSkills, {
+      ...(chipsReady ? { selectedSkillNames: selectedRequiredSkills } : {}),
+      experience,
+    });
+  }, [jobDetail, user, userSkills, selectedRequiredSkills, experience]);
 
   const industryMatchForBar = useMemo(() => {
     const tags = parseJobIndustryTags(
@@ -1524,7 +1455,9 @@ const JobDetailPage = () => {
       title: getJobTitle(),
       company_name: getCompanyName() || undefined,
       location:
-        location && location !== "Location not specified" ? location : undefined,
+        location && location !== "Location not specified"
+          ? location
+          : undefined,
       logo: getCompanyLogo(),
       apply_url: externalApplyUrl || undefined,
     };
@@ -1655,10 +1588,15 @@ const JobDetailPage = () => {
         getSnapshot={getExternalJobSnapshot}
       />
       {isMobile ? (
-        <Drawer open={!!skillPrompt} onOpenChange={(open) => !open && closeSkillConfirm()}>
+        <Drawer
+          open={!!skillPrompt}
+          onOpenChange={(open) => !open && closeSkillConfirm()}
+        >
           <DrawerContent className="border-none bg-white dark:bg-background">
             <DrawerHeader className="items-start pb-0 text-left">
-              <div className="mb-3 flex justify-center pl-11">{skillIllustration}</div>
+              <div className="mb-3 flex justify-center pl-11">
+                {skillIllustration}
+              </div>
               <DrawerTitle>{skillPromptTitle}</DrawerTitle>
               <DrawerDescription className="mt-1">
                 {skillConfirmCopy}
@@ -1671,7 +1609,10 @@ const JobDetailPage = () => {
           </DrawerContent>
         </Drawer>
       ) : (
-        <Dialog open={!!skillPrompt} onOpenChange={(open) => !open && closeSkillConfirm()}>
+        <Dialog
+          open={!!skillPrompt}
+          onOpenChange={(open) => !open && closeSkillConfirm()}
+        >
           <DialogContent className="max-w-sm gap-0">
             <div className="mb-3 flex justify-center">{skillIllustration}</div>
             <DialogHeader className="space-y-1 text-left sm:text-left">

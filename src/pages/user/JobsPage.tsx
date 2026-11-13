@@ -71,13 +71,11 @@ import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { JobSearchPreferenceChips } from "@/components/jobs/JobSearchPreferenceChips";
-import { profileApi } from "@/api/profile";
-import {
-  matchJobDetailToUser,
-  buildUserMatchProfileFromSkillTest,
-  normalizeSkillName,
-} from "@/services/matching";
 import type { JobDetail } from "@/api/jobs/types";
+import { matchJobAsShownOnJobPost } from "@/utils/displayedJobMatch";
+import { useUserSkillsForMatch } from "@/hooks/useUserSkillsForMatch";
+import { useUserExperienceForMatch } from "@/hooks/useUserExperienceForMatch";
+import { takeTopExperienceScoredJobs } from "@/utils/topExperienceJobs";
 import { useMobile } from "@/hooks/use-mobile";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
@@ -111,6 +109,7 @@ interface Job {
   work_arrangement?: string;
   benefits?: string;
   matchPercentage?: number;
+  experiencePercent?: number | null;
 }
 
 // Skill icon mapping - maps skill names to appropriate icons
@@ -766,19 +765,9 @@ const JobsPage = () => {
   const [loadingSkills, setLoadingSkills] = useState(true);
   const skillsInitializedRef = React.useRef(false);
 
-  // Profile skills (same source as JobDetailPage for identical total match)
-  const { data: profileSkills = [] } = useQuery({
-    queryKey: ["profileSkills", user?.id],
-    queryFn: () => profileApi.getMySkills(),
-    enabled: !!user,
-  });
-  const userSkillsForMatch = useMemo(() => {
-    const fromProfile = (profileSkills || []).map((s) =>
-      normalizeSkillName(s.skill_name),
-    );
-    const fromTest = (userTopSkills || []).map((s) => normalizeSkillName(s));
-    return [...new Set([...fromProfile, ...fromTest])];
-  }, [profileSkills, userTopSkills]);
+  // Same skills as the job post page, so each job's overall % matches that post.
+  const { userSkills: userSkillsForMatch } = useUserSkillsForMatch(user?.id);
+  const { experience, hasWorkExperience } = useUserExperienceForMatch(user?.id);
 
   // Pagination state for regular jobs
   const [regularJobsPage, setRegularJobsPage] = useState(1);
@@ -1663,14 +1652,14 @@ const JobsPage = () => {
             const employmentType = resolveJobEmploymentType(job);
             const workArrangement = resolveJobWorkArrangement(job);
 
-            // Total match % (same logic as job detail page)
-            const matchPercentage =
+            const match =
               user && userSkillsForMatch.length >= 0
-                ? matchJobDetailToUser(
+                ? matchJobAsShownOnJobPost(
                     job as unknown as JobDetail,
-                    buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-                  ).overallPercent
-                : undefined;
+                    userSkillsForMatch,
+                    { experience },
+                  )
+                : null;
 
             return {
               id: jobId,
@@ -1687,7 +1676,8 @@ const JobsPage = () => {
               salary,
               employment_type: employmentType,
               work_arrangement: workArrangement,
-              matchPercentage,
+              matchPercentage: match?.overallPercent,
+              experiencePercent: match?.expLevel.percent ?? null,
             };
           })
           .filter((job): job is Job => job !== null);
@@ -1696,7 +1686,7 @@ const JobsPage = () => {
         return [];
       }
     },
-    [savedJobs, user, userSkillsForMatch],
+    [savedJobs, user, userSkillsForMatch, experience],
   );
 
   const transformedJobs = React.useMemo(
@@ -1704,13 +1694,13 @@ const JobsPage = () => {
     [jobs, transformApiJobsToJobList],
   );
 
-  // Top matched jobs: sort by match % descending, show 3 on the home jobs page
   const topMatchedJobs = useMemo(() => {
-    const byMatch = [...transformedJobs].sort(
-      (a, b) => (b.matchPercentage ?? 0) - (a.matchPercentage ?? 0),
+    return takeTopExperienceScoredJobs(
+      transformedJobs,
+      3,
+      hasWorkExperience,
     );
-    return byMatch.slice(0, 3);
-  }, [transformedJobs]);
+  }, [transformedJobs, hasWorkExperience]);
 
   // Transform internship jobs separately - same transformation logic as regular jobs
   const transformedInternshipJobs = React.useMemo(() => {
@@ -1911,14 +1901,14 @@ const JobsPage = () => {
           const employmentType = resolveJobEmploymentType(job);
           const workArrangement = resolveJobWorkArrangement(job);
 
-          // Total match % (same logic as job detail page)
-          const matchPercentage =
+          const match =
             user && userSkillsForMatch.length >= 0
-              ? matchJobDetailToUser(
+              ? matchJobAsShownOnJobPost(
                   job as unknown as JobDetail,
-                  buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-                ).overallPercent
-              : undefined;
+                  userSkillsForMatch,
+                  { experience },
+                )
+              : null;
 
           return {
             id: jobId,
@@ -1935,7 +1925,8 @@ const JobsPage = () => {
             salary,
             employment_type: employmentType,
             work_arrangement: workArrangement,
-            matchPercentage,
+            matchPercentage: match?.overallPercent,
+            experiencePercent: match?.expLevel.percent ?? null,
           };
         })
         .filter((job): job is Job => job !== null);
@@ -1943,7 +1934,7 @@ const JobsPage = () => {
       console.error("Error transforming internship jobs:", error);
       return [];
     }
-  }, [internshipJobsRaw, savedJobs, user, userSkillsForMatch]);
+  }, [internshipJobsRaw, savedJobs, user, userSkillsForMatch, experience]);
 
   // All internship jobs - no filtering
   const internJobs = useMemo(() => {
@@ -2130,14 +2121,14 @@ const JobsPage = () => {
           const employmentType = resolveJobEmploymentType(job);
           const workArrangement = resolveJobWorkArrangement(job);
 
-          // Total match % (same logic as job detail page)
-          const matchPercentage =
+          const match =
             user && userSkillsForMatch.length >= 0
-              ? matchJobDetailToUser(
+              ? matchJobAsShownOnJobPost(
                   job as unknown as JobDetail,
-                  buildUserMatchProfileFromSkillTest(userSkillsForMatch),
-                ).overallPercent
-              : undefined;
+                  userSkillsForMatch,
+                  { experience },
+                )
+              : null;
 
           return {
             id: jobId,
@@ -2156,7 +2147,8 @@ const JobsPage = () => {
             salary,
             employment_type: employmentType,
             work_arrangement: workArrangement,
-            matchPercentage,
+            matchPercentage: match?.overallPercent,
+            experiencePercent: match?.expLevel.percent ?? null,
           };
         })
         .filter((job): job is Job => job !== null);
@@ -2164,11 +2156,15 @@ const JobsPage = () => {
       console.error("Error transforming remote jobs:", error);
       return [];
     }
-  }, [allRemoteJobs, savedJobs, user, userSkillsForMatch]);
+  }, [allRemoteJobs, savedJobs, user, userSkillsForMatch, experience]);
 
   const remoteJobs = useMemo(() => {
-    return transformedRemoteJobs.slice(0, 3);
-  }, [transformedRemoteJobs]);
+    return takeTopExperienceScoredJobs(
+      transformedRemoteJobs,
+      3,
+      hasWorkExperience,
+    );
+  }, [transformedRemoteJobs, hasWorkExperience]);
 
   // Debug logging
   useEffect(() => {

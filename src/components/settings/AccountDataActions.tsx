@@ -53,6 +53,8 @@ export function AccountDataActions() {
           refreshUser(),
           queryClient.invalidateQueries({ queryKey: ["profile"] }),
           queryClient.invalidateQueries({ queryKey: ["profileSkills"] }),
+          queryClient.invalidateQueries({ queryKey: ["job-match"] }),
+          queryClient.invalidateQueries({ queryKey: ["job-matches"] }),
           queryClient.invalidateQueries({ queryKey: ["myResume"] }),
         ]);
         toast.success(copy.cleanDataSuccess);

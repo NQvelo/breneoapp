@@ -159,6 +159,8 @@ export function AccountCvSection() {
       profileApi.getMySkills().catch(() => undefined),
       queryClient.invalidateQueries({ queryKey: ["profile"] }),
       queryClient.invalidateQueries({ queryKey: ["profileSkills"] }),
+      queryClient.invalidateQueries({ queryKey: ["job-match"] }),
+      queryClient.invalidateQueries({ queryKey: ["job-matches"] }),
       queryClient.invalidateQueries({ queryKey: ["profileGate"] }),
     ]);
     const data = meProfile?.data;
