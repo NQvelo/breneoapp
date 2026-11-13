@@ -385,7 +385,7 @@ export function TextInterviewChat() {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-28 sm:px-6 md:pb-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-36 sm:px-6 md:pb-5">
         <div className="flex w-full flex-col gap-2">
           {busy && messages.length === 0 ? <TypingRow /> : null}
           {messages.map((message, index) => (
@@ -404,82 +404,82 @@ export function TextInterviewChat() {
       </div>
 
       <form
-        className="fixed inset-x-0 bottom-0 z-40 shrink-0 border-t border-gray-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-gray-700 dark:bg-[#242424] md:static md:inset-auto md:z-auto md:bg-transparent md:px-6 md:pb-3 dark:md:bg-transparent"
+        className="fixed inset-x-0 bottom-0 z-40 shrink-0 border-t border-gray-200 bg-white px-4 pt-3 pb-[max(2.25rem,calc(env(safe-area-inset-bottom)+1.5rem))] dark:border-gray-700 dark:bg-[#242424] md:static md:inset-auto md:z-auto md:bg-transparent md:px-6 md:py-3 md:pb-3 dark:md:bg-transparent"
         onSubmit={(event) => {
           event.preventDefault();
           void sendAnswer();
         }}
       >
         <div className="flex w-full items-center gap-2">
-          {recording && recordingStream && recordingAudio ? (
-            <>
-              <VoiceWave
-                stream={recordingStream}
-                audioContext={recordingAudio}
-                className="md:hidden"
-              />
-              <div className="hidden h-[3.2rem] min-w-0 flex-1 items-center overflow-hidden rounded-md border border-input bg-input md:flex">
+          <div className="relative min-w-0 flex-1">
+            {recording && recordingStream && recordingAudio ? (
+              <>
                 <VoiceWave
                   stream={recordingStream}
                   audioContext={recordingAudio}
-                  embedded
+                  className="pr-11 md:hidden"
                 />
-                <Textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void sendAnswer();
-                    }
-                  }}
-                  placeholder={t.courses.textChatPlaceholder}
-                  disabled={busy || finished || !questionId || transcribing}
-                  rows={1}
-                  className="h-full min-h-0 flex-1 resize-none border-0 bg-transparent py-3 text-sm shadow-none"
-                />
-              </div>
-            </>
-          ) : (
-            <Textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void sendAnswer();
-                }
-              }}
-              placeholder={t.courses.textChatPlaceholder}
-              disabled={busy || finished || !questionId || transcribing}
-              rows={1}
-              className="h-[3.2rem] min-h-[3.2rem] max-h-36 resize-none py-3 text-base md:text-sm"
-            />
-          )}
-          <Button
-            type="button"
-            size="icon"
-            variant="secondary"
-            disabled={busy || finished || !questionId || transcribing}
-            aria-label={
-              recording ? t.courses.textChatStopRecording : t.courses.textChatRecord
-            }
-            aria-pressed={recording}
-            onClick={() => {
-              void toggleRecording();
-            }}
-            className={`h-[3.2rem] w-[3.2rem] shrink-0 rounded-md ${
-              recording
-                ? "bg-rose-500 text-white hover:bg-rose-500/90"
-                : "bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#4A4A4A] dark:text-white dark:hover:bg-[#4A4A4A]/90"
-            }`}
-          >
-            {transcribing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="hidden h-[3.2rem] min-w-0 items-center overflow-hidden rounded-md border border-input bg-input md:flex">
+                  <VoiceWave
+                    stream={recordingStream}
+                    audioContext={recordingAudio}
+                    embedded
+                  />
+                  <Textarea
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        void sendAnswer();
+                      }
+                    }}
+                    placeholder={t.courses.textChatPlaceholder}
+                    disabled={busy || finished || !questionId || transcribing}
+                    rows={1}
+                    className="h-full min-h-0 flex-1 resize-none border-0 bg-transparent py-3 pr-11 text-sm shadow-none"
+                  />
+                </div>
+              </>
             ) : (
-              <Mic className={`h-4 w-4 ${recording ? "animate-pulse" : ""}`} />
+              <Textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendAnswer();
+                  }
+                }}
+                placeholder={t.courses.textChatPlaceholder}
+                disabled={busy || finished || !questionId || transcribing}
+                rows={1}
+                className="h-[3.2rem] min-h-[3.2rem] max-h-36 resize-none py-3 pr-11 text-base md:text-sm"
+              />
             )}
-          </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={busy || finished || !questionId || transcribing}
+              aria-label={
+                recording ? t.courses.textChatStopRecording : t.courses.textChatRecord
+              }
+              aria-pressed={recording}
+              onClick={() => {
+                void toggleRecording();
+              }}
+              className={`absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 bg-transparent shadow-none hover:bg-transparent ${
+                recording ? "text-rose-500" : "text-muted-foreground"
+              }`}
+            >
+              {transcribing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mic className={`h-4 w-4 ${recording ? "animate-pulse" : ""}`} />
+              )}
+            </Button>
+          </div>
           <Button
             type="submit"
             size="icon"
@@ -557,7 +557,7 @@ function VoiceWave({
       className={`flex items-center gap-2 overflow-hidden ${
         embedded
           ? "h-full w-[42%] max-w-xs shrink-0 border-r border-input px-3"
-          : "h-[3.2rem] min-w-0 flex-1 rounded-md border border-input bg-input px-3"
+          : "h-[3.2rem] min-w-0 flex-1 rounded-md border border-input bg-input pl-3"
       } ${className}`}
     >
       <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-rose-500" />
