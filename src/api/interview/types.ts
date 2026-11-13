@@ -51,7 +51,9 @@ export type InterviewEvaluation = Omit<
   "question_number" | "total_questions" | "interview_complete" | "next_question"
 >;
 
+export type InterviewMode = "spoken" | "text";
+
 export type StartInterviewParams =
-  | { role: string }
-  | { job_id: number }
-  | { job_position: string };
+  | { role: string; mode?: InterviewMode }
+  | { job_id: number; mode?: InterviewMode }
+  | { job_position: string; mode?: InterviewMode };

@@ -27,6 +27,8 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
   showSidebar?: boolean;
   showHeader?: boolean;
+  /** Bottom tab bar on small screens. Desktop sidebar stays either way. */
+  showMobileNav?: boolean;
   background?: "default" | "white";
   /**
    * When false, `<main>` does not scroll internally; content grows with the page and the window scrolls.
@@ -41,6 +43,7 @@ export function DashboardLayout({
   children,
   showSidebar = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showSidebar,
   showHeader = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showHeader,
+  showMobileNav = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showMobileNav,
   background = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.background,
   containMainScroll = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.containMainScroll,
   navLocked = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.navLocked,
@@ -52,6 +55,7 @@ export function DashboardLayout({
     setShellOptions({
       showSidebar,
       showHeader,
+      showMobileNav,
       background,
       containMainScroll,
       navLocked,
@@ -61,6 +65,7 @@ export function DashboardLayout({
     setShellOptions,
     showSidebar,
     showHeader,
+    showMobileNav,
     background,
     containMainScroll,
     navLocked,
@@ -72,6 +77,7 @@ export function DashboardLayout({
     <DashboardChrome
       showSidebar={showSidebar}
       showHeader={showHeader}
+      showMobileNav={showMobileNav}
       background={background}
       containMainScroll={containMainScroll}
       navLocked={navLocked}
@@ -86,6 +92,7 @@ export function DashboardChrome({
   children,
   showSidebar = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showSidebar,
   showHeader = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showHeader,
+  showMobileNav = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.showMobileNav,
   background = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.background,
   containMainScroll = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.containMainScroll,
   navLocked = DEFAULT_DASHBOARD_LAYOUT_OPTIONS.navLocked,
@@ -186,6 +193,7 @@ export function DashboardChrome({
           toggleSidebar={toggleSidebar}
           onUpgradeClick={openSubscriptionModal}
           navLocked={navLocked}
+          showMobileNav={showMobileNav}
         />
       )}
       {showHeader && (

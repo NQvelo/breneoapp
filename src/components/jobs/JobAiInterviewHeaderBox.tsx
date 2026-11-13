@@ -10,10 +10,12 @@ export function buildAiInterviewStartPath(
   jobTitle: string,
   jobId?: string | number | null,
   role?: string | null,
+  mode?: "text" | "video" | null,
 ): string {
   const params = new URLSearchParams({
     return: window.location.pathname + window.location.search,
   });
+  if (mode === "text") params.set("mode", "text");
   const slug = role?.trim() ?? "";
   if (slug) {
     params.set("role", slug);

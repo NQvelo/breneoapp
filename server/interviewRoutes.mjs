@@ -53,6 +53,7 @@ export function registerInterviewRoutes(app, deps) {
       }
 
       // Role slug wins. A real job sends only job_id so the title is not used to pick questions.
+      const mode = String(raw.mode ?? "").trim();
       const upstreamBody = {
         user_id: ctx.userId,
         ...(role
@@ -60,6 +61,7 @@ export function registerInterviewRoutes(app, deps) {
           : jobId != null
             ? { job_id: jobId }
             : { job_position: jobPosition }),
+        ...(mode === "text" ? { mode: "text" } : {}),
       };
 
       const upstream = await fetch(`${base}/api/v1/interview/start/`, {
@@ -193,8 +195,153 @@ export function registerInterviewRoutes(app, deps) {
     "/api/v1/interview/submit-audio/:questionId",
     handleInterviewSubmitAudio,
   );
+  async function handleInterviewSubmitText(req, res) {
+    try {
+      const ctx = await deps.requireUserAuth(req, res);
+      if (!ctx) return;
+
+      if (!deps.aggregatorKey) {
+        return res.status(500).json({
+          detail:
+            "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart the BFF.",
+        });
+      }
+
+      const questionId = encodeURIComponent(
+        String(req.params.questionId || "").trim(),
+      );
+      if (!questionId) {
+        return res.status(400).json({ detail: "question_id is required" });
+      }
+
+      const raw =
+        req.body && typeof req.body === "object" && !Array.isArray(req.body)
+          ? /** @type {Record<string, unknown>} */ (req.body)
+          : {};
+      const answer = String(raw.answer ?? raw.answer_text ?? "").trim();
+      if (!answer) {
+        return res.status(400).json({ detail: "answer is required" });
+      }
+
+      const upstream = await fetch(
+        `${base}/api/v1/interview/submit-text/${questionId}/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-Employer-Key": deps.aggregatorKey,
+          },
+          body: JSON.stringify({
+            user_id: ctx.userId,
+            answer,
+          }),
+        },
+      );
+
+      const text = await upstream.text();
+      const data = deps.parseUpstreamJson(text);
+      if (!upstream.ok) {
+        return res
+          .status(upstream.status >= 400 ? upstream.status : 502)
+          .json(
+            typeof data === "object" && data !== null
+              ? data
+              : { detail: text || "Interview text submit failed" },
+          );
+      }
+
+      return res.status(upstream.status).json(data);
+    } catch (e) {
+      console.error("[interview-routes] submit-text failed:", e);
+      return res.status(500).json({ detail: "Internal server error" });
+    }
+  }
+
   app.post(
     "/api/v1/interview/submit-audio/:questionId/",
     handleInterviewSubmitAudio,
   );
+  app.post(
+    "/api/v1/interview/submit-text/:questionId",
+    handleInterviewSubmitText,
+  );
+  app.post(
+    "/api/v1/interview/submit-text/:questionId/",
+    handleInterviewSubmitText,
+  );
+
+  async function handleInterviewTranscribe(req, res) {
+    try {
+      const ctx = await deps.requireUserAuth(req, res);
+      if (!ctx) return;
+
+      if (!deps.aggregatorKey) {
+        return res.status(500).json({
+          detail:
+            "JOB_AGGREGATOR_EMPLOYER_KEY is not set. Add it to .env and restart the BFF.",
+        });
+      }
+
+      const contentType = String(req.headers["content-type"] || "").toLowerCase();
+      if (!contentType.includes("multipart/form-data")) {
+        return res.status(400).json({
+          detail: "Content-Type must be multipart/form-data with audio_file",
+        });
+      }
+
+      let buffer;
+      try {
+        buffer = await deps.readRequestBodyIntoBuffer(
+          req,
+          INTERVIEW_MULTIPART_MAX_BYTES,
+        );
+      } catch (e) {
+        const code = /** @type {Error & { code?: string }} */ (e).code;
+        return res.status(400).json({
+          detail:
+            code === "PAYLOAD_TOO_LARGE"
+              ? "Upload exceeds 25MB limit."
+              : "Could not read multipart upload.",
+        });
+      }
+
+      if (!buffer.length) {
+        return res.status(400).json({ detail: "Empty multipart body" });
+      }
+
+      const upstreamUrl = new URL(`${base}/api/v1/interview/transcribe/`);
+      upstreamUrl.searchParams.set("user_id", ctx.userId);
+
+      const upstream = await fetch(upstreamUrl.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": String(req.headers["content-type"] || ""),
+          Accept: "application/json",
+          "X-Employer-Key": deps.aggregatorKey,
+        },
+        body: buffer,
+      });
+
+      const text = await upstream.text();
+      const data = deps.parseUpstreamJson(text);
+      if (!upstream.ok) {
+        return res
+          .status(upstream.status >= 400 ? upstream.status : 502)
+          .json(
+            typeof data === "object" && data !== null
+              ? data
+              : { detail: text || "Interview transcription failed" },
+          );
+      }
+
+      return res.status(upstream.status).json(data);
+    } catch (e) {
+      console.error("[interview-routes] transcribe failed:", e);
+      return res.status(500).json({ detail: "Internal server error" });
+    }
+  }
+
+  app.post("/api/v1/interview/transcribe", handleInterviewTranscribe);
+  app.post("/api/v1/interview/transcribe/", handleInterviewTranscribe);
 }

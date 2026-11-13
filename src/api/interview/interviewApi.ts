@@ -34,7 +34,10 @@ function formatInterviewErrorDetail(data: Record<string, unknown>): string {
 
 function interviewStartBody(
   params: StartInterviewParams | string,
-): { role: string } | { job_id: number } | { job_position: string } {
+):
+  | { role: string; mode?: "text" }
+  | { job_id: number; mode?: "text" }
+  | { job_position: string; mode?: "text" } {
   if (typeof params === "string") {
     const trimmed = params.trim();
     if (!trimmed) {
@@ -50,21 +53,29 @@ function interviewStartBody(
     if (!role) {
       throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
     }
-    return { role };
+    return withInterviewMode({ role }, params.mode);
   }
 
   if ("job_id" in params) {
     if (!Number.isFinite(params.job_id)) {
       throw new Error("არასწორი სამუშაოს იდენტიფიკატორი.");
     }
-    return { job_id: params.job_id };
+    return withInterviewMode({ job_id: params.job_id }, params.mode);
   }
 
   const position = params.job_position.trim();
   if (!position) {
     throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
   }
-  return { job_position: position };
+  return withInterviewMode({ job_position: position }, params.mode);
+}
+
+function withInterviewMode<T extends Record<string, unknown>>(
+  body: T,
+  mode: "spoken" | "text" | undefined,
+): T | (T & { mode: "text" }) {
+  if (mode === "text") return { ...body, mode: "text" };
+  return body;
 }
 
 async function parseJsonBody(res: Response): Promise<Record<string, unknown>> {
@@ -168,7 +179,81 @@ export async function submitInterviewAudio(
   return data as unknown as SubmitInterviewResponse;
 }
 
+/** POST /api/v1/interview/submit-text/{questionId}/ — typed answer, no audio. */
+export async function submitInterviewText(
+  questionId: string,
+  answer: string,
+): Promise<SubmitInterviewResponse> {
+  assertEmployerJobsProxyConfigured("POST");
+
+  const id = encodeURIComponent(String(questionId).trim());
+  const text = answer.trim();
+  if (!id) {
+    throw new Error("კითხვის იდენტიფიკატორი არ არის.");
+  }
+  if (!text) {
+    throw new Error("პასუხი ცარიელია.");
+  }
+
+  const res = await employerBffFetch(
+    interviewUrl(`/api/v1/interview/submit-text/${id}/`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer: text }),
+    },
+  );
+
+  const data = await parseJsonBody(res);
+  if (!res.ok) throwInterviewError(res, data);
+
+  return data as unknown as SubmitInterviewResponse;
+}
+
+/** POST /api/v1/interview/transcribe/ — speech to text, no scoring. */
+export async function transcribeInterviewAudio(
+  audioBlob: Blob,
+  language: "ka" | "en",
+): Promise<string> {
+  assertEmployerJobsProxyConfigured("POST");
+
+  const maxBytes = 25 * 1024 * 1024;
+  if (audioBlob.size > maxBytes) {
+    throw new Error("ჩანაწერი 25 MB-ზე მეტია. გთხოვთ, შეამციროთ ხანგრძლივობა.");
+  }
+
+  const formData = new FormData();
+  const ext = audioBlob.type.includes("webm")
+    ? "webm"
+    : audioBlob.type.includes("ogg")
+      ? "ogg"
+      : audioBlob.type.includes("mp4")
+        ? "m4a"
+        : "webm";
+  formData.append("audio_file", audioBlob, `interview-recording.${ext}`);
+  formData.append("language", language);
+
+  const res = await employerBffFetch(interviewUrl("/api/v1/interview/transcribe/"), {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await parseJsonBody(res);
+  if (!res.ok) throwInterviewError(res, data);
+
+  const transcript =
+    data && typeof data === "object" && "transcript" in data
+      ? String((data as { transcript?: unknown }).transcript ?? "").trim()
+      : "";
+  if (!transcript) {
+    throw new Error("ხმა ვერ გაიშიფრა. სცადე თავიდან.");
+  }
+  return transcript;
+}
+
 export const interviewApi = {
   startInterview,
   submitInterviewAudio,
+  submitInterviewText,
+  transcribeInterviewAudio,
 };

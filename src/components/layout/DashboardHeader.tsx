@@ -144,6 +144,7 @@ const getPageTitle = (
     return t.notifications.title;
   if (pathname.startsWith("/cv-views")) return "CV views";
   if (pathname.startsWith("/skill-test")) return t.skillTest.title;
+  if (pathname.startsWith("/interviews")) return t.courses.interviews;
   if (pathname.startsWith("/webinars")) return t.atoms.headerTitle;
   // Don't show title for skill-path page - show back button instead
   if (pathname.startsWith("/skill-path")) return null;

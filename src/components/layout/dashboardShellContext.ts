@@ -3,6 +3,7 @@ import { createContext } from "react";
 export interface DashboardLayoutOptions {
   showSidebar: boolean;
   showHeader: boolean;
+  showMobileNav: boolean;
   background: "default" | "white";
   containMainScroll: boolean;
 }
@@ -10,6 +11,7 @@ export interface DashboardLayoutOptions {
 export const DEFAULT_DASHBOARD_LAYOUT_OPTIONS: DashboardLayoutOptions = {
   showSidebar: true,
   showHeader: true,
+  showMobileNav: true,
   background: "default",
   containMainScroll: true,
 };

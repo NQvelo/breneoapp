@@ -382,7 +382,7 @@ const jsonBodyParser = express.json({ limit: "2mb" });
 app.use((req, res, next) => {
   const isInterviewAudioUpload =
     req.method === "POST" &&
-    /\/api\/v1\/interview\/submit-audio\//i.test(
+    /\/api\/v1\/interview\/(?:submit-audio|transcribe)\//i.test(
       String(req.originalUrl || req.url || ""),
     );
   if (isInterviewAudioUpload) return next();

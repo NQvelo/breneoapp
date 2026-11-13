@@ -124,7 +124,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
-export { Bookmark, Share, Share2, Sun } from "lucide-react";
+export { Bookmark, Send, Share, Share2, Sun } from "lucide-react";
 
 export type IconProps = Omit<IconsaxProps, "ref"> & {
   strokeWidth?: number | string;

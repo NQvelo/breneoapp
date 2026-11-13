@@ -28,6 +28,7 @@ export function DashboardShell() {
     setOptions((prev) =>
       prev.showSidebar === next.showSidebar &&
       prev.showHeader === next.showHeader &&
+      prev.showMobileNav === next.showMobileNav &&
       prev.background === next.background &&
       prev.containMainScroll === next.containMainScroll
         ? prev

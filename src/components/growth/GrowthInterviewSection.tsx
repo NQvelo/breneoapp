@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { profileApi } from "@/api/profile";
-import { JobAiInterviewIllustration } from "@/components/jobs/JobAiInterviewHeaderBox";
-import { JobStartAiInterviewButton } from "@/components/jobs/JobStartAiInterviewButton";
+import {
+  JobAiInterviewIllustration,
+  buildAiInterviewStartPath,
+} from "@/components/jobs/JobAiInterviewHeaderBox";
+import { MessageSquare, Video } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,6 +23,7 @@ import {
 } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/contexts/LanguageContext";
+import { useLocalizedNavigate } from "@/hooks/useLocalizedNavigate";
 import { useMobile } from "@/hooks/use-mobile";
 import {
   matchInterviewRoles,
@@ -123,8 +127,12 @@ function HowItWorksModal({
   );
 }
 
+const interviewActionClass =
+  "h-8 gap-1.5 rounded-md bg-[#E6E7EB] px-2.5 text-xs text-black hover:bg-[#E6E7EB]/90 dark:bg-[#4A4A4A] dark:text-white dark:hover:bg-[#4A4A4A]/90";
+
 export function GrowthInterviewSection() {
   const t = useTranslation();
+  const navigate = useLocalizedNavigate();
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const { data: cvSignals, isLoading } = useQuery({
     queryKey: ["growthInterviewCv"],
@@ -165,13 +173,37 @@ export function GrowthInterviewSection() {
                   <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">
                     {title}
                   </h3>
-                  <JobStartAiInterviewButton
-                    role={roleId}
-                    jobTitle={title}
-                    label={t.courses.startInterview}
-                    showIcon={false}
-                    className="shrink-0"
-                  />
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        navigate(
+                          buildAiInterviewStartPath(title, null, roleId, "text"),
+                        )
+                      }
+                      className={interviewActionClass}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      {t.courses.textInterview}
+                    </Button>
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled
+                        className={interviewActionClass}
+                      >
+                        <Video className="h-4 w-4" />
+                        {t.courses.videoInterview}
+                      </Button>
+                      <span className="pointer-events-none absolute -top-2 right-0 z-10 whitespace-nowrap rounded-full bg-breneo-blue px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                        {t.courses.interviewComingSoon}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               );
             })

@@ -11,6 +11,7 @@ interface JobStartAiInterviewButtonProps {
   jobId?: string | number | null;
   /** Onboarding role slug. Practice sends this instead of the translated title. */
   role?: string | null;
+  mode?: "text" | "video";
   size?: ButtonProps["size"];
   className?: string;
   label?: string;
@@ -21,6 +22,7 @@ export function JobStartAiInterviewButton({
   jobTitle,
   jobId,
   role,
+  mode = "video",
   size = "sm",
   className,
   label,
@@ -30,7 +32,7 @@ export function JobStartAiInterviewButton({
   const navigate = useLocalizedNavigate();
 
   const handleStart = () => {
-    navigate(buildAiInterviewStartPath(jobTitle, jobId, role));
+    navigate(buildAiInterviewStartPath(jobTitle, jobId, role, mode));
   };
 
   return (

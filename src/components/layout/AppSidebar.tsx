@@ -46,6 +46,7 @@ interface AppSidebarProps {
   toggleSidebar: () => void;
   onUpgradeClick?: () => void;
   navLocked?: boolean;
+  showMobileNav?: boolean;
 }
 
 const lockedNavClass = "pointer-events-none cursor-not-allowed opacity-40";
@@ -80,6 +81,7 @@ export const AppSidebar = React.memo(function AppSidebar({
   toggleSidebar,
   onUpgradeClick,
   navLocked = false,
+  showMobileNav = true,
 }: AppSidebarProps) {
   const location = useLocation();
   // ✅ Get the user object directly from the context
@@ -357,7 +359,7 @@ export const AppSidebar = React.memo(function AppSidebar({
 
   return (
     <>
-      {/* Mobile Header */}
+      {showMobileNav ? (
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#F3F3F4]/80 dark:bg-[#181818]/80 backdrop-blur-xl backdrop-saturate-150 px-4 py-3">
         <div className="flex items-center justify-between">
           <LocalizedLink to={homePath} className="flex items-center ml-1">
@@ -397,13 +399,16 @@ export const AppSidebar = React.memo(function AppSidebar({
           </div>
         </div>
       </div>
+      ) : null}
 
-      <MobileTabBar
-        role={isAcademy ? "academy" : isEmployer ? "employer" : "user"}
-        profilePath={profilePath}
-        avatarUrl={sidebarAvatarUrl}
-        navLocked={navLocked}
-      />
+      {showMobileNav ? (
+        <MobileTabBar
+          role={isAcademy ? "academy" : isEmployer ? "employer" : "user"}
+          profilePath={profilePath}
+          avatarUrl={sidebarAvatarUrl}
+          navLocked={navLocked}
+        />
+      ) : null}
 
       {/* Desktop Sidebar */}
       <div
