@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { SubmitInterviewResponse } from "@/api/interview/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,8 @@ import {
   Loader2,
   UserRound,
 } from "@/components/icons";
+
+const INTERVIEWER_VIDEO_SRC = "/interview/hr-interviewer.mp4";
 
 const PASS_THRESHOLD = 75;
 /** Interviewer-side panel background (lighter grey on dark meeting canvas). */
@@ -73,8 +75,6 @@ export function MeetSelfTile({
   );
 }
 
-const SPEAKING_BAR_HEIGHTS = [6, 10, 14, 10, 6] as const;
-
 export function MeetInterviewerTile({
   isSpeaking,
   isActive,
@@ -84,54 +84,70 @@ export function MeetInterviewerTile({
   isActive: boolean;
   children?: React.ReactNode;
 }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoFailed, setVideoFailed] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || videoFailed) return;
+
+    if (!isSpeaking) {
+      video.pause();
+      if (video.readyState >= 1) {
+        video.currentTime = 0;
+      }
+      return;
+    }
+
+    const play = () => {
+      void video.play().catch(() => undefined);
+    };
+    if (video.readyState >= 2) {
+      play();
+      return;
+    }
+    video.addEventListener("canplay", play, { once: true });
+    return () => video.removeEventListener("canplay", play);
+  }, [isSpeaking, videoFailed]);
+
   return (
     <div
       className={cn(
-        "relative flex min-h-[180px] flex-1 flex-col items-center justify-center overflow-visible rounded-3xl max-sm:min-h-0 max-sm:h-[132px] max-sm:flex-none max-sm:shrink-0",
+        "relative flex min-h-[180px] flex-1 flex-col overflow-hidden rounded-3xl max-sm:min-h-0 max-sm:h-[132px] max-sm:flex-none max-sm:shrink-0",
         INTERVIEWER_PANEL_BG,
         isActive || isSpeaking
           ? "ring-2 ring-inset ring-[#8ab4f8]"
           : "ring-1 ring-inset ring-white/10",
       )}
     >
-      <div className="relative flex items-center justify-center py-4 max-sm:py-2">
-        <div className="relative h-20 w-20 max-sm:h-16 max-sm:w-16 sm:h-28 sm:w-28">
-          {isSpeaking ? (
-            <>
-              <span className="pointer-events-none absolute inset-0 rounded-full bg-[#8ab4f8]/20 animate-speak-ripple" />
-              <span
-                className="pointer-events-none absolute inset-0 rounded-full bg-[#8ab4f8]/15 animate-speak-ripple"
-                style={{ animationDelay: "0.8s" }}
-              />
-            </>
-          ) : null}
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#3c4043] to-[#1a1a1a]">
-            <UserRound
-              className={cn(
-                "h-10 w-10 text-white/85 max-sm:h-8 max-sm:w-8 sm:h-14 sm:w-14",
-                isSpeaking && "-translate-y-1.5 max-sm:-translate-y-1 sm:-translate-y-2",
-              )}
-            />
-            {isSpeaking ? (
-              <div
-                className="absolute inset-x-0 bottom-2 flex items-end justify-center gap-[3px] max-sm:bottom-1.5 sm:bottom-3 sm:gap-1"
-                aria-hidden
-              >
-                {SPEAKING_BAR_HEIGHTS.map((height, i) => (
-                  <span
-                    key={i}
-                    className="w-[3px] origin-bottom rounded-full bg-[#8ab4f8] animate-sound-bar sm:w-1"
-                    style={{
-                      height: `${height}px`,
-                      animationDelay: `${i * 0.1}s`,
-                    }}
-                  />
-                ))}
-              </div>
-            ) : null}
+      {videoFailed ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#3c4043] to-[#1a1a1a] sm:h-28 sm:w-28">
+            <UserRound className="h-10 w-10 text-white/85 sm:h-14 sm:w-14" />
           </div>
         </div>
-      </div>
+      ) : (
+        <video
+          ref={videoRef}
+          src={INTERVIEWER_VIDEO_SRC}
+          muted
+          playsInline
+          loop
+          preload="auto"
+          aria-hidden
+          onError={() => setVideoFailed(true)}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover object-[center_22%]",
+            !isSpeaking && "interviewer-idle",
+          )}
+        />
+      )}
+      {isSpeaking ? (
+        <span className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#8ab4f8]" />
+          საუბრობს
+        </span>
+      ) : null}
       <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white">
         HR ინტერვიუერი
       </div>

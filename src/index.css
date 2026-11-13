@@ -570,6 +570,27 @@
   animation: story-progress-fill 6s linear forwards;
 }
 
+@keyframes interviewer-idle {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+.interviewer-idle {
+  animation: interviewer-idle 5.5s ease-in-out infinite;
+  transform-origin: center 30%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interviewer-idle {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .story-progress-fill {
     animation: none;
