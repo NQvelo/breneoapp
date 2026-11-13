@@ -8,6 +8,7 @@ import type {
   StartInterviewResponse,
   SubmitInterviewResponse,
 } from "@/api/interview/types";
+import { isOnboardingRoleId } from "@/onboarding/onboardingAnswers";
 
 export type InterviewApiError = Error & {
   status?: number;
@@ -20,7 +21,7 @@ function interviewUrl(path: string): string {
 }
 
 function formatInterviewErrorDetail(data: Record<string, unknown>): string {
-  const d = data.detail;
+  const d = data.detail ?? data.error;
   if (typeof d === "string" && d.trim()) return d.trim();
   if (Array.isArray(d)) {
     return d.map((x) => String(x)).filter(Boolean).join(" ");
@@ -29,6 +30,41 @@ function formatInterviewErrorDetail(data: Record<string, unknown>): string {
     return data.message.trim();
   }
   return "";
+}
+
+function interviewStartBody(
+  params: StartInterviewParams | string,
+): { role: string } | { job_id: number } | { job_position: string } {
+  if (typeof params === "string") {
+    const trimmed = params.trim();
+    if (!trimmed) {
+      throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
+    }
+    return isOnboardingRoleId(trimmed)
+      ? { role: trimmed }
+      : { job_position: trimmed };
+  }
+
+  if ("role" in params) {
+    const role = params.role.trim();
+    if (!role) {
+      throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
+    }
+    return { role };
+  }
+
+  if ("job_id" in params) {
+    if (!Number.isFinite(params.job_id)) {
+      throw new Error("არასწორი სამუშაოს იდენტიფიკატორი.");
+    }
+    return { job_id: params.job_id };
+  }
+
+  const position = params.job_position.trim();
+  if (!position) {
+    throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
+  }
+  return { job_position: position };
 }
 
 async function parseJsonBody(res: Response): Promise<Record<string, unknown>> {
@@ -58,8 +94,8 @@ function throwInterviewError(
         ? "წვდომა აკრძალულია."
         : res.status === 404
           ? "კითხვა ვერ მოიძებნა ან თქვენს ანგარიშს არ ეკუთვნის."
-          : res.status === 400
-            ? "არასწორი მოთხოვნა. შეამოწმეთ პოზიცია ან ჩანაწერი."
+            : res.status === 400
+            ? "ეს როლი ინტერვიუსთვის მომზადებული არ არის."
             : res.status === 500
               ? "სერვერის შეცდომა ანალიზისას. სცადეთ ხელახლა ან შეამოწმეთ ჩანაწერი (მინ. 3 წამი)."
               : res.status === 502
@@ -77,25 +113,7 @@ export async function startInterview(
 ): Promise<StartInterviewResponse> {
   assertEmployerJobsProxyConfigured("POST");
 
-  const body =
-    typeof params === "string"
-      ? { job_position: params.trim() }
-      : "job_id" in params && params.job_id != null
-        ? {
-            job_id: params.job_id,
-            ...(params.job_position?.trim()
-              ? { job_position: params.job_position.trim() }
-              : {}),
-          }
-        : { job_position: String(params.job_position ?? "").trim() };
-
-  if ("job_id" in body && body.job_id != null) {
-    if (!Number.isFinite(body.job_id)) {
-      throw new Error("არასწორი სამუშაოს იდენტიფიკატორი.");
-    }
-  } else if (!body.job_position) {
-    throw new Error("გთხოვთ, მიუთითოთ სამუშაო პოზიცია.");
-  }
+  const body = interviewStartBody(params);
 
   const res = await employerBffFetch(interviewUrl("/api/v1/interview/start/"), {
     method: "POST",

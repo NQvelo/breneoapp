@@ -156,7 +156,7 @@ export function GrowthInterviewSection() {
             </p>
           ) : (
             interviews.map((roleId) => {
-              const title = t.courses.interviewRoles[roleId];
+              const title = t.onboarding.roles[roleId];
               return (
                 <div
                   key={roleId}
@@ -166,6 +166,7 @@ export function GrowthInterviewSection() {
                     {title}
                   </h3>
                   <JobStartAiInterviewButton
+                    role={roleId}
                     jobTitle={title}
                     label={t.courses.startInterview}
                     showIcon={false}

@@ -38,6 +38,15 @@ describe("matchInterviewRoles", () => {
     ).toEqual(["frontend"]);
   });
 
+  it("maps a data engineer CV to the prepared slug", () => {
+    expect(
+      matchInterviewRoles({
+        skills: ["Spark", "Airflow"],
+        jobTitles: ["Data Engineer"],
+      }),
+    ).toEqual(["data_engineer"]);
+  });
+
   it("returns nothing when the CV has no tech role", () => {
     expect(
       matchInterviewRoles({

@@ -1,17 +1,7 @@
-export const INTERVIEW_ROLE_IDS = [
-  "react",
-  "frontend",
-  "backend",
-  "fullstack",
-  "devops",
-  "ios",
-  "android",
-  "qa",
-  "data",
-  "security",
-] as const;
-
-export type InterviewRoleId = (typeof INTERVIEW_ROLE_IDS)[number];
+import {
+  ONBOARDING_ROLE_IDS,
+  type OnboardingRoleId,
+} from "@/onboarding/onboardingAnswers";
 
 export interface CvInterviewSignals {
   skills: string[];
@@ -29,10 +19,10 @@ function has(text: string, pattern: RegExp): boolean {
   return pattern.test(text);
 }
 
-/** Interview roles supported by skills and job titles saved from the CV. */
+/** Prepared-role slugs that match skills and job titles saved from the CV. */
 export function matchInterviewRoles(
   signals: CvInterviewSignals,
-): InterviewRoleId[] {
+): OnboardingRoleId[] {
   const text = cvText(signals);
   if (!text) return [];
 
@@ -57,16 +47,18 @@ export function matchInterviewRoles(
     text,
     /\b(?:qa|sdet|selenium|cypress|playwright|tester)\b|quality assurance/,
   );
-  const data = has(
+  const dataEngineer = has(
     text,
     /\bdata engineer\b|\b(?:spark|airflow|hadoop|snowflake|dbt|bigquery)\b|\betl\b/,
   );
+  const dataAnalyst = has(text, /\bdata analyst\b/);
+  const dataScientist = has(text, /\bdata scientist\b/);
   const security = has(
     text,
     /\b(?:cybersecurity|infosec|appsec|pentest|penetration)\b|security engineer|უსაფრთხოებ/,
   );
 
-  const matched = new Set<InterviewRoleId>();
+  const matched = new Set<OnboardingRoleId>();
   if (react) matched.add("react");
   if (react || frontend) matched.add("frontend");
   if (backend) matched.add("backend");
@@ -77,8 +69,10 @@ export function matchInterviewRoles(
   if (ios) matched.add("ios");
   if (android) matched.add("android");
   if (qa) matched.add("qa");
-  if (data) matched.add("data");
+  if (dataAnalyst) matched.add("data_analyst");
+  if (dataScientist) matched.add("data_scientist");
+  if (dataEngineer) matched.add("data_engineer");
   if (security) matched.add("security");
 
-  return INTERVIEW_ROLE_IDS.filter((roleId) => matched.has(roleId));
+  return ONBOARDING_ROLE_IDS.filter((roleId) => matched.has(roleId));
 }

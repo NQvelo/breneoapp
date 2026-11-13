@@ -17,6 +17,7 @@ export interface InterviewQuestion {
 export interface StartInterviewResponse {
   interview: {
     id: string;
+    role: string | null;
     job_id: number | null;
     job_position: string;
     created_at: string;
@@ -25,6 +26,8 @@ export interface StartInterviewResponse {
   welcome_audio_url: string | null;
   playback: InterviewPlaybackItem[];
   question: InterviewQuestion;
+  /** This session only, in order. Length 1–5. Later items have no audio yet. */
+  questions: InterviewQuestion[];
 }
 
 export interface SubmitInterviewResponse {
@@ -49,5 +52,6 @@ export type InterviewEvaluation = Omit<
 >;
 
 export type StartInterviewParams =
-  | { job_id: number; job_position?: string }
-  | { job_position: string; job_id?: never };
+  | { role: string }
+  | { job_id: number }
+  | { job_position: string };

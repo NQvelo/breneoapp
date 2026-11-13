@@ -8,12 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { useTranslation } from "@/contexts/LanguageContext";
-import {
-  calculateSkillScores,
-  getTopSkills,
-  getUserTestAnswers,
-  filterHardSkills,
-} from "@/utils/skillTestUtils";
+import { filterHardSkills } from "@/utils/skillTestUtils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Bookmark, ChevronRight } from "@/components/icons";
 import { toast } from "sonner";
@@ -125,32 +120,24 @@ const CoursesPage = () => {
       if (!user) return;
 
       try {
-        try {
-          const response = await apiClient.get("/api/skilltest/results/");
-          if (
-            response.data &&
-            Array.isArray(response.data) &&
-            response.data.length > 0
-          ) {
-            const skillsJson = response.data[0].skills_json;
-            const allSkills: string[] = skillsJson?.tech
-              ? Object.keys(skillsJson.tech)
-              : [];
-            setUserTopSkills(filterHardSkills(allSkills).slice(0, 5));
-            return;
-          }
-        } catch (apiError) {
-          console.log("API endpoint not available, trying Supabase...");
-        }
-
-        const answers = await getUserTestAnswers(String(user.id));
-        if (answers && answers.length > 0) {
-          const skillScores = calculateSkillScores(answers);
-          const allTopSkills = getTopSkills(skillScores, 10).map(
-            (s) => s.skill,
-          );
-          setUserTopSkills(filterHardSkills(allTopSkills).slice(0, 5));
-        }
+        const response = await apiClient.get(
+          `/api/skilltest/results/?user=${user.id}`,
+        );
+        const payload = response.data;
+        const result = Array.isArray(payload)
+          ? payload[0]
+          : payload &&
+              typeof payload === "object" &&
+              Array.isArray((payload as { results?: unknown }).results)
+            ? (payload as { results: unknown[] }).results[0]
+            : payload;
+        const skillsJson =
+          result && typeof result === "object"
+            ? (result as { skills_json?: { tech?: Record<string, unknown> } })
+                .skills_json
+            : undefined;
+        const allSkills = Object.keys(skillsJson?.tech || {});
+        setUserTopSkills(filterHardSkills(allSkills).slice(0, 5));
       } catch (error) {
         console.error("Error fetching user skills:", error);
       }

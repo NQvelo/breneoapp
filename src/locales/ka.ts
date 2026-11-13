@@ -470,18 +470,6 @@ export const ka = {
       "უპასუხე რამდენიმე კითხვას კამერით და მიიღე მყისიერი შეფასება თითოეულ პასუხზე.",
     noMatchingInterviews: "თქვენს CV-ს ჯერ არც ერთი ინტერვიუ არ ემთხვევა.",
     startInterview: "დაწყება",
-    interviewRoles: {
-      react: "React დეველოპერი",
-      frontend: "Frontend დეველოპერი",
-      backend: "Backend დეველოპერი",
-      fullstack: "Full Stack დეველოპერი",
-      devops: "DevOps ინჟინერი",
-      ios: "iOS დეველოპერი",
-      android: "Android დეველოპერი",
-      qa: "QA ინჟინერი",
-      data: "Data ინჟინერი",
-      security: "Security ინჟინერი",
-    },
   },
   // Profile
   profile: {

@@ -36,6 +36,7 @@ export function registerInterviewRoutes(app, deps) {
         req.body && typeof req.body === "object" && !Array.isArray(req.body)
           ? /** @type {Record<string, unknown>} */ (req.body)
           : {};
+      const role = String(raw.role ?? "").trim();
       const jobPosition = String(raw.job_position ?? "").trim();
       const jobIdRaw = raw.job_id;
       const jobId =
@@ -45,16 +46,20 @@ export function registerInterviewRoutes(app, deps) {
           ? Number(jobIdRaw)
           : null;
 
-      if (jobId == null && !jobPosition) {
+      if (!role && jobId == null && !jobPosition) {
         return res.status(400).json({
-          detail: "job_id or job_position is required",
+          detail: "role, job_id, or job_position is required",
         });
       }
 
+      // Role slug wins. A real job sends only job_id so the title is not used to pick questions.
       const upstreamBody = {
         user_id: ctx.userId,
-        ...(jobId != null ? { job_id: jobId } : {}),
-        ...(jobPosition ? { job_position: jobPosition } : {}),
+        ...(role
+          ? { role }
+          : jobId != null
+            ? { job_id: jobId }
+            : { job_position: jobPosition }),
       };
 
       const upstream = await fetch(`${base}/api/v1/interview/start/`, {

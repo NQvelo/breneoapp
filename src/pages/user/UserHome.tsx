@@ -40,11 +40,6 @@ import {
   Tag,
   MapPin,
 } from "@/components/icons";
-import {
-  getUserTestAnswers,
-  calculateSkillScores,
-  getTopSkills,
-} from "@/utils/skillTestUtils";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import type { ApiJobMatch } from "@/api/jobs/jobMatchesApi";
@@ -340,70 +335,6 @@ const UserHome = () => {
           // );
         }
 
-        // Method 3: Fallback to Supabase: fetch from usertestanswers
-        const answers = await getUserTestAnswers(String(user.id));
-        // console.log("🔍 Checking test completion:", {
-        //   userId: user.id,
-        //   answersCount: answers?.length || 0,
-        //   hasAnswers: answers && answers.length > 0,
-        // });
-
-        if (answers && answers.length > 0) {
-          const skillScores = calculateSkillScores(answers);
-          const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
-          const topSkills = topSkillsData.map((s) => s.skill);
-          setUserTopSkills(topSkills);
-          // For Supabase, we'll filter to tech skills by checking against known tech skill keywords
-          // This is a fallback - ideally we'd have tech/soft separation in the data
-          const techSkillKeywords = [
-            "javascript",
-            "python",
-            "java",
-            "c++",
-            "c#",
-            "go",
-            "rust",
-            "php",
-            "ruby",
-            "swift",
-            "kotlin",
-            "typescript",
-            "html",
-            "css",
-            "sql",
-            "react",
-            "vue",
-            "angular",
-            "node.js",
-            "express",
-            "django",
-            "flask",
-            "spring",
-            "laravel",
-            "rails",
-            "git",
-            "docker",
-            "kubernetes",
-            "aws",
-            "azure",
-            "gcp",
-            "linux",
-            "machine learning",
-            "data science",
-            "ai",
-            "blockchain",
-            "devops",
-            "testing",
-          ];
-          const hardSkills = topSkills.filter((skill) =>
-            techSkillKeywords.some(
-              (keyword) =>
-                skill.toLowerCase().includes(keyword.toLowerCase()) ||
-                keyword.toLowerCase().includes(skill.toLowerCase()),
-            ),
-          );
-          setUserHardSkills(hardSkills.length > 0 ? hardSkills : topSkills); // Fallback to all if no match
-        }
       } catch (error) {
         console.error("Error fetching user skills:", error);
       } finally {

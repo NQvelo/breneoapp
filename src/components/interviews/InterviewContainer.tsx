@@ -5,6 +5,7 @@ import type {
   InterviewPlaybackItem,
   InterviewQuestion,
   StartInterviewParams,
+  StartInterviewResponse,
   SubmitInterviewResponse,
 } from "@/api/interview/types";
 import {
@@ -12,7 +13,8 @@ import {
   type MeetingPhase,
 } from "@/components/interviews/InterviewMeetingRoom";
 import { InterviewReport } from "@/components/interviews/InterviewReport";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
+import { isOnboardingRoleId } from "@/onboarding/onboardingAnswers";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import {
   isAutoplayBlockedError,
@@ -46,33 +48,64 @@ function mediaErrorMessage(error: unknown): string {
 }
 
 function resolveStartParams(
+  roleRaw: string,
   jobIdRaw: string,
   position: string,
 ): StartInterviewParams | null {
-  const trimmedPosition = position.trim();
+  const role = roleRaw.trim();
+  if (role) return { role };
+
   const trimmedId = jobIdRaw.trim();
   if (trimmedId) {
     const numericId = Number(trimmedId);
     if (Number.isFinite(numericId) && trimmedId === String(numericId)) {
-      return trimmedPosition
-        ? { job_id: numericId, job_position: trimmedPosition }
-        : { job_id: numericId };
+      return { job_id: numericId };
     }
   }
+
+  const trimmedPosition = position.trim();
   if (trimmedPosition) return { job_position: trimmedPosition };
   return null;
+}
+
+function openingPlayback(
+  response: StartInterviewResponse,
+): InterviewPlaybackItem[] {
+  const items: InterviewPlaybackItem[] = [];
+  if (response.welcome_text || response.welcome_audio_url) {
+    items.push({
+      type: "welcome",
+      text: response.welcome_text,
+      audio_url: response.welcome_audio_url,
+    });
+  }
+  items.push({
+    type: "question",
+    text: response.question.question_text,
+    audio_url: response.question.question_audio_url,
+  });
+  return items;
 }
 
 export function InterviewContainer() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { language } = useLanguage();
+  const t = useTranslation();
   const returnPath =
     searchParams.get("return")?.trim() ||
     getLocalizedPath("/home", language);
+  const presetRole = searchParams.get("role")?.trim() ?? "";
   const presetJobIdRaw = searchParams.get("job_id")?.trim() ?? "";
   const presetPosition = searchParams.get("position")?.trim() ?? "";
-  const startParams = resolveStartParams(presetJobIdRaw, presetPosition);
+  const presetRoleLabel = isOnboardingRoleId(presetRole)
+    ? t.onboarding.roles[presetRole]
+    : "";
+  const startParams = resolveStartParams(
+    presetRole,
+    presetJobIdRaw,
+    presetPosition,
+  );
   const hasJobContext = startParams != null;
   const autoStartTriggeredRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -88,7 +121,9 @@ export function InterviewContainer() {
   const sessionActiveRef = useRef(true);
 
   const [phase, setPhase] = useState<MeetingPhase>("setup");
-  const [jobPosition, setJobPosition] = useState(presetPosition);
+  const [jobPosition, setJobPosition] = useState(
+    presetRoleLabel || presetPosition,
+  );
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] =
     useState<InterviewQuestion | null>(null);
@@ -347,7 +382,8 @@ export function InterviewContainer() {
   const handleStartInterview = useCallback(
     async (explicitParams?: StartInterviewParams) => {
       const params =
-        explicitParams ?? resolveStartParams(presetJobIdRaw, presetPosition);
+        explicitParams ??
+        resolveStartParams(presetRole, presetJobIdRaw, presetPosition);
 
       if (!params) {
         setError("ინტერვიუს დასაწყებად გადადით სამუშაოს გვერდზე.");
@@ -369,33 +405,20 @@ export function InterviewContainer() {
         ]);
         if (!sessionActiveRef.current) return;
         setInterviewId(response.interview.id);
+        const roleLabel =
+          response.interview.role && isOnboardingRoleId(response.interview.role)
+            ? t.onboarding.roles[response.interview.role]
+            : "";
         setJobPosition(
-          response.interview.job_position ||
+          roleLabel ||
+            response.interview.job_position ||
             response.question.job_position ||
-            ("job_position" in params ? params.job_position : "") ||
+            presetRoleLabel ||
             presetPosition,
         );
         setCurrentQuestion(response.question);
 
-        const playback =
-          response.playback?.length > 0
-            ? response.playback
-            : [
-                ...(response.welcome_audio_url
-                  ? [
-                      {
-                        type: "welcome" as const,
-                        text: response.welcome_text,
-                        audio_url: response.welcome_audio_url,
-                      },
-                    ]
-                  : []),
-                {
-                  type: "question" as const,
-                  text: response.question.question_text,
-                  audio_url: response.question.question_audio_url,
-                },
-              ];
+        const playback = openingPlayback(response);
 
         const firstSegment = playback[0];
         if (firstSegment) {
@@ -425,8 +448,11 @@ export function InterviewContainer() {
       attachStream,
       presetJobIdRaw,
       presetPosition,
+      presetRole,
+      presetRoleLabel,
       runPlaybackSequenceLocal,
       stopMedia,
+      t,
     ],
   );
 

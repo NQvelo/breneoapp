@@ -465,18 +465,6 @@ export const en = {
       "Answer a few questions on camera and get instant feedback on every answer.",
     noMatchingInterviews: "No interviews match your CV yet.",
     startInterview: "Start",
-    interviewRoles: {
-      react: "React Developer",
-      frontend: "Frontend Developer",
-      backend: "Backend Developer",
-      fullstack: "Full Stack Developer",
-      devops: "DevOps Engineer",
-      ios: "iOS Developer",
-      android: "Android Developer",
-      qa: "QA Engineer",
-      data: "Data Engineer",
-      security: "Security Engineer",
-    },
   },
   // Profile
   profile: {
@@ -870,7 +858,7 @@ export const en = {
     badge: "AI practice",
     title: "AI-based mock interview",
     description:
-      "Practice for this role with a virtual HR interviewer — 3 tailored questions, live camera, and instant feedback on every answer.",
+      "Practice for this role with a virtual HR interviewer — up to 5 prepared questions, live camera, and instant feedback on every answer.",
     roleHint: "Interview practice for: {role}",
     startButton: "Start interview now",
     headerButton: "AI Interview",

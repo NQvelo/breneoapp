@@ -9,6 +9,8 @@ import { buildAiInterviewStartPath } from "@/components/jobs/JobAiInterviewHeade
 interface JobStartAiInterviewButtonProps {
   jobTitle: string;
   jobId?: string | number | null;
+  /** Onboarding role slug. Practice sends this instead of the translated title. */
+  role?: string | null;
   size?: ButtonProps["size"];
   className?: string;
   label?: string;
@@ -18,6 +20,7 @@ interface JobStartAiInterviewButtonProps {
 export function JobStartAiInterviewButton({
   jobTitle,
   jobId,
+  role,
   size = "sm",
   className,
   label,
@@ -27,7 +30,7 @@ export function JobStartAiInterviewButton({
   const navigate = useLocalizedNavigate();
 
   const handleStart = () => {
-    navigate(buildAiInterviewStartPath(jobTitle, jobId));
+    navigate(buildAiInterviewStartPath(jobTitle, jobId, role));
   };
 
   return (

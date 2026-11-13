@@ -9,13 +9,22 @@ export const AI_INTERVIEW_ILLUSTRATION_DARK =
 export function buildAiInterviewStartPath(
   jobTitle: string,
   jobId?: string | number | null,
+  role?: string | null,
 ): string {
   const params = new URLSearchParams({
-    position: jobTitle,
     return: window.location.pathname + window.location.search,
   });
+  const slug = role?.trim() ?? "";
+  if (slug) {
+    params.set("role", slug);
+    return `/interviews?${params.toString()}`;
+  }
   if (jobId != null && String(jobId).trim() !== "") {
     params.set("job_id", String(jobId));
+    return `/interviews?${params.toString()}`;
+  }
+  if (jobTitle.trim()) {
+    params.set("position", jobTitle.trim());
   }
   return `/interviews?${params.toString()}`;
 }

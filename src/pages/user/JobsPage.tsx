@@ -11,7 +11,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Bookmark,
   AlertCircle,
@@ -85,12 +84,7 @@ import { takeTopExperienceScoredJobs } from "@/utils/topExperienceJobs";
 import { useMobile } from "@/hooks/use-mobile";
 import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
-import {
-  getUserTestAnswers,
-  calculateSkillScores,
-  getTopSkills,
-  filterHardSkills,
-} from "@/utils/skillTestUtils";
+import { filterHardSkills } from "@/utils/skillTestUtils";
 import { jobService, JobFilters, ApiJob } from "@/api/jobs";
 // Removed filterTechJobs and filterATSJobs imports - displaying all jobs without filtering
 import { getMatchQualityLabel } from "@/utils/jobMatchUtils";
@@ -966,17 +960,7 @@ const JobsPage = () => {
             return;
           }
         } catch (apiError) {
-          console.log("API endpoint not available, trying Supabase...");
-        }
-
-        // Fallback to Supabase: fetch from usertestanswers
-        const answers = await getUserTestAnswers(String(user.id));
-        if (answers && answers.length > 0) {
-          const skillScores = calculateSkillScores(answers);
-          const topSkillsData = getTopSkills(skillScores, 20); // Increase limit for better matching
-          const topSkills = topSkillsData.map((s) => s.skill);
-          const techSkillsOnly = filterHardSkills(topSkills);
-          setUserTopSkills(techSkillsOnly);
+          console.error("Error fetching skill test results:", apiError);
         }
       } catch (error) {
         console.error("Error fetching user skills:", error);

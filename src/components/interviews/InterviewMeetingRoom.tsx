@@ -42,7 +42,7 @@ const NEXT_QUESTION_AUTO_MS = 8000;
 
 const INTERVIEW_LOADING_MESSAGES = [
   "ინტერვიუერი ზარს მალე შემოუერთდება",
-  "AI კითხვებს ამზადებს",
+  "ინტერვიუს კითხვები იტვირთება",
   "კამერა და მიკროფონი იხსნება",
   "ინტერვიუს გარემო იტვირთება",
   "დარჩით მზად — ინტერვიუ მალე დაიწყება",
@@ -203,7 +203,10 @@ export function InterviewMeetingRoom({
   onLeave,
   children,
 }: InterviewMeetingRoomProps) {
-  const totalQuestions = currentQuestion?.total_questions ?? 3;
+  const totalQuestions = Math.min(
+    5,
+    Math.max(1, currentQuestion?.total_questions || 1),
+  );
   const inSession = phase !== "setup" && phase !== "session_complete";
   const [nextQuestionSecLeft, setNextQuestionSecLeft] = useState(0);
   const [soundOn, setSoundOn] = useState(true);

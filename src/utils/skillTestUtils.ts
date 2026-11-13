@@ -1,5 +1,5 @@
+import apiClient from "@/api/auth/apiClient";
 import { supabase } from "@/integrations/supabase/client";
-import { numericIdToUuid } from "@/lib/utils";
 
 export interface QuestionOption {
   label: string;
@@ -29,84 +29,42 @@ export interface UserTestResult {
   completedAt: Date;
 }
 
-// Fetch all user answers for analysis
-export const getUserTestAnswers = async (userId: string | number) => {
-  const userIdStr = String(userId);
-
-  // Try multiple user ID formats to handle different storage methods
-  const userIdVariants = [
-    numericIdToUuid(userIdStr), // Converted UUID format
-    userIdStr, // Direct user ID (might already be UUID or string)
+function skillNamesFromTestPayload(payload: unknown): string[] {
+  const result = Array.isArray(payload)
+    ? payload[0]
+    : payload &&
+        typeof payload === "object" &&
+        Array.isArray((payload as { results?: unknown }).results)
+      ? (payload as { results: unknown[] }).results[0]
+      : payload;
+  if (!result || typeof result !== "object") return [];
+  const skillsJson = (
+    result as {
+      skills_json?: {
+        tech?: Record<string, unknown>;
+        soft?: Record<string, unknown>;
+      };
+    }
+  ).skills_json;
+  return [
+    ...Object.keys(skillsJson?.tech || {}),
+    ...Object.keys(skillsJson?.soft || {}),
   ];
+}
 
-  // If userId is numeric, also try the numeric version
-  const numericId = parseInt(userIdStr, 10);
-  if (!isNaN(numericId) && numericId.toString() === userIdStr) {
-    userIdVariants.push(numericIdToUuid(numericId));
-  }
-
-  console.log("🔍 getUserTestAnswers - Trying variants:", {
-    originalUserId: userId,
-    userIdStr,
-    variants: userIdVariants,
-  });
-
-  // Try each variant
-  for (const userIdVariant of userIdVariants) {
-    try {
-      const { data, error } = await supabase
-        .from("usertestanswers")
-        .select("*")
-        .eq("userid", userIdVariant)
-        .order("answeredat", { ascending: true });
-
-      if (error) {
-        console.warn(
-          `⚠️ Error fetching with variant ${userIdVariant}:`,
-          error.message
-        );
-        // Continue to next variant
-        continue;
-      }
-
-      if (data && data.length > 0) {
-        console.log(
-          `✅ Found ${data.length} test answers for user ${userIdVariant}`
-        );
-        return data;
-      } else {
-        console.log(`ℹ️ No answers found for variant ${userIdVariant}`);
-      }
-    } catch (err) {
-      console.warn(`⚠️ Exception with variant ${userIdVariant}:`, err);
-      continue;
-    }
-  }
-
-  // Last resort: try to get current user's answers using auth context
+/** Skill-test names from breneo-api, shaped for calculateSkillScores. */
+export const getUserTestAnswers = async (userId: string | number) => {
   try {
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-    if (authUser) {
-      console.log("🔍 Trying with auth user ID:", authUser.id);
-      const { data, error } = await supabase
-        .from("usertestanswers")
-        .select("*")
-        .eq("userid", authUser.id)
-        .order("answeredat", { ascending: true });
-
-      if (!error && data && data.length > 0) {
-        console.log(`✅ Found ${data.length} test answers using auth user ID`);
-        return data;
-      }
-    }
-  } catch (authErr) {
-    console.warn("⚠️ Could not get auth user:", authErr);
+    const response = await apiClient.get(
+      `/api/skilltest/results/?user=${userId}`,
+    );
+    return skillNamesFromTestPayload(response.data).map((skill) => ({
+      relatedSkills: [skill],
+    }));
+  } catch (error) {
+    console.error("Error fetching skill test results:", error);
+    return [];
   }
-
-  console.log("❌ No test answers found with any variant");
-  return [];
 };
 
 // Calculate skill scores from user answers

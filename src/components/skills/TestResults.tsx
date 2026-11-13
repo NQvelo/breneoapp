@@ -2,10 +2,11 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { calculateSkillScores } from "@/utils/skillTestUtils";
-import { numericIdToUuid } from "@/lib/utils";
+import {
+  calculateSkillScores,
+  getUserTestAnswers,
+} from "@/utils/skillTestUtils";
 
 interface SkillResult {
   skill: string;
@@ -33,17 +34,8 @@ export function TestResults({
 
       try {
         // Fetch user's test answers
-        const { data: answers, error } = await supabase
-          .from("usertestanswers")
-          .select("*")
-          .eq("userid", numericIdToUuid(user.id));
-
-        if (error) {
-          console.error("Error fetching test answers:", error);
-          return;
-        }
-
-        if (!answers || answers.length === 0) {
+        const answers = await getUserTestAnswers(user.id);
+        if (answers.length === 0) {
           setLoading(false);
           return;
         }

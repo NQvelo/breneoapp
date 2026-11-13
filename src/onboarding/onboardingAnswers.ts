@@ -130,6 +130,12 @@ export const ONBOARDING_ROLE_IDS = [
 
 export type OnboardingRoleId = (typeof ONBOARDING_ROLE_IDS)[number];
 
+const ONBOARDING_ROLE_ID_SET = new Set<string>(ONBOARDING_ROLE_IDS);
+
+export function isOnboardingRoleId(value: string): value is OnboardingRoleId {
+  return ONBOARDING_ROLE_ID_SET.has(value);
+}
+
 export const ROLE_CATEGORY_SUBROLES: Record<
   OnboardingRoleCategoryId,
   readonly OnboardingRoleId[]
