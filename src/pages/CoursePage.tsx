@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { BookMarked, BarChart3 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { createAcademySlug } from "@/utils/academyUtils";
 import axios from "axios";
@@ -26,6 +27,8 @@ import {
   Video,
   Users,
   ExternalLink,
+  ArrowUpRight,
+  Star,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
@@ -39,6 +42,7 @@ interface AcademyProfile {
   logo_url?: string | null;
   profile_photo_url?: string | null;
   description?: string | null;
+  rating?: string | number | null;
 }
 
 type EnrolledUserRef = {
@@ -270,6 +274,16 @@ const CoursePage = () => {
           ]);
 
           const description = getStringField(["description", "desc", "about"]);
+          const rawRating =
+            data.rating ??
+            data.average_rating ??
+            data.review_rating ??
+            data.score ??
+            null;
+          const rating =
+            typeof rawRating === "number" || typeof rawRating === "string"
+              ? String(rawRating)
+              : "4.9";
 
           const profile = {
             id: course.academy_id,
@@ -284,6 +298,7 @@ const CoursePage = () => {
             logo_url: logoUrl && logoUrl.trim() !== "" ? logoUrl : null,
             description:
               description && description.trim() !== "" ? description : null,
+            rating,
           } as AcademyProfile;
 
           console.log("🔍 Academy profile fetched from API:", {
@@ -326,6 +341,7 @@ const CoursePage = () => {
               supabaseData.description && supabaseData.description.trim() !== ""
                 ? supabaseData.description
                 : null,
+            rating: "4.9",
           } as AcademyProfile;
 
           console.log("🔍 Academy profile fetched from Supabase:", {
@@ -348,10 +364,47 @@ const CoursePage = () => {
         profile_photo_url: null,
         logo_url: null,
         description: null,
+        rating: "4.9",
       } as AcademyProfile;
     },
     enabled: !!course?.academy_id,
   });
+
+  // Fetch all courses for this academy to compute total course count
+  const { data: allAcademyCourses = [] } = useQuery<ApiCourse[]>({
+    queryKey: ["courses-for-academy", course?.academy_id, course?.provider],
+    queryFn: async () => {
+      try {
+        const response = await fetch(
+          "https://web-production-80ed8.up.railway.app/api/courses/",
+        );
+        if (!response.ok) return [];
+        const data: unknown = await response.json();
+        const list: ApiCourse[] = Array.isArray(data)
+          ? (data as ApiCourse[])
+          : [];
+        const aid = course?.academy_id;
+        const prov = course?.provider?.toLowerCase();
+        return list.filter((c) => {
+          if (aid && String(c?.academy_id) === String(aid)) return true;
+          if (
+            prov &&
+            String(c?.academy_name ?? "").toLowerCase() === prov
+          ) {
+            return true;
+          }
+          return false;
+        });
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!(course?.academy_id || course?.provider),
+  });
+
+  const totalAcademyCoursesCount = useMemo(() => {
+    return Math.max(allAcademyCourses.length, 1);
+  }, [allAcademyCourses.length]);
 
   // Save course mutation
   const saveCourseMutation = useMutation({
@@ -457,8 +510,7 @@ const CoursePage = () => {
       const wasPreviouslySaved =
         context?.previousSavedCourses?.includes(idString) || false;
       toast.success(
-        `"${course?.title}" has been ${
-          wasPreviouslySaved ? "unsaved" : "saved"
+        `"${course?.title}" has been ${wasPreviouslySaved ? "unsaved" : "saved"
         } successfully.`,
       );
     },
@@ -618,211 +670,169 @@ const CoursePage = () => {
     <DashboardLayout>
       <div className="max-w-5xl mx-auto pt-0 sm:pt-4 pb-40 sm:pb-44 mb-16 sm:mb-20 sm:px-4 md:px-6">
         {/* Main Content Wrapper */}
-        <div className="pb-20 p-1">
-          {/* 1. Cover Image - Outside the main div */}
-          <div className="w-full h-48 sm:h-80 overflow-hidden rounded-3xl mb-6">
-            <img
-              src={course.image}
-              alt={course.title}
-              className="w-full h-full object-cover"
-            />
-          </div>
-
-          {/* 2. Course Title - Outside the main card */}
-          <h1 className="text-xl sm:text-2xl font-bold text-black dark:text-white mb-6">
-            {course.title}
-          </h1>
-
-          {/* Main Content Card */}
+        <div className="space-y-2">
+          {/* Main White Card wrapping cover image, title, and course details */}
           <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
-            <CardContent className="p-6 sm:p-6 space-y-0 ">
-              {/* 5. Info Cards Section with Registration and Save Buttons */}
-              <div className="py-0 px-0 sm:py-2 sm:px-0 bg-white dark:bg-white rounded-3xl">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 sm:gap-6">
-                  {/* Info Cards */}
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-12 flex-1 w-full sm:w-auto  rounded-2xl sm:rounded-none p-0 sm:p-0">
-                    {/* Price Card */}
-                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
-                          <DollarSign className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
-                        </div>
-                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
-                          Free
-                        </span>
-                        <div className="hidden sm:flex flex-col">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                            Free
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Course
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
-                        Course
-                      </span>
-                    </div>
+            <CardContent className="p-3 sm:p-4">
+              {/* Cover Image */}
+              <div className="w-full h-48 sm:h-80 overflow-hidden rounded-xl mb-4">
+                <img
+                  src={course.image}
+                  alt={course.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
 
-                    {/* Duration Card */}
-                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
-                          <RotateCcw className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
-                        </div>
-                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
-                          {course.duration || "2 თვე"}
-                        </span>
-                        <div className="hidden sm:flex flex-col">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                            {course.duration || "2 თვე"}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Duration
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
-                        Duration
-                      </span>
-                    </div>
+              {/* Course Title */}
+              <h1 className="text-xl sm:text-2xl font-bold text-black dark:text-white px-1 mb-4">
+                {course.title}
+              </h1>
 
-                    {/* Lectures Card */}
-                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/20 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
-                          <Video className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
-                        </div>
-                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
-                          {course.topics?.length || 16}
-                        </span>
-                        <div className="hidden sm:flex flex-col">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                            {course.topics?.length || 16}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Lectures
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
-                        Lectures
+              {/* Course Details & Actions Row */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+                {/* Course Detail Box with dividers, matching the user's design */}
+                <div className="grid grid-cols-2 sm:flex sm:items-center rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-white overflow-hidden w-full lg:w-auto">
+                  {/* Price Item */}
+                  <div className="flex items-center gap-3 px-4 py-3 sm:px-4 sm:py-2 border-r border-b sm:border-b-0 border-gray-200 dark:border-gray-700 flex-1 sm:flex-initial sm:shrink-0 min-w-0">
+                    <DollarSign className="h-5 w-5 text-gray-800 dark:text-gray-200 shrink-0" strokeWidth={1.8} />
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-medium tracking-wider text-gray-400 dark:text-gray-400 uppercase leading-none mb-0.5">
+                        PRICE
                       </span>
-                    </div>
-
-                    {/* Level Card */}
-                    <div className="flex flex-row items-center justify-between sm:justify-start gap-3 rounded-2xl py-1 flex-shrink-0 w-full sm:w-auto">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-xl sm:rounded-xl bg-breneo-blue/15 dark:bg-breneo-blue/15 sm:bg-breneo-blue/15 dark:sm:bg-breneo-blue/15 flex items-center justify-center flex-shrink-0">
-                          <Users className="h-5 w-5 sm:h-5 sm:w-5 text-breneo-blue dark:text-breneo-blue" />
-                        </div>
-                        <span className="text-base sm:text-sm font-semibold text-gray-900 dark:text-gray-100 sm:hidden">
-                          {course.level || "All Levels"}
-                        </span>
-                        <div className="hidden sm:flex flex-col">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                            {course.level || "All Levels"}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Level
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-m text-gray-500 dark:text-gray-400 sm:hidden ml-auto">
-                        Level
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight whitespace-nowrap">
+                        {course.price && parseFloat(course.price) > 0 ? `${course.price} ₾` : "Free"}
                       </span>
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-3 w-full sm:w-auto pb-0 sm:pb-0">
-                    <Button
-                      onClick={handleSaveCourse}
-                      disabled={isSaving || !user}
-                      variant="secondary"
-                      size="icon"
-                      className={cn(
-                        "aspect-square bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A]",
-                        isSaved
-                          ? "text-white-500 bg-[#E6E7EB] dark:bg-[#474747] "
-                          : "text-black dark:text-white ",
-                      )}
-                    >
-                      {isSaving ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : isSaved ? (
-                        <Bookmark className="h-4 w-4 fill-breneo-blue text-breneo-blue" />
-                      ) : (
-                        <Bookmark className="h-4 w-4" />
-                      )}
-                    </Button>
+                  {/* Duration Item */}
+                  <div className="flex items-center gap-3 px-4 py-3 sm:px-4 sm:py-2 border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-700 flex-1 sm:flex-initial sm:shrink-0 min-w-0">
+                    <Clock className="h-5 w-5 text-gray-800 dark:text-gray-200 shrink-0" strokeWidth={1.8} />
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-medium tracking-wider text-gray-400 dark:text-gray-400 uppercase leading-none mb-0.5">
+                        DURATION
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight whitespace-nowrap">
+                        {course.duration || "2 თვე"}
+                      </span>
+                    </div>
+                  </div>
 
-                    {course.registration_link ? (
-                      <Button
-                        type="button"
-                        size="default"
-                        disabled={enrollMutation.isPending}
-                        className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
-                        onClick={() => {
-                          if (!user) {
-                            toast.error(t.courses.enrollLoginRequired);
-                            return;
-                          }
-                          if (isUserEnrolled) {
+                  {/* Lessons Item */}
+                  <div className="flex items-center gap-3 px-4 py-3 sm:px-4 sm:py-2 border-r border-gray-200 dark:border-gray-700 flex-1 sm:flex-initial sm:shrink-0 min-w-0">
+                    <BookMarked className="h-5 w-5 text-gray-800 dark:text-gray-200 shrink-0" strokeWidth={1.8} />
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-medium tracking-wider text-gray-400 dark:text-gray-400 uppercase leading-none mb-0.5">
+                        LESSONS
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight whitespace-nowrap">
+                        {course.topics?.length || 16}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Difficulty Item */}
+                  <div className="flex items-center gap-3 px-4 py-3 sm:px-4 sm:py-2 flex-1 sm:flex-initial sm:shrink-0 min-w-0">
+                    <BarChart3 className="h-5 w-5 text-gray-800 dark:text-gray-200 shrink-0" strokeWidth={1.8} />
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-medium tracking-wider text-gray-400 dark:text-gray-400 uppercase leading-none mb-0.5">
+                        DIFFICULTY
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 leading-tight whitespace-nowrap">
+                        {course.level || "All Levels"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
+                  <Button
+                    onClick={handleSaveCourse}
+                    disabled={isSaving || !user}
+                    variant="secondary"
+                    size="icon"
+                    className={cn(
+                      "aspect-square bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A]",
+                      isSaved
+                        ? "text-white-500 bg-[#E6E7EB] dark:bg-[#474747] "
+                        : "text-black dark:text-white ",
+                    )}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isSaved ? (
+                      <Bookmark className="h-4 w-4 fill-breneo-blue text-breneo-blue" />
+                    ) : (
+                      <Bookmark className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  {course.registration_link ? (
+                    <Button
+                      type="button"
+                      size="default"
+                      disabled={enrollMutation.isPending}
+                      className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                      onClick={() => {
+                        if (!user) {
+                          toast.error(t.courses.enrollLoginRequired);
+                          return;
+                        }
+                        if (isUserEnrolled) {
+                          window.open(
+                            course.registration_link!,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
+                          return;
+                        }
+                        enrollMutation.mutate(course, {
+                          onSuccess: (result) => {
+                            if (result === "noop") return;
                             window.open(
                               course.registration_link!,
                               "_blank",
                               "noopener,noreferrer",
                             );
-                            return;
-                          }
-                          enrollMutation.mutate(course, {
-                            onSuccess: (result) => {
-                              if (result === "noop") return;
-                              window.open(
-                                course.registration_link!,
-                                "_blank",
-                                "noopener,noreferrer",
-                              );
-                            },
-                          });
-                        }}
-                      >
-                        {enrollMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : isUserEnrolled ? (
-                          t.courses.enrolled
-                        ) : (
-                          t.courses.enroll
-                        )}
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="default"
-                        disabled={
-                          !user || isUserEnrolled || enrollMutation.isPending
-                        }
-                        onClick={() => enrollMutation.mutate(course)}
-                        className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
-                      >
-                        {enrollMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : isUserEnrolled ? (
-                          t.courses.enrolled
-                        ) : (
-                          t.courses.enroll
-                        )}
-                      </Button>
-                    )}
-                  </div>
+                          },
+                        });
+                      }}
+                    >
+                      {enrollMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isUserEnrolled ? (
+                        t.courses.enrolled
+                      ) : (
+                        t.courses.enroll
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="default"
+                      disabled={
+                        !user || isUserEnrolled || enrollMutation.isPending
+                      }
+                      onClick={() => enrollMutation.mutate(course)}
+                      className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                    >
+                      {enrollMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : isUserEnrolled ? (
+                        t.courses.enrolled
+                      ) : (
+                        t.courses.enroll
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Course Description - Separate Card */}
-          <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white mt-6">
+          <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
             <CardContent className="p-6 sm:p-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 What will You learn
@@ -833,103 +843,91 @@ const CoursePage = () => {
             </CardContent>
           </Card>
 
-          <div
-            className={cn(
-              "grid grid-cols-1 gap-6 mt-6",
-              academyProfile && "lg:grid-cols-2",
-            )}
-          >
-            <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
-              <CardContent className="p-6 sm:p-6">
-                <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
-                  Lecturer
-                </h2>
-                <div className="flex items-start gap-4">
-                  <OptimizedAvatar
-                    src={lecturerPhotoUrl || undefined}
-                    alt={lecturerName}
-                    fallback={lecturerName ? lecturerName.charAt(0).toUpperCase() : "L"}
-                    size="lg"
-                    className="!h-16 !w-16 !rounded-sm"
-                  />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {lecturerName}
-                  </h3>
+          {/* Lecturer & Academy Section */}
+          <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+
+          {/* Lecturer Box */}
+          <div className="rounded-2xl bg-white dark:bg-white p-4 sm:p-5 w-full sm:w-48 md:w-52 flex-shrink-0 flex flex-row items-center sm:flex-col sm:items-stretch gap-3.5 sm:gap-3">
+            {/* Square photo — width = height */}
+            <div className="w-14 h-14 sm:w-full sm:h-auto aspect-square overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+              {lecturerPhotoUrl ? (
+                <img
+                  src={lecturerPhotoUrl}
+                  alt={lecturerName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-[#AAF0FF] text-[#099DBC] text-xl sm:text-3xl font-bold">
+                  {lecturerName ? lecturerName.charAt(0).toUpperCase() : "L"}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* About Academy Section - Separate Card */}
-            {academyProfile && (
-              <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
-                <CardContent className="p-6 sm:p-6">
-                  <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
-                    About Academy
-                  </h2>
-                  <div className="flex flex-col sm:flex-row gap-4 items-start">
-                    {/* Academy Logo */}
-                    <div className="flex-shrink-0">
-                      <OptimizedAvatar
-                        src={academyImageUrl || undefined}
-                        alt={academyName}
-                        fallback={
-                          academyName ? academyName.charAt(0).toUpperCase() : "A"
-                        }
-                        size="lg"
-                        className="!h-16 !w-16 !rounded-sm"
-                      />
-                    </div>
-
-                    {/* Academy Info */}
-                    <div className="flex-1 w-full">
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                            {academyName}
-                          </h3>
-                          {academyProfile.description ? (
-                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                              {academyProfile.description}
-                            </p>
-                          ) : (
-                            <p className="text-gray-500 dark:text-gray-500 italic">
-                              No description available.
-                            </p>
-                          )}
-                        </div>
-
-                        <Link
-                          to={academyUrl}
-                          className="hidden sm:block flex-shrink-0"
-                        >
-                          <Button
-                            variant="outline"
-                            className="flex items-center gap-2"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View Academy
-                          </Button>
-                        </Link>
-                      </div>
-
-                      {/* Mobile View Academy Button */}
-                      <div className="block sm:hidden mt-4 w-full">
-                        <Link to={academyUrl}>
-                          <Button
-                            variant="outline"
-                            className="w-full flex items-center gap-2 justify-center"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View Academy
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+              )}
+            </div>
+            {/* Label + Name */}
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] font-medium tracking-wider text-gray-400 dark:text-gray-400 uppercase leading-none block mb-1">
+                LECTURER
+              </span>
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 break-words leading-snug">
+                {lecturerName}
+              </h3>
+            </div>
           </div>
+
+          {/* Academy Box — growth-page style: gradient bg, logo + name + description, arrow icon */}
+          {academyProfile && (
+            <Link
+              to={academyUrl}
+              className="group flex-1 min-w-0 flex flex-col rounded-2xl bg-gradient-to-br from-white via-white to-breneo-blue/10 dark:from-[#242424] dark:via-[#242424] dark:to-breneo-blue/20 bg-[length:140%_140%] bg-[position:0%_0%] hover:bg-[position:100%_100%] hover:to-breneo-blue/15 dark:hover:to-breneo-blue/25 p-5 sm:p-6 transition-all duration-500 ease-out group-hover:shadow-soft"
+            >
+              {/* Header: logo + name + arrow */}
+              <div className="flex items-start gap-3">
+                <OptimizedAvatar
+                  src={academyImageUrl || undefined}
+                  alt={academyName}
+                  fallback={
+                    academyName ? academyName.charAt(0).toUpperCase() : "A"
+                  }
+                  size="lg"
+                  className="!h-12 !w-12 !rounded-xl flex-shrink-0"
+                />
+                <h3 className="min-w-0 flex-1 self-center text-base font-bold md:text-lg truncate text-gray-900 dark:text-gray-100 group-hover:text-breneo-blue transition-colors">
+                  {academyName}
+                </h3>
+                <ArrowUpRight className="h-5 w-5 flex-shrink-0 text-gray-400 transition-colors group-hover:text-breneo-blue mt-1" />
+              </div>
+
+              {/* Description */}
+              {academyProfile.description && (
+                <p className="mt-4 line-clamp-3 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                  {academyProfile.description}
+                </p>
+              )}
+
+              {/* Bottom Left: Total Courses & Rating */}
+              <div className="mt-auto flex items-center gap-8 pt-6">
+                <div>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                    {totalAcademyCoursesCount}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    {t.courses.totalCourses}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-amber-400 text-amber-400 shrink-0" />
+                    <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                      {academyProfile.rating || "4.9"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    {t.courses.rating}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          )}
+        </div>
         </div>
       </div>
     </DashboardLayout>
