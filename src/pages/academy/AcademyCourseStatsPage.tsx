@@ -98,21 +98,21 @@ export default function AcademyCourseStatsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 px-4 sm:px-6 lg:px-8">
+      <div className="space-y-3 md:px-6 lg:px-8">
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading course…
           </div>
         ) : loadError ? (
-          <Card>
+          <Card className="rounded-3xl border-0 bg-white shadow-none dark:bg-card">
             <CardContent className="py-12 text-center text-destructive">
               {loadError}
             </CardContent>
           </Card>
         ) : course ? (
           <>
-            <Card>
+            <Card className="rounded-3xl border-0 bg-white shadow-none dark:bg-card">
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1 space-y-1">

@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { recordCoursePageView } from "@/api/academy/courseAnalyticsApi";
 import { ENROLLED_COURSES_QUERY_KEY } from "@/hooks/useEnrolledCourses";
+import { sanitizeCourseDescription } from "@/utils/courseDescription";
 
 interface AcademyProfile {
   id: string;
@@ -675,7 +676,7 @@ const CoursePage = () => {
           <Card className="rounded-3xl border-0 shadow-none bg-white dark:bg-white">
             <CardContent className="p-3 sm:p-4">
               {/* Cover Image */}
-              <div className="w-full h-48 sm:h-80 overflow-hidden rounded-xl mb-4">
+              <div className="aspect-[2.58/1] w-full overflow-hidden rounded-xl mb-4">
                 <img
                   src={course.image}
                   alt={course.title}
@@ -837,9 +838,18 @@ const CoursePage = () => {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 What will You learn
               </h2>
-              <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md whitespace-pre-line">
-                {course.description || "No description available."}
-              </p>
+              {course.description ? (
+                <div
+                  className="course-description-content text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md [&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-3xl [&_h1]:font-bold [&_h2]:mb-3 [&_h2]:mt-5 [&_h2]:text-2xl [&_h2]:font-bold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-xl [&_h3]:font-semibold [&_h4]:mb-2 [&_h4]:mt-3 [&_h4]:text-lg [&_h4]:font-semibold [&_h5]:mb-2 [&_h5]:mt-3 [&_h5]:text-base [&_h5]:font-semibold [&_p]:mb-3 [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_a]:text-breneo-blue [&_a]:underline"
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeCourseDescription(course.description),
+                  }}
+                />
+              ) : (
+                <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md">
+                  No description available.
+                </p>
+              )}
             </CardContent>
           </Card>
 

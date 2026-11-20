@@ -54,7 +54,7 @@ export function AcademyCourseRegisteredPanel({
     useEnrolledUserPublicProfiles(enrolledUsers);
 
   return (
-    <Card>
+    <Card className="rounded-3xl border-0 bg-white shadow-none dark:bg-card">
       <CardHeader className="px-4 py-3 my-0 border-b-0">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
           Registered users
