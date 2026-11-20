@@ -837,7 +837,7 @@ const CoursePage = () => {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
                 What will You learn
               </h2>
-              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-[0.9rem] md:text-md whitespace-pre-line">
                 {course.description || "No description available."}
               </p>
             </CardContent>

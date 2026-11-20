@@ -127,14 +127,14 @@ const CoursesPage = () => {
         const result = Array.isArray(payload)
           ? payload[0]
           : payload &&
-              typeof payload === "object" &&
-              Array.isArray((payload as { results?: unknown }).results)
+            typeof payload === "object" &&
+            Array.isArray((payload as { results?: unknown }).results)
             ? (payload as { results: unknown[] }).results[0]
             : payload;
         const skillsJson =
           result && typeof result === "object"
             ? (result as { skills_json?: { tech?: Record<string, unknown> } })
-                .skills_json
+              .skills_json
             : undefined;
         const allSkills = Object.keys(skillsJson?.tech || {});
         setUserTopSkills(filterHardSkills(allSkills).slice(0, 5));
@@ -202,8 +202,8 @@ const CoursesPage = () => {
 
         const image =
           coverImageUrl &&
-          !coverImageUrl.startsWith("/") &&
-          !coverImageUrl.startsWith("http")
+            !coverImageUrl.startsWith("/") &&
+            !coverImageUrl.startsWith("http")
             ? `/${coverImageUrl}`
             : coverImageUrl;
 
@@ -264,8 +264,8 @@ const CoursesPage = () => {
         const matchPercentage =
           course.required_skills.length > 0
             ? Math.round(
-                (matchingSkills.length / course.required_skills.length) * 100,
-              )
+              (matchingSkills.length / course.required_skills.length) * 100,
+            )
             : 50;
         return {
           ...course,
@@ -372,7 +372,7 @@ const CoursesPage = () => {
         disabled={saveCourseMutation.isPending}
         aria-label={isCourseSaved ? "Unsave course" : "Save course"}
         className={cn(
-          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-10 w-10 flex-shrink-0",
+          "bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:hover:bg-[#4A4A4A] h-8 w-8 flex-shrink-0",
           isCourseSaved
             ? "text-breneo-blue bg-breneo-blue/10 hover:bg-breneo-blue/15 dark:bg-breneo-blue/20 dark:hover:bg-breneo-blue/30"
             : "text-black dark:text-white",
@@ -552,28 +552,30 @@ const CoursesPage = () => {
           <div className="space-y-10">
             <section>
               {sectionHeading(t.courses.academyCourses, 0)}
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="min-h-[220px] rounded-3xl bg-white p-5 dark:bg-[#242424] md:p-6">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="h-12 w-12 rounded-xl" />
-                    <Skeleton className="h-5 w-40" />
-                  </div>
-                  <Skeleton className="mt-5 h-4 w-full" />
-                  <Skeleton className="mt-2 h-4 w-3/4" />
-                </div>
-                <div className="overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="px-4 py-3 md:px-5">
-                      <Skeleton className="mb-2 h-4 w-2/3" />
-                      <Skeleton className="h-3 w-1/3" />
+              <div className="rounded-3xl bg-white dark:bg-[#242424]">
+                <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2">
+                  <div className="min-h-[220px] rounded-2xl border border-gray-200 p-5 dark:border-gray-700 md:p-6">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-12 w-12 rounded-xl" />
+                      <Skeleton className="h-5 w-40" />
                     </div>
-                  ))}
+                    <Skeleton className="mt-5 h-4 w-full" />
+                    <Skeleton className="mt-2 h-4 w-3/4" />
+                  </div>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 divide-y divide-gray-200 dark:border-gray-700 dark:divide-gray-700">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="px-4 py-3 md:px-5">
+                        <Skeleton className="mb-2 h-4 w-2/3" />
+                        <Skeleton className="h-3 w-1/3" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </section>
             <section>
               {sectionHeading(t.courses.ourCourses, 0)}
-              <div className="overflow-hidden rounded-3xl bg-white dark:bg-[#242424]">
+              <div className="overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="px-6 py-4">
                     <Skeleton className="mb-2 h-5 w-2/3" />
@@ -603,48 +605,50 @@ const CoursesPage = () => {
                     return (
                       <div
                         key={group.academyId}
-                        className="grid grid-cols-1 gap-4 lg:grid-cols-2"
+                        className="rounded-3xl bg-white dark:bg-[#242424]"
                       >
-                        <Link
-                          to={`/academy/${group.academyId}`}
-                          className="group flex h-full min-h-[220px] flex-col rounded-3xl bg-gradient-to-br from-white via-white to-breneo-blue/15 p-5 dark:from-[#242424] dark:via-[#242424] dark:to-breneo-blue/20 md:p-6"
-                        >
-                          <div className="flex items-start gap-3">
-                            <AcademyLogo
-                              name={group.name}
-                              src={profile?.logo ?? null}
-                            />
-                            <h3 className="min-w-0 flex-1 self-center truncate text-base font-bold md:text-lg">
-                              {group.name}
-                            </h3>
-                            <ArrowUpRight className="h-5 w-5 flex-shrink-0 text-gray-500 transition-colors group-hover:text-breneo-blue" />
-                          </div>
-                          {profile?.description ? (
-                            <p className="mt-5 line-clamp-3 text-sm text-gray-700 dark:text-gray-300">
-                              {profile.description}
-                            </p>
-                          ) : null}
-                          <div className="mt-auto flex gap-10 pt-6">
-                            <div>
-                              <p className="text-2xl font-bold">
-                                {group.courses.length}
-                              </p>
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                {t.courses.totalCourses}
-                              </p>
+                        <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2">
+                          <Link
+                            to={`/academy/${group.academyId}`}
+                            className="group flex h-full min-h-[220px] flex-col rounded-2xl border border-gray-200 bg-gradient-to-br from-white via-white to-breneo-blue/10 bg-[length:140%_140%] bg-[position:0%_0%] hover:bg-[position:100%_100%] hover:to-breneo-blue/15 p-5 dark:border-gray-700 dark:from-[#242424] dark:via-[#242424] dark:to-breneo-blue/20 dark:hover:to-breneo-blue/25 md:p-6 transition-all duration-500 ease-out"
+                          >
+                            <div className="flex items-start gap-3">
+                              <AcademyLogo
+                                name={group.name}
+                                src={profile?.logo ?? null}
+                              />
+                              <h3 className="min-w-0 flex-1 self-center truncate text-base font-bold md:text-lg transition-colors group-hover:text-breneo-blue">
+                                {group.name}
+                              </h3>
+                              <ArrowUpRight className="h-5 w-5 flex-shrink-0 text-gray-400 transition-colors group-hover:text-breneo-blue" />
                             </div>
-                            <div>
-                              <p className="text-2xl font-bold">{bestMatch}%</p>
-                              <p className="text-xs text-gray-600 dark:text-gray-400">
-                                {t.courses.bestMatch}
+                            {profile?.description ? (
+                              <p className="mt-5 line-clamp-3 text-sm text-gray-700 dark:text-gray-300">
+                                {profile.description}
                               </p>
+                            ) : null}
+                            <div className="mt-auto flex gap-10 pt-6">
+                              <div>
+                                <p className="text-2xl font-bold">
+                                  {group.courses.length}
+                                </p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  {t.courses.totalCourses}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-2xl font-bold">{bestMatch}%</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  {t.courses.bestMatch}
+                                </p>
+                              </div>
                             </div>
+                          </Link>
+                          <div className="self-start overflow-hidden rounded-2xl border border-gray-200 divide-y divide-gray-200 dark:border-gray-700 dark:divide-gray-700">
+                            {group.courses.map((course) =>
+                              renderAcademyCourseRow(course),
+                            )}
                           </div>
-                        </Link>
-                        <div className="self-start overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
-                          {group.courses.map((course) =>
-                            renderAcademyCourseRow(course),
-                          )}
                         </div>
                       </div>
                     );

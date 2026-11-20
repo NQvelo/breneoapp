@@ -150,82 +150,84 @@ export function GrowthInterviewSection() {
           <span className="text-sm text-gray-600">{interviews.length}</span>
         ) : null}
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="self-start overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
-          {isLoading ? (
-            [...Array(4)].map((_, index) => (
-              <div key={index} className="px-4 py-3 md:px-5">
-                <Skeleton className="h-4 w-2/3" />
-              </div>
-            ))
-          ) : interviews.length === 0 ? (
-            <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-              {t.courses.noMatchingInterviews}
-            </p>
-          ) : (
-            interviews.map((roleId) => {
-              const title = t.onboarding.roles[roleId];
-              return (
-                <div
-                  key={roleId}
-                  className="flex items-center gap-3 px-4 py-3 md:px-5"
-                >
-                  <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">
-                    {title}
-                  </h3>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        navigate(
-                          buildAiInterviewStartPath(title, null, roleId, "text"),
-                        )
-                      }
-                      className={interviewActionClass}
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                      {t.courses.textInterview}
-                    </Button>
-                    <div className="relative">
+      <div className="rounded-3xl bg-white dark:bg-[#242424]">
+        <div className="grid grid-cols-1 gap-3 p-3 lg:grid-cols-2">
+          <div className="self-start overflow-hidden rounded-2xl border border-gray-200 divide-y divide-gray-200 dark:border-gray-700 dark:divide-gray-700">
+            {isLoading ? (
+              [...Array(4)].map((_, index) => (
+                <div key={index} className="px-4 py-3 md:px-5">
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              ))
+            ) : interviews.length === 0 ? (
+              <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+                {t.courses.noMatchingInterviews}
+              </p>
+            ) : (
+              interviews.map((roleId) => {
+                const title = t.onboarding.roles[roleId];
+                return (
+                  <div
+                    key={roleId}
+                    className="flex items-center gap-3 px-4 py-3 md:px-5"
+                  >
+                    <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">
+                      {title}
+                    </h3>
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
-                        disabled
+                        onClick={() =>
+                          navigate(
+                            buildAiInterviewStartPath(title, null, roleId, "text"),
+                          )
+                        }
                         className={interviewActionClass}
                       >
-                        <Video className="h-4 w-4" />
-                        {t.courses.videoInterview}
+                        <MessageSquare className="h-4 w-4" />
+                        {t.courses.textInterview}
                       </Button>
-                      <span className="pointer-events-none absolute -top-2 right-0 z-10 whitespace-nowrap rounded-full bg-breneo-blue px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
-                        {t.courses.interviewComingSoon}
-                      </span>
+                      <div className="relative">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled
+                          className={interviewActionClass}
+                        >
+                          <Video className="h-4 w-4" />
+                          {t.courses.videoInterview}
+                        </Button>
+                        <span className="pointer-events-none absolute -top-2 right-0 z-10 whitespace-nowrap rounded-full bg-breneo-blue px-1.5 py-0.5 text-[9px] font-semibold leading-none text-white">
+                          {t.courses.interviewComingSoon}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-        <div className="flex h-full min-h-[220px] flex-col rounded-3xl bg-gradient-to-br from-white via-white to-breneo-blue/15 p-5 dark:from-[#242424] dark:via-[#242424] dark:to-breneo-blue/20 md:p-6">
-          <div className="mx-auto w-4/5 max-w-xs overflow-hidden rounded-2xl">
-            <JobAiInterviewIllustration />
+                );
+              })
+            )}
           </div>
-          <p className="mt-5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-            {t.courses.interviewDescription}
-          </p>
-          <div className="mt-auto pt-6">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setHowItWorksOpen(true)}
-              className="bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#4A4A4A] dark:text-white dark:hover:bg-[#4A4A4A]/90"
-            >
-              {t.courses.howItWorks}
-            </Button>
+          <div className="flex h-full min-h-[220px] flex-col rounded-2xl border border-gray-200 bg-gradient-to-br from-white via-white to-breneo-blue/15 p-5 dark:border-gray-700 dark:from-[#242424] dark:via-[#242424] dark:to-breneo-blue/20 md:p-6">
+            <div className="mx-auto w-4/5 max-w-xs overflow-hidden rounded-2xl">
+              <JobAiInterviewIllustration />
+            </div>
+            <p className="mt-5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+              {t.courses.interviewDescription}
+            </p>
+            <div className="mt-auto pt-6">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setHowItWorksOpen(true)}
+                className="bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#4A4A4A] dark:text-white dark:hover:bg-[#4A4A4A]/90"
+              >
+                {t.courses.howItWorks}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
