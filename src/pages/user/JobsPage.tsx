@@ -2308,9 +2308,9 @@ const JobsPage = () => {
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto py-6 px-2 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto py-6 pb-44 px-2 sm:px-6 lg:px-8 md:pb-6">
         {/* Modern Search Bar */}
-        <div className="mb-8 relative max-w-6xl mx-auto">
+        <div className="mb-8 relative max-w-6xl mx-auto hidden md:block">
           <div className="flex items-center bg-white dark:bg-[#242424] rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
             <Briefcase
               className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -2368,6 +2368,40 @@ const JobsPage = () => {
               patchFilters({ salaryMin, salaryMax, salaryByAgreement })
             }
           />
+        </div>
+
+        {/* Mobile search and filters share a continuous dock surface with the bottom nav. */}
+        <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-40 px-4 pb-1 pt-2 md:hidden">
+          <div className="mx-auto flex w-full max-w-[320px] items-center gap-1.5 rounded-full bg-[#f1f1f1] p-1.5 dark:bg-[#303030]">
+            <Input
+              placeholder={t.jobs.searchPlaceholder}
+              aria-label={t.jobs.searchPlaceholder}
+              value={searchTerm}
+              onChange={(e) => handleSearchTermChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="h-9 min-w-0 flex-1 rounded-full border-0 bg-transparent px-2 py-0 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-gray-100 dark:placeholder:text-gray-500"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={openFilters}
+              aria-label={t.jobs.filters}
+              className="h-9 w-9 flex-shrink-0 rounded-full text-foreground hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <SlidersHorizontal className="h-5 w-5" strokeWidth={2} />
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="icon"
+              onClick={handleSearch}
+              aria-label={t.jobs.search}
+              className="h-9 w-9 flex-shrink-0 rounded-full bg-breneo-blue text-white hover:bg-breneo-blue/90"
+            >
+              <Search className="h-5 w-5 text-white" />
+            </Button>
+          </div>
         </div>
 
         {(internshipError || remoteError || error) && (

@@ -405,7 +405,14 @@ export const AppSidebar = React.memo(function AppSidebar({
         <MobileTabBar
           role={isAcademy ? "academy" : isEmployer ? "employer" : "user"}
           profilePath={profilePath}
-          avatarUrl={sidebarAvatarUrl}
+          hasAttachedDock={[
+            "/jobs",
+            "/profile",
+            "/saved",
+            "/notifications",
+            "/employer/notifications",
+            "/skill-path",
+          ].some((path) => currentPath === path || currentPath.startsWith(`${path}/`))}
           navLocked={navLocked}
         />
       ) : null}

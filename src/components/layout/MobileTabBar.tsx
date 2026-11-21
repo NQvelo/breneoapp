@@ -1,7 +1,5 @@
 import React from "react";
 import { useLocation, type LinkProps } from "react-router-dom";
-import { useTheme } from "next-themes";
-import { TabBar } from "glisse";
 import {
   Book1,
   Briefcase,
@@ -15,34 +13,28 @@ import { useTranslation } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import { isNavHrefActive } from "./navActive";
 
-const TabBarLink = ({
-  href,
-  ...props
-}: Omit<LinkProps, "to"> & { href: string }) => (
+const TabBarLink = ({ href, ...props }: Omit<LinkProps, "to"> & { href: string }) => (
   <LocalizedLink to={href} {...props} />
 );
-
-const TAB_BAR_STYLE = { "--lg-tab-selected": "#19B5FE" } as React.CSSProperties;
 
 interface MobileTabBarProps {
   role: "user" | "academy" | "employer";
   profilePath: string;
-  avatarUrl?: string;
   navLocked?: boolean;
+  hasAttachedDock?: boolean;
 }
 
 /**
- * Memoized so it only re-renders on route, language, theme or avatar changes,
+ * Memoized so it only re-renders on route or language changes,
  * not on every sidebar update (auth, notifications, employer profile loading).
  */
 export const MobileTabBar = React.memo(function MobileTabBar({
   role,
   profilePath,
-  avatarUrl,
   navLocked = false,
+  hasAttachedDock = false,
 }: MobileTabBarProps) {
   const { pathname } = useLocation();
-  const { resolvedTheme } = useTheme();
   const t = useTranslation();
 
   const navItems = React.useMemo(
@@ -71,53 +63,58 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   const activeHref =
     navItems.find((item) => isNavHrefActive(item.href, pathname))?.href ??
     null;
+  const activeIndex = navItems.findIndex((item) => item.href === activeHref);
 
   const items = React.useMemo(
     () =>
       navItems.map((item) => ({
-        value: item.href,
         href: item.href,
         label: item.label,
-        icon:
-          item.href === profilePath && avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              decoding="async"
-              className="breneo-tab-avatar"
-              data-square={role === "user" ? undefined : ""}
-              data-active={item.href === activeHref ? "" : undefined}
-            />
-          ) : (
-            <item.icon variant={item.href === activeHref ? "Bold" : "Linear"} />
-          ),
+        icon: <item.icon variant={item.href === activeHref ? "Bold" : "Linear"} />,
       })),
-    [navItems, profilePath, avatarUrl, role, activeHref],
+    [navItems, activeHref],
   );
 
   return (
     <div
       className={cn(
         "breneo-tab-bar-dock md:hidden fixed bottom-0 left-0 right-0 z-50",
+        hasAttachedDock && "has-attached-dock",
         navLocked && "pointer-events-none opacity-40",
       )}
       aria-disabled={navLocked || undefined}
     >
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(6.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-background via-background/50 to-transparent"
-        aria-hidden
-      />
-
-      <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
-        <TabBar
-          aria-label="Main navigation"
-          className="breneo-tab-bar"
-          data-theme={resolvedTheme === "dark" ? "dark" : "light"}
-          link={TabBarLink}
-          value={activeHref}
-          items={items}
-          style={TAB_BAR_STYLE}
-        />
+      <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2">
+        <nav aria-label="Main navigation" className="breneo-mobile-nav">
+          <div
+            className="breneo-mobile-nav-items"
+            style={{
+              "--active-offset": `${Math.max(activeIndex, 0) * 62}px`,
+            } as React.CSSProperties}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "breneo-mobile-nav-indicator",
+                activeIndex < 0 && "is-hidden",
+              )}
+            />
+            {items.map((item) => {
+              const active = item.href === activeHref;
+              return (
+              <TabBarLink
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                className={cn("breneo-mobile-nav-item", active && "is-active")}
+              >
+                {item.icon}
+              </TabBarLink>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

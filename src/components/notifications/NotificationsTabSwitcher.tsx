@@ -27,11 +27,11 @@ export function NotificationsTabSwitcher({
   onTabChange,
 }: NotificationsTabSwitcherProps) {
   return (
-    <div className="fixed bottom-above-mobile-nav left-1/2 z-40 -translate-x-1/2 md:static md:translate-x-0 md:left-auto md:flex md:justify-start md:mb-4 md:w-auto">
+    <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-start md:mb-4 md:w-auto">
       <motion.div
         layout
         transition={pillSpring}
-        className="relative inline-flex items-center gap-0 rounded-3xl border border-gray-200 bg-white/95 p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl dark:border-gray-800 dark:bg-[#242424]/80 dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] md:shadow-sm"
+        className="mobile-attached-switcher-control relative inline-flex items-center gap-0 rounded-3xl border border-gray-200 bg-white/95 p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl dark:border-gray-800 dark:bg-[#242424]/80 dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] md:shadow-sm"
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.value;

@@ -82,11 +82,11 @@ export function ProfileViewSwitcher({
         : "applied-secondary";
 
   return (
-    <div className="fixed bottom-above-mobile-nav left-1/2 z-40 -translate-x-1/2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+    <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
       <motion.div
         layout
         transition={pillSpring}
-        className="inline-flex items-center gap-0 bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
+        className="mobile-attached-switcher-control inline-flex items-center gap-0 bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
       >
         <ToolbarButton active={activeView === "profile"} onClick={onProfile}>
           Profile

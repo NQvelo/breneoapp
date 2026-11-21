@@ -8,6 +8,7 @@ import { VitePWA } from "vite-plugin-pwa";
 const packageJson = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, "package.json"), "utf-8"),
 ) as { version?: string };
+const employerProxyTarget = `http://127.0.0.1:${process.env.EMPLOYER_PROXY_PORT || "8787"}`;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -26,45 +27,45 @@ export default defineConfig(({ mode }) => ({
               secure: true,
             },
             "/api/employer/companies": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/employer/staff-memberships": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/employer/access-state": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/employer/join-requests": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/employer/member-invites": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/employer/jobs": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/academy/course-analytics": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             // Job applications BFF: apply / my applications / withdraw / applicants (Breneo JWT + server secret).
             "/api/app": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/me/fcm-tokens": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             // Mock interview BFF: start + submit-audio (Breneo JWT + X-Employer-Key server-side).
             "/api/v1/interview": {
-              target: "http://127.0.0.1:8787",
+              target: employerProxyTarget,
               changeOrigin: true,
             },
             "/api/job-details": {
