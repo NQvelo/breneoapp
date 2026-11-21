@@ -82,7 +82,7 @@ export function ProfileViewSwitcher({
         : "applied-secondary";
 
   return (
-    <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(4.1rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+    <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
       <motion.div
         layout
         transition={pillSpring}

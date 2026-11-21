@@ -361,9 +361,9 @@
 }
 
 .breneo-mobile-nav-item svg {
-  width: 24px;
-  height: 24px;
-  stroke-width: 4.5;
+  width: 26px;
+  height: 26px;
+  stroke-width: 5;
   transform: scale(0.96);
   transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
