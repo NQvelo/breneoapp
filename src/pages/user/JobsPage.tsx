@@ -2371,7 +2371,7 @@ const JobsPage = () => {
         </div>
 
         {/* Mobile search and filters share a continuous dock surface with the bottom nav. */}
-        <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 px-4 pb-1 pt-2 md:hidden">
+        <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 px-4 pb-1 pt-2 md:hidden">
           <div className="mx-auto flex w-full max-w-[320px] items-center gap-1.5 rounded-full bg-[#f1f1f1] p-1.5 dark:bg-[#303030]">
             <Input
               placeholder={t.jobs.searchPlaceholder}

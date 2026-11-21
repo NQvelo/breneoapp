@@ -84,12 +84,12 @@ export const MobileTabBar = React.memo(function MobileTabBar({
       )}
       aria-disabled={navLocked || undefined}
     >
-      <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2">
+      <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
         <nav aria-label="Main navigation" className="breneo-mobile-nav">
           <div
             className="breneo-mobile-nav-items"
             style={{
-              "--active-offset": `${Math.max(activeIndex, 0) * 62}px`,
+              "--active-offset": `${Math.max(activeIndex, 0) * 74}px`,
             } as React.CSSProperties}
           >
             <span

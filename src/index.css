@@ -326,18 +326,18 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 26px;
 }
 
 .breneo-mobile-nav-indicator {
   position: absolute;
   z-index: 0;
-  top: 2px;
-  left: -4px;
-  width: 56px;
-  height: 36px;
+  top: 0;
+  left: -12px;
+  width: 72px;
+  height: 40px;
   border-radius: 9999px;
-  background: #f0f0f0;
+  background: #eeeeee;
   pointer-events: none;
   transform: translate3d(var(--active-offset, 0px), 0, 0);
   transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -361,15 +361,15 @@
 }
 
 .breneo-mobile-nav-item svg {
-  width: 26px;
-  height: 26px;
-  stroke-width: 5;
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.5;
   transform: scale(0.96);
   transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
+.breneo-mobile-nav-item.is-active { color: #181818; }
 .breneo-mobile-nav-item.is-active svg { transform: scale(1); }
-.dark .breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
+.dark .breneo-mobile-nav-item.is-active { color: #f5f5f5; }
 
 @media (prefers-reduced-motion: reduce) {
   .breneo-mobile-nav-indicator,
