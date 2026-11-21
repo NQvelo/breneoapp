@@ -21,7 +21,7 @@ interface MobileTabBarProps {
   role: "user" | "academy" | "employer";
   profilePath: string;
   navLocked?: boolean;
-  hasAttachedDock?: boolean;
+  onExtensionMount?: (element: HTMLDivElement | null) => void;
 }
 
 /**
@@ -32,7 +32,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   role,
   profilePath,
   navLocked = false,
-  hasAttachedDock = false,
+  onExtensionMount,
 }: MobileTabBarProps) {
   const { pathname } = useLocation();
   const t = useTranslation();
@@ -64,6 +64,24 @@ export const MobileTabBar = React.memo(function MobileTabBar({
     navItems.find((item) => isNavHrefActive(item.href, pathname))?.href ??
     null;
   const activeIndex = navItems.findIndex((item) => item.href === activeHref);
+  const navItemsRef = React.useRef<HTMLDivElement>(null);
+  const [navItemsWidth, setNavItemsWidth] = React.useState(0);
+
+  React.useLayoutEffect(() => {
+    const nav = navItemsRef.current;
+    if (!nav) return;
+
+    const measure = () => setNavItemsWidth(nav.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, []);
+
+  const activeOffset =
+    activeIndex > 0 && navItems.length > 1
+      ? ((navItemsWidth - 48) / (navItems.length - 1)) * activeIndex
+      : 0;
 
   const items = React.useMemo(
     () =>
@@ -79,17 +97,18 @@ export const MobileTabBar = React.memo(function MobileTabBar({
     <div
       className={cn(
         "breneo-tab-bar-dock md:hidden fixed bottom-0 left-0 right-0 z-50",
-        hasAttachedDock && "has-attached-dock",
         navLocked && "pointer-events-none opacity-40",
       )}
       aria-disabled={navLocked || undefined}
     >
+      <div ref={onExtensionMount} className="breneo-mobile-nav-extension" />
       <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
         <nav aria-label="Main navigation" className="breneo-mobile-nav">
           <div
+            ref={navItemsRef}
             className="breneo-mobile-nav-items"
             style={{
-              "--active-offset": `${Math.max(activeIndex, 0) * 74}px`,
+              "--active-offset": `${Math.max(activeOffset, 0)}px`,
             } as React.CSSProperties}
           >
             <span

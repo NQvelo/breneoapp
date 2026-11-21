@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { MobileBottomDockExtension } from "@/components/layout/mobileBottomDock";
 import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -2371,6 +2372,7 @@ const JobsPage = () => {
         </div>
 
         {/* Mobile search and filters share a continuous dock surface with the bottom nav. */}
+        <MobileBottomDockExtension>
         <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 px-4 pb-1 pt-2 md:hidden">
           <div className="mx-auto flex w-full max-w-[320px] items-center gap-1.5 rounded-full bg-[#f1f1f1] p-1.5 dark:bg-[#303030]">
             <Input
@@ -2403,6 +2405,7 @@ const JobsPage = () => {
             </Button>
           </div>
         </div>
+        </MobileBottomDockExtension>
 
         {(internshipError || remoteError || error) && (
           <div className="bg-red-50 text-red-700 p-4 rounded-md flex items-center gap-3 mb-6">

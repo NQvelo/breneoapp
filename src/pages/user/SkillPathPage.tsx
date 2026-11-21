@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { MobileBottomDockExtension } from "@/components/layout/mobileBottomDock";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1704,6 +1705,7 @@ const SkillPathPage = () => {
   return (
     <DashboardLayout>
       {/* Skills/Matched Roles Switcher */}
+      <MobileBottomDockExtension>
       <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
         <motion.div
           layout
@@ -1759,6 +1761,7 @@ const SkillPathPage = () => {
           </motion.button>
         </motion.div>
       </div>
+      </MobileBottomDockExtension>
 
       <div className="space-y-4 md:space-y-6 pb-32 md:pb-6">
         {/* Skills Chart Section - shown when "Your Skills" is active */}

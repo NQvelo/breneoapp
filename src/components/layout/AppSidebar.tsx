@@ -47,6 +47,7 @@ interface AppSidebarProps {
   onUpgradeClick?: () => void;
   navLocked?: boolean;
   showMobileNav?: boolean;
+  onMobileDockExtensionMount?: (element: HTMLDivElement | null) => void;
 }
 
 const lockedNavClass = "pointer-events-none cursor-not-allowed opacity-40";
@@ -82,6 +83,7 @@ export const AppSidebar = React.memo(function AppSidebar({
   onUpgradeClick,
   navLocked = false,
   showMobileNav = true,
+  onMobileDockExtensionMount,
 }: AppSidebarProps) {
   const location = useLocation();
   // ✅ Get the user object directly from the context
@@ -405,14 +407,7 @@ export const AppSidebar = React.memo(function AppSidebar({
         <MobileTabBar
           role={isAcademy ? "academy" : isEmployer ? "employer" : "user"}
           profilePath={profilePath}
-          hasAttachedDock={[
-            "/jobs",
-            "/profile",
-            "/saved",
-            "/notifications",
-            "/employer/notifications",
-            "/skill-path",
-          ].some((path) => currentPath === path || currentPath.startsWith(`${path}/`))}
+          onExtensionMount={onMobileDockExtensionMount}
           navLocked={navLocked}
         />
       ) : null}

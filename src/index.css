@@ -240,62 +240,84 @@
 .breneo-tab-bar-dock {
   transform: translateZ(0);
   will-change: transform;
-  border-top: 1px solid rgb(0 0 0 / 0.06);
-  background: rgb(255 255 255 / 0.96);
+  border-top: 0;
+  background: #fff;
   box-shadow: 0 -2px 10px rgb(0 0 0 / 0.05);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.breneo-mobile-nav-extension:empty {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .breneo-mobile-nav-extension > .jobs-mobile-search-dock,
+  .breneo-mobile-nav-extension > .mobile-attached-switcher {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .breneo-mobile-nav-extension > .jobs-mobile-search-dock {
+    display: block;
+    padding: 0.75rem 1rem 0.25rem;
+  }
+
+  .breneo-mobile-nav-extension > .mobile-attached-switcher {
+    padding: 0.75rem 1rem 0.25rem;
+  }
 }
 
 .dark .breneo-tab-bar-dock {
-  border-top-color: rgb(255 255 255 / 0.08);
-  background: rgb(36 36 36 / 0.96);
+  background: #242424;
   box-shadow: 0 -2px 10px rgb(0 0 0 / 0.18);
 }
 
 .jobs-mobile-search-dock {
   border: 1px solid rgb(0 0 0 / 0.06);
   border-bottom: 0;
-  background: rgb(255 255 255 / 0.96);
+  background: #fff;
   box-shadow: 0 -2px 12px rgb(0 0 0 / 0.045);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .dark .jobs-mobile-search-dock {
   border-color: rgb(255 255 255 / 0.08);
-  background: rgb(36 36 36 / 0.96);
+  background: #242424;
   box-shadow: 0 -2px 12px rgb(0 0 0 / 0.18);
 }
 
 @media (max-width: 767px) {
-  .breneo-tab-bar-dock.has-attached-dock {
-    border-top-color: transparent;
-    box-shadow: none;
-  }
-
-  .dark .breneo-tab-bar-dock.has-attached-dock {
-    box-shadow: none;
-  }
-
   .mobile-attached-switcher {
-    border-top: 1px solid rgb(0 0 0 / 0.06);
-    border-bottom: 0;
-    background: rgb(255 255 255 / 0.96);
+    border: 0;
+    background: transparent;
     box-shadow: none;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .dark .mobile-attached-switcher {
-    border-top-color: rgb(255 255 255 / 0.08);
-    background: rgb(36 36 36 / 0.96);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .mobile-attached-switcher-control {
-    border-color: transparent !important;
-    background: #f1f1f1 !important;
+    border-color: rgb(0 0 0 / 0.12) !important;
+    background: transparent !important;
     box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     padding: 0.2rem !important;
   }
 
@@ -305,6 +327,16 @@
   }
 
   .dark .mobile-attached-switcher-control {
+    border-color: rgb(255 255 255 / 0.16) !important;
+    background: transparent !important;
+  }
+
+  /* The switcher itself is outlined; only the selected segment gets a surface. */
+  .mobile-attached-switcher-control :is(.bg-sky-100, .dark\:bg-gray-700) {
+    background: #f1f1f1 !important;
+  }
+
+  .dark .mobile-attached-switcher-control :is(.bg-sky-100, .dark\:bg-gray-700) {
     background: #303030 !important;
   }
 }
@@ -326,7 +358,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 26px;
+  justify-content: space-between;
+  width: min(100%, 320px);
 }
 
 .breneo-mobile-nav-indicator {
@@ -351,12 +384,13 @@
   position: relative;
   z-index: 1;
   display: inline-flex;
+  flex: 0 0 48px;
   width: 48px;
   height: 40px;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  color: #737373;
+  color: #8a8a8a;
   transition: color 120ms ease;
 }
 
@@ -367,9 +401,10 @@
   transform: scale(0.96);
   transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.breneo-mobile-nav-item.is-active { color: #181818; }
+.breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
 .breneo-mobile-nav-item.is-active svg { transform: scale(1); }
-.dark .breneo-mobile-nav-item.is-active { color: #f5f5f5; }
+.dark .breneo-mobile-nav-item { color: #9a9a9a; }
+.dark .breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
 
 @media (prefers-reduced-motion: reduce) {
   .breneo-mobile-nav-indicator,

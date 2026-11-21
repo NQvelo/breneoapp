@@ -22,6 +22,7 @@ import {
   DashboardShellContext,
   DEFAULT_DASHBOARD_LAYOUT_OPTIONS,
 } from "./dashboardShellContext";
+import { MobileBottomDockContext } from "./mobileBottomDock";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -100,6 +101,8 @@ export function DashboardChrome({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [mobileDockTarget, setMobileDockTarget] = useState<HTMLDivElement | null>(null);
+  const [hasMobileDockExtension, setHasMobileDockExtension] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const mainContentRef = useRef<HTMLElement>(null);
   const location = useLocation();
@@ -156,6 +159,11 @@ export function DashboardChrome({
     setIsSubscriptionModalOpen(true);
   }, []);
 
+  const mobileDockContextValue = React.useMemo(
+    () => ({ target: mobileDockTarget, setHasExtension: setHasMobileDockExtension }),
+    [mobileDockTarget],
+  );
+
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = resolvedContainMainScroll
@@ -181,6 +189,9 @@ export function DashboardChrome({
   }, [resolvedContainMainScroll]);
 
   return (
+    <MobileBottomDockContext.Provider
+      value={mobileDockContextValue}
+    >
     <div
       className={cn(
         resolvedContainMainScroll ? "h-screen overflow-hidden" : "min-h-screen overflow-x-hidden",
@@ -194,6 +205,7 @@ export function DashboardChrome({
           onUpgradeClick={openSubscriptionModal}
           navLocked={navLocked}
           showMobileNav={showMobileNav}
+          onMobileDockExtensionMount={setMobileDockTarget}
         />
       )}
       {showHeader && (
@@ -215,6 +227,7 @@ export function DashboardChrome({
           showSidebar && (sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]"),
           // Adjusted top padding for the new header position
           showHeader && "pt-24 pb-32 md:pt-24 md:pb-0",
+          showMobileNav && hasMobileDockExtension && "pb-48 md:pb-0",
           (showSidebar || showHeader) && "px-2 md:px-6"
         )}
       >
@@ -227,5 +240,6 @@ export function DashboardChrome({
         onClose={() => setIsSubscriptionModalOpen(false)} 
       />
     </div>
+    </MobileBottomDockContext.Provider>
   );
 }

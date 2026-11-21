@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { MobileBottomDockExtension } from "@/components/layout/mobileBottomDock";
 
 export type NotificationsTab = "notifications" | "cv_views" | "join_requests";
 
@@ -27,6 +28,7 @@ export function NotificationsTabSwitcher({
   onTabChange,
 }: NotificationsTabSwitcherProps) {
   return (
+    <MobileBottomDockExtension>
     <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-start md:mb-4 md:w-auto">
       <motion.div
         layout
@@ -61,5 +63,6 @@ export function NotificationsTabSwitcher({
         })}
       </motion.div>
     </div>
+    </MobileBottomDockExtension>
   );
 }

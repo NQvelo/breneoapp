@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { MobileBottomDockExtension } from "@/components/layout/mobileBottomDock";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, Link } from "react-router-dom";
@@ -402,6 +403,7 @@ const SavedPage = () => {
   return (
     <DashboardLayout>
       {/* Profile/Courses/Jobs Switcher */}
+      <MobileBottomDockExtension>
       <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
         <div className="mobile-attached-switcher-control relative inline-flex items-center bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-full p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
           <button
@@ -432,6 +434,7 @@ const SavedPage = () => {
           </button>
         </div>
       </div>
+      </MobileBottomDockExtension>
 
       <div className="max-w-7xl mx-auto pb-20 md:pb-6 px-2 sm:px-6 lg:px-8">
         {/* Saved Courses Tab */}
