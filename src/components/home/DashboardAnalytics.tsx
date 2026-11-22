@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Briefcase, Flame } from "@/components/icons";
+import { ArrowRight, Briefcase } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -24,19 +24,18 @@ interface DashboardAnalyticsProps {
   applicationStatsLoading?: boolean;
   dailyPick: DailyPickJob | null;
   dailyPickLoading?: boolean;
-  hideDailyPick?: boolean;
 }
 
+const sectionTitleClass = "text-base font-bold text-white";
 const sectionClass =
   "flex min-w-0 flex-1 flex-col gap-4 py-6 first:pt-0 last:pb-0 md:px-6 md:py-0 md:first:pl-0 md:last:pr-0";
-const sectionTitleClass = "text-base font-bold text-white";
 const glassClass =
-  "rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md";
+  "rounded-2xl border border-white/20 bg-white/15 backdrop-blur-md";
 const dailyPickCardClass = cn(
   glassClass,
   "flex w-full min-w-0 max-w-full items-start gap-3 overflow-hidden p-3",
 );
-const heroSkeletonClass = "bg-white/20";
+const heroSkeletonClass = "bg-white/25";
 
 const ApplicationStatusSection: React.FC<{
   stats: ApplicationStats;
@@ -65,10 +64,7 @@ const ApplicationStatusSection: React.FC<{
         {metrics.map(({ label, value }) => (
           <div
             key={label}
-            className={cn(
-              glassClass,
-              "flex flex-col items-start gap-1 px-3 py-3",
-            )}
+            className={cn(glassClass, "flex flex-col items-start gap-1 px-3 py-3")}
           >
             {isLoading ? (
               <Skeleton className={cn(heroSkeletonClass, "h-7 w-8")} />
@@ -77,7 +73,7 @@ const ApplicationStatusSection: React.FC<{
                 {value}
               </span>
             )}
-            <span className="text-xs text-white/75">{label}</span>
+            <span className="text-xs text-white/85">{label}</span>
           </div>
         ))}
       </div>
@@ -90,14 +86,7 @@ const DailyPickSection: React.FC<{
   isLoading?: boolean;
 }> = ({ job, isLoading }) => (
   <div className={sectionClass}>
-    <div className="flex items-center gap-2">
-      <h3 className={sectionTitleClass}>Daily Pick</h3>
-      {/* <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/90 px-2 py-0.5 text-[11px] font-semibold text-white">
-        <Flame className="h-3 w-3" />
-        Hot
-      </span> */}
-    </div>
-
+    <h3 className={sectionTitleClass}>Daily Pick</h3>
     {isLoading ? (
       <div className={cn(dailyPickCardClass, "mt-auto")}>
         <Skeleton className={cn(heroSkeletonClass, "h-10 w-10 rounded-md")} />
@@ -109,10 +98,7 @@ const DailyPickSection: React.FC<{
     ) : job ? (
       <Link
         to={`/jobs/${encodeURIComponent(job.id)}`}
-        className={cn(
-          dailyPickCardClass,
-          "group mt-auto transition-colors hover:bg-white/20",
-        )}
+        className={cn(dailyPickCardClass, "group mt-auto transition-colors hover:bg-white/25")}
       >
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-white">
           {job.logo ? (
@@ -133,21 +119,19 @@ const DailyPickSection: React.FC<{
           <h4 className="line-clamp-2 break-words text-sm font-bold text-white group-hover:underline">
             {job.title}
           </h4>
-          <p className="mt-0.5 truncate text-xs text-white/75">
+          <p className="mt-0.5 truncate text-xs text-white/85">
             {job.company} • {job.location}
           </p>
         </div>
         {job.matchPercentage != null && (
-          <span className="flex-shrink-0 rounded-[10px] bg-emerald-400/90 px-2 py-0.5 text-xs font-bold text-emerald-950">
+          <span className="flex-shrink-0 rounded-[10px] bg-emerald-300 px-2 py-0.5 text-xs font-bold text-emerald-950">
             {Math.round(job.matchPercentage)}% Match
           </span>
         )}
       </Link>
     ) : (
       <div className={cn(dailyPickCardClass, "mt-auto")}>
-        <p className="text-xs text-white/80">
-          No highlighted job today. Check back soon!
-        </p>
+        <p className="text-xs text-white/85">No highlighted job today. Check back soon!</p>
       </div>
     )}
   </div>
@@ -158,11 +142,9 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
   applicationStatsLoading,
   dailyPick,
   dailyPickLoading,
-  hideDailyPick = false,
 }) => (
   <section
     className="relative isolate overflow-hidden rounded-3xl p-5 md:p-7"
-    style={{ boxShadow: "0 6px 20px 0 rgba(0, 0, 0, 0.04)" }}
   >
     <div
       aria-hidden="true"
@@ -185,9 +167,7 @@ export const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({
           stats={applicationStats}
           isLoading={applicationStatsLoading}
         />
-        {hideDailyPick ? null : (
-          <DailyPickSection job={dailyPick} isLoading={dailyPickLoading} />
-        )}
+        <DailyPickSection job={dailyPick} isLoading={dailyPickLoading} />
       </div>
     </div>
   </section>

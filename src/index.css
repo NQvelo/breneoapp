@@ -359,7 +359,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(100%, 320px);
+  width: min(100%, 280px);
 }
 
 .breneo-mobile-nav-indicator {
