@@ -769,3 +769,11 @@
     width: 100%;
   }
 }
+
+/* Dashboard content already starts below the fixed mobile header. */
+@media (max-width: 767px) {
+  main[data-dashboard-main] > div > :first-child {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+}

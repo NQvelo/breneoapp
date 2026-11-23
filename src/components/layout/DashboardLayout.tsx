@@ -226,7 +226,7 @@ export function DashboardChrome({
             : "h-auto min-h-[calc(100dvh-6rem)] overflow-visible md:min-h-[calc(100vh-6rem)]",
           showSidebar && (sidebarCollapsed ? "md:ml-24" : "md:ml-[17rem]"),
           // Adjusted top padding for the new header position
-          showHeader && "pt-24 pb-32 md:pt-24 md:pb-0",
+          showHeader && "pt-[68px] pb-32 md:pt-24 md:pb-0",
           showMobileNav && hasMobileDockExtension && "pb-48 md:pb-0",
           (showSidebar || showHeader) && "px-2 md:px-6"
         )}

@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import {
   Dialog,
@@ -50,7 +49,6 @@ import {
   resolveJobWorkArrangement,
 } from "@/utils/jobEmploymentDisplay";
 import { cn } from "@/lib/utils";
-import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import { toast } from "sonner";
 import {
   DashboardAnalytics,
@@ -61,6 +59,7 @@ import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelco
 import { useMyApplicationCounts } from "@/hooks/useMyApplications";
 import { useNeedsProfileForMatching } from "@/hooks/useNeedsProfileForMatching";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { createAcademySlug } from "@/utils/academyUtils";
 
 const HOME_MATCH_LIMIT = 9;
 
@@ -137,10 +136,12 @@ interface Course {
   id: string;
   title: string;
   provider: string;
+  academyId?: string;
   category: string;
   level: string;
   duration: string;
   image: string;
+  academyLogo?: string;
   is_saved?: boolean;
   required_skills?: string[];
   match?: number;
@@ -170,10 +171,20 @@ const mapApiCourseToHomeCourse = (course: Record<string, unknown>): Course => {
   const requiredSkills = Array.isArray(course.required_skills)
     ? (course.required_skills as unknown[]).map((s) => String(s))
     : [];
+  const academyLogo =
+    course.academy_logo_url ??
+    course.academy_logo ??
+    course.academy_profile_photo_url ??
+    course.academy_profile_image ??
+    course.logo_url ??
+    course.profile_image;
+
   return {
     id,
     title: String(course.title ?? ""),
     provider: String(course.academy_name ?? ""),
+    academyId:
+      course.academy_id != null ? String(course.academy_id) : undefined,
     category: String(course.language ?? course.location ?? ""),
     level: String(course.level ?? ""),
     duration: String(course.total_duration ?? ""),
@@ -181,6 +192,10 @@ const mapApiCourseToHomeCourse = (course: Record<string, unknown>): Course => {
       course.cover_image_url,
       course.lecturer_photo_url,
     ),
+    academyLogo:
+      typeof academyLogo === "string" && academyLogo.trim()
+        ? normalizeHomeCourseCoverUrl(academyLogo, "")
+        : undefined,
     required_skills: requiredSkills,
   };
 };
@@ -456,6 +471,37 @@ const UserHome = () => {
       }
     },
     enabled: showMatchedJobs && !loadingSkills,
+  });
+
+  const { data: homeAcademyProfiles = {} } = useQuery<Record<string, { name?: string; logo?: string }>>({
+    queryKey: ["home-academy-profiles", courses.map((course) => course.academyId).filter(Boolean).sort().join(",")],
+    queryFn: async () => {
+      const academyIds = [...new Set(courses.map((course) => course.academyId).filter((id): id is string => Boolean(id)))];
+      const profiles = await Promise.all(
+        academyIds.map(async (id) => {
+          try {
+            const response = await apiClient.get(`/api/academy/${id}/`);
+            const data = (response.data?.profile_data || response.data || {}) as Record<string, unknown>;
+            const stringField = (...keys: string[]) => {
+              for (const key of keys) {
+                const value = data[key];
+                if (typeof value === "string" && value.trim()) return value.trim();
+              }
+              return undefined;
+            };
+            return [id, {
+              name: stringField("academy_name", "name"),
+              logo: stringField("profile_photo_url", "profilePhotoUrl", "profile_image_url", "logo_url", "logoUrl", "logo", "image"),
+            }] as const;
+          } catch {
+            return [id, {}] as const;
+          }
+        }),
+      );
+      return Object.fromEntries(profiles);
+    },
+    enabled: courses.length > 0,
+    staleTime: 5 * 60 * 1000,
   });
 
   // Filter and sort courses based on user skills
@@ -980,7 +1026,7 @@ const UserHome = () => {
                       className="relative flex-shrink-0 snap-start w-[calc((100%-2rem)/3)] min-w-[280px]"
                     >
                       <CardContent className="p-0">
-                        <Skeleton className="h-40 w-full rounded-t-3xl" />
+                        <Skeleton className="aspect-[2.58/1] w-full rounded-t-3xl" />
                         <div className="p-4">
                           <Skeleton className="h-5 w-3/4 mb-2" />
                           <Skeleton className="h-4 w-1/2 mb-3" />
@@ -1016,7 +1062,7 @@ const UserHome = () => {
                       >
                         <Card className="relative transition-all duration-200 cursor-pointer group rounded-3xl w-full flex flex-col hover:shadow-soft">
                           <CardContent className="p-0 overflow-hidden rounded-3xl flex flex-col flex-grow relative">
-                            <div className="relative w-full h-40 overflow-hidden rounded-t-3xl isolate">
+                            <div className="relative aspect-[2.58/1] w-full overflow-hidden rounded-t-3xl isolate">
                               <img
                                 src={course.image}
                                 alt={course.title}
@@ -1028,20 +1074,53 @@ const UserHome = () => {
                                 }}
                               />
                             </div>
-                            <div className="p-4 flex flex-col flex-grow min-h-[140px]">
+                            <div className="p-3 flex flex-col flex-grow min-h-[112px]">
                               <h3 className="font-semibold text-base mb-2 line-clamp-2 group-hover:text-breneo-blue transition-colors">
                                 {course.title}
                               </h3>
 
                               <div className="flex items-center justify-between gap-3 mt-auto flex-wrap">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {course.duration && (
-                                    <Badge
-                                      className={PLATFORM_CHIP_BADGE_CLASS}
-                                    >
-                                      {course.duration}
-                                    </Badge>
-                                  )}
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <div
+                                    role="link"
+                                    tabIndex={0}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      navigate(course.academyId
+                                        ? `/academy/${course.academyId}`
+                                        : `/academy/${createAcademySlug(course.provider)}`);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        navigate(course.academyId
+                                          ? `/academy/${course.academyId}`
+                                          : `/academy/${createAcademySlug(course.provider)}`);
+                                      }
+                                    }}
+                                    className="flex min-w-0 items-center gap-2 rounded-xl px-2 py-1 text-left transition-colors hover:opacity-75"
+                                    aria-label={`View ${homeAcademyProfiles[course.academyId || ""]?.name || course.provider || "Academy"}`}
+                                  >
+                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-white text-xs font-semibold text-muted-foreground">
+                                    {homeAcademyProfiles[course.academyId || ""]?.logo || course.academyLogo ? (
+                                      <img
+                                        src={homeAcademyProfiles[course.academyId || ""]?.logo || course.academyLogo}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                                        }}
+                                      />
+                                    ) : (
+                                      (course.provider.trim().charAt(0).toUpperCase() || "A")
+                                    )}
+                                  </div>
+                                  <span className="truncate text-sm font-medium text-foreground">
+                                    {homeAcademyProfiles[course.academyId || ""]?.name || course.provider || "Academy"}
+                                  </span>
+                                  </div>
                                 </div>
                                 <Button
                                   variant="secondary"
