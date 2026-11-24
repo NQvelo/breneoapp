@@ -112,6 +112,12 @@ export function PwaPullToRefresh() {
     const onTouchStart = (event: TouchEvent) => {
       if (refreshing || !isPageAtTop(event.target)) return;
       if (event.touches.length !== 1) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-long-press-drag]")
+      ) {
+        return;
+      }
 
       startYRef.current = event.touches[0].clientY;
       pullingRef.current = true;

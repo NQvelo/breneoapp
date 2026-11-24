@@ -22,6 +22,7 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLongPressDrag } from "@/hooks/useLongPressDrag";
 
 interface ManagementCourse {
   id: string;
@@ -291,6 +292,13 @@ export function ProfileCourseManagementView({
     saved: savedOnlyCourses,
     applied: enrolledCourses,
   };
+  const touchDrag = useLongPressDrag(isMobile, (courseId, columnId) => {
+    if (columnId !== "applied") return;
+    const course = savedOnlyCourses.find(
+      (item) => String(item.id) === courseId,
+    );
+    if (course) setCourseToApply(course);
+  });
 
   if (loadingSavedCourses || loadingEnrolledCourses) {
     return (
@@ -308,12 +316,14 @@ export function ProfileCourseManagementView({
           return (
             <section
               key={column.id}
+              data-management-column={column.id}
               className={cn(
                 "flex-1 min-h-[360px] bg-white p-3 dark:bg-[#242424]",
                 "border-r-[8px] border-breneo-lightgray last:border-r-0 dark:border-r-[#181818]",
                 isMobile
                   ? "w-[78vw] min-w-[78vw] max-w-[78vw]"
                   : "min-w-[320px]",
+                touchDrag.dropTarget === column.id && "ring-2 ring-inset ring-breneo-blue",
               )}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
@@ -352,15 +362,29 @@ export function ProfileCourseManagementView({
                   return (
                     <article
                       key={id}
-                      draggable={column.id === "saved"}
+                      data-long-press-drag
+                      draggable={!isMobile && column.id === "saved"}
                       onDragStart={() => setDraggingCourseId(id)}
                       onDragEnd={() => setDraggingCourseId(null)}
+                      onTouchStart={(event) => {
+                        if (column.id === "saved") {
+                          touchDrag.onTouchStart(event, id);
+                        }
+                      }}
+                      onTouchMove={touchDrag.onTouchMove}
+                      onTouchEnd={touchDrag.onTouchEnd}
+                      onTouchCancel={touchDrag.onTouchEnd}
+                      onContextMenu={(event) => {
+                        if (isMobile) event.preventDefault();
+                      }}
+                      onClickCapture={touchDrag.onClickCapture}
                       onClick={() =>
                         navigate(`/course/${encodeURIComponent(id)}`)
                       }
                       className={cn(
-                        "cursor-pointer rounded-2xl p-4 transition-colors",
+                        "cursor-pointer select-none rounded-2xl p-4 transition-colors",
                         column.card,
+                        touchDrag.draggingId === id && "opacity-60",
                       )}
                     >
                       <div className="flex items-start gap-3">

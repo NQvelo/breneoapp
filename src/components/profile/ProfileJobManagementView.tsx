@@ -12,6 +12,7 @@ import {
 } from "@/api/jobs/jobApplicationsApi";
 import { Briefcase, Loader2 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { useLongPressDrag } from "@/hooks/useLongPressDrag";
 
 type JobStatus = "saved" | "applied" | "review" | "interview" | "done";
 
@@ -191,6 +192,11 @@ export function ProfileJobManagementView() {
     }
   }
 
+  const touchDrag = useLongPressDrag(isMobile, (jobId, columnId) => {
+    const column = columns.find((item) => item.id === columnId);
+    if (column) moveJob(jobId, column.id);
+  });
+
   if (loadingSaved || loadingApplications) {
     return (
       <div className="flex min-h-[280px] items-center justify-center">
@@ -207,10 +213,12 @@ export function ProfileJobManagementView() {
           return (
             <section
               key={column.id}
+              data-management-column={column.id}
               className={cn(
                 "flex-1 min-h-[360px] bg-white p-3 dark:bg-[#242424]",
                 "border-r-[8px] border-breneo-lightgray last:border-r-0 dark:border-r-[#181818]",
                 isMobile ? "w-[78vw] min-w-[78vw] max-w-[78vw]" : "min-w-[320px]",
+                touchDrag.dropTarget === column.id && "ring-2 ring-inset ring-breneo-blue",
               )}
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
@@ -228,13 +236,23 @@ export function ProfileJobManagementView() {
                 {columnJobs.map((job) => (
                   <article
                     key={job.id}
-                    draggable
+                    data-long-press-drag
+                    draggable={!isMobile}
                     onDragStart={() => setDraggingId(job.id)}
                     onDragEnd={() => setDraggingId(null)}
+                    onTouchStart={(event) => touchDrag.onTouchStart(event, job.id)}
+                    onTouchMove={touchDrag.onTouchMove}
+                    onTouchEnd={touchDrag.onTouchEnd}
+                    onTouchCancel={touchDrag.onTouchEnd}
+                    onContextMenu={(event) => {
+                      if (isMobile) event.preventDefault();
+                    }}
+                    onClickCapture={touchDrag.onClickCapture}
                     onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
                     className={cn(
-                      "cursor-pointer rounded-2xl p-4 transition-colors",
+                      "cursor-pointer select-none rounded-2xl p-4 transition-colors",
                       column.card,
+                      (draggingId === job.id || touchDrag.draggingId === job.id) && "opacity-60",
                     )}
                   >
                     <div className="flex items-start gap-3">
