@@ -29,7 +29,7 @@ export function NotificationsTabSwitcher({
 }: NotificationsTabSwitcherProps) {
   return (
     <MobileBottomDockExtension>
-    <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-start md:mb-4 md:w-auto">
+    <div className="mobile-attached-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 pt-2 pb-0 md:static md:translate-x-0 md:left-auto md:flex md:justify-start md:mb-4 md:w-auto">
       <motion.div
         layout
         transition={pillSpring}

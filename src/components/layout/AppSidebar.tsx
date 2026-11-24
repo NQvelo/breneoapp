@@ -385,9 +385,9 @@ export const AppSidebar = React.memo(function AppSidebar({
                          bg-black/[0.06] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.05] transition-colors rounded-full"
             >
               {mounted && theme === "dark" ? (
-                <Moon size={20} />
+                <Moon size={18} />
               ) : (
-                <Sun size={20} />
+                <Sun size={18} />
               )}
             </button>
             <LocalizedLink
@@ -395,7 +395,7 @@ export const AppSidebar = React.memo(function AppSidebar({
               className="relative h-10 w-10 flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 
                          bg-black/[0.06] dark:bg-white/[0.03] hover:bg-black/[0.08] dark:hover:bg-white/[0.05] transition-colors rounded-full"
             >
-              <Bell size={20} />
+              <Bell size={18} />
               <NotificationCountBadge count={unreadNotificationCount} />
             </LocalizedLink>
           </div>
@@ -452,7 +452,7 @@ export const AppSidebar = React.memo(function AppSidebar({
                     )}
                   >
                     <item.icon
-                      size={22}
+                      size={20}
                       className={cn(
                         "transition-colors duration-200 flex-shrink-0",
                         isActive
@@ -493,7 +493,7 @@ export const AppSidebar = React.memo(function AppSidebar({
                 )}
               >
                 <Settings
-                  size={22}
+                  size={20}
                   className={cn(
                     "flex-shrink-0 transition-colors duration-200",
                     currentPath === settingsPath
@@ -522,12 +522,12 @@ export const AppSidebar = React.memo(function AppSidebar({
               >
                 {subscriptionInfo?.is_active ? (
                   <Sparkles
-                    size={22}
+                    size={20}
                     className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:scale-110 transition-transform"
                   />
                 ) : (
                   <ArrowRight
-                    size={22}
+                    size={20}
                     className="text-gray-700 dark:text-gray-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform"
                   />
                 )}

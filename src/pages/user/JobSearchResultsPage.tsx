@@ -1045,7 +1045,7 @@ const JobSearchResultsPage = () => {
           </div>
         </div>
         {/* Search Bar */}
-        <div className="mb-8 relative max-w-6xl mx-auto hidden md:block">
+        <div className="mb-8 relative max-w-7xl mx-auto hidden md:block">
           <div className="flex items-center bg-white dark:bg-[#242424] rounded-3xl pl-3 md:pl-4 pr-2 md:pr-2.5 py-2.5 md:py-3 overflow-visible min-h-[3rem]">
             <Briefcase
               className="h-5 w-5 text-breneo-accent dark:text-breneo-blue flex-shrink-0 mr-2"
@@ -1088,7 +1088,7 @@ const JobSearchResultsPage = () => {
 
         </div>
 
-        <div className="mb-4 hidden flex-nowrap items-center gap-2 md:mx-auto md:flex md:max-w-6xl">
+        <div className="mb-4 hidden flex-nowrap items-center gap-2 md:mx-auto md:flex md:max-w-7xl">
           <span className="shrink-0 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-300">
             {regularJobs.length > 0
               ? `${regularJobs.length} ${t.jobs.vacancies}`
@@ -1140,7 +1140,7 @@ const JobSearchResultsPage = () => {
         </div>
 
         <MobileBottomDockExtension>
-          <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 px-4 pb-1 pt-2 md:hidden">
+          <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 px-4 pt-2 pb-0 md:hidden">
             <div className="mx-auto flex w-full max-w-[320px] items-center gap-1.5 rounded-full bg-[#f1f1f1] p-1.5 dark:bg-[#303030]">
               <Input
                 placeholder={t.jobs.searchPlaceholder}
