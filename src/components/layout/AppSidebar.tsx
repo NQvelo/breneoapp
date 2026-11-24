@@ -371,7 +371,7 @@ export const AppSidebar = React.memo(function AppSidebar({
             {isRegularUser ? (
               <Button
                 variant="ghost"
-                className="relative h-10 px-3 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200 
+                className="relative h-10 min-w-0 px-3 rounded-full !text-gray-500 hover:!text-gray-700 dark:!text-gray-400 dark:hover:!text-gray-200
                            bg-black/[0.06] dark:bg-white/[0.03] hover:!bg-black/[0.08] dark:hover:!bg-white/[0.05] transition-colors
                            text-sm font-medium flex items-center gap-2"
               >

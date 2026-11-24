@@ -33,7 +33,7 @@ export function AuthHeaderControls() {
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className={`${pillClassName} px-3 text-sm font-medium flex items-center gap-2`}
+            className={`${pillClassName} min-w-0 px-3 text-sm font-medium flex items-center gap-2`}
           >
             <Globe className="h-4 w-4" />
             <span>{language.toUpperCase()}</span>
