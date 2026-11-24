@@ -1077,7 +1077,6 @@ const AcademyProfilePage = () => {
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button
               type="button"
-              size="sm"
               onClick={() => void handleUpdateProfile()}
               disabled={isSubmitting}
             >
@@ -1094,14 +1093,14 @@ const AcademyProfilePage = () => {
             </Button>
             <Button
               type="button"
-              variant="secondary"
-              size="sm"
-              className="h-10 w-10 shrink-0 p-0"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
               onClick={() => setIsEditing(false)}
               disabled={isSubmitting}
               aria-label="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </div>
         </SheetHeader>
@@ -1222,21 +1221,20 @@ const AcademyProfilePage = () => {
           <SheetTitle className="flex-1 min-w-0">Edit About</SheetTitle>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button
-              size="sm"
               onClick={() => void handleSaveAbout()}
               disabled={isSubmitting}
             >
               {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
             <Button
-              variant="secondary"
-              size="sm"
-              className="h-10 w-10 shrink-0 p-0"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
               onClick={() => setIsAboutOpen(false)}
               disabled={isSubmitting}
               aria-label="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </div>
         </SheetHeader>
@@ -1273,13 +1271,13 @@ const AcademyProfilePage = () => {
           <SheetTitle className="flex-1 min-w-0">Profile Photo</SheetTitle>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button
-              variant="secondary"
-              size="sm"
-              className="h-10 w-10 shrink-0 p-0"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
               onClick={() => setIsProfileImageModalOpen(false)}
               aria-label="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </div>
         </SheetHeader>

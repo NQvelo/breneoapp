@@ -73,8 +73,8 @@ export const BetaVersionModal: React.FC = () => {
   const updateButton = (
     <Button
       variant="default"
-      className={cn("w-full", !isMobile && "h-9")}
-      size={isMobile ? "default" : "sm"}
+      size="default"
+      className="w-full"
       onClick={() => void handleUpdate()}
       disabled={isUpdating}
     >
@@ -119,14 +119,16 @@ export const BetaVersionModal: React.FC = () => {
       aria-describedby="app-update-message"
       className="fixed bottom-6 right-6 z-[70] w-[min(20rem,calc(100vw-3rem))] rounded-2xl border bg-background p-4 shadow-lg animate-in fade-in-0 slide-in-from-bottom-2"
     >
-      <button
+      <Button
         type="button"
-        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        variant="ghost"
+        size="icon"
+        className="absolute right-3 top-3 text-black hover:text-black dark:text-white dark:hover:text-white"
         onClick={() => handleDismiss(false)}
         aria-label={t.common.close}
       >
-        <X className="h-3.5 w-3.5" />
-      </button>
+        <X className="h-5 w-5" />
+      </Button>
       <h2 id="app-update-title" className="pr-6 text-sm font-semibold">
         {t.appUpdate.title}
       </h2>

@@ -651,7 +651,7 @@ export default function EmployerProfilePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
+            <Button variant="ghost" onClick={() => setIsEditing(false)}>
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={isSubmitting}>
@@ -757,7 +757,7 @@ export default function EmployerProfilePage() {
           </div>
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setCompanyPickerOpen(false)}
               disabled={pickerSaving}
             >

@@ -568,7 +568,7 @@ export function AccountCvSection() {
           <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               className="flex-1"
               disabled={removing}
               onClick={() => setConfirmRemove(false)}

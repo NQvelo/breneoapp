@@ -3084,7 +3084,7 @@ const ProfilePage = () => {
             <DialogFooter className="flex flex-row gap-2 pt-10 sm:space-x-0">
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
                 className="flex-1"
                 onClick={() => setLogoutConfirmOpen(false)}
               >
@@ -3137,21 +3137,20 @@ const ProfilePage = () => {
             <SheetTitle className="flex-1 min-w-0">Edit About Me</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               <Button
-                size="sm"
                 onClick={handleSaveAboutMe}
                 disabled={updatingAboutMe}
               >
                 {updatingAboutMe ? "Saving..." : "Save Changes"}
               </Button>
               <Button
-                variant="secondary"
-                size="sm"
-                className="h-10 w-10 p-0 shrink-0"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
                 onClick={() => setIsAboutMeModalOpen(false)}
                 disabled={updatingAboutMe}
                 aria-label="Cancel"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 text-black dark:text-white" />
               </Button>
             </div>
           </SheetHeader>
@@ -3185,13 +3184,13 @@ const ProfilePage = () => {
             <SheetTitle className="flex-1 min-w-0">Profile Photo</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
               <Button
-                variant="secondary"
-                size="sm"
-                className="h-10 w-10 p-0 shrink-0"
+                variant="ghost"
+                size="icon"
+                className="shrink-0"
                 onClick={() => setIsProfileImageModalOpen(false)}
                 aria-label="Cancel"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 text-black dark:text-white" />
               </Button>
             </div>
           </SheetHeader>

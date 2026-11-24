@@ -95,7 +95,7 @@ export function AccountDataActions() {
     <>
       <Button
         type="button"
-        variant="secondary"
+        variant="ghost"
         className="flex-1"
         disabled={busy}
         onClick={close}

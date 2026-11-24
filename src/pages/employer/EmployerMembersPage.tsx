@@ -443,7 +443,7 @@ export default function EmployerMembersPage() {
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               disabled={inviteSending}
               onClick={() => setInviteOpen(false)}
             >

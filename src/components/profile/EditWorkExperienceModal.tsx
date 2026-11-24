@@ -422,7 +422,6 @@ export function EditWorkExperienceModal({
             <Button
               type="submit"
               form="edit-work-experience-form"
-              size="sm"
               disabled={saving}
             >
               {saving ? (
@@ -436,14 +435,14 @@ export function EditWorkExperienceModal({
             </Button>
             <Button
               type="button"
-              variant="secondary"
-              size="sm"
-              className="h-10 w-10 p-0 shrink-0"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
               onClick={() => onOpenChange(false)}
               disabled={saving}
               aria-label="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </div>
         </SheetHeader>
@@ -552,7 +551,7 @@ export function EditWorkExperienceModal({
             {rows.length < 10 && (
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 onClick={addRow}
                 className="w-full"
               >

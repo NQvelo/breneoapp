@@ -475,7 +475,8 @@ export const CourseFilterModal: React.FC<CourseFilterModalProps> = ({
                     onApply();
                     setMobileView("main");
                   }}
-                  className="h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
+                  variant="default"
+                  size="default"
                 >
                   {SAVE_BUTTON_KA}
                 </Button>
@@ -489,7 +490,9 @@ export const CourseFilterModal: React.FC<CourseFilterModalProps> = ({
                   setCountrySearchQuery("");
                   setMobileView("main");
                 }}
-                className="w-full h-12 bg-breneo-blue text-white hover:bg-breneo-blue/90 rounded-[18px] text-base font-medium font-semibold"
+                variant="default"
+                size="default"
+                fullWidth
               >
                 Done
               </Button>
@@ -535,7 +538,8 @@ export const CourseFilterModal: React.FC<CourseFilterModalProps> = ({
             )}
             <Button
               onClick={onApply}
-              className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90"
+              variant="default"
+              size="default"
             >
               {SAVE_BUTTON_KA}
             </Button>

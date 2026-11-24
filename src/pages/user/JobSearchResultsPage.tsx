@@ -1466,7 +1466,6 @@ const JobSearchResultsPage = () => {
           onFiltersChange={setTempFilters}
           onApply={handleApplyFilters}
           onClear={handleClearFilters}
-          showSaveFilter
           userTopSkills={userTopSkills}
         />
       </div>

@@ -135,7 +135,6 @@ export function EditPersonalInfoModal({
             <Button
               type="submit"
               form="edit-personal-info-form"
-              size="sm"
               disabled={saving}
             >
               {saving ? (
@@ -149,14 +148,14 @@ export function EditPersonalInfoModal({
             </Button>
             <Button
               type="button"
-              variant="secondary"
-              size="sm"
-              className="h-10 w-10 p-0 shrink-0"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
               onClick={() => onOpenChange(false)}
               disabled={saving}
               aria-label="Cancel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </div>
         </SheetHeader>

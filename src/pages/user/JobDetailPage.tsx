@@ -1516,7 +1516,7 @@ const JobDetailPage = () => {
   const skillNoButton = (
     <Button
       type="button"
-      variant="secondary"
+      variant="ghost"
       className={isMobile ? "w-full" : "flex-1"}
       onClick={closeSkillConfirm}
       disabled={isSavingSkill}

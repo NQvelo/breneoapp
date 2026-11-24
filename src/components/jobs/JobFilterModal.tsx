@@ -82,7 +82,6 @@ interface JobFilterModalProps {
   }) => void;
   onApply: () => void;
   onClear?: () => void;
-  showSaveFilter?: boolean;
   userTopSkills?: string[]; // User's top skills from test results
 }
 
@@ -95,6 +94,14 @@ const workTypeLabels: Record<string, string> = {
   PARTTIME: "Part Time",
   CONTRACTOR: "Contractor",
   INTERN: "Intern",
+};
+
+const getSelectedSummary = (labels: string[]) => {
+  const [firstLabel] = labels;
+  if (!firstLabel) return null;
+  return labels.length > 1
+    ? `${firstLabel} +${labels.length - 1}`
+    : firstLabel;
 };
 
 interface FilterFormProps {
@@ -145,6 +152,27 @@ const FilterForm: React.FC<FilterFormProps> = ({
   const filteredCities = React.useMemo(
     () => filterGeorgianCities(searchQuery, language),
     [searchQuery, language],
+  );
+
+  const workTypeSummary = getSelectedSummary(
+    filters.jobTypes.map((type) => workTypeLabels[type] || type),
+  );
+  const citySummary = getSelectedSummary(
+    filters.countries.map((cityId) => georgianCityLabelById(cityId, language)),
+  );
+  const categorySummary = getSelectedSummary(
+    (filters.roleCategory ?? []).map((value) => {
+      const category = JOB_ROLE_CATEGORIES.find(
+        (option) => option.value === value,
+      );
+      return category ? t.onboarding.roleCategories[category.labelId] : value;
+    }),
+  );
+  const levelSummary = getSelectedSummary(
+    (filters.seniority ?? []).map((value) => {
+      const level = JOB_SENIORITY_LEVELS.find((option) => option === value);
+      return level ? t.jobs.levels[level] : value;
+    }),
   );
 
   // Reset search query when leaving country view
@@ -480,7 +508,14 @@ const FilterForm: React.FC<FilterFormProps> = ({
             <span className="text-sm font-medium">
               {t.jobs.workType}
             </span>
-            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <div className="flex min-w-0 items-center gap-2">
+              {workTypeSummary && (
+                <span className="max-w-[40vw] truncate text-sm font-medium text-breneo-blue">
+                  {workTypeSummary}
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+            </div>
           </button>
           <button
             type="button"
@@ -490,7 +525,14 @@ const FilterForm: React.FC<FilterFormProps> = ({
             <span className="text-sm font-medium">
               {t.jobs.city}
             </span>
-            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <div className="flex min-w-0 items-center gap-2">
+              {citySummary && (
+                <span className="max-w-[40vw] truncate text-sm font-medium text-breneo-blue">
+                  {citySummary}
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+            </div>
           </button>
           <button
             type="button"
@@ -500,7 +542,14 @@ const FilterForm: React.FC<FilterFormProps> = ({
             <span className="text-sm font-medium">
               {t.jobs.category}
             </span>
-            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <div className="flex min-w-0 items-center gap-2">
+              {categorySummary && (
+                <span className="max-w-[40vw] truncate text-sm font-medium text-breneo-blue">
+                  {categorySummary}
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+            </div>
           </button>
           <button
             type="button"
@@ -510,7 +559,14 @@ const FilterForm: React.FC<FilterFormProps> = ({
             <span className="text-sm font-medium">
               {t.jobs.level}
             </span>
-            <ChevronRight className="h-4 w-4 text-gray-400" />
+            <div className="flex min-w-0 items-center gap-2">
+              {levelSummary && (
+                <span className="max-w-[40vw] truncate text-sm font-medium text-breneo-blue">
+                  {levelSummary}
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+            </div>
           </button>
         </div>
 
@@ -843,7 +899,6 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
   onFiltersChange,
   onApply,
   onClear,
-  showSaveFilter = false,
   userTopSkills = [],
 }) => {
   const { t } = useLanguage();
@@ -934,7 +989,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
     return (
       <Drawer open={isOpen} onOpenChange={onClose}>
         <DrawerContent className="max-h-[90vh] flex flex-col bg-white backdrop-blur-none">
-          <DrawerHeader className="flex-shrink-0 border-b border-[#e4e4e4] py-3">
+          <DrawerHeader className="flex-shrink-0 border-b border-[#e4e4e4] py-3 dark:border-[#3a3a3a]">
             <div className="flex items-center gap-2">
               <DrawerTitle className="text-xl font-bold">
                 {mobileView === "workType"
@@ -989,29 +1044,18 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                       setMobileView("main");
                     }}
                     variant="ghost"
-                    size="sm"
                     className="shrink-0"
                   >
                     {t.jobs.clearAllFilters}
                   </Button>
                 )}
                 <div className="flex gap-2">
-                  {showSaveFilter && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled
-                      className="h-12 px-4 rounded-[18px] text-base font-medium bg-white text-gray-700 hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444] border-0"
-                    >
-                      {t.common.save}
-                    </Button>
-                  )}
                   <Button
                     onClick={() => {
                       onApply();
                       setMobileView("main");
                     }}
-                    size="sm"
+                    size="default"
                   >
                     {t.common.apply}
                   </Button>
@@ -1029,7 +1073,7 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
                   setCountrySearchQuery("");
                   setMobileView("main");
                 }}
-                size="sm"
+                size="default"
               >
                 Done
               </Button>
@@ -1074,19 +1118,10 @@ export const JobFilterModal: React.FC<JobFilterModalProps> = ({
               </Button>
             )}
             <div className="flex gap-2 ml-auto">
-              {showSaveFilter && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled
-                  className="h-12 px-4 text-base font-medium bg-white text-gray-700 hover:bg-gray-50 dark:bg-[#3A3A3A] dark:text-gray-200 dark:hover:bg-[#444] border-0"
-                >
-                  {t.common.save}
-                </Button>
-              )}
               <Button
                 onClick={onApply}
-                className="w-auto h-12 px-8 bg-breneo-blue text-white hover:bg-breneo-blue/90"
+                variant="default"
+                size="default"
               >
                 {t.common.apply}
               </Button>

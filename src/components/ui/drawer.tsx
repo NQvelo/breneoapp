@@ -2,6 +2,7 @@ import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { X } from "@/components/icons";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const Drawer = ({
@@ -44,7 +45,7 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-2 right-2 bottom-4 z-50 mt-24 flex h-auto flex-col rounded-[36px] border-t border-l border-r bg-background/90 backdrop-blur-md",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-[36px] border-t border-l border-r bg-background/90 backdrop-blur-md",
         className
       )}
       {...props}
@@ -69,12 +70,15 @@ const DrawerHeader = ({
   >
     <div className="flex-1">{children}</div>
     <DrawerClose asChild>
-      <button
-        className="rounded-full bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100 h-7 w-7 flex items-center justify-center shrink-0 transition-colors p-0"
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
         aria-label="Close"
+        className="text-black hover:text-black dark:text-white dark:hover:text-white"
       >
-        <X className="h-3.5 w-3.5" />
-      </button>
+        <X className="h-5 w-5" />
+      </Button>
     </DrawerClose>
   </div>
 );

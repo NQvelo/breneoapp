@@ -140,20 +140,19 @@ export function EditSkillsModal({
           <div className="flex items-center gap-2 shrink-0 ml-auto">
             <Button
               type="button"
-              size="sm"
               onClick={() => onOpenChange(false)}
             >
               Done
             </Button>
             <Button
               type="button"
-              variant="secondary"
-              size="sm"
-              className="h-10 w-10 p-0 shrink-0"
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
               onClick={() => onOpenChange(false)}
               aria-label="Close"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-black dark:text-white" />
             </Button>
           </div>
         </SheetHeader>

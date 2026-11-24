@@ -145,8 +145,8 @@ export function ApplicantProfileSheet({
               </p>
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="default"
                 onClick={() => void refetch()}
                 disabled={isFetching}
               >

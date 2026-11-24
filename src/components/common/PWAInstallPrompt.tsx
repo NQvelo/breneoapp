@@ -66,7 +66,12 @@ export const PWAInstallPrompt: React.FC = () => {
             <Download className="mr-2 h-4 w-4" />
             Install Now
           </Button>
-          <Button onClick={handleDismiss} variant="outline" className="flex-1">
+          <Button
+            onClick={handleDismiss}
+            variant="ghost"
+            size="default"
+            className="flex-1"
+          >
             <X className="mr-2 h-4 w-4" />
             Maybe Later
           </Button>

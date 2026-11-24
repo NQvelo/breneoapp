@@ -104,9 +104,9 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
               {searchTerm && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon-sm"
                   onClick={handleClearSearch}
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                  className="absolute right-1 top-1/2 -translate-y-1/2"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -124,7 +124,7 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
           </div>
           <div className="p-4 border-t">
             <DrawerClose asChild>
-              <Button variant="outline" className="w-full">
+              <Button variant="ghost" size="default" className="w-full">
                 Cancel
               </Button>
             </DrawerClose>
@@ -152,9 +152,9 @@ export const CountrySelectorModal: React.FC<CountrySelectorModalProps> = ({
             {searchTerm && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon-sm"
                 onClick={handleClearSearch}
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                className="absolute right-1 top-1/2 -translate-y-1/2"
               >
                 <X className="h-4 w-4" />
               </Button>

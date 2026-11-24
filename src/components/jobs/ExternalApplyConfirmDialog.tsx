@@ -121,7 +121,7 @@ export function ExternalApplyConfirmDialog({
   const noButton = (
     <Button
       type="button"
-      variant="secondary"
+      variant="ghost"
       className={isMobile ? "w-full" : "flex-1"}
       onClick={handleNo}
       disabled={confirmMutation.isPending}

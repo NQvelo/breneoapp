@@ -37,9 +37,9 @@ const sheetVariants = cva(
         top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
           "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+        left: "inset-y-0 left-0 h-full w-full border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left md:w-3/4 md:max-w-sm",
         right:
-          "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+          "inset-y-0 right-0 h-full w-full border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right md:w-3/4 md:max-w-sm",
         /** Profile style: full-screen on mobile; wider floating panel on desktop */
         rightProfile:
           "inset-0 h-full w-full max-w-none border-0 rounded-none shadow-lg data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:inset-y-4 md:right-4 md:left-auto md:h-[calc(100vh-2rem)] md:w-[42%] md:max-w-[600px] md:min-w-[min(100%,22rem)] md:rounded-[24px] md:border md:border-gray-200 dark:md:border-gray-800 md:shadow-xl md:overflow-hidden md:data-[state=closed]:slide-out-to-right md:data-[state=open]:slide-in-from-right",
@@ -153,14 +153,14 @@ function SheetHeaderCloseButton({
   return (
     <Button
       type="button"
-      variant="secondary"
-      size="sm"
-      className={cn("h-10 w-10 p-0 shrink-0", className)}
+      variant="ghost"
+      size="icon"
+      className={cn("shrink-0", className)}
       onClick={onClose}
       disabled={disabled}
       aria-label={ariaLabel}
     >
-      <X className="h-4 w-4" />
+      <X className="h-5 w-5 text-black dark:text-white" />
     </Button>
   );
 }
