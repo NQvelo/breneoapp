@@ -350,6 +350,7 @@ export function ProfileCourseManagementView({
                 {courses.map((course) => {
                   const id = String(course.id);
                   const isSaved = savedCourseIds.includes(id);
+                  const isTouchDragging = touchDrag.draggingId === id;
                   const title = course.title || "Untitled course";
                   const academy = course.provider || "Academy";
                   const academyLogo =
@@ -381,10 +382,24 @@ export function ProfileCourseManagementView({
                       onClick={() =>
                         navigate(`/course/${encodeURIComponent(id)}`)
                       }
+                      style={
+                        isTouchDragging && touchDrag.dragPosition
+                          ? {
+                              position: "fixed",
+                              left: touchDrag.dragPosition.left,
+                              top: touchDrag.dragPosition.top,
+                              width: touchDrag.dragPosition.width,
+                              zIndex: 100,
+                              pointerEvents: "none",
+                            }
+                          : undefined
+                      }
                       className={cn(
                         "cursor-pointer select-none rounded-2xl p-4 transition-colors",
                         column.card,
-                        touchDrag.draggingId === id && "opacity-60",
+                        isTouchDragging &&
+                          "cursor-grabbing shadow-2xl ring-2 ring-breneo-blue/50 scale-[1.03] rotate-1 transition-[transform,box-shadow] duration-150 ease-out",
+                        isTouchDragging && "opacity-90",
                       )}
                     >
                       <div className="flex items-start gap-3">

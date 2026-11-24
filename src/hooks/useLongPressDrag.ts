@@ -4,15 +4,25 @@ import type { MouseEvent, TouchEvent } from "react";
 const LONG_PRESS_DELAY_MS = 400;
 const MOVE_CANCEL_THRESHOLD_PX = 10;
 
+interface DragPosition {
+  left: number;
+  top: number;
+  width: number;
+}
+
 export function useLongPressDrag(
   enabled: boolean,
   onDrop: (itemId: string, columnId: string) => void,
 ) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState<DragPosition | null>(null);
   const draggingIdRef = useRef<string | null>(null);
   const dropTargetRef = useRef<string | null>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
+  const grabOffsetRef = useRef<{ x: number; y: number; width: number } | null>(
+    null,
+  );
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clickResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClickRef = useRef(false);
@@ -34,16 +44,28 @@ export function useLongPressDrag(
       }
 
       const touch = event.touches[0];
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const initialPosition = {
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+      };
       const sourceColumn = event.currentTarget
         .closest<HTMLElement>("[data-management-column]")
         ?.dataset.managementColumn;
       startPointRef.current = { x: touch.clientX, y: touch.clientY };
+      grabOffsetRef.current = {
+        x: touch.clientX - bounds.left,
+        y: touch.clientY - bounds.top,
+        width: bounds.width,
+      };
       dropTargetRef.current = sourceColumn ?? null;
       setDropTarget(sourceColumn ?? null);
       clearLongPressTimer();
       longPressTimerRef.current = setTimeout(() => {
         draggingIdRef.current = itemId;
         setDraggingId(itemId);
+        setDragPosition(initialPosition);
       }, LONG_PRESS_DELAY_MS);
     },
     [clearLongPressTimer, enabled],
@@ -89,6 +111,14 @@ export function useLongPressDrag(
       if (event.touches.length !== 1) return;
       event.preventDefault();
       const touch = event.touches[0];
+      const grabOffset = grabOffsetRef.current;
+      if (grabOffset) {
+        setDragPosition({
+          left: touch.clientX - grabOffset.x,
+          top: touch.clientY - grabOffset.y,
+          width: grabOffset.width,
+        });
+      }
       const column = document
         .elementFromPoint(touch.clientX, touch.clientY)
         ?.closest<HTMLElement>("[data-management-column]")
@@ -111,8 +141,10 @@ export function useLongPressDrag(
       draggingIdRef.current = null;
       dropTargetRef.current = null;
       startPointRef.current = null;
+      grabOffsetRef.current = null;
       setDraggingId(null);
       setDropTarget(null);
+      setDragPosition(null);
     };
 
     const handleTouchEnd = () => finishDrag(true);
@@ -136,5 +168,13 @@ export function useLongPressDrag(
     [clearLongPressTimer],
   );
 
-  return { draggingId, dropTarget, onTouchStart, onTouchMove, onTouchEnd, onClickCapture };
+  return {
+    draggingId,
+    dropTarget,
+    dragPosition,
+    onTouchStart,
+    onTouchMove,
+    onTouchEnd,
+    onClickCapture,
+  };
 }

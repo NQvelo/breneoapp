@@ -233,62 +233,84 @@ export function ProfileJobManagementView() {
                 <span className="text-sm text-gray-500">{columnJobs.length}</span>
               </div>
               <div className="space-y-3">
-                {columnJobs.map((job) => (
-                  <article
-                    key={job.id}
-                    data-long-press-drag
-                    draggable={!isMobile}
-                    onDragStart={() => setDraggingId(job.id)}
-                    onDragEnd={() => setDraggingId(null)}
-                    onTouchStart={(event) => touchDrag.onTouchStart(event, job.id)}
-                    onTouchMove={touchDrag.onTouchMove}
-                    onTouchEnd={touchDrag.onTouchEnd}
-                    onTouchCancel={touchDrag.onTouchEnd}
-                    onContextMenu={(event) => {
-                      if (isMobile) event.preventDefault();
-                    }}
-                    onClickCapture={touchDrag.onClickCapture}
-                    onClick={() => navigate(`/jobs/${encodeURIComponent(job.id)}`)}
-                    className={cn(
-                      "cursor-pointer select-none rounded-2xl p-4 transition-colors",
-                      column.card,
-                      (draggingId === job.id || touchDrag.draggingId === job.id) && "opacity-60",
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-breneo-blue/10">
-                        {job.logo ? (
-                          <img src={job.logo} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <Briefcase className="h-5 w-5 text-breneo-blue" />
-                        )}
+                {columnJobs.map((job) => {
+                  const isTouchDragging = touchDrag.draggingId === job.id;
+                  return (
+                    <article
+                      key={job.id}
+                      data-long-press-drag
+                      draggable={!isMobile}
+                      onDragStart={() => setDraggingId(job.id)}
+                      onDragEnd={() => setDraggingId(null)}
+                      onTouchStart={(event) =>
+                        touchDrag.onTouchStart(event, job.id)
+                      }
+                      onTouchMove={touchDrag.onTouchMove}
+                      onTouchEnd={touchDrag.onTouchEnd}
+                      onTouchCancel={touchDrag.onTouchEnd}
+                      onContextMenu={(event) => {
+                        if (isMobile) event.preventDefault();
+                      }}
+                      onClickCapture={touchDrag.onClickCapture}
+                      onClick={() =>
+                        navigate(`/jobs/${encodeURIComponent(job.id)}`)
+                      }
+                      style={
+                        isTouchDragging && touchDrag.dragPosition
+                          ? {
+                              position: "fixed",
+                              left: touchDrag.dragPosition.left,
+                              top: touchDrag.dragPosition.top,
+                              width: touchDrag.dragPosition.width,
+                              zIndex: 100,
+                              pointerEvents: "none",
+                            }
+                          : undefined
+                      }
+                      className={cn(
+                        "cursor-pointer select-none rounded-2xl p-4 transition-colors",
+                        column.card,
+                        isTouchDragging &&
+                          "cursor-grabbing shadow-2xl ring-2 ring-breneo-blue/50 scale-[1.03] rotate-1 transition-[transform,box-shadow] duration-150 ease-out",
+                        (draggingId === job.id || isTouchDragging) &&
+                          "opacity-90",
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-breneo-blue/10">
+                          {job.logo ? (
+                            <img src={job.logo} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <Briefcase className="h-5 w-5 text-breneo-blue" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                            {job.company}
+                          </p>
+                          <p className="truncate text-xs text-gray-500">{job.location}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          {job.company}
-                        </p>
-                        <p className="truncate text-xs text-gray-500">{job.location}</p>
-                      </div>
-                    </div>
-                    <h4 className="mt-3 line-clamp-2 font-bold text-gray-900 dark:text-gray-100">
-                      {job.title}
-                    </h4>
-                    {(job.appliedAt || job.employerViewedCv) ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {job.appliedAt ? (
-                          <span className="rounded-[10px] bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                            Applied: {job.appliedAt}
-                          </span>
-                        ) : null}
-                        {job.employerViewedCv ? (
-                          <span className="rounded-[10px] bg-breneo-blue/10 px-2.5 py-1 text-xs font-medium text-breneo-blue">
-                            CV view: {Math.max(job.employerCvViewCount ?? 1, 1)}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </article>
-                ))}
+                      <h4 className="mt-3 line-clamp-2 font-bold text-gray-900 dark:text-gray-100">
+                        {job.title}
+                      </h4>
+                      {(job.appliedAt || job.employerViewedCv) ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {job.appliedAt ? (
+                            <span className="rounded-[10px] bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                              Applied: {job.appliedAt}
+                            </span>
+                          ) : null}
+                          {job.employerViewedCv ? (
+                            <span className="rounded-[10px] bg-breneo-blue/10 px-2.5 py-1 text-xs font-medium text-breneo-blue">
+                              CV view: {Math.max(job.employerCvViewCount ?? 1, 1)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
             </section>
           );
