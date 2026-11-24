@@ -367,7 +367,7 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
-  width: 100%;
+  width: min(100%, 260px);
 }
 
 .breneo-mobile-nav-item {
@@ -377,7 +377,7 @@
   min-width: 0;
   min-height: 64px;
   flex-direction: column;
-  gap: 3px;
+  gap: 2.2px;
   align-items: center;
   justify-content: center;
   color: hsl(var(--muted-foreground));

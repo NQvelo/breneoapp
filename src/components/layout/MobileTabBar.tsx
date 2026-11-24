@@ -82,7 +82,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
       aria-disabled={navLocked || undefined}
     >
       <div ref={onExtensionMount} className="breneo-mobile-nav-extension" />
-      <div className="relative flex justify-center bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-0.5">
+      <div className="relative flex justify-center bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-0">
         <nav aria-label="Main navigation" className="breneo-mobile-nav">
           <div className="breneo-mobile-nav-items">
             {items.map((item) => {
