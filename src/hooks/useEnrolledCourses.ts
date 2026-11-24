@@ -6,6 +6,8 @@ export interface EnrolledCourseItem {
   id: string;
   title: string;
   provider: string;
+  academyId?: string;
+  academyLogo?: string;
   category: string;
   level: string;
   duration: string;
@@ -47,6 +49,14 @@ function mapCourseToEnrolledItem(
     id,
     title: String(course.title ?? ""),
     provider: String(course.academy_name ?? ""),
+    academyId:
+      course.academy_id != null ? String(course.academy_id) : undefined,
+    academyLogo:
+      typeof course.academy_logo_url === "string"
+        ? normalizeImagePath(course.academy_logo_url)
+        : typeof course.academy_logo === "string"
+          ? normalizeImagePath(course.academy_logo)
+          : undefined,
     category: String(course.language ?? course.location ?? ""),
     level: String(course.level ?? ""),
     duration: String(course.total_duration ?? ""),

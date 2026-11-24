@@ -385,11 +385,10 @@
 }
 
 .breneo-mobile-nav-item svg {
+  flex: 0 0 23px;
   width: 23px;
   height: 23px;
   stroke-width: 2;
-  transform: none;
-  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .breneo-mobile-nav-label {
@@ -402,11 +401,9 @@
 }
 
 .breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
-.breneo-mobile-nav-item.is-active svg { transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .breneo-mobile-nav-item,
-  .breneo-mobile-nav-item svg {
+  .breneo-mobile-nav-item {
     transition-duration: 0.01ms;
   }
 }

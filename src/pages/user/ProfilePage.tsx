@@ -121,6 +121,8 @@ import {
 } from "@/components/profile";
 import { ProfileAppliedView } from "@/components/profile/ProfileAppliedView";
 import { ProfileViewSwitcher } from "@/components/profile/ProfileViewSwitcher";
+import { ProfileJobManagementView } from "@/components/profile/ProfileJobManagementView";
+import { ProfileCourseManagementView } from "@/components/profile/ProfileCourseManagementView";
 function PersonalInfoMenuRow({
   icon,
   iconClassName,
@@ -195,6 +197,46 @@ interface SavedCourse {
   description: string;
   academy_id?: string | null;
   academy_logo?: string | null;
+}
+
+function extractSavedCourseIds(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object") return [];
+  const data = payload as Record<string, unknown>;
+  const profile =
+    data.profile && typeof data.profile === "object"
+      ? (data.profile as Record<string, unknown>)
+      : {};
+  const userData =
+    data.user && typeof data.user === "object"
+      ? (data.user as Record<string, unknown>)
+      : {};
+  const profileData =
+    data.profile_data && typeof data.profile_data === "object"
+      ? (data.profile_data as Record<string, unknown>)
+      : {};
+  const values = [
+    data.saved_courses,
+    profile.saved_courses,
+    userData.saved_courses,
+    profileData.saved_courses,
+  ].find(Array.isArray);
+  if (!Array.isArray(values)) return [];
+
+  return values
+    .map((item) => {
+      if (typeof item === "string" || typeof item === "number") {
+        return String(item);
+      }
+      if (!item || typeof item !== "object") return "";
+      const course = item as Record<string, unknown>;
+      const nestedCourse =
+        course.course && typeof course.course === "object"
+          ? (course.course as Record<string, unknown>)
+          : {};
+      const id = course.course_id ?? course.courseId ?? nestedCourse.id ?? course.id;
+      return id == null ? "" : String(id);
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -375,7 +417,7 @@ const ProfilePage = () => {
   const aboutMeTextRef = useRef<HTMLParagraphElement>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<
-    "profile" | "saved" | "applied"
+    "profile" | "jobs" | "courses" | "management" | "saved" | "applied"
   >("profile");
   const [activeSavedTab, setActiveSavedTab] = useState<"courses" | "jobs">(
     "courses",
@@ -407,31 +449,22 @@ const ProfilePage = () => {
   // Update active view based on hash
   useEffect(() => {
     const hash = location.hash;
+    if (hash === "#management-courses" || hash === "#savedcourses" || hash === "#appliedcourses") {
+      setActiveView("courses");
+      return;
+    }
     if (
+      hash === "#management" ||
+      hash === "#management-jobs" ||
       hash === "#saved" ||
       hash === "#savedjobs" ||
-      hash === "#savedcourses"
-    ) {
-      setActiveView("saved");
-      if (hash === "#savedjobs") {
-        setActiveSavedTab("jobs");
-      } else {
-        setActiveSavedTab("courses");
-      }
-    } else if (
       hash === "#applied" ||
-      hash === "#appliedjobs" ||
-      hash === "#appliedcourses"
+      hash === "#appliedjobs"
     ) {
-      setActiveView("applied");
-      if (hash === "#appliedjobs") {
-        setActiveAppliedTab("jobs");
-      } else {
-        setActiveAppliedTab("courses");
-      }
-    } else {
-      setActiveView("profile");
+      setActiveView("jobs");
+      return;
     }
+    setActiveView("profile");
   }, [location.hash]);
 
   // Initialize profile image from user context on mount
@@ -513,14 +546,8 @@ const ProfilePage = () => {
     queryKey: ["savedCourseIds", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      try {
-        const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
-        const savedCoursesArray = profileResponse.data?.saved_courses || [];
-        return savedCoursesArray.map((id: string | number) => String(id));
-      } catch (error) {
-        console.error("Error fetching saved course IDs:", error);
-        return [];
-      }
+      const profileResponse = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+      return extractSavedCourseIds(profileResponse.data);
     },
     enabled: !!user?.id,
   });
@@ -705,6 +732,10 @@ const ProfilePage = () => {
       toast.error("Failed to update saved courses. Please try again.");
     },
     onSuccess: (_, courseId) => {
+      queryClient.invalidateQueries({ queryKey: ["savedCourseIds", user?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["savedCoursesDetails", user?.id],
+      });
       queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       const savedCoursesList = queryClient.getQueryData<string[]>([
@@ -1951,16 +1982,16 @@ const ProfilePage = () => {
   return (
     <DashboardLayout>
       <ProfileViewSwitcher
-        activeView={activeView}
-        activeSavedTab={activeSavedTab}
-        activeAppliedTab={activeAppliedTab}
+        activeView={
+          activeView === "profile"
+            ? "profile"
+            : activeView === "courses"
+              ? "courses"
+              : "jobs"
+        }
         onProfile={() => navigate("#")}
-        onSavedSummary={() => navigate("#savedcourses")}
-        onAppliedSummary={() => navigate("#appliedcourses")}
-        onSavedCourses={() => navigate("#savedcourses")}
-        onSavedJobs={() => navigate("#savedjobs")}
-        onAppliedCourses={() => navigate("#appliedcourses")}
-        onAppliedJobs={() => navigate("#appliedjobs")}
+        onJobs={() => navigate("#management")}
+        onCourses={() => navigate("#management-courses")}
       />
       {activeView === "profile" ? (
         <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
@@ -2443,12 +2474,11 @@ const ProfilePage = () => {
         <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
           {/* Saved Courses Tab */}
           {activeSavedTab === "courses" && (
-            <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
-              <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  Saved Courses
-                </h2>
-              </div>
+            <div className="space-y-3">
+              <h2 className="px-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+                Saved Courses
+              </h2>
+              <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
               {loadingSavedCourses ? (
                 <div className="flex flex-col justify-center items-center py-20 bg-white/50 dark:bg-[#242424]/50">
                   <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
@@ -2473,7 +2503,7 @@ const ProfilePage = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-3 md:p-4">
                   {savedCourses.map((course) => {
                     const isCourseSaved = savedCourseIds.includes(
                       String(course.id),
@@ -2481,7 +2511,7 @@ const ProfilePage = () => {
                     return (
                       <div
                         key={course.id}
-                        className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                        className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#242424] transition-colors"
                         onClick={() => navigate(`/course/${course.id}`)}
                       >
                         <div
@@ -2493,6 +2523,18 @@ const ProfilePage = () => {
                         >
                           {isMobile ? (
                             <>
+                              <div className="relative aspect-[2.58/1] w-full overflow-hidden">
+                                <img
+                                  src={course.image || "/lovable-uploads/no_photo.png"}
+                                  alt={course.title}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src =
+                                      "/lovable-uploads/no_photo.png";
+                                  }}
+                                />
+                              </div>
                               {/* Top row: image + provider info + save button (top right) */}
                               <div className="flex items-start gap-3 mb-3">
                                 <div className="flex-shrink-0 relative w-10 h-10">
@@ -2583,7 +2625,20 @@ const ProfilePage = () => {
                               </div>
                             </>
                           ) : (
-                            <div className="flex gap-4">
+                            <div>
+                              <div className="relative aspect-[2.58/1] w-full overflow-hidden">
+                                <img
+                                  src={course.image || "/lovable-uploads/no_photo.png"}
+                                  alt={course.title}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src =
+                                      "/lovable-uploads/no_photo.png";
+                                  }}
+                                />
+                              </div>
+                              <div className="flex gap-4">
                               {/* Left Section - Course Details (desktop) */}
                               <div className="flex-1 p-4 min-w-0">
                                 <div className="flex items-start gap-4">
@@ -2677,6 +2732,7 @@ const ProfilePage = () => {
                                 </Button>
                               </div>
                             </div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -2684,17 +2740,17 @@ const ProfilePage = () => {
                   })}
                 </div>
               )}
+              </div>
             </div>
           )}
 
           {/* Saved Jobs Tab */}
           {activeSavedTab === "jobs" && (
-            <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
-              <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  Saved Jobs
-                </h2>
-              </div>
+            <div className="space-y-3">
+              <h2 className="px-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+                Saved Jobs
+              </h2>
+              <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
               {loadingSavedJobs ? (
                 <div className="flex flex-col justify-center items-center py-20 bg-white/50 dark:bg-[#242424]/50">
                   <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
@@ -2738,47 +2794,59 @@ const ProfilePage = () => {
                         >
                           {isMobile ? (
                             <>
-                              {/* Top row: logo + company info + save button (top right) */}
                               <div className="flex items-start gap-3 mb-3">
-                                <div className="flex-shrink-0 relative w-10 h-10">
-                                  {job.company_logo ? (
+                                {job.company_logo ? (
+                                  <div className="flex-shrink-0 relative w-10 h-10">
                                     <img
                                       src={job.company_logo}
                                       alt={`${job.company} logo`}
                                       className="w-10 h-10 rounded-full object-cover"
                                       loading="lazy"
+                                      referrerPolicy="no-referrer"
                                       onError={(e) => {
-                                        const target =
-                                          e.target as HTMLImageElement;
-                                        target.style.display = "none";
-                                        const fallback =
-                                          target.nextElementSibling as HTMLElement;
-                                        if (fallback) {
-                                          fallback.style.display = "flex";
-                                        }
+                                        (e.target as HTMLImageElement).style.display =
+                                          "none";
                                       }}
                                     />
-                                  ) : null}
-                                  <div
-                                    className={`w-10 h-10 rounded-full bg-breneo-accent flex items-center justify-center ${
-                                      job.company_logo
-                                        ? "hidden absolute inset-0"
-                                        : ""
-                                    }`}
-                                  >
-                                    <Briefcase className="h-5 w-5 text-white" />
                                   </div>
-                                </div>
+                                ) : null}
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="font-semibold text-sm min-w-0 text-gray-900 dark:text-gray-100">
+                                  <h3 className="font-semibold text-sm min-w-0">
                                     <CompanyNameLink
                                       name={job.company}
-                                      className="font-semibold text-sm text-gray-900 dark:text-gray-100"
+                                      className="font-semibold text-sm"
                                     />
                                   </h3>
                                   <p className="mt-0.5 text-xs text-gray-500 truncate">
                                     {job.location}
                                   </p>
+                                </div>
+                              </div>
+
+                              <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6">
+                                {job.title}
+                              </h4>
+
+                              <JobListingMetaBadges
+                                className="mt-1"
+                                employmentType={job.employment_type}
+                                workArrangement={job.work_arrangement}
+                                salary={job.salary}
+                              />
+
+                              <div className="mt-5 flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <RadialProgress
+                                    value={job.matchPercentage ?? 0}
+                                    size={40}
+                                    strokeWidth={4}
+                                    showLabel={false}
+                                    percentageTextSize="sm"
+                                    className="text-breneo-blue flex-shrink-0"
+                                  />
+                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-100 whitespace-nowrap">
+                                    {getMatchQualityLabel(job.matchPercentage)}
+                                  </span>
                                 </div>
                                 <Button
                                   variant="secondary"
@@ -2807,94 +2875,42 @@ const ProfilePage = () => {
                                   />
                                 </Button>
                               </div>
-
-                              {/* Job Title */}
-                              <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6 min-h-[3rem] text-gray-900 dark:text-gray-100">
-                                {job.title}
-                              </h4>
-
-                              {/* Chips left; matching bar + text on the right */}
-                              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                                <JobListingMetaBadges
-                                  className="mt-0"
-                                  employmentType={job.employment_type}
-                                  workArrangement={job.work_arrangement}
-                                  salary={job.salary}
-                                />
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <RadialProgress
-                                    value={job.matchPercentage ?? 0}
-                                    size={40}
-                                    strokeWidth={4}
-                                    showLabel={false}
-                                    percentageTextSize="sm"
-                                    className="text-breneo-blue flex-shrink-0"
-                                  />
-                                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-100 whitespace-nowrap">
-                                    {getMatchQualityLabel(job.matchPercentage)}
-                                  </span>
-                                </div>
-                              </div>
                             </>
                           ) : (
                             <div className="flex gap-4">
-                              {/* Left Section - Job Details (desktop) */}
                               <div className="flex-1 p-4 min-w-0">
                                 <div className="flex items-start gap-4">
-                                  {/* Company Logo */}
-                                  <div className="flex-shrink-0 relative w-12 h-12">
-                                    {job.company_logo ? (
+                                  {job.company_logo ? (
+                                    <div className="flex-shrink-0 relative w-12 h-12">
                                       <img
                                         src={job.company_logo}
                                         alt={job.company}
-                                        className="w-12 h-12 rounded-md object-cover absolute inset-0 z-10"
+                                        className="w-12 h-12 rounded-md object-cover"
                                         loading="lazy"
+                                        referrerPolicy="no-referrer"
                                         onError={(e) => {
-                                          const target =
-                                            e.target as HTMLImageElement;
-                                          target.style.display = "none";
-                                          const fallback =
-                                            target.parentElement?.querySelector(
-                                              ".logo-fallback",
-                                            ) as HTMLElement;
-                                          if (fallback) {
-                                            fallback.style.display = "flex";
-                                            fallback.style.zIndex = "10";
-                                          }
+                                          (e.target as HTMLImageElement).style.display =
+                                            "none";
                                         }}
                                       />
-                                    ) : null}
-                                    <div
-                                      className={`w-12 h-12 rounded-md bg-breneo-blue/10 flex items-center justify-center logo-fallback absolute inset-0 ${
-                                        job.company_logo ? "z-0" : "z-10"
-                                      }`}
-                                      style={{
-                                        display: job.company_logo
-                                          ? "none"
-                                          : "flex",
-                                      }}
-                                    >
-                                      <Briefcase className="h-6 w-6 text-breneo-blue" />
                                     </div>
-                                  </div>
+                                  ) : null}
 
-                                  {/* Job Info */}
                                   <div className="flex-1 min-w-0">
                                     <div className="mb-1 md:mb-2">
-                                      <h3 className="font-normal text-sm text-gray-600 dark:text-gray-400 mb-1 min-w-0">
+                                      <h3 className="font-normal text-sm text-gray-600 mb-1 min-w-0">
                                         <CompanyNameLink
                                           name={job.company}
-                                          className="font-normal text-sm text-gray-600 dark:text-gray-400"
+                                          className="font-normal text-sm text-gray-600"
                                         />
                                       </h3>
-                                      <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3 text-gray-900 dark:text-gray-100">
+                                      <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
                                         {job.title}
                                       </h4>
                                     </div>
 
-                                    {/* Desktop: Details */}
                                     <div className="space-y-2">
-                                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                                         <div className="flex items-center gap-1.5">
                                           <MapPin className="h-4 w-4" />
                                           <span>{job.location}</span>
@@ -2919,10 +2935,8 @@ const ProfilePage = () => {
                                 </div>
                               </div>
 
-                              {/* Right: default = match bar + text; hover = save button */}
                               <div className="flex-shrink-0 py-4 pl-4 pr-14 relative w-24 min-h-[88px] flex flex-col items-center justify-center">
-                                {/* Default: matching bar */}
-                                <div className="flex flex-col items-center gap-2 px-2 transition-opacity duration-200 group-hover:opacity-0 group-hover:pointer-events-none">
+                              <div className="flex flex-col items-center gap-2 px-2 transition-opacity duration-200 group-hover:opacity-0 group-hover:pointer-events-none">
                                   <RadialProgress
                                     value={job.matchPercentage ?? 0}
                                     size={48}
@@ -2935,7 +2949,6 @@ const ProfilePage = () => {
                                     {getMatchQualityLabel(job.matchPercentage)}
                                   </span>
                                 </div>
-                                {/* Hover: save button */}
                                 <Button
                                   variant="secondary"
                                   size="icon"
@@ -2971,12 +2984,20 @@ const ProfilePage = () => {
                   })}
                 </div>
               )}
+              </div>
             </div>
           )}
         </div>
+      ) : activeView === "courses" ? (
+        <div className="max-w-7xl mx-auto pt-0 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <ProfileCourseManagementView
+            savedCourseIds={savedCourseIds}
+            onToggleSave={(courseId) => saveCourseMutation.mutate(courseId)}
+          />
+        </div>
       ) : (
-        <div className="max-w-7xl mx-auto pt-2 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
-          <ProfileAppliedView activeTab={activeAppliedTab} />
+        <div className="max-w-7xl mx-auto pt-0 pb-32 md:pb-6 px-2 sm:px-6 lg:px-8">
+          <ProfileJobManagementView />
         </div>
       )}
 

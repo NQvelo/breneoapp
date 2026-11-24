@@ -33,7 +33,7 @@ export function NotificationsTabSwitcher({
       <motion.div
         layout
         transition={pillSpring}
-        className="mobile-attached-switcher-control relative inline-flex items-center gap-0 rounded-3xl border border-gray-200 bg-white/95 p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl dark:border-gray-800 dark:bg-[#242424]/80 dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] md:shadow-sm"
+        className="mobile-attached-switcher-control relative inline-flex items-center gap-0 rounded-3xl border border-gray-200 bg-gray-100/95 p-1 shadow-[0_8px_32px_rgba(0,0,0,0.06)] backdrop-blur-xl dark:border-gray-800 dark:bg-[#242424]/80 dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] md:bg-white/95 dark:md:bg-[#242424]/80 md:shadow-sm"
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.value;
@@ -46,14 +46,14 @@ export function NotificationsTabSwitcher({
               className={cn(
                 "relative shrink-0 whitespace-nowrap rounded-3xl px-6 py-2.5 text-sm outline-none transition-colors duration-200",
                 isActive
-                  ? "font-bold text-sky-950 dark:text-gray-100"
+                  ? "font-bold text-gray-900 md:dark:text-gray-100"
                   : "font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200",
               )}
             >
               {isActive ? (
                 <motion.div
                   layoutId="notifications-page-tab-pill"
-                  className="absolute inset-0 rounded-3xl bg-sky-100 dark:bg-gray-700"
+                  className="absolute inset-0 rounded-3xl bg-white shadow-sm md:bg-sky-100 dark:md:bg-gray-700"
                   transition={pillSpring}
                 />
               ) : null}

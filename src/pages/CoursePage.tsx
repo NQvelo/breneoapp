@@ -29,6 +29,7 @@ import {
   ExternalLink,
   ArrowUpRight,
   Star,
+  Share2,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/contexts/LanguageContext";
@@ -602,6 +603,29 @@ const CoursePage = () => {
     saveCourseMutation.mutate(courseId);
   };
 
+  const handleShareCourse = async () => {
+    if (!course) return;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: course.title,
+          text: `Check out this course: ${course.title}`,
+          url: window.location.href,
+        });
+        toast.success("Shared successfully!");
+        return;
+      }
+
+      await navigator.clipboard.writeText(window.location.href);
+      toast.success("Link copied to clipboard!");
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      console.error("Error sharing course:", error);
+      toast.error("Could not share course.");
+    }
+  };
+
   const isUserEnrolled = useMemo(() => {
     if (!course) return false;
     if (!user) return Boolean(course.is_enrolled);
@@ -747,14 +771,15 @@ const CoursePage = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
+                <div className="flex items-center gap-2 w-full pt-2 lg:w-auto lg:pt-0 justify-end">
                   <Button
                     onClick={handleSaveCourse}
                     disabled={isSaving || !user}
                     variant="secondary"
                     size="icon"
+                    aria-label={isSaved ? t.courses.saved : t.courses.save}
                     className={cn(
-                      "aspect-square bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A]",
+                      "h-10 w-10 shrink-0 [&_svg]:size-4 bg-[#E6E7EB] hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A]",
                       isSaved
                         ? "text-white-500 bg-[#E6E7EB] dark:bg-[#474747] "
                         : "text-black dark:text-white ",
@@ -769,12 +794,22 @@ const CoursePage = () => {
                     )}
                   </Button>
 
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={handleShareCourse}
+                    aria-label="Share course"
+                    className="h-10 w-10 shrink-0 [&_svg]:size-4 bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:text-white dark:hover:bg-[#3A3A3A]/90"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+
                   {course.registration_link ? (
                     <Button
                       type="button"
-                      size="default"
+                      size="sm"
                       disabled={enrollMutation.isPending}
-                      className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                      className="bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
                       onClick={() => {
                         if (!user) {
                           toast.error(t.courses.enrollLoginRequired);
@@ -811,12 +846,12 @@ const CoursePage = () => {
                   ) : (
                     <Button
                       type="button"
-                      size="default"
+                      size="sm"
                       disabled={
                         !user || isUserEnrolled || enrollMutation.isPending
                       }
                       onClick={() => enrollMutation.mutate(course)}
-                      className="w-full sm:w-auto px-6 text-sm bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
+                      className="bg-breneo-blue hover:bg-breneo-blue/90 text-white rounded-xl"
                     >
                       {enrollMutation.isPending ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

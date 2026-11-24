@@ -319,8 +319,7 @@ export const ka = {
     interests: "ინტერესები",
     profileWelcome: {
       title: "პროფილის შევსება მნიშვნელოვანია",
-      subtitle:
-        "სრული პროფილით Breneo AI უფრო მეტ ვაკანსიას შეგირჩევთ.",
+      subtitle: "სრული პროფილით Breneo AI უფრო მეტ ვაკანსიას შეგირჩევთ.",
       whyTitle: "რატომ არის ეს თქვენთვის მნიშვნელოვანი",
       whyBody:
         "CV-ის ან გამოცდილების გარეშე Breneo AI ვერ შეგირჩევთ ვაკანსიებს.",
@@ -372,7 +371,7 @@ export const ka = {
     choose: "აირჩიე",
     saveThisFilter: "ფილტრის შენახვა",
     activeFilters: "აქტიური ფილტრები",
-    clearAllFilters: "ყველა ფილტრის წაშლა",
+    clearAllFilters: "ფილტრის წაშლა",
     interests: "ინტერესები / უნარები",
     type: "ტიპი",
     posted: "გამოქვეყნებულია",
@@ -465,8 +464,7 @@ export const ka = {
     howItWorksGotIt: "გასაგებია",
     howItWorksStep1:
       "აქ ჩანს როლები, რომლებიც შენი CV-ის უნარებსა და თანამდებობებს ემთხვევა.",
-    howItWorksStep2:
-      "აირჩიე როლი და დაიწყე ტექსტური ჩატი ან ვიდეო ინტერვიუ.",
+    howItWorksStep2: "აირჩიე როლი და დაიწყე ტექსტური ჩატი ან ვიდეო ინტერვიუ.",
     howItWorksStep3:
       "თითო კითხვას ცალ-ცალკე უპასუხე. Breneo AI ამ პასუხს აფასებს და შემდეგ კითხვას სვამს.",
     noMatchingInterviews: "თქვენს CV-ს ჯერ არც ერთი ინტერვიუ არ ემთხვევა.",

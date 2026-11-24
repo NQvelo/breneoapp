@@ -1,23 +1,28 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { useMobile } from "@/hooks/use-mobile";
 import { useEnrolledCourses } from "@/hooks/useEnrolledCourses";
 import { useMyApplications } from "@/hooks/useMyApplications";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import apiClient from "@/api/auth/apiClient";
+import { API_ENDPOINTS } from "@/api/auth/endpoints";
+import { toast } from "sonner";
+import { Bookmark } from "@/components/icons";
+import { cn } from "@/lib/utils";
+import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import {
   jobIdFromApplication,
   type JobApplicationItem,
 } from "@/api/jobs/jobApplicationsApi";
-import { PLATFORM_CHIP_BADGE_CLASS } from "@/lib/chipStyles";
 import {
   Briefcase,
   GraduationCap,
   Loader2,
   MapPin,
-  Calendar,
 } from "@/components/icons";
 
 export type AppliedTab = "courses" | "jobs";
@@ -60,105 +65,137 @@ export function ProfileAppliedView({ activeTab }: ProfileAppliedViewProps) {
     enabled && activeTab === "jobs",
   );
   const appliedJobs = myApps?.applications ?? [];
+  const queryClient = useQueryClient();
+  const { data: savedCourseIds = [] } = useQuery<string[]>({
+    queryKey: ["savedCourseIds", user?.id],
+    queryFn: async () => {
+      const response = await apiClient.get(API_ENDPOINTS.AUTH.PROFILE);
+      const data = response.data;
+      const ids =
+        data && typeof data === "object"
+          ? (data as { saved_courses?: unknown[] }).saved_courses
+          : undefined;
+      return Array.isArray(ids)
+        ? ids.map((id) => String(id))
+        : [];
+    },
+    enabled: enabled && activeTab === "courses",
+  });
+  const saveCourseMutation = useMutation({
+    mutationFn: (courseId: string) =>
+      apiClient.post(`/api/save-course/${courseId}/`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["savedCourseIds", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["savedCourses", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Course saved status updated.");
+    },
+  });
 
   if (activeTab === "courses") {
     return (
-      <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            Applied Courses
-          </h2>
+      <div className="space-y-3">
+        <h2 className="px-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+          Applied Courses
+        </h2>
+        <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
+          {loadingCourses ? (
+            <LoadingState />
+          ) : enrolledCourses.length === 0 ? (
+            <EmptyState
+              icon={GraduationCap}
+              title="No applied courses"
+              description="Enroll in a course to see it here."
+              actionLabel="Browse Courses"
+              onAction={() => navigate("/courses")}
+            />
+          ) : (
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {enrolledCourses.map((course) => (
+                <div
+                  key={course.id}
+                  className="group cursor-pointer transition-colors"
+                  onClick={() => navigate(`/course/${course.id}`)}
+                >
+                  <CourseRow
+                    course={course}
+                    isMobile={isMobile}
+                    enrolledLabel={t.courses.enrolled}
+                    isSaved={savedCourseIds.includes(String(course.id))}
+                    onSave={(event) => {
+                      event.stopPropagation();
+                      saveCourseMutation.mutate(String(course.id));
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {loadingCourses ? (
-          <LoadingState />
-        ) : enrolledCourses.length === 0 ? (
-          <EmptyState
-            icon={GraduationCap}
-            title="No applied courses"
-            description="Enroll in a course to see it here."
-            actionLabel="Browse Courses"
-            onAction={() => navigate("/courses")}
-          />
-        ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {enrolledCourses.map((course) => (
-              <div
-                key={course.id}
-                className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
-                onClick={() => navigate(`/course/${course.id}`)}
-              >
-                <CourseRow
-                  course={course}
-                  isMobile={isMobile}
-                  enrolledLabel={t.courses.enrolled}
-                />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     );
   }
 
   return (
-    <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
-      <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          Applied Jobs
-        </h2>
-      </div>
-      {loadingJobs ? (
-        <LoadingState />
-      ) : appliedJobs.length === 0 ? (
-        <EmptyState
-          icon={Briefcase}
-          title="No applied jobs"
-          description="Jobs you apply to will show up here."
-          actionLabel="Browse Jobs"
-          onAction={() => navigate("/jobs")}
-        />
-      ) : (
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {appliedJobs.map((item) => {
-            const jobId = jobIdFromApplication(item);
-            const job = item.job;
-            const title =
-              (job?.title && String(job.title)) || "Job application";
-            const company =
-              (job?.company_name && String(job.company_name)) || "";
-            const location = (job?.location && String(job.location)) || "";
-            const logo = jobLogoFromApplication(item);
-            const when = formatAppliedDate(
-              typeof item.applied_at === "string" ? item.applied_at : undefined,
-            );
-            const employerViewedCv = item.employer_viewed_cv === true;
-            const employerCvViewCount =
-              typeof item.employer_cv_view_count === "number"
-                ? item.employer_cv_view_count
-                : undefined;
+    <div className="space-y-3">
+      <h2 className="px-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+        Applied Jobs
+      </h2>
+      <div className="rounded-3xl bg-white dark:bg-[#242424] overflow-hidden">
+        {loadingJobs ? (
+          <LoadingState />
+        ) : appliedJobs.length === 0 ? (
+          <EmptyState
+            icon={Briefcase}
+            title="No applied jobs"
+            description="Jobs you apply to will show up here."
+            actionLabel="Browse Jobs"
+            onAction={() => navigate("/jobs")}
+          />
+        ) : (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {appliedJobs.map((item) => {
+              const jobId = jobIdFromApplication(item);
+              const job = item.job;
+              const title =
+                (job?.title && String(job.title)) || "Job application";
+              const company =
+                (job?.company_name && String(job.company_name)) || "";
+              const location = (job?.location && String(job.location)) || "";
+              const logo = jobLogoFromApplication(item);
+              const when = formatAppliedDate(
+                typeof item.applied_at === "string" ? item.applied_at : undefined,
+              );
+              const employerViewedCv = item.employer_viewed_cv === true;
+              const employerCvViewCount =
+                typeof item.employer_cv_view_count === "number"
+                  ? item.employer_cv_view_count
+                  : undefined;
 
-            return (
-              <div
-                key={`${jobId}-${String(item.applied_at ?? "")}`}
-                className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
-                onClick={() => {
-                  if (jobId) navigate(`/jobs/${encodeURIComponent(jobId)}`);
-                }}
-              >
-                <JobRow
-                  title={title}
-                  company={company}
-                  location={location}
-                  logo={logo}
-                  when={when}
-                  employerViewedCv={employerViewedCv}
-                  employerCvViewCount={employerCvViewCount}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
+              return (
+                <div
+                  key={`${jobId}-${String(item.applied_at ?? "")}`}
+                  className="group cursor-pointer transition-colors hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  onClick={() => {
+                    if (jobId) navigate(`/jobs/${encodeURIComponent(jobId)}`);
+                  }}
+                >
+                  <JobRow
+                    title={title}
+                    company={company}
+                    location={location}
+                    logo={logo}
+                    when={when}
+                    employerViewedCv={employerViewedCv}
+                    employerCvViewCount={employerCvViewCount}
+                    isMobile={isMobile}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -201,11 +238,15 @@ function CourseRow({
   course,
   isMobile,
   enrolledLabel,
+  isSaved,
+  onSave,
 }: {
   course: {
     id: string;
     title: string;
     provider: string;
+    academyId?: string;
+    academyLogo?: string;
     level: string;
     duration: string;
     image: string;
@@ -213,57 +254,66 @@ function CourseRow({
   };
   isMobile: boolean;
   enrolledLabel: string;
+  isSaved: boolean;
+  onSave: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
-    <div
-      className={
-        isMobile
-          ? "px-5 pt-5 pb-4 flex flex-col"
-          : "p-4 md:p-5 flex items-center gap-4"
-      }
-    >
-      <div className="flex-shrink-0 w-12 h-12 rounded-md overflow-hidden bg-breneo-blue/10">
-        {course.image ? (
-          <img
-            src={course.image}
-            alt=""
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src =
-                "/lovable-uploads/no_photo.png";
-            }}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <GraduationCap className="h-6 w-6 text-breneo-blue" />
-          </div>
-        )}
+    <CardContent className="rounded-3xl border border-gray-200 dark:border-gray-700 p-0 overflow-hidden bg-white dark:bg-[#242424] h-full">
+      <div className="relative aspect-[2.58/1] w-full overflow-hidden">
+        <img
+          src={course.image || "/lovable-uploads/no_photo.png"}
+          alt={course.title}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src =
+              "/lovable-uploads/no_photo.png";
+          }}
+        />
       </div>
-      <div className="flex-1 min-w-0 mt-3 md:mt-0">
-        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-          {course.provider || "Course provider"}
-        </p>
-        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-2 mt-0.5">
+      <div className="p-3 flex flex-col min-h-[112px]">
+        <h3 className="font-semibold text-base mb-2 line-clamp-2">
           {course.title}
         </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
-            {enrolledLabel}
-          </Badge>
-          {course.level ? (
-            <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
-              {course.level}
-            </Badge>
-          ) : null}
-          {course.duration ? (
-            <Badge className={PLATFORM_CHIP_BADGE_CLASS}>
-              {course.duration}
-            </Badge>
-          ) : null}
+        <div className="mt-auto flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-white text-xs font-semibold text-muted-foreground">
+              {course.academyLogo ? (
+                <img
+                  src={course.academyLogo}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                (course.provider.trim().charAt(0).toUpperCase() || "A")
+              )}
+            </div>
+            <span className="truncate text-sm font-medium">
+              {course.provider || "Academy"}
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={onSave}
+            aria-label={isSaved ? "Unsave course" : "Save course"}
+            className={cn(
+              "h-10 w-10 flex-shrink-0",
+              isSaved
+                ? "text-breneo-blue bg-breneo-blue/10"
+                : "text-black dark:text-white",
+            )}
+          >
+            <Bookmark
+              className={cn(
+                "h-4 w-4",
+                isSaved ? "fill-breneo-blue text-breneo-blue" : "",
+              )}
+            />
+          </Button>
         </div>
       </div>
-    </div>
+    </CardContent>
   );
 }
 
@@ -275,6 +325,7 @@ function JobRow({
   when,
   employerViewedCv,
   employerCvViewCount,
+  isMobile,
 }: {
   title: string;
   company: string;
@@ -283,56 +334,117 @@ function JobRow({
   when: string | null;
   employerViewedCv: boolean;
   employerCvViewCount?: number;
+  isMobile: boolean;
 }) {
-  const viewCount = employerViewedCv
-    ? Math.max(employerCvViewCount ?? 1, 1)
-    : 0;
+  const cvLabel =
+    employerViewedCv
+      ? `CV view: ${Math.max(employerCvViewCount ?? 1, 1)}`
+      : "No view";
 
   return (
-    <div className="px-5 pt-5 pb-4 md:p-5 flex items-start gap-3 md:gap-4">
-      <div className="flex-shrink-0 w-12 h-12 rounded-full overflow-hidden bg-breneo-accent flex items-center justify-center">
-        {logo ? (
-          <img
-            src={logo}
-            alt=""
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <Briefcase className="h-6 w-6 text-white" />
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-          {company || "Company"}
-        </p>
-        <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 line-clamp-2 leading-6 min-h-[3rem] mt-0.5">
-          {title}
-        </h3>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-          {location ? (
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              {location}
+    <div className={isMobile ? "px-5 pt-5 pb-4 flex flex-col flex-grow" : "p-0"}>
+      {isMobile ? (
+        <>
+          <div className="flex items-start gap-3 mb-3">
+            {logo ? (
+              <div className="flex-shrink-0 relative w-10 h-10">
+                <img
+                  src={logo}
+                  alt={`${company} logo`}
+                  className="w-10 h-10 rounded-md object-cover"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            ) : null}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm min-w-0">
+                <CompanyNameLink name={company} className="font-semibold text-sm" />
+              </h3>
+              <p className="mt-0.5 text-xs text-gray-500 truncate">{location}</p>
+            </div>
+          </div>
+
+          <h4 className="font-bold text-base mb-2 line-clamp-2 leading-6">
+            {title}
+          </h4>
+
+          <div className="mt-5 flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+            {when ? (
+              <span className="rounded-[10px] bg-gray-100 px-3 py-1.5 text-[13px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                Applied: {when}
+              </span>
+            ) : null}
+            <span className={cn(
+              "rounded-[10px] px-3 py-1.5 text-[13px] font-medium",
+              employerViewedCv
+                ? "bg-breneo-blue/10 text-breneo-blue"
+                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
+            )}>
+              {cvLabel}
             </span>
-          ) : null}
-          {when ? (
-            <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5 shrink-0" />
-              {when}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex gap-4">
+          <div className="flex-1 p-4 min-w-0">
+            <div className="flex items-start gap-4">
+              {logo ? (
+                <div className="flex-shrink-0 relative w-12 h-12">
+                  <img
+                    src={logo}
+                    alt={company}
+                    className="w-12 h-12 rounded-md object-cover"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              ) : null}
+              <div className="flex-1 min-w-0">
+                <div className="mb-1 md:mb-2">
+                  <h3 className="font-normal text-sm text-gray-600 mb-1 min-w-0">
+                    <CompanyNameLink name={company} className="font-normal text-sm text-gray-600" />
+                  </h3>
+                  <h4 className="font-bold text-base md:text-lg mb-1 md:mb-2 line-clamp-2 md:line-clamp-3">
+                    {title}
+                  </h4>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4" />
+                      <span>{location}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex-shrink-0 py-4 pr-6 flex flex-col items-end justify-center gap-2">
+            {when ? (
+              <span className="rounded-[10px] bg-gray-100 px-3 py-1.5 text-[13px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                Applied: {when}
+              </span>
+            ) : null}
+            <span className={cn(
+              "rounded-[10px] px-3 py-1.5 text-[13px] font-medium",
+              employerViewedCv
+                ? "bg-breneo-blue/10 text-breneo-blue"
+                : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
+            )}>
+              {cvLabel}
             </span>
-          ) : null}
-          {employerViewedCv ? (
-            <span className="text-breneo-blue dark:text-sky-300">
-              Employer viewed your application {viewCount}{" "}
-              {viewCount === 1 ? "time" : "times"}
-            </span>
-          ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -15,19 +15,13 @@ const segmentFade = {
   ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
 };
 
-export type ProfileToolbarView = "profile" | "saved" | "applied";
+export type ProfileToolbarView = "profile" | "jobs" | "courses";
 
 interface ProfileViewSwitcherProps {
   activeView: ProfileToolbarView;
-  activeSavedTab: "courses" | "jobs";
-  activeAppliedTab: "courses" | "jobs";
   onProfile: () => void;
-  onSavedSummary: () => void;
-  onAppliedSummary: () => void;
-  onSavedCourses: () => void;
-  onSavedJobs: () => void;
-  onAppliedCourses: () => void;
-  onAppliedJobs: () => void;
+  onJobs: () => void;
+  onCourses: () => void;
 }
 
 function ToolbarButton({
@@ -47,14 +41,14 @@ function ToolbarButton({
         "relative shrink-0 px-4 py-2.5 md:px-5 text-sm whitespace-nowrap outline-none rounded-3xl",
         "transition-colors duration-200",
         active
-          ? "text-sky-950 dark:text-gray-100 font-bold"
+          ? "text-gray-900 md:dark:text-gray-100 font-bold"
           : "text-gray-500 dark:text-gray-400 font-medium hover:text-gray-700 dark:hover:text-gray-200",
       )}
     >
       {active ? (
         <motion.div
           layoutId="profile-toolbar-pill"
-          className="absolute inset-0 rounded-3xl bg-sky-100 dark:bg-gray-700"
+          className="absolute inset-0 rounded-3xl bg-white shadow-sm md:bg-sky-100 dark:md:bg-gray-700"
           transition={pillSpring}
         />
       ) : null}
@@ -65,32 +59,22 @@ function ToolbarButton({
 
 export function ProfileViewSwitcher({
   activeView,
-  activeSavedTab,
-  activeAppliedTab,
   onProfile,
-  onSavedSummary,
-  onAppliedSummary,
-  onSavedCourses,
-  onSavedJobs,
-  onAppliedCourses,
-  onAppliedJobs,
+  onJobs,
+  onCourses,
 }: ProfileViewSwitcherProps) {
-  const segmentKey =
-    activeView === "profile"
-      ? "profile-secondary"
-      : activeView === "saved"
-        ? "saved-secondary"
-        : "applied-secondary";
+  const isProfile = activeView === "profile";
+  const segmentKey = isProfile ? "profile-secondary" : "management-secondary";
 
   return (
     <MobileBottomDockExtension>
-    <div className="mobile-attached-switcher profile-mobile-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-6 md:w-auto">
+    <div className="mobile-attached-switcher profile-mobile-switcher fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 py-2 md:static md:translate-x-0 md:left-auto md:flex md:justify-center md:mb-2 md:w-auto">
       <motion.div
         layout
         transition={pillSpring}
-        className="mobile-attached-switcher-control inline-flex items-center gap-0 bg-white dark:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
+        className="mobile-attached-switcher-control inline-flex items-center gap-0 bg-gray-100 dark:bg-[#242424]/80 md:bg-white dark:md:bg-[#242424]/80 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-3xl p-1 shadow-sm"
       >
-        <ToolbarButton active={activeView === "profile"} onClick={onProfile}>
+        <ToolbarButton active={isProfile} onClick={onProfile}>
           Profile
         </ToolbarButton>
 
@@ -108,43 +92,20 @@ export function ProfileViewSwitcher({
               transition={segmentFade}
               className="flex items-center"
             >
-              {activeView === "profile" ? (
-                <>
-                  <ToolbarButton active={false} onClick={onSavedSummary}>
-                    Saved
-                  </ToolbarButton>
-                  <ToolbarButton active={false} onClick={onAppliedSummary}>
-                    Applied
-                  </ToolbarButton>
-                </>
-              ) : activeView === "saved" ? (
-                <>
-                  <ToolbarButton
-                    active={activeSavedTab === "courses"}
-                    onClick={onSavedCourses}
-                  >
-                    Saved Courses
-                  </ToolbarButton>
-                  <ToolbarButton
-                    active={activeSavedTab === "jobs"}
-                    onClick={onSavedJobs}
-                  >
-                    Saved Jobs
-                  </ToolbarButton>
-                </>
+              {isProfile ? (
+                <ToolbarButton active={false} onClick={onJobs}>
+                  Management
+                </ToolbarButton>
               ) : (
                 <>
-                  <ToolbarButton
-                    active={activeAppliedTab === "courses"}
-                    onClick={onAppliedCourses}
-                  >
-                    Applied Courses
+                  <ToolbarButton active={activeView === "jobs"} onClick={onJobs}>
+                    Jobs
                   </ToolbarButton>
                   <ToolbarButton
-                    active={activeAppliedTab === "jobs"}
-                    onClick={onAppliedJobs}
+                    active={activeView === "courses"}
+                    onClick={onCourses}
                   >
-                    Applied Jobs
+                    Courses
                   </ToolbarButton>
                 </>
               )}

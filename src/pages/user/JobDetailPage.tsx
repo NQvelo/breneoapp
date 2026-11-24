@@ -1808,7 +1808,7 @@ const JobDetailPage = () => {
                         onClick={() => saveJobMutation.mutate()}
                         disabled={saveJobMutation.isPending}
                         aria-label={isSaved ? "Unsave job" : "Save job"}
-                        className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                        className="h-10 w-10 shrink-0 [&_svg]:size-4 bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:text-white dark:hover:bg-[#3A3A3A]/90"
                       >
                         <Bookmark
                           className={`h-4 w-4 ${
@@ -1825,7 +1825,7 @@ const JobDetailPage = () => {
                         size="icon"
                         onClick={handleShareClick}
                         aria-label="Share job"
-                        className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                        className="h-10 w-10 shrink-0 [&_svg]:size-4 bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:text-white dark:hover:bg-[#3A3A3A]/90"
                       >
                         <Share2 className="h-4 w-4" />
                       </Button>
@@ -1837,7 +1837,7 @@ const JobDetailPage = () => {
                               variant="secondary"
                               size="icon"
                               aria-label="Share job"
-                              className="h-10 w-10 shrink-0 [&_svg]:size-4 dark:bg-[#181818] dark:hover:bg-[#252525]"
+                              className="h-10 w-10 shrink-0 [&_svg]:size-4 bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:text-white dark:hover:bg-[#3A3A3A]/90"
                             >
                               <Share2 className="h-4 w-4" />
                             </Button>
@@ -2259,7 +2259,7 @@ const JobDetailPage = () => {
                     onClick={() => saveJobMutation.mutate()}
                     disabled={saveJobMutation.isPending}
                     aria-label={isSaved ? "Unsave job" : "Save job"}
-                    className="h-10 w-10 [&_svg]:size-4 bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70"
+                    className="h-10 w-10 shrink-0 [&_svg]:size-4 bg-[#E6E7EB] text-black hover:bg-[#E6E7EB]/90 dark:bg-[#3A3A3A] dark:text-white dark:hover:bg-[#3A3A3A]/90"
                   >
                     <Bookmark
                       className={`h-4 w-4 ${

@@ -264,7 +264,8 @@ export function DashboardHeader({
                     navigate(-1);
                   }
                 }}
-                className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+                aria-label={t.common.back}
+                className="relative h-10 min-w-0 px-3 py-0 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
                            text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                            text-sm font-medium flex items-center gap-2 transition-colors"
               >
@@ -294,7 +295,7 @@ export function DashboardHeader({
           {isRegularUser ? (
             <Button
               variant="ghost"
-              className="relative h-10 px-3 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
+              className="relative h-10 min-w-0 px-3 py-0 rounded-full bg-gray-200 dark:bg-border/50 hover:bg-gray-300 dark:hover:bg-border/70
                          text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200
                          text-sm font-medium flex items-center gap-2 transition-colors"
             >
