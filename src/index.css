@@ -240,11 +240,18 @@
 .breneo-tab-bar-dock {
   transform: translateZ(0);
   will-change: transform;
-  border-top: 0;
-  background: #fff;
-  box-shadow: 0 -2px 10px rgb(0 0 0 / 0.05);
+  /* One shared edge and shadow for the main tabs and any secondary dock row. */
+  border-top: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--background));
+  box-shadow: 0 -3px 14px rgb(0 0 0 / 0.07);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+.breneo-mobile-nav-extension {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .breneo-mobile-nav-extension:empty {
@@ -278,8 +285,9 @@
 }
 
 .dark .breneo-tab-bar-dock {
-  background: #242424;
-  box-shadow: 0 -2px 10px rgb(0 0 0 / 0.18);
+  background: hsl(var(--background));
+  border-top-color: hsl(var(--border) / 0.7);
+  box-shadow: 0 -3px 14px rgb(0 0 0 / 0.2);
 }
 
 .jobs-mobile-search-dock {
@@ -341,13 +349,13 @@
   }
 }
 
-/* Compact mobile navigation modeled on the ChatGPT app's quiet bottom dock. */
+/* Mobile bottom navigation with labels and a full-width bar. */
 .breneo-mobile-nav {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 48px;
+  min-height: 68px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -358,56 +366,45 @@
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: min(100%, 280px);
+  justify-content: space-around;
+  width: 100%;
 }
-
-.breneo-mobile-nav-indicator {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  left: -12px;
-  width: 72px;
-  height: 40px;
-  border-radius: 9999px;
-  background: #eeeeee;
-  pointer-events: none;
-  transform: translate3d(var(--active-offset, 0px), 0, 0);
-  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: transform;
-}
-
-.breneo-mobile-nav-indicator.is-hidden { opacity: 0; }
-.dark .breneo-mobile-nav-indicator { background: #414141; }
 
 .breneo-mobile-nav-item {
   position: relative;
-  z-index: 1;
   display: inline-flex;
-  flex: 0 0 48px;
-  width: 48px;
-  height: 40px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 64px;
+  flex-direction: column;
+  gap: 3px;
   align-items: center;
   justify-content: center;
-  border-radius: 9999px;
-  color: #8a8a8a;
+  color: hsl(var(--muted-foreground));
   transition: color 120ms ease;
 }
 
 .breneo-mobile-nav-item svg {
-  width: 24px;
-  height: 24px;
-  stroke-width: 2.5;
-  transform: scale(0.96);
+  width: 23px;
+  height: 23px;
+  stroke-width: 2;
+  transform: none;
   transition: transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+.breneo-mobile-nav-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.7rem;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
-.breneo-mobile-nav-item.is-active svg { transform: scale(1); }
-.dark .breneo-mobile-nav-item { color: #9a9a9a; }
-.dark .breneo-mobile-nav-item.is-active { color: hsl(var(--primary)); }
+.breneo-mobile-nav-item.is-active svg { transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .breneo-mobile-nav-indicator,
   .breneo-mobile-nav-item,
   .breneo-mobile-nav-item svg {
     transition-duration: 0.01ms;

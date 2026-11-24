@@ -1141,7 +1141,7 @@ const JobSearchResultsPage = () => {
 
         <MobileBottomDockExtension>
           <div className="jobs-mobile-search-dock fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 px-4 pt-2 pb-0 md:hidden">
-            <div className="mx-auto flex w-full max-w-[320px] items-center gap-1.5 rounded-full bg-[#f1f1f1] p-1.5 dark:bg-[#303030]">
+            <div className="mx-auto flex w-full max-w-[320px] items-center gap-1.5 rounded-full bg-white p-1.5 dark:bg-[#303030]">
               <Input
                 placeholder={t.jobs.searchPlaceholder}
                 aria-label={t.jobs.searchPlaceholder}

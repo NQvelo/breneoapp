@@ -63,26 +63,6 @@ export const MobileTabBar = React.memo(function MobileTabBar({
   const activeHref =
     navItems.find((item) => isNavHrefActive(item.href, pathname))?.href ??
     null;
-  const activeIndex = navItems.findIndex((item) => item.href === activeHref);
-  const navItemsRef = React.useRef<HTMLDivElement>(null);
-  const [navItemsWidth, setNavItemsWidth] = React.useState(0);
-
-  React.useLayoutEffect(() => {
-    const nav = navItemsRef.current;
-    if (!nav) return;
-
-    const measure = () => setNavItemsWidth(nav.clientWidth);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(nav);
-    return () => observer.disconnect();
-  }, []);
-
-  const activeOffset =
-    activeIndex > 0 && navItems.length > 1
-      ? ((navItemsWidth - 48) / (navItems.length - 1)) * activeIndex
-      : 0;
-
   const items = React.useMemo(
     () =>
       navItems.map((item) => ({
@@ -102,22 +82,9 @@ export const MobileTabBar = React.memo(function MobileTabBar({
       aria-disabled={navLocked || undefined}
     >
       <div ref={onExtensionMount} className="breneo-mobile-nav-extension" />
-      <div className="relative flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
+      <div className="relative flex justify-center bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-0.5">
         <nav aria-label="Main navigation" className="breneo-mobile-nav">
-          <div
-            ref={navItemsRef}
-            className="breneo-mobile-nav-items"
-            style={{
-              "--active-offset": `${Math.max(activeOffset, 0)}px`,
-            } as React.CSSProperties}
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "breneo-mobile-nav-indicator",
-                activeIndex < 0 && "is-hidden",
-              )}
-            />
+          <div className="breneo-mobile-nav-items">
             {items.map((item) => {
               const active = item.href === activeHref;
               return (
@@ -129,6 +96,7 @@ export const MobileTabBar = React.memo(function MobileTabBar({
                 className={cn("breneo-mobile-nav-item", active && "is-active")}
               >
                 {item.icon}
+                <span className="breneo-mobile-nav-label">{item.label}</span>
               </TabBarLink>
               );
             })}
