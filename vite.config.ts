@@ -104,7 +104,7 @@ export default defineConfig(({ mode }) => ({
     },
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["robots.txt", "lovable-uploads/*.png"],
+      includeAssets: ["robots.txt", "lovable-uploads/*.png", "pwa/*.png"],
       manifest: {
         id: "/",
         name: "Breneo - AI-Powered Learning & Job Matching Platform",
@@ -119,20 +119,20 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         icons: [
           {
-            src: "/lovable-uploads/breneo-favicon.png",
+            src: "/pwa/icon-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/lovable-uploads/breneo-favicon.png",
-            sizes: "490x490",
+            src: "/pwa/icon-512.png",
+            sizes: "512x512",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/lovable-uploads/breneo-favicon.png",
-            sizes: "490x490",
+            src: "/pwa/icon-512-maskable.png",
+            sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
           },
@@ -146,7 +146,7 @@ export default defineConfig(({ mode }) => ({
             url: "/dashboard",
             icons: [
               {
-                src: "/lovable-uploads/breneo-favicon.png",
+                src: "/pwa/icon-96.png",
                 sizes: "96x96",
               },
             ],
