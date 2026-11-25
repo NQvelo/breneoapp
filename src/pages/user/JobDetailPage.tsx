@@ -1567,12 +1567,17 @@ const JobDetailPage = () => {
           onOpenChange={(open) => !open && closeSkillConfirm()}
         >
           <DrawerContent className="border-none bg-white dark:bg-background">
-            <DrawerHeader className="items-start pb-0 text-left">
-              <div className="mb-3 flex justify-center pl-11">
+            <DrawerHeader
+              closeButtonPosition="top-right"
+              className="items-center pb-0 text-center"
+            >
+              <div className="mb-3 flex justify-center">
                 {skillIllustration}
               </div>
-              <DrawerTitle>{skillPromptTitle}</DrawerTitle>
-              <DrawerDescription className="mt-1">
+              <DrawerTitle className="text-center">
+                {skillPromptTitle}
+              </DrawerTitle>
+              <DrawerDescription className="mt-1 text-center">
                 {skillConfirmCopy}
               </DrawerDescription>
             </DrawerHeader>

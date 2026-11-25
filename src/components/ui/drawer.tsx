@@ -59,11 +59,14 @@ DrawerContent.displayName = "DrawerContent";
 const DrawerHeader = ({
   className,
   children,
+  closeButtonPosition = "inline",
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
+}: React.HTMLAttributes<HTMLDivElement> & {
+  closeButtonPosition?: "inline" | "top-right";
+}) => (
   <div
     className={cn(
-      "flex items-center justify-between gap-4 px-6 pt-6 pb-4",
+      "relative flex items-center justify-between gap-4 px-6 pt-6 pb-4",
       className
     )}
     {...props}
@@ -75,7 +78,10 @@ const DrawerHeader = ({
         variant="ghost"
         size="icon"
         aria-label="Close"
-        className="text-black hover:text-black dark:text-white dark:hover:text-white"
+        className={cn(
+          "text-black hover:text-black dark:text-white dark:hover:text-white",
+          closeButtonPosition === "top-right" && "absolute right-4 top-4",
+        )}
       >
         <X className="h-5 w-5" />
       </Button>

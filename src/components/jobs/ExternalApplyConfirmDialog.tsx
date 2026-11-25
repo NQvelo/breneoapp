@@ -149,11 +149,15 @@ export function ExternalApplyConfirmDialog({
     return (
       <Drawer open={open} onOpenChange={handleOpenChange}>
         <DrawerContent className="border-none bg-white dark:bg-background">
-          <DrawerHeader className="items-start pb-0 text-left">
-            {/* pl-11 offsets the header's close button (h-7 + gap-4) so the image is centered in the drawer */}
-            <div className="mb-3 flex justify-center pl-11">{illustration}</div>
-            <DrawerTitle>{t.jobs.didYouApplyTitle}</DrawerTitle>
-            <DrawerDescription className="mt-1">
+          <DrawerHeader
+            closeButtonPosition="top-right"
+            className="items-center pb-0 text-center"
+          >
+            <div className="mb-3 flex justify-center">{illustration}</div>
+            <DrawerTitle className="text-center">
+              {t.jobs.didYouApplyTitle}
+            </DrawerTitle>
+            <DrawerDescription className="mt-1 text-center">
               {t.jobs.didYouApplyDescription}
             </DrawerDescription>
           </DrawerHeader>

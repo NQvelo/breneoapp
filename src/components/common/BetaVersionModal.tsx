@@ -87,23 +87,24 @@ export const BetaVersionModal: React.FC = () => {
     return (
       <Drawer open={isOpen} onOpenChange={handleDismiss}>
         <DrawerContent className="max-h-[85vh]">
-          <div className="px-6 pb-0">
-            <div className="flex flex-col items-center justify-center pb-4">
+          <DrawerHeader
+            closeButtonPosition="top-right"
+            className="items-center px-6 pb-0 text-center"
+          >
+            <div className="mb-3 flex justify-center">
               <img
                 src="/lovable-uploads/3dicons-rocket-front-color.png"
                 alt=""
                 className="h-32 w-32 object-contain"
               />
             </div>
-            <DrawerHeader className="px-0 pt-0 pb-4">
-              <DrawerTitle className="text-xl font-bold">
-                {t.appUpdate.title}
-              </DrawerTitle>
-            </DrawerHeader>
-            <DrawerDescription className="text-base">
+            <DrawerTitle className="text-center text-xl font-bold">
+              {t.appUpdate.title}
+            </DrawerTitle>
+            <DrawerDescription className="mt-1 text-center text-base">
               {message}
             </DrawerDescription>
-          </div>
+          </DrawerHeader>
           <div className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-10">
             {updateButton}
           </div>
