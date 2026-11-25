@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadialProgress } from "@/components/ui/radial-progress";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import {
   Dialog,
   DialogContent,
@@ -706,24 +707,16 @@ const UserHome = () => {
         <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex items-start gap-3 mb-3 min-h-10">
-              {job.company_logo ? (
-                <div className="flex-shrink-0 relative w-10 h-10">
-                  <img
-                    src={job.company_logo}
-                    alt={`${
-                      job.company_name ||
-                      (typeof job.company === "string"
-                        ? job.company
-                        : job.company?.name || "Company")
-                    } logo`}
-                    className="w-10 h-10 rounded-md object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              ) : null}
+              <CompanyLogo
+                src={job.company_logo}
+                companyName={
+                  job.company_name ||
+                  (typeof job.company === "string"
+                    ? job.company
+                    : job.company?.name || "Company")
+                }
+                className="h-10 w-10 rounded-md"
+              />
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-sm truncate">
                   {job.company_name ||

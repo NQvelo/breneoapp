@@ -15,6 +15,7 @@ import {
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { PLATFORM_CHIP_BG_CLASS } from "@/lib/chipStyles";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { supabase } from "@/integrations/supabase/client";
 import { jobService, ApiJob, JobFilters } from "@/api/jobs";
 import { resolveExternalApplyUrl } from "@/api/jobs/externalJobFields";
@@ -957,17 +958,11 @@ const SkillPathDetailPage = () => {
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          {companyLogo && (
-                            <img
-                              src={companyLogo}
-                              alt={companyName}
-                              className="w-12 h-12 rounded-lg object-contain flex-shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
-                          )}
+                          <CompanyLogo
+                            src={companyLogo}
+                            companyName={companyName}
+                            className="h-12 w-12"
+                          />
                           <div className="flex-1 min-w-0">
                             <h5 className="font-semibold text-sm mb-1 line-clamp-1">
                               {jobTitle}

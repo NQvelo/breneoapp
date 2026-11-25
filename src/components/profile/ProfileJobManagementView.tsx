@@ -13,6 +13,7 @@ import {
 import { Briefcase, Loader2 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { useLongPressDrag } from "@/hooks/useLongPressDrag";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 
 type JobStatus = "saved" | "applied" | "review" | "interview" | "done";
 
@@ -28,12 +29,50 @@ interface ManagementJob {
   status: JobStatus;
 }
 
-const columns: Array<{ id: JobStatus; label: string; dot: string; card: string }> = [
-  { id: "saved", label: "Saved", dot: "bg-gray-400", card: "bg-gray-100 dark:bg-[#303030]" },
-  { id: "applied", label: "Applied", dot: "bg-sky-500", card: "bg-sky-50 dark:bg-sky-950/40" },
-  { id: "review", label: "Review", dot: "bg-violet-500", card: "bg-violet-50 dark:bg-violet-950/40" },
-  { id: "interview", label: "Interview", dot: "bg-amber-500", card: "bg-amber-50 dark:bg-amber-950/40" },
-  { id: "done", label: "Done", dot: "bg-emerald-500", card: "bg-emerald-50 dark:bg-emerald-950/40" },
+function InsertionMarker() {
+  return (
+    <div aria-hidden className="relative z-10 my-1 h-1 rounded-full bg-breneo-blue shadow-[0_0_10px_rgba(59,130,246,0.65)]">
+      <span className="absolute -left-1 -top-1.5 h-4 w-4 rounded-full border-2 border-white bg-breneo-blue shadow dark:border-[#242424]" />
+    </div>
+  );
+}
+
+const columns: Array<{ id: JobStatus; label: string; dot: string; card: string; chip: string }> = [
+  {
+    id: "saved",
+    label: "Saved",
+    dot: "bg-gray-400",
+    card: "bg-gray-100 dark:bg-[#303030]",
+    chip: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
+  },
+  {
+    id: "applied",
+    label: "Applied",
+    dot: "bg-sky-500",
+    card: "bg-sky-50 dark:bg-sky-950/40",
+    chip: "bg-sky-100 text-sky-700 dark:bg-sky-900/60 dark:text-sky-200",
+  },
+  {
+    id: "review",
+    label: "Review",
+    dot: "bg-violet-500",
+    card: "bg-violet-50 dark:bg-violet-950/40",
+    chip: "bg-violet-100 text-violet-700 dark:bg-violet-900/60 dark:text-violet-200",
+  },
+  {
+    id: "interview",
+    label: "Interview",
+    dot: "bg-amber-500",
+    card: "bg-amber-50 dark:bg-amber-950/40",
+    chip: "bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200",
+  },
+  {
+    id: "done",
+    label: "Done",
+    dot: "bg-emerald-500",
+    card: "bg-emerald-50 dark:bg-emerald-950/40",
+    chip: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200",
+  },
 ];
 
 function formatAppliedDate(value: string | undefined): string | undefined {
@@ -57,9 +96,13 @@ export function ProfileJobManagementView() {
   const [savedJobs, setSavedJobs] = useState<ManagementJob[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
   const [manualStatuses, setManualStatuses] = useState<Record<string, JobStatus>>({});
+  const [manualOrders, setManualOrders] = useState<
+    Partial<Record<JobStatus, string[]>>
+  >({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const storageKey = `job-management-statuses:${user?.id ?? "guest"}`;
+  const orderStorageKey = `${storageKey}:order`;
 
   useEffect(() => {
     try {
@@ -69,6 +112,17 @@ export function ProfileJobManagementView() {
       setManualStatuses({});
     }
   }, [storageKey]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(orderStorageKey);
+      setManualOrders(
+        stored ? (JSON.parse(stored) as Partial<Record<JobStatus, string[]>>) : {},
+      );
+    } catch {
+      setManualOrders({});
+    }
+  }, [orderStorageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,19 +236,49 @@ export function ProfileJobManagementView() {
     });
   }, [savedJobs, appliedJobs, manualStatuses]);
 
-  function moveJob(jobId: string, status: JobStatus) {
-    const next = { ...manualStatuses, [jobId]: status };
-    setManualStatuses(next);
+  function getOrderedJobs(status: JobStatus) {
+    const order = manualOrders[status] ?? [];
+    return jobs
+      .filter((job) => job.status === status)
+      .sort((first, second) => {
+        const firstIndex = order.indexOf(first.id);
+        const secondIndex = order.indexOf(second.id);
+        if (firstIndex < 0 && secondIndex < 0) return 0;
+        if (firstIndex < 0) return 1;
+        if (secondIndex < 0) return -1;
+        return firstIndex - secondIndex;
+      });
+  }
+
+  function moveJob(jobId: string, status: JobStatus, beforeId: string | null) {
+    const nextStatuses = { ...manualStatuses, [jobId]: status };
+    const nextOrders = { ...manualOrders };
+    for (const column of columns) {
+      nextOrders[column.id] = getOrderedJobs(column.id)
+        .filter((job) => job.id !== jobId)
+        .map((job) => job.id);
+    }
+    const destinationOrder = [...(nextOrders[status] ?? [])];
+    const insertionIndex = beforeId ? destinationOrder.indexOf(beforeId) : -1;
+    destinationOrder.splice(
+      insertionIndex < 0 ? destinationOrder.length : insertionIndex,
+      0,
+      jobId,
+    );
+    nextOrders[status] = destinationOrder;
+    setManualStatuses(nextStatuses);
+    setManualOrders(nextOrders);
     try {
-      localStorage.setItem(storageKey, JSON.stringify(next));
+      localStorage.setItem(storageKey, JSON.stringify(nextStatuses));
+      localStorage.setItem(orderStorageKey, JSON.stringify(nextOrders));
     } catch {
       // Ignore storage restrictions; the board still updates for this session.
     }
   }
 
-  const touchDrag = useLongPressDrag(isMobile, (jobId, columnId) => {
+  const touchDrag = useLongPressDrag(isMobile, (jobId, columnId, beforeId) => {
     const column = columns.find((item) => item.id === columnId);
-    if (column) moveJob(jobId, column.id);
+    if (column) moveJob(jobId, column.id, beforeId);
   });
 
   if (loadingSaved || loadingApplications) {
@@ -209,7 +293,7 @@ export function ProfileJobManagementView() {
     <div>
       <div className="flex overflow-x-auto rounded-3xl bg-white dark:bg-[#242424] scrollbar-hide">
         {columns.map((column) => {
-          const columnJobs = jobs.filter((job) => job.status === column.id);
+          const columnJobs = getOrderedJobs(column.id);
           return (
             <section
               key={column.id}
@@ -218,13 +302,25 @@ export function ProfileJobManagementView() {
                 "flex-1 min-h-[360px] bg-white p-3 dark:bg-[#242424]",
                 "border-r-[8px] border-breneo-lightgray last:border-r-0 dark:border-r-[#181818]",
                 isMobile ? "w-[78vw] min-w-[78vw] max-w-[78vw]" : "min-w-[320px]",
-                touchDrag.dropTarget === column.id && "ring-2 ring-inset ring-breneo-blue",
               )}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (draggingId) touchDrag.onNativeDragOver(event, column.id);
+              }}
               onDrop={(event) => {
                 event.preventDefault();
-                if (draggingId) moveJob(draggingId, column.id);
+                if (draggingId) {
+                  const position = touchDrag.dropPosition;
+                  moveJob(
+                    draggingId,
+                    column.id,
+                    position?.columnId === column.id
+                      ? position.beforeId
+                      : null,
+                  );
+                }
                 setDraggingId(null);
+                touchDrag.onNativeDragEnd();
               }}
             >
               <div className="mb-3 flex items-center gap-2 px-1">
@@ -236,53 +332,66 @@ export function ProfileJobManagementView() {
                 {columnJobs.map((job) => {
                   const isTouchDragging = touchDrag.draggingId === job.id;
                   return (
-                    <article
-                      key={job.id}
-                      data-long-press-drag
-                      draggable={!isMobile}
-                      onDragStart={() => setDraggingId(job.id)}
-                      onDragEnd={() => setDraggingId(null)}
-                      onTouchStart={(event) =>
-                        touchDrag.onTouchStart(event, job.id)
-                      }
-                      onTouchMove={touchDrag.onTouchMove}
-                      onTouchEnd={touchDrag.onTouchEnd}
-                      onTouchCancel={touchDrag.onTouchEnd}
-                      onContextMenu={(event) => {
-                        if (isMobile) event.preventDefault();
-                      }}
-                      onClickCapture={touchDrag.onClickCapture}
-                      onClick={() =>
-                        navigate(`/jobs/${encodeURIComponent(job.id)}`)
-                      }
-                      style={
-                        isTouchDragging && touchDrag.dragPosition
-                          ? {
-                              position: "fixed",
-                              left: touchDrag.dragPosition.left,
-                              top: touchDrag.dragPosition.top,
-                              width: touchDrag.dragPosition.width,
-                              zIndex: 100,
-                              pointerEvents: "none",
-                            }
-                          : undefined
-                      }
-                      className={cn(
-                        "cursor-pointer select-none rounded-2xl p-4 transition-colors",
-                        column.card,
-                        isTouchDragging &&
-                          "cursor-grabbing shadow-2xl ring-2 ring-breneo-blue/50 scale-[1.03] rotate-1 transition-[transform,box-shadow] duration-150 ease-out",
-                        (draggingId === job.id || isTouchDragging) &&
-                          "opacity-90",
-                      )}
-                    >
+                    <React.Fragment key={job.id}>
+                      {touchDrag.dropPosition?.columnId === column.id &&
+                      touchDrag.dropPosition.beforeId === job.id ? (
+                        <InsertionMarker />
+                      ) : null}
+                      <article
+                        data-long-press-drag
+                        data-management-item={job.id}
+                        draggable={!isMobile}
+                        onDragStart={(event) => {
+                          touchDrag.onNativeDragStart(event, job.id);
+                          setDraggingId(job.id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingId(null);
+                          touchDrag.onNativeDragEnd();
+                        }}
+                        onTouchStart={(event) =>
+                          touchDrag.onTouchStart(event, job.id)
+                        }
+                        onTouchMove={touchDrag.onTouchMove}
+                        onTouchEnd={touchDrag.onTouchEnd}
+                        onTouchCancel={touchDrag.onTouchEnd}
+                        onContextMenu={(event) => {
+                          if (isMobile) event.preventDefault();
+                        }}
+                        onClickCapture={touchDrag.onClickCapture}
+                        onClick={() =>
+                          navigate(`/jobs/${encodeURIComponent(job.id)}`)
+                        }
+                        style={
+                          isTouchDragging && touchDrag.dragPosition
+                            ? {
+                                position: "fixed",
+                                left: touchDrag.dragPosition.left,
+                                top: touchDrag.dragPosition.top,
+                                width: touchDrag.dragPosition.width,
+                                zIndex: 100,
+                                pointerEvents: "none",
+                              }
+                            : undefined
+                        }
+                        className={cn(
+                          "cursor-pointer select-none rounded-2xl p-4 transition-[transform,opacity,box-shadow] duration-200 ease-out",
+                          column.card,
+                          isTouchDragging &&
+                            "cursor-grabbing shadow-2xl ring-2 ring-breneo-blue/50 scale-[1.03] rotate-1 transition-[transform,box-shadow] duration-150 ease-out",
+                          (draggingId === job.id || isTouchDragging) &&
+                            "opacity-90",
+                          touchDrag.nativeDraggingId === job.id &&
+                            "cursor-grabbing scale-[0.98] opacity-40 shadow-lg",
+                        )}
+                      >
                       <div className="flex items-start gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-breneo-blue/10">
-                          {job.logo ? (
-                            <img src={job.logo} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <Briefcase className="h-5 w-5 text-breneo-blue" />
-                          )}
+                          <CompanyLogo
+                            src={job.logo}
+                            companyName={job.company}
+                            className="h-10 w-10 rounded-lg"
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -297,20 +406,25 @@ export function ProfileJobManagementView() {
                       {(job.appliedAt || job.employerViewedCv) ? (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {job.appliedAt ? (
-                            <span className="rounded-[10px] bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                            <span className={cn("rounded-[10px] px-2.5 py-1 text-xs font-medium", column.chip)}>
                               Applied: {job.appliedAt}
                             </span>
                           ) : null}
                           {job.employerViewedCv ? (
-                            <span className="rounded-[10px] bg-breneo-blue/10 px-2.5 py-1 text-xs font-medium text-breneo-blue">
+                            <span className={cn("rounded-[10px] px-2.5 py-1 text-xs font-medium", column.chip)}>
                               CV view: {Math.max(job.employerCvViewCount ?? 1, 1)}
                             </span>
                           ) : null}
                         </div>
                       ) : null}
-                    </article>
+                      </article>
+                    </React.Fragment>
                   );
                 })}
+                {touchDrag.dropPosition?.columnId === column.id &&
+                touchDrag.dropPosition.beforeId === null ? (
+                  <InsertionMarker />
+                ) : null}
               </div>
             </section>
           );

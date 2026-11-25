@@ -23,6 +23,7 @@ import apiClient from "@/api/auth/apiClient";
 import { API_ENDPOINTS } from "@/api/auth/endpoints";
 import { fetchJobDetail } from "@/api/jobs/jobService";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
 import { formatJobSalaryDisplay } from "@/utils/jobSalaryFormat";
 import {
@@ -599,21 +600,11 @@ const SavedPage = () => {
                     >
                       <CardContent className="p-6">
                         <div className="flex items-start gap-3 mb-4">
-                          {job.company_logo ? (
-                            <img
-                              src={job.company_logo}
-                              alt={`${job.company} logo`}
-                              className="w-12 h-12 rounded-3xl object-cover flex-shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-3xl bg-breneo-blue/10 flex items-center justify-center flex-shrink-0">
-                              <Briefcase className="h-6 w-6 text-breneo-blue" />
-                            </div>
-                          )}
+                          <CompanyLogo
+                            src={job.company_logo}
+                            companyName={job.company}
+                            className="h-12 w-12 rounded-3xl"
+                          />
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1 min-w-0">
                               <CompanyNameLink

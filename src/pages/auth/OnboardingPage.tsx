@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage, useTranslation } from "@/contexts/LanguageContext";
 import { getLocalizedPath } from "@/utils/localeUtils";
 import { cn } from "@/lib/utils";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { loadJobsForRoles, type PreviewJob } from "@/onboarding/onboardingJobs";
 import {
   loadOnboardingDraft,
@@ -662,18 +663,11 @@ export default function OnboardingPage() {
                       {previewJobs.map((job) => (
                         <div key={job.id} className="p-4">
                           <div className="flex items-start gap-4">
-                            {job.logo ? (
-                              <img
-                                src={job.logo}
-                                alt=""
-                                className="h-12 w-12 flex-shrink-0 rounded-md object-cover"
-                                loading="lazy"
-                                referrerPolicy="no-referrer"
-                                onError={(event) => {
-                                  event.currentTarget.style.display = "none";
-                                }}
-                              />
-                            ) : null}
+                            <CompanyLogo
+                              src={job.logo}
+                              companyName={job.company}
+                              className="h-12 w-12"
+                            />
                             <div className="min-w-0 flex-1">
                               <h3 className="mb-1 truncate text-sm font-normal text-gray-600 dark:text-gray-300">
                                 {job.company}

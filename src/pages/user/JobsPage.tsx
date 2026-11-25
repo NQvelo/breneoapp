@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MobileBottomDockExtension } from "@/components/layout/mobileBottomDock";
 import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -2439,21 +2440,11 @@ const JobsPage = () => {
                   <CardContent className="flex h-full flex-1 flex-col px-5 pt-5 pb-4">
                     <div className="flex min-h-0 flex-1 flex-col">
                       <div className="flex items-start gap-3 mb-3 min-h-10">
-                        {job.company_logo ? (
-                          <div className="flex-shrink-0 relative w-10 h-10">
-                            <img
-                              src={job.company_logo}
-                              alt={`${job.company_name || job.company} logo`}
-                              className="w-10 h-10 rounded-md object-cover flex-shrink-0"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
-                          </div>
-                        ) : null}
+                        <CompanyLogo
+                          src={job.company_logo}
+                          companyName={job.company_name || job.company}
+                          className="h-10 w-10"
+                        />
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm truncate">
                             <CompanyNameLink
@@ -2570,21 +2561,11 @@ const JobsPage = () => {
                     <div className="flex min-h-0 flex-1 flex-col">
                       {/* Company Logo and Info */}
                       <div className="flex items-start gap-3 mb-3 min-h-10">
-                        {job.company_logo ? (
-                          <div className="flex-shrink-0 relative w-10 h-10">
-                            <img
-                              src={job.company_logo}
-                              alt={`${job.company_name || job.company} logo`}
-                              className="w-10 h-10 rounded-full object-cover"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
-                          </div>
-                        ) : null}
+                        <CompanyLogo
+                          src={job.company_logo}
+                          companyName={job.company_name || job.company}
+                          className="h-10 w-10 rounded-full"
+                        />
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm truncate">
                             <CompanyNameLink

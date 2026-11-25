@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1671,23 +1672,12 @@ const JobDetailPage = () => {
                         const logoUrl = getCompanyLogo();
                         const companyLabel = getCompanyName();
                         const renderLogo = () =>
-                          logoUrl ? (
-                            <img
+                          (
+                            <CompanyLogo
                               src={logoUrl}
-                              alt={companyLabel || "Company logo"}
-                              className="h-10 w-10 md:h-12 md:w-12 rounded-md object-cover flex-shrink-0 border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
+                              companyName={companyLabel}
+                              className="h-10 w-10 md:h-12 md:w-12"
                             />
-                          ) : (
-                            <div
-                              className="h-10 w-10 md:h-12 md:w-12 rounded-md flex-shrink-0 border border-gray-100 dark:border-gray-800 bg-muted flex items-center justify-center"
-                              aria-hidden
-                            >
-                              <Building2 className="h-5 w-5 md:h-6 md:w-6 text-muted-foreground" />
-                            </div>
                           );
                         return (
                           <>
@@ -2092,19 +2082,11 @@ const JobDetailPage = () => {
                   <div className="space-y-6">
                     {/* Header: Name and Logo */}
                     <div className="flex items-center gap-4">
-                      {getCompanyLogo() ? (
-                        <div className="flex-shrink-0">
-                          <img
-                            src={getCompanyLogo()}
-                            alt={getCompanyName() || "Company logo"}
-                            className="h-12 w-12 md:h-12 md:w-12 rounded-2xl object-cover bg-white shadow-sm"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display =
-                                "none";
-                            }}
-                          />
-                        </div>
-                      ) : null}
+                      <CompanyLogo
+                        src={getCompanyLogo()}
+                        companyName={getCompanyName()}
+                        className="h-12 w-12 rounded-2xl"
+                      />
 
                       <h3 className="min-w-0 text-xl font-bold text-gray-900 dark:text-white">
                         {getCompanyName() ? (

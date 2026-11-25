@@ -9,6 +9,7 @@ import React, {
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { Button } from "@/components/ui/button";
 import {
   Edit,
@@ -2795,21 +2796,11 @@ const ProfilePage = () => {
                           {isMobile ? (
                             <>
                               <div className="flex items-start gap-3 mb-3">
-                                {job.company_logo ? (
-                                  <div className="flex-shrink-0 relative w-10 h-10">
-                                    <img
-                                      src={job.company_logo}
-                                      alt={`${job.company} logo`}
-                                      className="w-10 h-10 rounded-full object-cover"
-                                      loading="lazy"
-                                      referrerPolicy="no-referrer"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display =
-                                          "none";
-                                      }}
-                                    />
-                                  </div>
-                                ) : null}
+                                <CompanyLogo
+                                  src={job.company_logo}
+                                  companyName={job.company}
+                                  className="h-10 w-10 rounded-full"
+                                />
                                 <div className="flex-1 min-w-0">
                                   <h3 className="font-semibold text-sm min-w-0">
                                     <CompanyNameLink
@@ -2880,21 +2871,11 @@ const ProfilePage = () => {
                             <div className="flex gap-4">
                               <div className="flex-1 p-4 min-w-0">
                                 <div className="flex items-start gap-4">
-                                  {job.company_logo ? (
-                                    <div className="flex-shrink-0 relative w-12 h-12">
-                                      <img
-                                        src={job.company_logo}
-                                        alt={job.company}
-                                        className="w-12 h-12 rounded-md object-cover"
-                                        loading="lazy"
-                                        referrerPolicy="no-referrer"
-                                        onError={(e) => {
-                                          (e.target as HTMLImageElement).style.display =
-                                            "none";
-                                        }}
-                                      />
-                                    </div>
-                                  ) : null}
+                                  <CompanyLogo
+                                    src={job.company_logo}
+                                    companyName={job.company}
+                                    className="h-12 w-12"
+                                  />
 
                                   <div className="flex-1 min-w-0">
                                     <div className="mb-1 md:mb-2">

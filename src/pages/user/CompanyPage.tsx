@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RadialProgress } from "@/components/ui/radial-progress";
 import { JobListingMetaBadges } from "@/components/jobs/JobListingMetaBadges";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { useMobile } from "@/hooks/use-mobile";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { getJobAggregatorClient } from "@/api/httpClients";
@@ -470,26 +471,14 @@ const CompanyPage = () => {
                 </div>
               ) : (
                 <div className="flex items-start gap-4">
-                  {logo ? (
-                    <img
-                      src={logo}
-                      alt=""
-                      className={cn(
-                        "h-16 w-16 rounded-2xl object-cover bg-white flex-shrink-0",
-                        companyImageShadow,
-                      )}
-                      onError={() => setLogoFailed(true)}
-                    />
-                  ) : (
-                    <div
-                      className={cn(
-                        "h-16 w-16 rounded-2xl bg-white dark:bg-card flex items-center justify-center flex-shrink-0",
-                        companyImageShadow,
-                      )}
-                    >
-                      <Building2 className="h-7 w-7 text-muted-foreground" />
-                    </div>
-                  )}
+                  <CompanyLogo
+                    src={logo}
+                    companyName={companyName}
+                    className={cn(
+                      "h-16 w-16 rounded-2xl",
+                      companyImageShadow,
+                    )}
+                  />
                   <div className="min-w-0">
                     <h1 className="text-2xl font-semibold text-gray-900 dark:text-white break-words">
                       {displayName}

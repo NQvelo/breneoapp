@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Bookmark } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { CompanyNameLink } from "@/components/jobs/CompanyNameLink";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import {
   jobIdFromApplication,
   type JobApplicationItem,
@@ -346,20 +347,11 @@ function JobRow({
       {isMobile ? (
         <>
           <div className="flex items-start gap-3 mb-3">
-            {logo ? (
-              <div className="flex-shrink-0 relative w-10 h-10">
-                <img
-                  src={logo}
-                  alt={`${company} logo`}
-                  className="w-10 h-10 rounded-md object-cover"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              </div>
-            ) : null}
+            <CompanyLogo
+              src={logo}
+              companyName={company}
+              className="h-10 w-10"
+            />
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-sm min-w-0">
                 <CompanyNameLink name={company} className="font-semibold text-sm" />
@@ -394,20 +386,11 @@ function JobRow({
         <div className="flex gap-4">
           <div className="flex-1 p-4 min-w-0">
             <div className="flex items-start gap-4">
-              {logo ? (
-                <div className="flex-shrink-0 relative w-12 h-12">
-                  <img
-                    src={logo}
-                    alt={company}
-                    className="w-12 h-12 rounded-md object-cover"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              ) : null}
+            <CompanyLogo
+              src={logo}
+              companyName={company}
+              className="h-12 w-12"
+            />
               <div className="flex-1 min-w-0">
                 <div className="mb-1 md:mb-2">
                   <h3 className="font-normal text-sm text-gray-600 mb-1 min-w-0">

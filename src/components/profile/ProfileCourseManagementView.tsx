@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -72,6 +72,14 @@ function normalizeLogoUrl(value: string): string {
   return `/${value}`;
 }
 
+function InsertionMarker() {
+  return (
+    <div aria-hidden className="relative z-10 my-1 h-1 rounded-full bg-breneo-blue shadow-[0_0_10px_rgba(59,130,246,0.65)]">
+      <span className="absolute -left-1 -top-1.5 h-4 w-4 rounded-full border-2 border-white bg-breneo-blue shadow dark:border-[#242424]" />
+    </div>
+  );
+}
+
 export function ProfileCourseManagementView({
   savedCourseIds,
   onToggleSave,
@@ -81,9 +89,29 @@ export function ProfileCourseManagementView({
   const queryClient = useQueryClient();
   const isMobile = useMobile();
   const [draggingCourseId, setDraggingCourseId] = useState<string | null>(null);
+  const [courseOrders, setCourseOrders] = useState<
+    Partial<Record<CourseColumn, string[]>>
+  >({});
+  const [pendingAppliedBeforeId, setPendingAppliedBeforeId] = useState<
+    string | null
+  >(null);
   const [courseToApply, setCourseToApply] = useState<ManagementCourse | null>(
     null,
   );
+  const orderStorageKey = `course-management-order:${user?.id ?? "guest"}`;
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(orderStorageKey);
+      setCourseOrders(
+        stored
+          ? (JSON.parse(stored) as Partial<Record<CourseColumn, string[]>>)
+          : {},
+      );
+    } catch {
+      setCourseOrders({});
+    }
+  }, [orderStorageKey]);
   const {
     data: savedCourses = [],
     isLoading: loadingSavedCourses,
@@ -262,7 +290,27 @@ export function ProfileCourseManagementView({
         });
       }
     },
-    onSuccess: async (result) => {
+    onSuccess: async (result, course) => {
+      const appliedOrder = [
+        ...(courseOrders.applied ??
+          enrolledCourses.map((item) => String(item.id))),
+      ].filter((id) => id !== course.id);
+      const insertionIndex = pendingAppliedBeforeId
+        ? appliedOrder.indexOf(pendingAppliedBeforeId)
+        : -1;
+      appliedOrder.splice(
+        insertionIndex < 0 ? appliedOrder.length : insertionIndex,
+        0,
+        course.id,
+      );
+      const nextOrders = { ...courseOrders, applied: appliedOrder };
+      setCourseOrders(nextOrders);
+      setPendingAppliedBeforeId(null);
+      try {
+        localStorage.setItem(orderStorageKey, JSON.stringify(nextOrders));
+      } catch {
+        // The course order remains updated for this session.
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ENROLLED_COURSES_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ["courses"] }),
@@ -288,17 +336,72 @@ export function ProfileCourseManagementView({
     },
   });
 
-  const coursesByStatus: Record<CourseColumn, ManagementCourse[]> = {
-    saved: savedOnlyCourses,
-    applied: enrolledCourses,
-  };
-  const touchDrag = useLongPressDrag(isMobile, (courseId, columnId) => {
-    if (columnId !== "applied") return;
-    const course = savedOnlyCourses.find(
-      (item) => String(item.id) === courseId,
+  const coursesByStatus = useMemo(
+    () =>
+      Object.fromEntries(
+        columns.map(({ id }) => {
+          const order = courseOrders[id] ?? [];
+          const currentCourses =
+            id === "saved" ? savedOnlyCourses : enrolledCourses;
+          const courses = [...currentCourses].sort((first, second) => {
+            const firstIndex = order.indexOf(first.id);
+            const secondIndex = order.indexOf(second.id);
+            if (firstIndex < 0 && secondIndex < 0) return 0;
+            if (firstIndex < 0) return 1;
+            if (secondIndex < 0) return -1;
+            return firstIndex - secondIndex;
+          });
+          return [id, courses];
+        }),
+      ) as Record<CourseColumn, ManagementCourse[]>,
+    [courseOrders, enrolledCourses, savedOnlyCourses],
+  );
+
+  function handleCourseDrop(
+    courseId: string,
+    columnId: string,
+    beforeId: string | null,
+  ) {
+    const sourceColumn = savedOnlyCourses.some(
+      (course) => course.id === courseId,
+    )
+      ? "saved"
+      : enrolledCourses.some((course) => String(course.id) === courseId)
+        ? "applied"
+        : null;
+
+    if (sourceColumn === "saved" && columnId === "applied") {
+      const course = savedOnlyCourses.find((item) => item.id === courseId);
+      if (course) {
+        setPendingAppliedBeforeId(beforeId);
+        setCourseToApply(course);
+      }
+      return;
+    }
+
+    setPendingAppliedBeforeId(null);
+    if (sourceColumn !== columnId) return;
+
+    const nextOrders = { ...courseOrders };
+    const targetOrder = coursesByStatus[columnId]
+      .filter((course) => course.id !== courseId)
+      .map((course) => course.id);
+    const insertionIndex = beforeId ? targetOrder.indexOf(beforeId) : -1;
+    targetOrder.splice(
+      insertionIndex < 0 ? targetOrder.length : insertionIndex,
+      0,
+      courseId,
     );
-    if (course) setCourseToApply(course);
-  });
+    nextOrders[columnId] = targetOrder;
+    setCourseOrders(nextOrders);
+    try {
+      localStorage.setItem(orderStorageKey, JSON.stringify(nextOrders));
+    } catch {
+      // The course order remains updated for this session.
+    }
+  }
+
+  const touchDrag = useLongPressDrag(isMobile, handleCourseDrop);
 
   if (loadingSavedCourses || loadingEnrolledCourses) {
     return (
@@ -323,18 +426,27 @@ export function ProfileCourseManagementView({
                 isMobile
                   ? "w-[78vw] min-w-[78vw] max-w-[78vw]"
                   : "min-w-[320px]",
-                touchDrag.dropTarget === column.id && "ring-2 ring-inset ring-breneo-blue",
               )}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (draggingCourseId) {
+                  touchDrag.onNativeDragOver(event, column.id);
+                }
+              }}
               onDrop={(event) => {
                 event.preventDefault();
-                if (column.id === "applied" && draggingCourseId) {
-                  const course = savedOnlyCourses.find(
-                    (item) => String(item.id) === draggingCourseId,
+                if (draggingCourseId) {
+                  const position = touchDrag.dropPosition;
+                  handleCourseDrop(
+                    draggingCourseId,
+                    column.id,
+                    position?.columnId === column.id
+                      ? position.beforeId
+                      : null,
                   );
-                  if (course) setCourseToApply(course);
                 }
                 setDraggingCourseId(null);
+                touchDrag.onNativeDragEnd();
               }}
             >
               <div className="mb-3 flex items-center gap-2 px-1">
@@ -361,17 +473,26 @@ export function ProfileCourseManagementView({
                       : undefined);
 
                   return (
-                    <article
-                      key={id}
+                    <Fragment key={id}>
+                      {touchDrag.dropPosition?.columnId === column.id &&
+                      touchDrag.dropPosition.beforeId === id ? (
+                        <InsertionMarker />
+                      ) : null}
+                      <article
                       data-long-press-drag
-                      draggable={!isMobile && column.id === "saved"}
-                      onDragStart={() => setDraggingCourseId(id)}
-                      onDragEnd={() => setDraggingCourseId(null)}
-                      onTouchStart={(event) => {
-                        if (column.id === "saved") {
-                          touchDrag.onTouchStart(event, id);
-                        }
+                      data-management-item={id}
+                      draggable={!isMobile}
+                      onDragStart={(event) => {
+                        touchDrag.onNativeDragStart(event, id);
+                        setDraggingCourseId(id);
                       }}
+                      onDragEnd={() => {
+                        setDraggingCourseId(null);
+                        touchDrag.onNativeDragEnd();
+                      }}
+                      onTouchStart={(event) =>
+                        touchDrag.onTouchStart(event, id)
+                      }
                       onTouchMove={touchDrag.onTouchMove}
                       onTouchEnd={touchDrag.onTouchEnd}
                       onTouchCancel={touchDrag.onTouchEnd}
@@ -395,11 +516,13 @@ export function ProfileCourseManagementView({
                           : undefined
                       }
                       className={cn(
-                        "cursor-pointer select-none rounded-2xl p-4 transition-colors",
+                        "cursor-pointer select-none rounded-2xl p-4 transition-[transform,opacity,box-shadow] duration-200 ease-out",
                         column.card,
                         isTouchDragging &&
                           "cursor-grabbing shadow-2xl ring-2 ring-breneo-blue/50 scale-[1.03] rotate-1 transition-[transform,box-shadow] duration-150 ease-out",
                         isTouchDragging && "opacity-90",
+                        touchDrag.nativeDraggingId === id &&
+                          "cursor-grabbing scale-[0.98] opacity-40 shadow-lg",
                       )}
                     >
                       <div className="flex items-start gap-3">
@@ -453,9 +576,14 @@ export function ProfileCourseManagementView({
                       <h4 className="mt-3 line-clamp-2 font-bold text-gray-900 dark:text-gray-100">
                         {title}
                       </h4>
-                    </article>
+                      </article>
+                    </Fragment>
                   );
                 })}
+                {touchDrag.dropPosition?.columnId === column.id &&
+                touchDrag.dropPosition.beforeId === null ? (
+                  <InsertionMarker />
+                ) : null}
                 {courses.length === 0 ? (
                   <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-3 text-center">
                     {(column.id === "applied" && enrolledCoursesError) ||
@@ -482,7 +610,10 @@ export function ProfileCourseManagementView({
       <Dialog
         open={Boolean(courseToApply)}
         onOpenChange={(open) => {
-          if (!open && !applyMutation.isPending) setCourseToApply(null);
+          if (!open && !applyMutation.isPending) {
+            setCourseToApply(null);
+            setPendingAppliedBeforeId(null);
+          }
         }}
       >
         <DialogContent className="max-w-sm gap-0">
@@ -499,7 +630,10 @@ export function ProfileCourseManagementView({
               type="button"
               variant="ghost"
               disabled={applyMutation.isPending}
-              onClick={() => setCourseToApply(null)}
+              onClick={() => {
+                setCourseToApply(null);
+                setPendingAppliedBeforeId(null);
+              }}
             >
               Cancel
             </Button>
