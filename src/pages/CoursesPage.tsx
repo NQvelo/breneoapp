@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { GrowthInterviewSection } from "@/components/growth/GrowthInterviewSection";
+import { ProfessionQuizSection } from "@/components/growth/ProfessionQuizSection";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DashboardProfileWelcome } from "@/components/home/DashboardProfileWelcome";
 import { Button } from "@/components/ui/button";
@@ -659,13 +660,8 @@ const CoursesPage = () => {
             <section className="mb-10">
               {sectionHeading(t.courses.ourCourses, ourCourses.length)}
               <div className="overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
-                {ourCourses.length === 0 ? (
-                  <p className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    {t.courses.noOurCourses}
-                  </p>
-                ) : (
-                  ourCourses.map((course) => renderOurCourseRow(course))
-                )}
+                {ourCourses.map((course) => renderOurCourseRow(course))}
+                <ProfessionQuizSection />
               </div>
             </section>
           </>

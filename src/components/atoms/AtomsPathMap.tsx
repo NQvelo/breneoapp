@@ -53,7 +53,7 @@ export function AtomsPathMap({
                   atom={atom}
                   statusLabels={statusLabels}
                   onClick={() => {
-                    if (atom.status === "available") {
+                    if (atom.status !== "locked") {
                       onSelectAtom(atom);
                     }
                   }}

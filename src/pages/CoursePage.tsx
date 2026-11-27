@@ -4,7 +4,7 @@ import { BookMarked, BarChart3 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import OptimizedAvatar from "@/components/ui/OptimizedAvatar";
 import { createAcademySlug } from "@/utils/academyUtils";

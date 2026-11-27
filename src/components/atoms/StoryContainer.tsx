@@ -8,6 +8,7 @@ import { QuizAnnouncementCard } from "./QuizAnnouncementCard";
 import { QuizCard } from "./QuizCard";
 import { TinderCardDeck, type DeckSlide } from "./TinderCardDeck";
 import { SlidePreview } from "./SlidePreview";
+import { StoryProgressBar } from "./StoryProgressBar";
 import { cn } from "@/lib/utils";
 
 interface StoryQuiz {
@@ -206,10 +207,21 @@ export function StoryContainer({
 
   return (
     <div className={cn("flex h-full w-full flex-col", className)}>
-      <header className="relative shrink-0 px-5 py-5 pr-16 md:px-6 md:py-6 md:pr-20">
-        <p className="min-w-0 truncate text-lg font-semibold text-foreground md:text-xl">
-          {lessonTitle}
-        </p>
+      <header className="relative shrink-0 space-y-3 px-5 py-5 pr-16 md:px-6 md:py-6 md:pr-20">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-lg font-semibold text-foreground md:text-xl">
+            {lessonTitle}
+          </p>
+          <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+            {t.atoms.lessonStepProgress
+              .replace("{current}", String(activeIndex + 1))
+              .replace("{total}", String(slides.length))}
+          </span>
+        </div>
+        <StoryProgressBar
+          totalSegments={slides.length}
+          activeIndex={activeIndex}
+        />
         {onClose ? (
           <button
             type="button"

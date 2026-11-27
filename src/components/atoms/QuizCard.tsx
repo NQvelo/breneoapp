@@ -11,6 +11,7 @@ interface QuizCardProps {
   onComplete: (result: AtomSubmitResult) => void;
   onAnswered?: () => void;
   className?: string;
+  lessonLayout?: boolean;
 }
 
 export function QuizCard({
@@ -20,6 +21,7 @@ export function QuizCard({
   onComplete,
   onAnswered,
   className,
+  lessonLayout = false,
 }: QuizCardProps) {
   const [selectedIndex, setSelectedIndex] = useState<0 | 1 | 2 | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,13 +51,28 @@ export function QuizCard({
     }
   };
 
+  const submitButtonContent = isSubmitting ? (
+    <>
+      <Loader2 className="animate-spin" />
+      Saving...
+    </>
+  ) : (
+    "Complete & Save"
+  );
+
   return (
     <div className={cn("flex w-full flex-col gap-4", className)}>
       <p className="text-xl font-semibold text-gray-800 dark:text-foreground">
         {question}
       </p>
 
-      <div className="space-y-3">
+      <div
+        className={
+          lessonLayout
+            ? "grid grid-cols-1 gap-3 md:grid-cols-2"
+            : "space-y-3"
+        }
+      >
         {options.map((option, index) => {
           const letter = String.fromCharCode(65 + index);
           const isSelected = selectedIndex === index;
@@ -114,22 +131,38 @@ export function QuizCard({
         <p className="text-sm text-destructive">{submitError}</p>
       ) : null}
 
-      <div className="mt-2">
-        <Button
-          className="h-14 w-full bg-[#00BFFF] px-8 text-white hover:bg-[#00BFFF]/90"
-          disabled={selectedIndex === null || isSubmitting}
-          onClick={handleSubmit}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Complete & Save"
-          )}
-        </Button>
-      </div>
+      {lessonLayout ? (
+        <>
+          <div className="mt-2 hidden justify-end md:flex">
+            <Button
+              className="bg-[#00BFFF] text-white hover:bg-[#00BFFF]/90"
+              disabled={selectedIndex === null || isSubmitting}
+              onClick={handleSubmit}
+            >
+              {submitButtonContent}
+            </Button>
+          </div>
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:hidden">
+            <Button
+              className="h-14 w-full bg-[#00BFFF] px-8 text-white hover:bg-[#00BFFF]/90"
+              disabled={selectedIndex === null || isSubmitting}
+              onClick={handleSubmit}
+            >
+              {submitButtonContent}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div className="mt-2">
+          <Button
+            className="h-14 w-full bg-[#00BFFF] px-8 text-white hover:bg-[#00BFFF]/90"
+            disabled={selectedIndex === null || isSubmitting}
+            onClick={handleSubmit}
+          >
+            {submitButtonContent}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ export function AtomPathNode({
   const isLocked = atom.status === "locked";
   const isAvailable = atom.status === "available";
   const isCompleted = atom.status === "completed";
+  const isClickable = !isLocked;
 
   return (
     <button
@@ -29,8 +30,9 @@ export function AtomPathNode({
       disabled={isLocked}
       onClick={onClick}
       className={cn(
-        "group flex w-[min(100%,220px)] flex-col items-center gap-2 text-center transition-transform",
-        isAvailable && "hover:scale-105",
+        "group flex w-[min(100%,220px)] flex-col items-center gap-2 text-center transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4",
+        isClickable &&
+          "cursor-pointer hover:translate-y-0.5 active:translate-y-[5px]",
         isLocked && "cursor-not-allowed",
         className,
       )}
@@ -41,13 +43,13 @@ export function AtomPathNode({
         ) : null}
         <div
           className={cn(
-            "relative flex h-16 w-16 items-center justify-center rounded-full border-4 shadow-md transition-colors",
-            isCompleted &&
-              "border-amber-400 bg-amber-400 text-white dark:border-amber-500 dark:bg-amber-500",
-            isAvailable &&
-              "border-primary bg-primary text-white shadow-primary/30",
+            "relative flex h-16 w-16 items-center justify-center rounded-full border-4 transition-all",
+            (isCompleted || isAvailable) &&
+              "border-breneo-blue bg-breneo-blue text-white shadow-[0_5px_0_#1d4ed8]",
+            isClickable &&
+              "group-hover:shadow-[0_3px_0_#1d4ed8] group-active:shadow-[0_0px_0_#1d4ed8]",
             isLocked &&
-              "border-muted-foreground/20 bg-muted text-muted-foreground",
+              "border-muted-foreground/20 bg-muted text-muted-foreground shadow-[0_4px_0_#9ca3af]",
           )}
         >
           {isCompleted ? (
@@ -61,7 +63,8 @@ export function AtomPathNode({
         <span
           className={cn(
             "absolute -bottom-1 left-1/2 flex h-6 min-w-6 -translate-x-1/2 items-center justify-center rounded-full px-1.5 text-xs font-bold",
-            isCompleted && "bg-amber-500 text-white",
+            isCompleted &&
+              "bg-breneo-blue text-white shadow-[0_2px_0_#1d4ed8]",
             isAvailable && "bg-white text-primary dark:bg-zinc-900",
             isLocked && "bg-muted text-muted-foreground",
           )}
@@ -84,7 +87,7 @@ export function AtomPathNode({
         <p
           className={cn(
             "mt-0.5 text-xs font-medium uppercase tracking-wide",
-            isCompleted && "text-amber-600 dark:text-amber-400",
+            isCompleted && "text-breneo-blue",
             isAvailable && "text-primary",
             isLocked && "text-muted-foreground",
           )}

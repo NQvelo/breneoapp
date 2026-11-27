@@ -38,6 +38,9 @@ const JobDetailPage = lazy(() => import("@/pages/user/JobDetailPage"));
 const CompanyPage = lazy(() => import("@/pages/user/CompanyPage"));
 const CoursesPage = lazy(() => import("@/pages/CoursesPage"));
 const CoursePage = lazy(() => import("@/pages/CoursePage"));
+const ProfessionQuizPathPage = lazy(
+  () => import("@/pages/user/ProfessionQuizPathPage"),
+);
 const SkillTestPage = lazy(() => import("@/pages/user/SkillTestPage"));
 const SkillPathPage = lazy(() => import("@/pages/user/SkillPathPage"));
 const SkillPathDetailPage = lazy(
@@ -285,6 +288,14 @@ export const AppRoutes = () => {
             element: userOnly(<CompanyPage />),
           },
           { path: "/jobs/:jobId", element: userOnly(<JobDetailPage />) },
+          {
+            path: "/courses/quizzes/:professionId/atoms/:atomId",
+            element: userOnly(<ProfessionQuizPathPage />),
+          },
+          {
+            path: "/courses/quizzes/:professionId",
+            element: userOnly(<ProfessionQuizPathPage />),
+          },
           { path: "/courses", element: userOnly(<CoursesPage />) },
           { path: "/course/:courseId", element: userOnly(<CoursePage />) },
           { path: "/webinars", element: userOnly(<WebinarsPage />) },

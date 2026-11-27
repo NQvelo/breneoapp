@@ -1,8 +1,10 @@
 import React from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { LocalizedLink } from "@/components/routing/LocalizedLink";
 import { removeLanguagePrefix } from "@/utils/localeUtils";
 import { Bell, Moon, Sun, Zap, ArrowLeft } from "@/components/icons";
+import { atomsApi } from "@/api/atoms";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,6 +52,9 @@ const isSkillPathPage = (pathname: string): boolean => {
   // Match patterns like /skill-path, /en/skill-path, /ka/skill-path, /skill-path/:skillName, etc.
   return pathname.includes("/skill-path");
 };
+
+const isProfessionQuizPathPage = (pathname: string): boolean =>
+  /^\/courses\/quizzes\/\d+(?:\/atoms\/\d+)?$/.test(pathname);
 
 // Helper function to check if current path is a course add/edit page
 const isCourseAddEditPage = (pathname: string): boolean => {
@@ -164,6 +169,18 @@ export function DashboardHeader({
   const t = useTranslation();
   const [mounted, setMounted] = React.useState(false);
   const currentPath = removeLanguagePrefix(location.pathname);
+  const isProfessionQuizPath = isProfessionQuizPathPage(currentPath);
+  const professionId = Number(
+    /^\/courses\/quizzes\/(\d+)/.exec(currentPath)?.[1],
+  );
+  const { data: quizProfessions = [] } = useQuery({
+    queryKey: ["atoms", "professions"],
+    queryFn: () => atomsApi.listProfessions(),
+    enabled: isProfessionQuizPath,
+  });
+  const professionQuizTitle = quizProfessions.find(
+    (profession) => profession.id === professionId,
+  )?.title;
   const isEmployer =
     user?.user_type === "employer" ||
     (typeof window !== "undefined" &&
@@ -217,12 +234,14 @@ export function DashboardHeader({
     isCompany ||
     isCourseDetail ||
     isSkillPath ||
+    isProfessionQuizPath ||
     isCourseAddEdit ||
     isEmployerJobPreview ||
     isEmployerJobStats ||
     isAcademyCourseStats ||
     isSettingsDetail;
-  const headerTitle = courseAddEditTitle || settingsSectionTitle;
+  const headerTitle =
+    courseAddEditTitle || settingsSectionTitle || professionQuizTitle;
 
   const notificationsPath =
     getRole() === "employer" ? "/employer/notifications" : "/notifications";
@@ -288,7 +307,25 @@ export function DashboardHeader({
         </div>
 
         {/* This div is a placeholder to balance the flex layout on mobile */}
-        <div className="md:hidden"></div>
+        <div className="flex items-center gap-3 md:hidden">
+          {isProfessionQuizPath ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+              aria-label={t.common.back}
+              className="relative h-10 w-10 rounded-full bg-gray-200 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-700 dark:bg-border/50 dark:text-gray-400 dark:hover:bg-border/70 dark:hover:text-gray-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {isProfessionQuizPath && professionQuizTitle ? (
+            <h1 className="min-w-0 truncate text-lg font-semibold text-foreground">
+              {professionQuizTitle}
+            </h1>
+          ) : null}
+        </div>
 
         {/* Right side icons - hidden on mobile */}
         <div className="hidden md:flex items-center gap-2">
