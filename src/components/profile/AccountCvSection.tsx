@@ -497,7 +497,7 @@ export function AccountCvSection() {
                     : ""}
               </DrawerDescription>
             </DrawerHeader>
-            <DrawerFooter className="px-6 pb-8 pt-10">
+            <DrawerFooter className="px-8 pb-8 pt-10">
               {uploadResult?.kind === "success" ? (
                 <Button type="button" onClick={goToProfile}>
                   {copy.viewProfile}

@@ -271,25 +271,11 @@ export function EditEducationModal({
       <SheetContent
         side="rightProfile"
         overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
-        className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4 bg-white dark:bg-[#181818]"
+        className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-0 md:px-8 md:pt-8 md:pb-0 bg-white dark:bg-[#181818]"
       >
         <SheetHeader>
           <SheetTitle className="flex-1 min-w-0">Edit education</SheetTitle>
           <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <Button
-              type="submit"
-              form="edit-education-form"
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
-            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -308,7 +294,7 @@ export function EditEducationModal({
           onSubmit={handleSubmit}
           className="flex flex-col flex-1 min-h-0"
         >
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
             {error && (
               <p className="text-sm text-destructive font-medium">{error}</p>
             )}
@@ -414,6 +400,23 @@ export function EditEducationModal({
                 Add education
               </Button>
             )}
+          </div>
+          <div className="shrink-0 -mx-4 px-8 pt-3 pb-[calc(2rem+env(safe-area-inset-bottom))] md:-mx-8 md:px-8 md:pb-5 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#181818]">
+            <Button
+              type="submit"
+              form="edit-education-form"
+              disabled={saving}
+              className="w-full"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
           </div>
         </form>
       </SheetContent>

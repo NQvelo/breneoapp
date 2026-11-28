@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/contexts/LanguageContext";
 import {
   useUserXp,
+  XP_PER_ATOM_COMPLETION,
   XP_PER_COURSE_ENROLLMENT,
   XP_PER_JOB_APPLICATION,
 } from "@/hooks/useUserXp";
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { useMobile } from "@/hooks/use-mobile";
-import { Briefcase, GraduationCap } from "@/components/icons";
+import { Briefcase, GraduationCap, Zap } from "@/components/icons";
 
 const STORAGE_KEY_PREFIX = "xp_last_seen_counts";
 
@@ -128,6 +129,7 @@ function AnimatedXpValue({ value }: { value: number }) {
 interface XpCounts {
   jobApplicationsCount: number;
   courseEnrollmentsCount: number;
+  atomCompletionsCount: number;
 }
 
 const readCounts = (key: string): XpCounts | null => {
@@ -140,6 +142,10 @@ const readCounts = (key: string): XpCounts | null => {
       typeof parsed.courseEnrollmentsCount !== "number"
     ) {
       return null;
+    }
+    // Backfill atomCompletionsCount for older stored values
+    if (typeof parsed.atomCompletionsCount !== "number") {
+      parsed.atomCompletionsCount = 0;
     }
     return parsed as XpCounts;
   } catch {
@@ -178,8 +184,13 @@ export function XpGainedModal() {
       localStorage.getItem("userRole") === "academy");
   const enabled = !!user && !isEmployer && !isAcademy;
 
-  const { xp, jobApplicationsCount, courseEnrollmentsCount, isReady } =
-    useUserXp(enabled, user?.id);
+  const {
+    xp,
+    jobApplicationsCount,
+    courseEnrollmentsCount,
+    atomCompletionsCount,
+    isReady,
+  } = useUserXp(enabled, user?.id);
 
   const storageKey =
     user?.id != null ? `${STORAGE_KEY_PREFIX}_${user.id}` : null;
@@ -187,7 +198,11 @@ export function XpGainedModal() {
   useEffect(() => {
     if (!enabled || !isReady || !storageKey) return;
 
-    const current = { jobApplicationsCount, courseEnrollmentsCount };
+    const current = {
+      jobApplicationsCount,
+      courseEnrollmentsCount,
+      atomCompletionsCount,
+    };
     const seen = readCounts(storageKey);
     writeCounts(storageKey, current);
     if (!seen) return;
@@ -200,7 +215,11 @@ export function XpGainedModal() {
       0,
       current.courseEnrollmentsCount - seen.courseEnrollmentsCount,
     );
-    if (newJobs === 0 && newCourses === 0) return;
+    const newAtoms = Math.max(
+      0,
+      current.atomCompletionsCount - seen.atomCompletionsCount,
+    );
+    if (newJobs === 0 && newCourses === 0 && newAtoms === 0) return;
 
     const stillOpen = openRef.current;
     setGained((prev) => {
@@ -209,6 +228,8 @@ export function XpGainedModal() {
         jobApplicationsCount: (base?.jobApplicationsCount ?? 0) + newJobs,
         courseEnrollmentsCount:
           (base?.courseEnrollmentsCount ?? 0) + newCourses,
+        atomCompletionsCount:
+          (base?.atomCompletionsCount ?? 0) + newAtoms,
       };
     });
     openRef.current = true;
@@ -219,6 +240,7 @@ export function XpGainedModal() {
     storageKey,
     jobApplicationsCount,
     courseEnrollmentsCount,
+    atomCompletionsCount,
   ]);
 
   if (!enabled) return null;
@@ -226,7 +248,9 @@ export function XpGainedModal() {
   const jobsXp = (gained?.jobApplicationsCount ?? 0) * XP_PER_JOB_APPLICATION;
   const coursesXp =
     (gained?.courseEnrollmentsCount ?? 0) * XP_PER_COURSE_ENROLLMENT;
-  const gainedXp = jobsXp + coursesXp;
+  const atomsXp =
+    (gained?.atomCompletionsCount ?? 0) * XP_PER_ATOM_COMPLETION;
+  const gainedXp = jobsXp + coursesXp + atomsXp;
 
   const rows = [
     gained && gained.jobApplicationsCount > 0
@@ -255,6 +279,20 @@ export function XpGainedModal() {
                   String(gained.courseEnrollmentsCount),
                 ),
           xp: coursesXp,
+        }
+      : null,
+    gained && gained.atomCompletionsCount > 0
+      ? {
+          key: "atoms",
+          icon: Zap,
+          label:
+            gained.atomCompletionsCount === 1
+              ? t.xpGained.atomCompletion
+              : t.xpGained.atomCompletions.replace(
+                  "{count}",
+                  String(gained.atomCompletionsCount),
+                ),
+          xp: atomsXp,
         }
       : null,
   ].filter((row): row is NonNullable<typeof row> => row !== null);

@@ -1,4 +1,3 @@
-import { RotateCcw } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -31,8 +30,7 @@ export function PathComplete({
           breakthrough is one step away.
         </p>
         {onRestart ? (
-          <Button variant="default" onClick={onRestart}>
-            <RotateCcw className="h-4 w-4" />
+          <Button variant="default" onClick={onRestart} className="min-w-[216px]">
             Choose another path
           </Button>
         ) : null}

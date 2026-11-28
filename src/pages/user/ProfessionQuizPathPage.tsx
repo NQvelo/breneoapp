@@ -296,11 +296,12 @@ export default function ProfessionQuizPathPage() {
           </section>
         ) : path && profession ? (
           path.atoms.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-muted-foreground">
-                {t.atoms.noAtoms}
-              </CardContent>
-            </Card>
+            <NoAtomsCard
+              title={t.atoms.noAtomsTitle}
+              description={t.atoms.noAtoms}
+              buttonLabel={t.atoms.backToGrowth}
+              onBack={() => navigate("/courses")}
+            />
           ) : path.completed_count >= path.total_count ? (
             <PathComplete
               professionTitle={profession.title}
@@ -320,14 +321,52 @@ export default function ProfessionQuizPathPage() {
             </section>
           )
         ) : !isLoading && !hasError ? (
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              {profession && path === null ? t.atoms.noAtoms : t.atoms.loadError}
-            </CardContent>
-          </Card>
+          profession && path === null ? (
+            <NoAtomsCard
+              title={t.atoms.noAtomsTitle}
+              description={t.atoms.noAtoms}
+              buttonLabel={t.atoms.backToGrowth}
+              onBack={() => navigate("/courses")}
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                {t.atoms.loadError}
+              </CardContent>
+            </Card>
+          )
         ) : null}
         </div>
       </main>
     </DashboardLayout>
+  );
+}
+
+function NoAtomsCard({
+  title,
+  description,
+  buttonLabel,
+  onBack,
+}: {
+  title: string;
+  description: string;
+  buttonLabel: string;
+  onBack: () => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center px-6 py-12 text-center">
+        <img
+          src="/lovable-uploads/3dicons-zoom-dynamic-color.png"
+          alt=""
+          className="mb-5 h-28 w-28 object-contain"
+        />
+        <h2 className="mb-2 text-2xl font-bold text-foreground">{title}</h2>
+        <p className="mb-6 max-w-md text-muted-foreground">{description}</p>
+        <Button variant="default" onClick={onBack} className="min-w-[216px]">
+          {buttonLabel}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

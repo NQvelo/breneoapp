@@ -111,6 +111,7 @@ const CoursesPage = () => {
   const queryClient = useQueryClient();
   // State for user's top skills from test results
   const [userTopSkills, setUserTopSkills] = useState<string[]>([]);
+  const [allAtomsModalOpen, setAllAtomsModalOpen] = useState(false);
   const [sessionFilteredCourses, setSessionFilteredCourses] = useState<
     Course[]
   >(() => loadFilteredCoursesFromSession());
@@ -575,7 +576,7 @@ const CoursesPage = () => {
               </div>
             </section>
             <section>
-              {sectionHeading(t.courses.ourCourses, 0)}
+              {sectionHeading(t.atoms.sectionTitle, 0)}
               <div className="overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="px-6 py-4">
@@ -658,10 +659,24 @@ const CoursesPage = () => {
               )}
             </section>
             <section className="mb-10">
-              {sectionHeading(t.courses.ourCourses, ourCourses.length)}
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold">{t.atoms.sectionTitle}</h2>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAllAtomsModalOpen(true)}
+                  className="h-8 bg-transparent px-2.5 text-xs font-semibold text-breneo-blue hover:bg-breneo-blue/10 hover:text-breneo-blue"
+                >
+                  {t.atoms.seeAll}
+                </Button>
+              </div>
               <div className="overflow-hidden rounded-3xl bg-white divide-y divide-gray-200 dark:bg-[#242424] dark:divide-gray-700">
                 {ourCourses.map((course) => renderOurCourseRow(course))}
-                <ProfessionQuizSection />
+                <ProfessionQuizSection
+                  modalOpen={allAtomsModalOpen}
+                  onModalOpenChange={setAllAtomsModalOpen}
+                />
               </div>
             </section>
           </>

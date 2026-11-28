@@ -105,7 +105,7 @@ export const BetaVersionModal: React.FC = () => {
               {message}
             </DrawerDescription>
           </DrawerHeader>
-          <div className="px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-10">
+          <div className="px-8 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-10">
             {updateButton}
           </div>
         </DrawerContent>

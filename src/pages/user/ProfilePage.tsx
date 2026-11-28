@@ -1998,7 +1998,7 @@ const ProfilePage = () => {
         <div className="max-w-7xl mx-auto pt-2 pb-40 md:pb-6 px-2 sm:px-6 lg:px-8 space-y-4 md:space-y-6">
           {/* 1. Personal information */}
           <Card className="border-0 rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <CardHeader className="my-0 flex flex-row items-center justify-between p-5 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Personal information
               </h3>
@@ -2059,7 +2059,7 @@ const ProfilePage = () => {
                 </DropdownMenu>
               )}
             </CardHeader>
-            <CardContent className="px-6 pb-6">
+            <CardContent className="px-5 pb-5 pt-0">
               <div className="flex flex-row items-center gap-4 mb-4">
                 <div className="flex-shrink-0">
                   <div
@@ -2172,58 +2172,93 @@ const ProfilePage = () => {
             </CardContent>
           </Card>
 
-          {/* 2. About Me */}
-          <Card className="border-0 rounded-3xl">
-            <CardHeader className="mb-0 flex flex-row items-center justify-between p-4 pb-2 border-b-0">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                About Me
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={handleOpenAboutMeModal}
-                aria-label="Edit about me"
+          {/* 2. About Me & Skills */}
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+            <Card className="flex-1 min-w-0 border-0 rounded-3xl">
+              <CardHeader className="my-0 flex flex-row items-center justify-between p-5 pb-3 border-b-0">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  About Me
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={handleOpenAboutMeModal}
+                  aria-label="Edit about me"
+                >
+                  <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </Button>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0">
+                {loadingProfile ? (
+                  <div className="text-center py-4 text-gray-500">Loading...</div>
+                ) : aboutMe ? (
+                  <div>
+                    <p
+                      ref={aboutMeTextRef}
+                      className={cn(
+                        "text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed",
+                        !aboutMeExpanded && "line-clamp-5",
+                      )}
+                    >
+                      {aboutMe}
+                    </p>
+                    {aboutMeOverflows ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
+                        onClick={() => setAboutMeExpanded((open) => !open)}
+                      >
+                        {aboutMeExpanded ? "View less" : "View more"}
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">
+                    No information available. Add some details about yourself!
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Skills */}
+            <button
+              id="skills"
+              type="button"
+              onClick={() => setIsSkillsModalOpen(true)}
+              aria-label="Edit skills"
+              className="scroll-mt-24 group w-full md:w-52 lg:w-56 shrink-0 rounded-3xl border-0 bg-card text-card-foreground p-5 flex flex-row md:flex-col items-center md:justify-center gap-4 md:gap-3 text-left md:text-center transition-colors hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer"
+            >
+              <img
+                src="/lovable-uploads/3dicons-puzzle-dynamic-color.png"
+                alt=""
+                className="h-12 w-12 md:h-16 md:w-16 shrink-0 object-contain transition-transform duration-200 group-hover:scale-105"
+              />
+              <div className="min-w-0 flex-1 md:flex-initial">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-breneo-blue transition-colors">
+                  Skills
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {loadingProfileSkills
+                    ? "Loading..."
+                    : profileSkills.length === 0
+                      ? "Add your skills"
+                      : `${profileSkills.length} ${profileSkills.length === 1 ? "skill" : "skills"}`}
+                </p>
+              </div>
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full md:hidden"
+                aria-hidden="true"
               >
                 <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-            </CardHeader>
-            <CardContent className="px-6 pb-4 pt-0">
-              {loadingProfile ? (
-                <div className="text-center py-4 text-gray-500">Loading...</div>
-              ) : aboutMe ? (
-                <div>
-                  <p
-                    ref={aboutMeTextRef}
-                    className={cn(
-                      "text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed",
-                      !aboutMeExpanded && "line-clamp-5",
-                    )}
-                  >
-                    {aboutMe}
-                  </p>
-                  {aboutMeOverflows ? (
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="text-breneo-blue p-0 h-auto mt-2 font-normal text-sm hover:underline"
-                      onClick={() => setAboutMeExpanded((open) => !open)}
-                    >
-                      {aboutMeExpanded ? "View less" : "View more"}
-                    </Button>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 italic">
-                  No information available. Add some details about yourself!
-                </p>
-              )}
-            </CardContent>
-          </Card>
+              </span>
+            </button>
+          </div>
 
           {/* 3. Education */}
           <Card id="education" className="scroll-mt-24 border-0 rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <CardHeader className="my-0 flex flex-row items-center justify-between p-5 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Education
               </h3>
@@ -2237,7 +2272,7 @@ const ProfilePage = () => {
                 <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
               </Button>
             </CardHeader>
-            <CardContent className="px-6 pb-6">
+            <CardContent className="px-5 pb-5 pt-0">
               {loadingEducations ? (
                 <p className="text-sm text-gray-500">Loading...</p>
               ) : educations.length === 0 ? (
@@ -2281,7 +2316,7 @@ const ProfilePage = () => {
 
           {/* 4. Work experience */}
           <Card id="experience" className="scroll-mt-24 border-0 rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
+            <CardHeader className="my-0 flex flex-row items-center justify-between p-5 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Work experience
               </h3>
@@ -2295,7 +2330,7 @@ const ProfilePage = () => {
                 <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
               </Button>
             </CardHeader>
-            <CardContent className="px-6 pb-6">
+            <CardContent className="px-5 pb-5 pt-0">
               {loadingWorkExperiences ? (
                 <p className="text-sm text-gray-500">Loading...</p>
               ) : workExperiences.length === 0 ? (
@@ -2335,54 +2370,14 @@ const ProfilePage = () => {
             </CardContent>
           </Card>
 
-          {/* 5. Skills */}
-          <Card id="skills" className="scroll-mt-24 border-0 rounded-3xl">
-            <CardHeader className="flex flex-row items-center justify-between p-4 pb-3 border-b-0">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                Skills
-              </h3>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => setIsSkillsModalOpen(true)}
-                aria-label="Edit skills"
-              >
-                <Edit className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-              </Button>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
-              {loadingProfileSkills ? (
-                <p className="text-sm text-gray-500">Loading...</p>
-              ) : profileSkills.length === 0 ? (
-                <p className="text-sm text-gray-500">No skills added yet.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {profileSkills.map((s) => (
-                    <Badge
-                      key={s.id}
-                      variant="outline"
-                      className={cn(
-                        "capitalize px-3 py-1.5 text-xs rounded-[10px] border-0",
-                        PLATFORM_CHIP_BG_CLASS,
-                      )}
-                    >
-                      {s.skill_name}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Personal Skills Card */}
           <Card className="border-0 rounded-3xl">
-            <CardHeader className="p-4 pb-3 border-b-0">
+            <CardHeader className="my-0 p-5 pb-3 border-b-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 Personal Skills
               </h3>
             </CardHeader>
-            <CardContent className="px-6 py-4">
+            <CardContent className="px-5 pb-5 pt-0">
               {loadingResults ? (
                 <div className="text-center py-4 text-gray-500">
                   Loading skill results...
@@ -3133,17 +3128,11 @@ const ProfilePage = () => {
         <SheetContent
           side="rightProfile"
           overlayClassName="backdrop-blur-sm bg-black/20 dark:bg-black/40"
-          className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-3 md:px-8 md:pt-8 md:pb-4 bg-white dark:bg-[#181818]"
+          className="flex flex-col h-full overflow-hidden px-4 pt-6 pb-0 md:px-8 md:pt-8 md:pb-0 bg-white dark:bg-[#181818]"
         >
           <SheetHeader>
             <SheetTitle className="flex-1 min-w-0">Edit About Me</SheetTitle>
             <div className="flex items-center gap-2 shrink-0 ml-auto">
-              <Button
-                onClick={handleSaveAboutMe}
-                disabled={updatingAboutMe}
-              >
-                {updatingAboutMe ? "Saving..." : "Save Changes"}
-              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -3156,7 +3145,7 @@ const ProfilePage = () => {
               </Button>
             </div>
           </SheetHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pb-4">
             <div>
               <Label htmlFor="about-me">Tell us about yourself</Label>
               <Textarea
@@ -3168,6 +3157,15 @@ const ProfilePage = () => {
                 disabled={updatingAboutMe}
               />
             </div>
+          </div>
+          <div className="shrink-0 -mx-4 px-8 pt-3 pb-[calc(2rem+env(safe-area-inset-bottom))] md:-mx-8 md:px-8 md:pb-5 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-[#181818]">
+            <Button
+              onClick={handleSaveAboutMe}
+              disabled={updatingAboutMe}
+              className="w-full"
+            >
+              {updatingAboutMe ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
