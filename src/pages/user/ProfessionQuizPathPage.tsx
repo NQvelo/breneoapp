@@ -150,8 +150,18 @@ export default function ProfessionQuizPathPage() {
 
   return (
     <DashboardLayout showHeader showMobileNav={!atomIdParam}>
-      <main className="-mx-2 min-h-[calc(100dvh-6rem)] md:-mx-6">
-        <div className="mx-auto w-full max-w-7xl space-y-6 px-2 py-5 sm:px-6 lg:px-8">
+      <main className="relative isolate -mx-2 min-h-[calc(100dvh-6rem)] md:-mx-6">
+        {path &&
+        profession &&
+        !atomIdParam &&
+        path.atoms.length > 0 &&
+        path.completed_count < path.total_count ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-x-0 bottom-0 z-0 h-[50vh] min-h-96 bg-gradient-to-t from-breneo-blue/30 via-breneo-blue/10 to-transparent md:hidden"
+          />
+        ) : null}
+        <div className="relative z-10 mx-auto w-full max-w-7xl space-y-6 px-2 py-5 sm:px-6 lg:px-8">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-10 w-2/3" />
@@ -194,7 +204,7 @@ export default function ProfessionQuizPathPage() {
         ) : profession && activeAtom ? (
           <section className="space-y-5">
             {isQuizStep ? (
-              <Card className="rounded-2xl">
+              <Card className="rounded-3xl">
                 <CardContent className="space-y-5 p-5 sm:p-7">
                   <StoryProgressBar
                     totalSegments={totalLessonSteps}
@@ -215,7 +225,7 @@ export default function ProfessionQuizPathPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="rounded-2xl">
+              <Card className="rounded-3xl">
                 <CardContent className="space-y-5 p-5 sm:p-7">
                   <StoryProgressBar
                     totalSegments={totalLessonSteps}
@@ -255,7 +265,7 @@ export default function ProfessionQuizPathPage() {
               </Card>
             )}
             {!isQuizStep ? (
-              <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:hidden">
+              <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] backdrop-blur md:hidden">
                 <Button
                   type="button"
                   variant="outline"

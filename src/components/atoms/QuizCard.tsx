@@ -142,7 +142,7 @@ export function QuizCard({
               {submitButtonContent}
             </Button>
           </div>
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] backdrop-blur md:hidden">
             <Button
               className="h-14 w-full bg-[#00BFFF] px-8 text-white hover:bg-[#00BFFF]/90"
               disabled={selectedIndex === null || isSubmitting}

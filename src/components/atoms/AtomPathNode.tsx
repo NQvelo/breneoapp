@@ -1,4 +1,4 @@
-import { Atom, Check, Lock } from "@/components/icons";
+import { Star } from "@/components/icons";
 import type { AtomPathItem } from "@/api/atoms";
 import { cn } from "@/lib/utils";
 
@@ -30,47 +30,35 @@ export function AtomPathNode({
       disabled={isLocked}
       onClick={onClick}
       className={cn(
-        "group flex w-[min(100%,220px)] flex-col items-center gap-2 text-center transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4",
+        "group flex w-[min(100%,220px)] flex-col items-center gap-1.5 text-center transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4",
         isClickable &&
           "cursor-pointer hover:translate-y-0.5 active:translate-y-[5px]",
         isLocked && "cursor-not-allowed",
         className,
       )}
     >
-      <div className="relative">
+      <div className="relative flex flex-col items-center pt-7">
         {isAvailable ? (
-          <span className="absolute inset-0 -m-2 animate-pulse rounded-full bg-primary/20" />
+          <span className="absolute top-0 rounded-lg border-2 border-primary/30 bg-background px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-primary shadow-sm">
+            {statusLabels.available}
+          </span>
         ) : null}
-        <div
-          className={cn(
-            "relative flex h-16 w-16 items-center justify-center rounded-full border-4 transition-all",
-            (isCompleted || isAvailable) &&
-              "border-breneo-blue bg-breneo-blue text-white shadow-[0_5px_0_#1d4ed8]",
-            isClickable &&
-              "group-hover:shadow-[0_3px_0_#1d4ed8] group-active:shadow-[0_0px_0_#1d4ed8]",
-            isLocked &&
-              "border-muted-foreground/20 bg-muted text-muted-foreground shadow-[0_4px_0_#9ca3af]",
-          )}
-        >
-          {isCompleted ? (
-            <Check className="h-7 w-7" strokeWidth={3} />
-          ) : isLocked ? (
-            <Lock className="h-6 w-6" />
-          ) : (
-            <Atom className="h-7 w-7" />
-          )}
+        <div className="relative">
+          <div
+            className={cn(
+              "relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-4 transition-all",
+              (isCompleted || isAvailable) &&
+                "border-breneo-blue bg-breneo-blue text-white shadow-[0_6px_0_#1d4ed8]",
+              isAvailable && "animate-pulse motion-reduce:animate-none",
+              isClickable &&
+                "group-hover:shadow-[0_3px_0_#1d4ed8] group-active:shadow-[0_0px_0_#1d4ed8]",
+              isLocked &&
+                "border-muted-foreground/20 bg-muted text-muted-foreground shadow-[0_6px_0_#9ca3af]",
+            )}
+          >
+            <Star className="h-9 w-9 fill-current" aria-hidden="true" />
+          </div>
         </div>
-        <span
-          className={cn(
-            "absolute -bottom-1 left-1/2 flex h-6 min-w-6 -translate-x-1/2 items-center justify-center rounded-full px-1.5 text-xs font-bold",
-            isCompleted &&
-              "bg-breneo-blue text-white shadow-[0_2px_0_#1d4ed8]",
-            isAvailable && "bg-white text-primary dark:bg-zinc-900",
-            isLocked && "bg-muted text-muted-foreground",
-          )}
-        >
-          {atom.sequence_order}
-        </span>
       </div>
 
       <div className="px-2">
@@ -88,7 +76,7 @@ export function AtomPathNode({
           className={cn(
             "mt-0.5 text-xs font-medium uppercase tracking-wide",
             isCompleted && "text-breneo-blue",
-            isAvailable && "text-primary",
+            isAvailable && "hidden",
             isLocked && "text-muted-foreground",
           )}
         >

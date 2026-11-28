@@ -1,4 +1,4 @@
-import { PartyPopper, RotateCcw } from "@/components/icons";
+import { RotateCcw } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -16,19 +16,22 @@ export function PathComplete({
   return (
     <Card className={className}>
       <CardContent className="flex flex-col items-center px-6 py-12 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <PartyPopper className="h-8 w-8" />
-        </div>
+        <img
+          src="/lovable-uploads/3dicons-bookmark-fav-front-color.png"
+          alt=""
+          className="mb-5 h-28 w-28 object-contain"
+        />
         <h2 className="mb-2 text-2xl font-bold text-foreground">
           Path complete!
         </h2>
         <p className="mb-6 max-w-md text-muted-foreground">
           You have finished all atoms for{" "}
           <span className="font-medium text-foreground">{professionTitle}</span>
-          . Great work — keep building your skills.
+          . Every lesson is progress. Keep your momentum going; your next
+          breakthrough is one step away.
         </p>
         {onRestart ? (
-          <Button variant="outline" onClick={onRestart}>
+          <Button variant="default" onClick={onRestart}>
             <RotateCcw className="h-4 w-4" />
             Choose another path
           </Button>
